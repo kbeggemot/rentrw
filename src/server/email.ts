@@ -16,6 +16,7 @@ type SendEmailParams = {
 export async function sendEmail(params: SendEmailParams): Promise<void> {
   const host = process.env.SMTP_HOST;
   const from = process.env.SMTP_FROM || 'no-reply@rentrw.local';
+  const fromName = process.env.SMTP_FROM_NAME || 'RentRW';
 
   if (!host) {
     // Fallback: write to local outbox
@@ -50,12 +51,16 @@ export async function sendEmail(params: SendEmailParams): Promise<void> {
     debug: String(process.env.SMTP_DEBUG || '').trim() === '1',
   } as any);
 
+  const html = params.html ?? (params.text ? `<pre>${params.text}</pre>` : undefined);
   await transporter.sendMail({
-    from,
+    from: `${fromName} <${from}>`,
+    sender: from,
+    replyTo: from,
     to: params.to,
     subject: params.subject,
     text: params.text,
-    html: params.html,
+    html,
+    envelope: { from, to: params.to },
   });
 }
 
