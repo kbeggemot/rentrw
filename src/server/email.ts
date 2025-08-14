@@ -46,6 +46,8 @@ export async function sendEmail(params: SendEmailParams): Promise<void> {
     port,
     secure,
     auth: user && pass ? { user, pass } : undefined,
+    logger: String(process.env.SMTP_DEBUG || '').trim() === '1',
+    debug: String(process.env.SMTP_DEBUG || '').trim() === '1',
   } as any);
 
   await transporter.sendMail({

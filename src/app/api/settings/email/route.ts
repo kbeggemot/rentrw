@@ -61,7 +61,13 @@ export async function POST(req: Request) {
       subject: 'Подтверждение e-mail в RentRW',
       text: `Ваш код подтверждения: ${code}\n\nВведите его на странице настроек: ${ui}`,
     });
-    return NextResponse.json({ email: maskEmail(targetEmail!), verification: 'sent' }, { status: 200 });
+    return NextResponse.json({ email: maskEmail(targetEmail!), verification: 'sent', debug: {
+      host: process.env.SMTP_HOST ? 'set' : 'missing',
+      port: process.env.SMTP_PORT ? 'set' : 'missing',
+      secure: process.env.SMTP_SECURE ?? 'unset',
+      user: process.env.SMTP_USER ? 'set' : 'missing',
+      from: process.env.SMTP_FROM ? 'set' : 'missing',
+    } }, { status: 200 });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Server error';
     return NextResponse.json({ error: message }, { status: 500 });
