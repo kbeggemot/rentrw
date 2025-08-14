@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createUser } from '@/server/userStore';
+import { upsertPending } from '@/server/registrationStore';
+import { sendEmail } from '@/server/email';
 
 export const runtime = 'nodejs';
 
@@ -9,11 +11,13 @@ export async function POST(req: Request) {
     const phone: string | undefined = body?.phone;
     const password: string | undefined = body?.password;
     const email: string | undefined = body?.email;
-    if (!phone || !password) return NextResponse.json({ error: 'INVALID' }, { status: 400 });
-    const user = await createUser(phone, password, email);
-    const res = NextResponse.json({ ok: true, user: { id: user.id, phone: user.phone, email: user.email } });
-    res.headers.set('Set-Cookie', `session_user=${user.id}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${60 * 60 * 24 * 7}`);
-    return res;
+    if (!phone || !password || !email) return NextResponse.json({ error: 'INVALID' }, { status: 400 });
+    // Step 1: send code and store pending
+    const code = String(Math.floor(100000 + Math.random() * 900000));
+    await upsertPending({ phone, email, password, code, expiresAt: Date.now() + 15 * 60 * 1000 });
+    const origin = process.env.NEXT_PUBLIC_BASE_URL || new URL(req.url).origin;
+    await sendEmail({ to: email, subject: 'Подтверждение регистрации RentRW', text: `Код подтверждения: ${code}`, html: `<p>Код подтверждения: <b>${code}</b></p><p>Если вы не запрашивали регистрацию, проигнорируйте это письмо.</p>` });
+    return NextResponse.json({ ok: true, step: 'confirm', phone, email });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Server error';
     return NextResponse.json({ error: message }, { status: 500 });

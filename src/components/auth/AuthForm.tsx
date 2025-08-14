@@ -13,6 +13,7 @@ export function AuthForm() {
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
   const [loading, setLoading] = useState(false);
+  const [awaitCode, setAwaitCode] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [passwordError, setPasswordError] = useState<string | null>(null);
 
@@ -33,7 +34,7 @@ export function AuthForm() {
       setPasswordError('Пароли не совпадают');
       return;
     }
-    if (isRegister) {
+    if (isRegister && !awaitCode) {
       const ok = /.+@.+\..+/.test(email.trim());
       if (!ok) {
         setLoading(false);
@@ -43,21 +44,30 @@ export function AuthForm() {
       }
     }
     try {
-      const endpoint = isRegister ? '/api/auth/register' : '/api/auth/login';
+      const endpoint = isRegister ? (awaitCode ? '/api/auth/register/confirm' : '/api/auth/register') : '/api/auth/login';
       const res = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(isRegister ? { phone, password, email: email.trim() } : { phone, password }),
+        body: JSON.stringify(isRegister ? (awaitCode ? { phone, code: confirm.trim() } : { phone, password, email: email.trim() }) : { phone, password }),
       });
       const text = await res.text();
       let data: { error?: string } | null = null;
       try { data = text ? (JSON.parse(text) as { error?: string }) : null; } catch {}
       if (!res.ok) throw new Error(data?.error || 'AUTH_ERROR');
-      window.location.href = '/dashboard';
+      if (isRegister && !awaitCode) {
+        // move to code step
+        setAwaitCode(true);
+        setError('Мы отправили код на вашу почту. Введите его, чтобы завершить регистрацию.');
+        setPassword('');
+        setConfirm('');
+      } else {
+        window.location.href = '/dashboard';
+      }
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'AUTH_ERROR';
       if (msg === 'EMAIL_TAKEN') setError('Такой e-mail уже используется');
       else if (msg === 'USER_EXISTS') setError('Пользователь с таким телефоном уже существует');
+      else if (msg === 'INVALID_CODE') setError('Неверный код подтверждения');
       else setError('Ошибка. Попробуйте ещё раз.');
     } finally {
       setLoading(false);
@@ -79,7 +89,7 @@ export function AuthForm() {
           onChange={(e) => setPhone(e.target.value)}
           required
         />
-        {isRegister ? (
+        {isRegister && !awaitCode ? (
           <Input
             label="E-mail"
             type="email"
@@ -103,7 +113,7 @@ export function AuthForm() {
             {passwordError}
           </div>
         ) : null}
-        {isRegister ? (
+        {isRegister && !awaitCode ? (
           <Input
             label="Повторите пароль"
             type="password"
@@ -111,6 +121,16 @@ export function AuthForm() {
             value={confirm}
             onChange={(e) => setConfirm(e.target.value)}
             passwordToggle
+            required
+          />
+        ) : null}
+        {isRegister && awaitCode ? (
+          <Input
+            label="Код из письма"
+            type="text"
+            placeholder="000000"
+            value={confirm}
+            onChange={(e) => setConfirm(e.target.value)}
             required
           />
         ) : null}
