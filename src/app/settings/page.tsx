@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 
-export default function SettingsPage() {
+function SettingsContent() {
   const [currentMasked, setCurrentMasked] = useState<string | null>(null);
   const [token, setToken] = useState('');
   const [saving, setSaving] = useState(false);
@@ -285,6 +285,14 @@ export default function SettingsPage() {
         {message ? <div className="text-sm text-gray-600 dark:text-gray-300">{message}</div> : null}
       </form>
     </div>
+  );
+}
+
+export default function SettingsPage() {
+  return (
+    <Suspense fallback={null}>
+      <SettingsContent />
+    </Suspense>
   );
 }
 

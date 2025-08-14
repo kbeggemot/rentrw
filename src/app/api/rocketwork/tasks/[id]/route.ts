@@ -9,7 +9,7 @@ export const runtime = 'nodejs';
 
 const DEFAULT_BASE_URL = 'https://app.rocketwork.ru/api/';
 
-export async function GET(_: Request, { params }: { params: { id: string } }) {
+export async function GET(_: Request) {
   try {
     const cookie = _.headers.get('cookie') || '';
     const mc = /(?:^|;\s*)session_user=([^;]+)/.exec(cookie);
@@ -19,7 +19,9 @@ export async function GET(_: Request, { params }: { params: { id: string } }) {
 
     const base = process.env.ROCKETWORK_API_BASE_URL || DEFAULT_BASE_URL;
     // поддерживаем специальный id last из локального стора для дебага
-    let taskId = params.id;
+    const urlObj = new URL(_.url);
+    const segs = urlObj.pathname.split('/');
+    let taskId = decodeURIComponent(segs[segs.length - 1] || '');
     if (taskId === 'last') {
       try {
         const raw = await fs.readFile(path.join(process.cwd(), '.data', 'tasks.json'), 'utf8');
