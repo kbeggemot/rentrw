@@ -66,6 +66,11 @@ async function isEmailTaken(email: string, exceptUserId?: string): Promise<boole
   return users.some((u) => (u.email?.trim().toLowerCase() === normalized) && u.id !== exceptUserId);
 }
 
+// Public helper to check email uniqueness without modifying state
+export async function isEmailInUse(email: string, exceptUserId?: string): Promise<boolean> {
+  return isEmailTaken(email, exceptUserId);
+}
+
 export async function createUser(phone: string, password: string, email?: string): Promise<UserRecord> {
   const users = await readUsers();
   const exists = users.find((u) => u.phone === phone);

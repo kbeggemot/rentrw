@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createUser } from '@/server/userStore';
+import { createUser, isEmailInUse } from '@/server/userStore';
 import { upsertPending } from '@/server/registrationStore';
 import { sendEmail } from '@/server/email';
 
@@ -12,7 +12,11 @@ export async function POST(req: Request) {
     const password: string | undefined = body?.password;
     const email: string | undefined = body?.email;
     if (!phone || !password || !email) return NextResponse.json({ error: 'INVALID' }, { status: 400 });
-    // Step 1: send code and store pending
+    // Step 1: ensure email unique across users
+    if (await isEmailInUse(email)) {
+      return NextResponse.json({ error: 'EMAIL_TAKEN' }, { status: 400 });
+    }
+    // Step 2: send code and store pending
     const code = String(Math.floor(100000 + Math.random() * 900000));
     await upsertPending({ phone, email, password, code, expiresAt: Date.now() + 15 * 60 * 1000 });
     const origin = process.env.NEXT_PUBLIC_BASE_URL || new URL(req.url).origin;
