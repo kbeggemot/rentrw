@@ -19,12 +19,13 @@ export async function POST(req: Request) {
     const token = randomBytes(24).toString('hex');
     const ttl = 1000 * 60 * 30; // 30 minutes
     await createResetToken({ userId: user.id, email: user.email, token, expiresAt: Date.now() + ttl });
-    const base = process.env.NEXT_PUBLIC_BASE_URL || '';
-    const link = base ? `${base}/auth/reset/${token}` : `/auth/reset/${token}`;
+    const origin = process.env.NEXT_PUBLIC_BASE_URL || new URL(req.url).origin;
+    const fullLink = `${origin}/auth/reset/${token}`;
     await sendEmail({
       to: user.email,
       subject: 'Сброс пароля в RentRW',
-      text: `Вы запросили смену пароля. Перейдите по ссылке и задайте новый пароль: ${link}`,
+      text: `Вы запросили смену пароля. Перейдите по ссылке и задайте новый пароль: ${fullLink}`,
+      html: `<p>Вы запросили смену пароля.</p><p><a href="${fullLink}" target="_blank" rel="noopener noreferrer">Перейти</a></p>`,
     });
     return NextResponse.json({ ok: true });
   } catch (error) {
