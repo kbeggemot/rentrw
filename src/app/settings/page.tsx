@@ -290,7 +290,13 @@ function SettingsContent() {
             ) : null}
           </div>
         ) : null}
-        {emailVerified ? (<div className="text-sm text-gray-600 dark:text-gray-300">E-mail подтверждён</div>) : null}
+        {emailVerified ? (
+          emailMsgKind === 'error' && emailMsg ? (
+            <div className="text-sm text-red-600">{emailMsg}</div>
+          ) : (
+            <div className="text-sm text-gray-600 dark:text-gray-300">E-mail подтверждён</div>
+          )
+        ) : null}
         <div className="pt-6">
           <label className="block text-sm text-gray-700 dark:text-gray-300 mb-1">Учётная запись</label>
           <Input type="text" value={accountPhone ?? ''} readOnly placeholder="Нет данных" />
