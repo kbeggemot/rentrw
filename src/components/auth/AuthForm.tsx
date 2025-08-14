@@ -17,17 +17,15 @@ export function AuthForm() {
   const [error, setError] = useState<string | null>(null);
   const [passwordError, setPasswordError] = useState<string | null>(null);
 
-  // Restore pending registration state (in case of refresh)
+  // На свежей загрузке / при переходе на страницу авторизации — сбрасываем любые промежуточные данные
   useEffect(() => {
-    try {
-      const pending = sessionStorage.getItem('reg.pending');
-      if (pending) {
-        const p = JSON.parse(pending) as { phone?: string; email?: string; awaitCode?: boolean };
-        if (p.phone) setPhone(p.phone);
-        if (p.email) setEmail(p.email);
-        if (p.awaitCode) { setAwaitCode(true); setIsRegister(true); }
-      }
-    } catch {}
+    setAwaitCode(false);
+    setIsRegister(false);
+    setPhone('');
+    setEmail('');
+    setPassword('');
+    setConfirm('');
+    try { sessionStorage.removeItem('reg.pending'); } catch {}
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -164,7 +162,7 @@ export function AuthForm() {
         </Button>
       </form>
       <div className="mt-4 text-sm flex items-center justify-between">
-        <button onClick={() => setIsRegister((v) => !v)} className="text-foreground/80 hover:underline">
+        <button onClick={() => { setIsRegister((v) => !v); setAwaitCode(false); try { sessionStorage.removeItem('reg.pending'); } catch {} }} className="text-foreground/80 hover:underline">
           {isRegister ? 'У меня уже есть аккаунт' : 'Создать аккаунт'}
         </button>
         <button
