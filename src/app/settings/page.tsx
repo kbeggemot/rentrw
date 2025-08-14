@@ -226,8 +226,14 @@ function SettingsContent() {
                     setMessage('Код подтверждения отправлен на e-mail');
                   } catch (e) {
                     const msg = e instanceof Error ? e.message : 'ERROR';
-                    if (msg === 'EMAIL_TAKEN') setMessage('Такой e-mail уже используется');
-                    else setMessage('Ошибка');
+                    if (msg === 'EMAIL_TAKEN') {
+                      setEmailMsgKind('error');
+                      setEmailMsg('Такой e-mail уже используется');
+                      setMessage(null);
+                      setEmailEditing(false);
+                    } else {
+                      setMessage('Ошибка');
+                    }
                   } finally {
                     setSavingEmail(false);
                   }
