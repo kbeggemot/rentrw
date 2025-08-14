@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getDecryptedApiToken } from '@/server/secureStore';
 import { listAllSales, updateSaleFromStatus } from '@/server/taskStore';
+import type { RocketworkTask } from '@/types/rocketwork';
 
 export const runtime = 'nodejs';
 
@@ -21,8 +22,8 @@ export async function POST(req: Request) {
         const url = new URL(`tasks/${encodeURIComponent(String(s.taskId))}`, base.endsWith('/') ? base : base + '/').toString();
         const res = await fetch(url, { method: 'GET', headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }, cache: 'no-store' });
         const text = await res.text();
-        let data: any = null; try { data = text ? JSON.parse(text) : null; } catch { data = text; }
-        const t = data && typeof data === 'object' && 'task' in data ? (data as any).task : data;
+        let data: unknown = null; try { data = text ? JSON.parse(text) : null; } catch { data = text; }
+        const t: RocketworkTask = (data && typeof data === 'object' && 'task' in (data as Record<string, unknown>)) ? ((data as any).task as RocketworkTask) : (data as RocketworkTask);
 
         const ofd = (t?.ofd_url as string | undefined) ?? (t?.acquiring_order?.ofd_url as string | undefined) ?? null;
         const add = (t?.additional_commission_ofd_url as string | undefined) ?? null;

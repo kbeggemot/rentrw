@@ -5,6 +5,7 @@ import { getDecryptedApiToken } from '@/server/secureStore';
 import { getNextOrderId } from '@/server/orderStore';
 import { saveTaskId, recordSaleOnCreate } from '@/server/taskStore';
 import { getUserAgentSettings } from '@/server/userStore';
+import type { RocketworkTask } from '@/types/rocketwork';
 
 export const runtime = 'nodejs';
 
@@ -252,7 +253,7 @@ export async function POST(req: Request) {
 
     // Пытаемся извлечь id задачи из ответа и сохраняем (учитываем вариант task.id)
     const maybeObj = typeof data === 'object' && data !== null ? (data as Record<string, unknown>) : null;
-    const taskObj = (maybeObj?.task as Record<string, unknown> | undefined) ?? undefined;
+    const taskObj = (maybeObj?.task as RocketworkTask | undefined) ?? undefined;
     const taskId = (taskObj?.id as number | string | undefined)
       ?? (maybeObj?.id as number | string | undefined)
       ?? (maybeObj?.task_id as number | string | undefined);

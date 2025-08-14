@@ -73,7 +73,6 @@ export default function SalesPage() {
   useEffect(() => {
     // При первом заходе: показать текущие данные и параллельно обновить
     load(true);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const filtered = useMemo(() => {

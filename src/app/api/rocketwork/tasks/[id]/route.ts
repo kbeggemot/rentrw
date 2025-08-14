@@ -3,6 +3,7 @@ import { getDecryptedApiToken } from '@/server/secureStore';
 import { promises as fs } from 'fs';
 import path from 'path';
 import { updateSaleFromStatus } from '@/server/taskStore';
+import type { RocketworkTask } from '@/types/rocketwork';
 
 export const runtime = 'nodejs';
 
@@ -57,13 +58,13 @@ export async function GET(_: Request, { params }: { params: { id: string } }) {
     }
 
     let maybeObj = typeof data === 'object' && data !== null ? (data as Record<string, unknown>) : null;
-    let normalized: any = maybeObj?.task ?? data;
+    let normalized: RocketworkTask = (maybeObj?.task as RocketworkTask) ?? (data as RocketworkTask);
 
     // Attempt short polling for receipts if already paid/transferred and receipts missing
     let tries = 0;
-    const hasAnyReceipt = (obj: any): boolean => {
-      const purchase = (obj?.ofd_url || obj?.acquiring_order?.ofd_url) as string | undefined;
-      const addComm = (obj?.additional_commission_ofd_url) as string | undefined;
+    const hasAnyReceipt = (obj: RocketworkTask): boolean => {
+      const purchase = (obj?.ofd_url || obj?.acquiring_order?.ofd_url) ?? undefined;
+      const addComm = obj?.additional_commission_ofd_url ?? undefined;
       if (obj?.additional_commission_value) {
         return Boolean(purchase) && Boolean(addComm);
       }
@@ -75,7 +76,7 @@ export async function GET(_: Request, { params }: { params: { id: string } }) {
       text = await res.text();
       try { data = text ? JSON.parse(text) : null; } catch { data = text; }
       maybeObj = typeof data === 'object' && data !== null ? (data as Record<string, unknown>) : null;
-      normalized = (maybeObj?.task ?? data) as any;
+      normalized = ((maybeObj?.task as RocketworkTask) ?? (data as RocketworkTask));
       tries += 1;
     }
 
@@ -95,7 +96,7 @@ export async function GET(_: Request, { params }: { params: { id: string } }) {
           text = await res.text();
           try { data = text ? JSON.parse(text) : null; } catch { data = text; }
           maybeObj = typeof data === 'object' && data !== null ? (data as Record<string, unknown>) : null;
-          normalized = (maybeObj?.task ?? data) as any;
+          normalized = ((maybeObj?.task as RocketworkTask) ?? (data as RocketworkTask));
           triesNpd += 1;
         }
       }

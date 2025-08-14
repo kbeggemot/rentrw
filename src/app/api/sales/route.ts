@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { listSales, updateSaleFromStatus } from '@/server/taskStore';
+import type { RocketworkTask } from '@/types/rocketwork';
 import { getDecryptedApiToken } from '@/server/secureStore';
 
 export const runtime = 'nodejs';
@@ -38,9 +39,9 @@ export async function GET(req: Request) {
             const taskUrl = new URL(`tasks/${encodeURIComponent(String(s.taskId))}`, base.endsWith('/') ? base : base + '/').toString();
             let res = await fetch(taskUrl, { method: 'GET', headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }, cache: 'no-store' });
             let text = await res.text();
-            let data: any = null;
+            let data: unknown = null;
             try { data = text ? JSON.parse(text) : null; } catch { data = text; }
-            let normalized: any = data && typeof data === 'object' && 'task' in data ? (data as any).task : data;
+            let normalized: RocketworkTask = (data && typeof data === 'object' && 'task' in (data as Record<string, unknown>)) ? ((data as any).task as RocketworkTask) : (data as RocketworkTask);
             // If paid/transferred but no receipts, try a few times
             let tries = 0;
             const status = normalized?.acquiring_order?.status as string | undefined;
@@ -49,7 +50,7 @@ export async function GET(req: Request) {
               res = await fetch(taskUrl, { method: 'GET', headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }, cache: 'no-store' });
               text = await res.text();
               try { data = text ? JSON.parse(text) : null; } catch { data = text; }
-              normalized = data && typeof data === 'object' && 'task' in data ? (data as any).task : data;
+              normalized = (data && typeof data === 'object' && 'task' in (data as Record<string, unknown>)) ? ((data as any).task as RocketworkTask) : (data as RocketworkTask);
               tries += 1;
             }
             const ofdUrl = (normalized?.ofd_url as string | undefined)
