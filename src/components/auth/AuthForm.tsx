@@ -54,8 +54,11 @@ export function AuthForm() {
       try { data = text ? (JSON.parse(text) as { error?: string }) : null; } catch {}
       if (!res.ok) throw new Error(data?.error || 'AUTH_ERROR');
       window.location.href = '/dashboard';
-    } catch {
-      setError('Ошибка. Попробуйте ещё раз.');
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'AUTH_ERROR';
+      if (msg === 'EMAIL_TAKEN') setError('Такой e-mail уже используется');
+      else if (msg === 'USER_EXISTS') setError('Пользователь с таким телефоном уже существует');
+      else setError('Ошибка. Попробуйте ещё раз.');
     } finally {
       setLoading(false);
     }
@@ -124,9 +127,30 @@ export function AuthForm() {
         <button onClick={() => setIsRegister((v) => !v)} className="text-foreground/80 hover:underline">
           {isRegister ? 'У меня уже есть аккаунт' : 'Создать аккаунт'}
         </button>
-        <Link className="text-foreground/80 hover:underline" href="#">
+        <button
+          className="text-foreground/80 hover:underline"
+          type="button"
+          onClick={async () => {
+            if (!phone) {
+              setError('Введите телефон для сброса пароля');
+              return;
+            }
+            setLoading(true);
+            setError(null);
+            try {
+              await fetch('/api/auth/reset/request', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ phone }) });
+              setError(null);
+              alert('Письмо с инструкциями отправлено на почту');
+            } catch {
+              // Всегда показываем одинаковый результат
+              alert('Письмо с инструкциями отправлено на почту');
+            } finally {
+              setLoading(false);
+            }
+          }}
+        >
           Забыли пароль?
-        </Link>
+        </button>
       </div>
     </div>
   );

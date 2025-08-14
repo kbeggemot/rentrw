@@ -50,10 +50,21 @@ export function verifyPassword(password: string, salt: string, expectedHash: str
   return timingSafeEqual(a, b);
 }
 
+async function isEmailTaken(email: string, exceptUserId?: string): Promise<boolean> {
+  const normalized = email.trim().toLowerCase();
+  const users = await readUsers();
+  return users.some((u) => (u.email?.trim().toLowerCase() === normalized) && u.id !== exceptUserId);
+}
+
 export async function createUser(phone: string, password: string, email?: string): Promise<UserRecord> {
   const users = await readUsers();
   const exists = users.find((u) => u.phone === phone);
   if (exists) throw new Error('USER_EXISTS');
+  if (email) {
+    if (await isEmailTaken(email)) {
+      throw new Error('EMAIL_TAKEN');
+    }
+  }
   const { hash, salt } = hashPassword(password);
   const user: UserRecord = { id: randomBytes(12).toString('hex'), phone, passHash: hash, passSalt: salt, email };
   users.push(user);
@@ -77,6 +88,9 @@ export async function updateUserEmail(userId: string, email: string): Promise<vo
   const users = await readUsers();
   const idx = users.findIndex((u) => u.id === userId);
   if (idx === -1) throw new Error('USER_NOT_FOUND');
+  if (await isEmailTaken(email, userId)) {
+    throw new Error('EMAIL_TAKEN');
+  }
   users[idx].email = email;
   users[idx].emailVerified = false;
   await writeUsers(users);

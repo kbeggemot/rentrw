@@ -225,7 +225,9 @@ function SettingsContent() {
                     setEmailPending(true);
                     setMessage('Код подтверждения отправлен на e-mail');
                   } catch (e) {
-                    setMessage(e instanceof Error ? e.message : 'Ошибка');
+                    const msg = e instanceof Error ? e.message : 'ERROR';
+                    if (msg === 'EMAIL_TAKEN') setMessage('Такой e-mail уже используется');
+                    else setMessage('Ошибка');
                   } finally {
                     setSavingEmail(false);
                   }
