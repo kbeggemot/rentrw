@@ -16,6 +16,7 @@
     "qrcode": "^1.5.4",
     "react": "19.1.0",
     "react-dom": "19.1.0",
+    "nodemailer": "^6.9.14",
     "@tailwindcss/postcss": "^4",
     "tailwindcss": "^4"
   },

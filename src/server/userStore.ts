@@ -8,6 +8,7 @@ export type UserRecord = {
   passHash: string;
   passSalt: string;
   email?: string;
+  emailVerified?: boolean;
   agentDescription?: string;
   defaultAgentCommission?: { type: 'percent' | 'fixed'; value: number };
 };
@@ -77,6 +78,7 @@ export async function updateUserEmail(userId: string, email: string): Promise<vo
   const idx = users.findIndex((u) => u.id === userId);
   if (idx === -1) throw new Error('USER_NOT_FOUND');
   users[idx].email = email;
+  users[idx].emailVerified = false;
   await writeUsers(users);
 }
 
@@ -86,6 +88,14 @@ export async function getUserAgentSettings(userId: string): Promise<{ agentDescr
     agentDescription: u?.agentDescription ?? null,
     defaultCommission: u?.defaultAgentCommission ?? null,
   };
+}
+
+export async function setUserEmailVerified(userId: string, verified: boolean): Promise<void> {
+  const users = await readUsers();
+  const idx = users.findIndex((u) => u.id === userId);
+  if (idx === -1) throw new Error('USER_NOT_FOUND');
+  users[idx].emailVerified = verified;
+  await writeUsers(users);
 }
 
 export async function updateUserAgentSettings(

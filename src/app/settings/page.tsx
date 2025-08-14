@@ -12,9 +12,12 @@ function SettingsContent() {
   const [message, setMessage] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
   const [emailMasked, setEmailMasked] = useState<string | null>(null);
+  const [emailVerified, setEmailVerified] = useState<boolean>(false);
   const [emailEditing, setEmailEditing] = useState(false);
   const [emailValue, setEmailValue] = useState('');
   const [savingEmail, setSavingEmail] = useState(false);
+  const [emailCode, setEmailCode] = useState('');
+  const [emailPending, setEmailPending] = useState(false);
   const [accountPhone, setAccountPhone] = useState<string | null>(null);
   const [agentDesc, setAgentDesc] = useState('');
   const [agentType, setAgentType] = useState<'percent' | 'fixed'>('percent');
@@ -35,6 +38,7 @@ function SettingsContent() {
           const er = await fetch('/api/settings/email', { cache: 'no-store' });
           const ed = await er.json();
           setEmailMasked(ed?.email ?? null);
+          setEmailVerified(Boolean(ed?.verified));
         } catch {}
         try {
           const ar = await fetch('/api/settings/account', { cache: 'no-store' });
@@ -164,6 +168,28 @@ function SettingsContent() {
               <Button type="button" variant="secondary" onClick={() => { setEmailEditing(true); setEmailValue(''); setMessage(null); }}>
                 Изменить e-mail
               </Button>
+              {emailMasked && !emailVerified ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={async () => {
+                    setSavingEmail(true);
+                    setMessage(null);
+                    try {
+                      // Re-send verification to current email
+                      const em = emailMasked.replace(/\*/g, '');
+                      const r = await fetch('/api/settings/email', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: em }) });
+                      if (!r.ok) throw new Error('SEND_FAILED');
+                      setEmailPending(true);
+                      setMessage('Код отправлен на e-mail');
+                    } catch {
+                      setMessage('Не удалось отправить код');
+                    } finally {
+                      setSavingEmail(false);
+                    }
+                  }}
+                >Отправить код</Button>
+              ) : null}
             </div>
           ) : (
             <div className="flex items-center gap-3">
@@ -193,7 +219,8 @@ function SettingsContent() {
                     setEmailMasked(d?.email ?? null);
                     setEmailEditing(false);
                     setEmailValue('');
-                    setMessage('E-mail обновлён');
+                    setEmailPending(true);
+                    setMessage('Код подтверждения отправлен на e-mail');
                   } catch (e) {
                     setMessage(e instanceof Error ? e.message : 'Ошибка');
                   } finally {
@@ -209,6 +236,45 @@ function SettingsContent() {
             </div>
           )}
         </div>
+        {emailMasked && !emailVerified ? (
+          <div className="pt-3">
+            <label className="block text-sm text-gray-700 dark:text-gray-300 mb-1">Подтверждение e-mail</label>
+            <div className="flex items-end gap-3">
+              <Input
+                type="text"
+                placeholder="Код из письма"
+                value={emailCode}
+                onChange={(e) => setEmailCode(e.target.value)}
+                className="w-48"
+              />
+              <Button
+                type="button"
+                variant="secondary"
+                disabled={emailCode.trim().length === 0}
+                onClick={async () => {
+                  setSavingEmail(true);
+                  setMessage(null);
+                  try {
+                    const r = await fetch('/api/settings/email/verify', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code: emailCode.trim() }) });
+                    const t = await r.text();
+                    const d = t ? JSON.parse(t) : {};
+                    if (!r.ok) throw new Error(d?.error || t || 'Ошибка подтверждения');
+                    setEmailPending(false);
+                    setEmailVerified(true);
+                    setEmailCode('');
+                    setMessage('E-mail подтверждён');
+                  } catch (e) {
+                    setMessage(e instanceof Error ? e.message : 'Ошибка');
+                  } finally {
+                    setSavingEmail(false);
+                  }
+                }}
+              >Подтвердить</Button>
+            </div>
+            {emailPending ? <div className="text-xs text-gray-500 mt-1">Мы отправили код на ваш e-mail.</div> : null}
+          </div>
+        ) : null}
+        {emailVerified ? (<div className="text-sm text-gray-600 dark:text-gray-300">E-mail подтверждён</div>) : null}
         <div className="pt-6">
           <label className="block text-sm text-gray-700 dark:text-gray-300 mb-1">Учётная запись</label>
           <Input type="text" value={accountPhone ?? ''} readOnly placeholder="Нет данных" />
