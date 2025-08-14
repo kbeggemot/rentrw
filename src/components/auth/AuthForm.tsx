@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { BrandMark } from '@/components/BrandMark';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 
@@ -16,6 +16,19 @@ export function AuthForm() {
   const [awaitCode, setAwaitCode] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [passwordError, setPasswordError] = useState<string | null>(null);
+
+  // Restore pending registration state (in case of refresh)
+  useEffect(() => {
+    try {
+      const pending = sessionStorage.getItem('reg.pending');
+      if (pending) {
+        const p = JSON.parse(pending) as { phone?: string; email?: string; awaitCode?: boolean };
+        if (p.phone) setPhone(p.phone);
+        if (p.email) setEmail(p.email);
+        if (p.awaitCode) { setAwaitCode(true); setIsRegister(true); }
+      }
+    } catch {}
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -57,10 +70,13 @@ export function AuthForm() {
       if (isRegister && !awaitCode) {
         // move to code step
         setAwaitCode(true);
+        setIsRegister(true);
+        try { sessionStorage.setItem('reg.pending', JSON.stringify({ phone, email: email.trim(), awaitCode: true })); } catch {}
         setError('Мы отправили код на вашу почту. Введите его, чтобы завершить регистрацию.');
         setPassword('');
         setConfirm('');
       } else {
+        try { sessionStorage.removeItem('reg.pending'); } catch {}
         window.location.href = '/dashboard';
       }
     } catch (e) {
