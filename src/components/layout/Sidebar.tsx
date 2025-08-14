@@ -33,6 +33,14 @@ export function Sidebar() {
           Продажи
         </Link>
         <Link
+          href="/partners"
+          className={`px-3 py-2 rounded-md text-sm w-full text-left ${
+            isActive('/partners') ? 'bg-gray-100 dark:bg-gray-900 font-medium' : 'hover:bg-gray-50 dark:hover:bg-gray-900'
+          }`}
+        >
+          Партнеры
+        </Link>
+        <Link
           href="/settings?view=1"
           className={`px-3 py-2 rounded-md text-sm w-full text-left ${
             isActive('/settings') ? 'bg-gray-100 dark:bg-gray-900 font-medium' : 'hover:bg-gray-50 dark:hover:bg-gray-900'

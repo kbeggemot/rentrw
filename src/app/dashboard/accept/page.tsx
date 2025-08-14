@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import QRCode from 'qrcode';
 import { Input } from '@/components/ui/Input';
 import { Textarea } from '@/components/ui/Textarea';
@@ -8,7 +9,10 @@ import { Button } from '@/components/ui/Button';
 
 type PaymentMethod = 'qr' | 'card';
 
-export default function AcceptPaymentPage() {
+import { Suspense } from 'react';
+
+function AcceptPaymentContent() {
+  const search = useSearchParams();
   const [hasToken, setHasToken] = useState<boolean | null>(null);
   useEffect(() => {
     let aborted = false;
@@ -23,6 +27,14 @@ export default function AcceptPaymentPage() {
     };
     check();
     return () => { aborted = true; };
+  }, []);
+
+  useEffect(() => {
+    const wantAgent = search.get('agent') === '1';
+    const qp = search.get('phone') || '';
+    if (wantAgent) setIsAgentSale(true);
+    if (qp) setAgentPhone(qp);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   const [amount, setAmount] = useState('');
   const [description, setDescription] = useState('');
@@ -400,6 +412,14 @@ export default function AcceptPaymentPage() {
         ) : null}
       </form>
     </div>
+  );
+}
+
+export default function AcceptPaymentPage() {
+  return (
+    <Suspense fallback={null}>
+      <AcceptPaymentContent />
+    </Suspense>
   );
 }
 
