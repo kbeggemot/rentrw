@@ -183,9 +183,10 @@ function SettingsContent() {
                       const r = await fetch('/api/settings/email', { method: 'POST' });
                       if (!r.ok) throw new Error('SEND_FAILED');
                       setEmailPending(true);
-                    } catch {
-                      setEmailMsgKind('error');
-                      setEmailMsg('Не удалось отправить код');
+                  } catch (e) {
+                    setEmailMsgKind('error');
+                    const msg = e instanceof Error ? e.message : 'SEND_FAILED';
+                    setEmailMsg(/MASKED_EMAIL/.test(msg) ? 'E-mail указан как маска. Нажмите “Изменить e-mail” и введите полный адрес.' : 'Не удалось отправить код');
                     } finally {
                       setSavingEmail(false);
                     }

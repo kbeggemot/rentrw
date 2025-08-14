@@ -37,17 +37,26 @@ export async function POST(req: Request) {
     const userId = (mc ? decodeURIComponent(mc[1]) : undefined) || req.headers.get('x-user-id') || 'default';
     const body = await req.json().catch(() => null);
     const incoming: string | undefined = body?.email;
+    const emailRegex = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+    const isMasked = (v: string) => v.includes('*');
     let targetEmail: string | null = null;
     if (incoming) {
-      if (!/.+@.+\..+/.test(incoming)) {
+      const candidate = String(incoming).trim();
+      if (isMasked(candidate)) {
+        return NextResponse.json({ error: 'MASKED_EMAIL' }, { status: 400 });
+      }
+      if (!emailRegex.test(candidate)) {
         return NextResponse.json({ error: 'INVALID_EMAIL' }, { status: 400 });
       }
-      targetEmail = incoming.trim();
-      await updateUserEmail(userId, targetEmail);
+      targetEmail = candidate;
+      await updateUserEmail(userId, candidate);
     } else {
       const user = await getUserById(userId);
       targetEmail = user?.email ?? null;
       if (!targetEmail) return NextResponse.json({ error: 'NO_EMAIL' }, { status: 400 });
+      if (isMasked(targetEmail) || !emailRegex.test(targetEmail)) {
+        return NextResponse.json({ error: 'MASKED_EMAIL' }, { status: 400 });
+      }
     }
     // issue verification code
     const code = String(Math.floor(100000 + Math.random() * 900000));
