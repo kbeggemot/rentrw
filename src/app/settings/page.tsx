@@ -271,7 +271,13 @@ function SettingsContent() {
                     setMessage('E-mail подтверждён');
                   } catch (e) {
                     setEmailMsgKind('error');
-                    setEmailMsg(e instanceof Error ? e.message : 'Ошибка');
+                    const raw = e instanceof Error ? e.message : 'Ошибка';
+                    let friendly = raw;
+                    if (/^INVALID_CODE$/i.test(raw)) friendly = 'Код указан неверно';
+                    else if (/^EXPIRED$/i.test(raw)) friendly = 'Срок действия кода истёк';
+                    else if (/^NO_PENDING$/i.test(raw)) friendly = 'Код не запрашивался или уже использован';
+                    else if (/^INVALID_EMAIL$/i.test(raw)) friendly = 'Некорректный e-mail';
+                    setEmailMsg(friendly);
                   } finally {
                     setSavingEmail(false);
                   }

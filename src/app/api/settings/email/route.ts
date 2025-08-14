@@ -36,24 +36,32 @@ export async function POST(req: Request) {
     const mc = /(?:^|;\s*)session_user=([^;]+)/.exec(cookie);
     const userId = (mc ? decodeURIComponent(mc[1]) : undefined) || req.headers.get('x-user-id') || 'default';
     const body = await req.json().catch(() => null);
-    const email: string | undefined = body?.email;
-    if (!email || !/.+@.+\..+/.test(email)) {
-      return NextResponse.json({ error: 'INVALID_EMAIL' }, { status: 400 });
+    const incoming: string | undefined = body?.email;
+    let targetEmail: string | null = null;
+    if (incoming) {
+      if (!/.+@.+\..+/.test(incoming)) {
+        return NextResponse.json({ error: 'INVALID_EMAIL' }, { status: 400 });
+      }
+      targetEmail = incoming.trim();
+      await updateUserEmail(userId, targetEmail);
+    } else {
+      const user = await getUserById(userId);
+      targetEmail = user?.email ?? null;
+      if (!targetEmail) return NextResponse.json({ error: 'NO_EMAIL' }, { status: 400 });
     }
-    await updateUserEmail(userId, email);
     // issue verification code
     const code = String(Math.floor(100000 + Math.random() * 900000));
     const dataDir = path.join(process.cwd(), '.data');
     await fs.mkdir(dataDir, { recursive: true });
-    await fs.writeFile(path.join(dataDir, `email_code_${userId}.txt`), JSON.stringify({ email, code, ts: Date.now() }), 'utf8');
+    await fs.writeFile(path.join(dataDir, `email_code_${userId}.txt`), JSON.stringify({ email: targetEmail, code, ts: Date.now() }), 'utf8');
     const base = process.env.NEXT_PUBLIC_BASE_URL || '';
     const ui = base ? `${base}/settings` : '/settings';
     await sendEmail({
-      to: email,
+      to: targetEmail!,
       subject: 'Подтверждение e-mail в RentRW',
       text: `Ваш код подтверждения: ${code}\n\nВведите его на странице настроек: ${ui}`,
     });
-    return NextResponse.json({ email: maskEmail(email), verification: 'sent' }, { status: 200 });
+    return NextResponse.json({ email: maskEmail(targetEmail!), verification: 'sent' }, { status: 200 });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Server error';
     return NextResponse.json({ error: message }, { status: 500 });
