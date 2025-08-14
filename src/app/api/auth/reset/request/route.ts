@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getUserById, findUserByPhone } from '@/server/userStore';
+import { findUserByPhoneLoose } from '@/server/userStore';
 import { randomBytes } from 'crypto';
 import { createResetToken } from '@/server/resetStore';
 import { sendEmail } from '@/server/email';
@@ -11,7 +11,7 @@ export async function POST(req: Request) {
     const body = await req.json().catch(() => null);
     const phone: string | undefined = body?.phone?.toString().trim();
     if (!phone) return NextResponse.json({ error: 'INVALID' }, { status: 400 });
-    const user = await findUserByPhone(phone);
+    const user = await findUserByPhoneLoose(phone);
     if (!user || !user.email || !user.emailVerified) {
       // Return success anyway to prevent enumeration
       return NextResponse.json({ ok: true });

@@ -138,7 +138,7 @@ export function AuthForm() {
             setLoading(true);
             setError(null);
             try {
-              await fetch('/api/auth/reset/request', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ phone }) });
+              await fetch('/api/auth/reset/request', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ phone: phone.trim() }) });
               setError(null);
               alert('Письмо с инструкциями отправлено на почту');
             } catch {

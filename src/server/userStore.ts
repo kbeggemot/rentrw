@@ -36,6 +36,16 @@ export async function findUserByPhone(phone: string): Promise<UserRecord | undef
   return users.find((u) => u.phone === phone);
 }
 
+function onlyDigits(s: string): string {
+  return (s || '').replace(/\D/g, '');
+}
+
+export async function findUserByPhoneLoose(phone: string): Promise<UserRecord | undefined> {
+  const target = onlyDigits(phone);
+  const users = await readUsers();
+  return users.find((u) => onlyDigits(u.phone) === target);
+}
+
 export function hashPassword(password: string, salt?: string): { hash: string; salt: string } {
   const realSalt = salt ?? randomBytes(16).toString('hex');
   const key = scryptSync(password, realSalt, 64).toString('hex');
