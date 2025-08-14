@@ -18,6 +18,8 @@ function SettingsContent() {
   const [savingEmail, setSavingEmail] = useState(false);
   const [emailCode, setEmailCode] = useState('');
   const [emailPending, setEmailPending] = useState(false);
+  const [emailMsg, setEmailMsg] = useState<string | null>(null);
+  const [emailMsgKind, setEmailMsgKind] = useState<'info' | 'error'>('info');
   const [accountPhone, setAccountPhone] = useState<string | null>(null);
   const [agentDesc, setAgentDesc] = useState('');
   const [agentType, setAgentType] = useState<'percent' | 'fixed'>('percent');
@@ -175,15 +177,18 @@ function SettingsContent() {
                   onClick={async () => {
                     setSavingEmail(true);
                     setMessage(null);
+                    setEmailMsg(null);
                     try {
                       // Re-send verification to current email
                       const em = emailMasked.replace(/\*/g, '');
                       const r = await fetch('/api/settings/email', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: em }) });
                       if (!r.ok) throw new Error('SEND_FAILED');
                       setEmailPending(true);
-                      setMessage('Код отправлен на e-mail');
+                      setEmailMsgKind('info');
+                      setEmailMsg('Код отправлен на e-mail');
                     } catch {
-                      setMessage('Не удалось отправить код');
+                      setEmailMsgKind('error');
+                      setEmailMsg('Не удалось отправить код');
                     } finally {
                       setSavingEmail(false);
                     }
@@ -254,6 +259,7 @@ function SettingsContent() {
                 onClick={async () => {
                   setSavingEmail(true);
                   setMessage(null);
+                  setEmailMsg(null);
                   try {
                     const r = await fetch('/api/settings/email/verify', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code: emailCode.trim() }) });
                     const t = await r.text();
@@ -264,7 +270,8 @@ function SettingsContent() {
                     setEmailCode('');
                     setMessage('E-mail подтверждён');
                   } catch (e) {
-                    setMessage(e instanceof Error ? e.message : 'Ошибка');
+                    setEmailMsgKind('error');
+                    setEmailMsg(e instanceof Error ? e.message : 'Ошибка');
                   } finally {
                     setSavingEmail(false);
                   }
@@ -272,6 +279,9 @@ function SettingsContent() {
               >Подтвердить</Button>
             </div>
             {emailPending ? <div className="text-xs text-gray-500 mt-1">Мы отправили код на ваш e-mail.</div> : null}
+            {emailMsg ? (
+              <div className={`text-sm mt-2 ${emailMsgKind === 'error' ? 'text-red-600' : 'text-gray-600 dark:text-gray-300'}`}>{emailMsg}</div>
+            ) : null}
           </div>
         ) : null}
         {emailVerified ? (<div className="text-sm text-gray-600 dark:text-gray-300">E-mail подтверждён</div>) : null}
