@@ -179,13 +179,10 @@ function SettingsContent() {
                     setMessage(null);
                     setEmailMsg(null);
                     try {
-                      // Re-send verification to current email
-                      const em = emailMasked.replace(/\*/g, '');
-                      const r = await fetch('/api/settings/email', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: em }) });
+                      // Re-send verification to saved full email on server (no masked email in payload)
+                      const r = await fetch('/api/settings/email', { method: 'POST' });
                       if (!r.ok) throw new Error('SEND_FAILED');
                       setEmailPending(true);
-                      setEmailMsgKind('info');
-                      setEmailMsg('Код отправлен на e-mail');
                     } catch {
                       setEmailMsgKind('error');
                       setEmailMsg('Не удалось отправить код');

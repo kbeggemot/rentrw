@@ -59,7 +59,7 @@ export async function POST(req: Request) {
     await sendEmail({
       to: targetEmail!,
       subject: 'Подтверждение e-mail в RentRW',
-      text: `Ваш код подтверждения: ${code}\n\nВведите его на странице настроек: ${ui}`,
+      text: `Ваш код подтверждения: ${code}\n\nЕсли вы его не запрашивали, проигнорируйте это письмо.`,
     });
     return NextResponse.json({ email: maskEmail(targetEmail!), verification: 'sent', debug: {
       host: process.env.SMTP_HOST ? 'set' : 'missing',
