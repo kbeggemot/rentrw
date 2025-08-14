@@ -96,15 +96,17 @@ export function AuthForm() {
       <h1 className="text-xl font-semibold mt-4 mb-1">{isRegister ? 'Регистрация' : 'Вход'}</h1>
       <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">Введите номер телефона и пароль</p>
       <form className="flex flex-col gap-3" onSubmit={handleSubmit}>
-        <Input
-          label="Телефон"
-          type="tel"
-          inputMode="tel"
-          placeholder="+7 900 000-00-00"
-          value={phone}
-          onChange={(e) => setPhone(e.target.value)}
-          required
-        />
+        {(!isRegister || (isRegister && !awaitCode)) ? (
+          <Input
+            label="Телефон"
+            type="tel"
+            inputMode="tel"
+            placeholder="+7 900 000-00-00"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+            required
+          />
+        ) : null}
         {isRegister && !awaitCode ? (
           <Input
             label="E-mail"
@@ -115,15 +117,17 @@ export function AuthForm() {
             required
           />
         ) : null}
-        <Input
-          label="Пароль"
-          type="password"
-          placeholder="••••••••"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          passwordToggle
-          required
-        />
+        {(!isRegister || (isRegister && !awaitCode)) ? (
+          <Input
+            label="Пароль"
+            type="password"
+            placeholder="••••••••"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            passwordToggle
+            required
+          />
+        ) : null}
         {passwordError ? (
           <div className="text-xs text-red-600" role="alert">
             {passwordError}
