@@ -33,19 +33,19 @@ export function AuthForm() {
     setLoading(true);
     setError(null);
     setPasswordError(null);
-    // Простая валидация пароля на клиенте
-    const strongEnough = /^(?=.*[A-Za-z])(?=.*\d).{8,}$/.test(password);
-    if (!strongEnough) {
-      setLoading(false);
-      setPasswordError('Пароль должен быть не короче 8 символов и содержать буквы и цифры');
-      return;
-    }
-    if (isRegister && password !== confirm) {
-      setLoading(false);
-      setPasswordError('Пароли не совпадают');
-      return;
-    }
+    // Валидация пароля только на шаге ввода пароля (до отправки кода)
     if (isRegister && !awaitCode) {
+      const strongEnough = /^(?=.*[A-Za-z])(?=.*\d).{8,}$/.test(password);
+      if (!strongEnough) {
+        setLoading(false);
+        setPasswordError('Пароль должен быть не короче 8 символов и содержать буквы и цифры');
+        return;
+      }
+      if (password !== confirm) {
+        setLoading(false);
+        setPasswordError('Пароли не совпадают');
+        return;
+      }
       const ok = /.+@.+\..+/.test(email.trim());
       if (!ok) {
         setLoading(false);
