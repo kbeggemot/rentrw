@@ -63,10 +63,10 @@ function isSameCredentialId(storedId: string, respId: string): boolean {
   return false;
 }
 
-export async function startRegistration(user: UserRecord) {
+export async function startRegistration(user: UserRecord, opts?: { rpID?: string; origin?: string }) {
   const rpName = 'RentRW';
-  const rpID = new URL(process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000').hostname;
-  const origin = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
+  const rpID = opts?.rpID || new URL(process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000').hostname;
+  const origin = opts?.origin || process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
   const optionsJSON: any = {
     rp: { name: rpName, id: rpID },
     user: { id: Buffer.from(user.id).toString('base64url'), name: user.phone, displayName: user.phone },
@@ -98,11 +98,11 @@ export async function finishRegistration(userId: string, response: any, rpID: st
   return { verified: true };
 }
 
-export async function startAuth(userId: string) {
+export async function startAuth(userId: string, opts?: { rpID?: string; origin?: string }) {
   const creds = await readCreds();
-  const rpID = new URL(process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000').hostname;
+  const rpID = opts?.rpID || new URL(process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000').hostname;
   const options = generateAuthenticationOptions({ rpID, allowCredentials: (creds[userId] || []).map(c => ({ id: c.id, type: 'public-key' as const, transports: c.transports })) });
-  const origin = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
+  const origin = opts?.origin || process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
   return { options, rpID, origin };
 }
 
@@ -131,11 +131,11 @@ export async function finishAuth(userId: string, response: any, rpID: string, or
   return { verified: true };
 }
 
-export async function startLoginAnonymous() {
-  const rpID = new URL(process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000').hostname;
+export async function startLoginAnonymous(opts?: { rpID?: string; origin?: string }) {
+  const rpID = opts?.rpID || new URL(process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000').hostname;
   // allow discoverable credentials by not specifying allowCredentials
   const options = generateAuthenticationOptions({ rpID, userVerification: 'preferred' });
-  const origin = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
+  const origin = opts?.origin || process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
   return { options, rpID, origin };
 }
 

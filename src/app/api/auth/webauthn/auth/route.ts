@@ -8,7 +8,13 @@ export async function POST(req: Request) {
   const cookie = req.headers.get('cookie') || '';
   const mc = /(?:^|;\s*)session_user=([^;]+)/.exec(cookie);
   const userId = (mc ? decodeURIComponent(mc[1]) : undefined) || req.headers.get('x-user-id') || '';
-  const { options, rpID, origin } = userId ? await startAuth(userId) : await startLoginAnonymous();
+  const url = new URL(req.url);
+  const hdrOrigin = req.headers.get('origin') || undefined;
+  const hdrHost = req.headers.get('x-forwarded-host') || req.headers.get('host') || url.host;
+  const hdrProto = req.headers.get('x-forwarded-proto') || (hdrOrigin ? new URL(hdrOrigin).protocol.replace(':','') : 'http');
+  const computedOrigin = hdrOrigin || `${hdrProto}://${hdrHost}`;
+  const computedRpID = hdrHost.split(':')[0];
+  const { options, rpID, origin } = userId ? await startAuth(userId, { rpID: computedRpID, origin: computedOrigin }) : await startLoginAnonymous({ rpID: computedRpID, origin: computedOrigin });
   // Ensure options are JSON-serializable strings for IDs
   try {
     const toB64 = (v: any): string | undefined => {
