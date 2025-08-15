@@ -4,6 +4,7 @@ import { useEffect, useState, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
+import { startRegistration as startWebAuthnReg, browserSupportsWebAuthn, platformAuthenticatorIsAvailable } from '@simplewebauthn/browser';
 
 function SettingsContent() {
   const [currentMasked, setCurrentMasked] = useState<string | null>(null);
@@ -26,6 +27,10 @@ function SettingsContent() {
   const [agentValue, setAgentValue] = useState('');
   const [savingAgent, setSavingAgent] = useState(false);
   const [savingAgentDesc, setSavingAgentDesc] = useState(false);
+  const [keys, setKeys] = useState<Array<{ id: string; counter: number }> | null>(null);
+  const [keysLoading, setKeysLoading] = useState(false);
+  const [keysMsg, setKeysMsg] = useState<string | null>(null);
+  const [bioLoading, setBioLoading] = useState(false);
   const search = useSearchParams();
   const router = useRouter();
 
@@ -54,6 +59,19 @@ function SettingsContent() {
           if (sd?.defaultCommission?.type) setAgentType(sd.defaultCommission.type);
           if (typeof sd?.defaultCommission?.value === 'number') setAgentValue(String(sd.defaultCommission.value));
         } catch {}
+        // загрузка ключей
+        try {
+          setKeysLoading(true);
+          const kr = await fetch('/api/auth/webauthn/list', { cache: 'no-store' });
+          const kd = await kr.json();
+          if (!kr.ok) throw new Error(kd?.error || 'ERROR');
+          setKeys(Array.isArray(kd?.items) ? kd.items : []);
+        } catch (e) {
+          setKeysMsg(e instanceof Error ? e.message : 'Ошибка');
+          setKeys([]);
+        } finally {
+          setKeysLoading(false);
+        }
         // Если пришли из меню (view=1) — показываем обзор (не режим ввода)
         const fromMenu = search.get('view') === '1';
         setEditing(fromMenu ? false : !data.token);
@@ -95,6 +113,49 @@ function SettingsContent() {
       setMessage(message);
     } finally {
       setSaving(false);
+    }
+  };
+
+  const setupBiometry = async () => {
+    setBioLoading(true);
+    try {
+      const supported = await browserSupportsWebAuthn();
+      const platform = await platformAuthenticatorIsAvailable();
+      if (!supported || !platform) throw new Error('Биометрия недоступна на этом устройстве');
+      const init = await fetch('/api/auth/webauthn/register', { method: 'POST' });
+      const { options, rpID, origin } = await init.json();
+      const attResp = await startWebAuthnReg(options);
+      const put = await fetch('/api/auth/webauthn/register', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ response: attResp, rpID, origin }) });
+      if (!put.ok) throw new Error('Не удалось подключить Face ID / Touch ID');
+      try { localStorage.setItem('hasPasskey', '1'); } catch {}
+      try { document.cookie = 'has_passkey=1; Path=/; SameSite=Lax; Max-Age=31536000'; } catch {}
+      // обновить список ключей
+      setKeysLoading(true);
+      const kr = await fetch('/api/auth/webauthn/list', { cache: 'no-store' });
+      const kd = await kr.json();
+      setKeys(Array.isArray(kd?.items) ? kd.items : []);
+    } catch (e) {
+      alert(e instanceof Error ? e.message : 'Ошибка WebAuthn');
+    } finally {
+      setBioLoading(false);
+      setKeysLoading(false);
+    }
+  };
+
+  const removeKey = async (id: string) => {
+    if (!confirm('Удалить выбранный ключ?')) return;
+    try {
+      const res = await fetch(`/api/auth/webauthn/list?id=${encodeURIComponent(id)}`, { method: 'DELETE' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error || 'Не удалось удалить ключ');
+      const remain = typeof data?.remain === 'number' ? data.remain : undefined;
+      setKeys((prev) => (prev || []).filter((k) => k.id !== id));
+      if (remain === 0) {
+        try { localStorage.removeItem('hasPasskey'); } catch {}
+        try { document.cookie = 'has_passkey=; Path=/; Max-Age=0; SameSite=Lax'; } catch {}
+      }
+    } catch (e) {
+      alert(e instanceof Error ? e.message : 'Ошибка');
     }
   };
 
@@ -376,6 +437,36 @@ function SettingsContent() {
             >Сохранить</Button>
           </div>
         </div>
+
+        <div className="pt-8">
+          <h2 className="text-lg font-semibold mb-2">Ключи входа (Face ID / Touch ID)</h2>
+          {keysLoading ? (
+            <div className="text-sm text-gray-600 dark:text-gray-300">Загрузка…</div>
+          ) : (keys && keys.length === 0) ? (
+            <div className="flex items-center gap-3">
+              <div className="text-sm text-gray-600 dark:text-gray-300">Ключи не найдены на этом аккаунте.</div>
+              <Button type="button" variant="secondary" loading={bioLoading} onClick={setupBiometry}>Подключить</Button>
+            </div>
+          ) : keys ? (
+            <div className="space-y-2">
+              {keys.map((k) => (
+                <div key={k.id} className="flex items-center justify-between border border-gray-200 dark:border-gray-800 rounded px-3 py-2">
+                  <div className="text-sm break-all">
+                    <div className="font-mono text-xs text-gray-700 dark:text-gray-300">{k.id}</div>
+                    <div className="text-xs text-gray-500">counter: {k.counter}</div>
+                  </div>
+                  <Button type="button" variant="secondary" onClick={() => removeKey(k.id)}>Удалить</Button>
+                </div>
+              ))}
+              <div>
+                <Button type="button" variant="secondary" loading={bioLoading} onClick={setupBiometry}>Добавить новый ключ</Button>
+              </div>
+            </div>
+          ) : (
+            <div className="text-sm text-gray-600 dark:text-gray-300">Нет данных</div>
+          )}
+        </div>
+
         {message ? <div className="text-sm text-gray-600 dark:text-gray-300">{message}</div> : null}
       </form>
     </div>

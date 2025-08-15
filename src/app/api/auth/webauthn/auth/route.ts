@@ -1,0 +1,53 @@
+import { NextResponse } from 'next/server';
+import { startAuth, finishAuth, startLoginAnonymous, finishLoginAnonymous } from '@/server/webauthn';
+import { randomBytes } from 'crypto';
+
+export const runtime = 'nodejs';
+
+export async function POST(req: Request) {
+  const cookie = req.headers.get('cookie') || '';
+  const mc = /(?:^|;\s*)session_user=([^;]+)/.exec(cookie);
+  const userId = (mc ? decodeURIComponent(mc[1]) : undefined) || req.headers.get('x-user-id') || '';
+  const { options, rpID, origin } = userId ? await startAuth(userId) : await startLoginAnonymous();
+  // Ensure options are JSON-serializable strings for IDs
+  try {
+    const toB64 = (v: any): string | undefined => {
+      if (typeof v === 'string') return v;
+      if (v && ArrayBuffer.isView(v)) return Buffer.from(v as Uint8Array).toString('base64url');
+      if (v instanceof ArrayBuffer) return Buffer.from(new Uint8Array(v)).toString('base64url');
+      return undefined;
+    };
+    let ch = toB64((options as any).challenge);
+    if (!ch || ch.length === 0) ch = randomBytes(32).toString('base64url');
+    (options as any).challenge = ch;
+    if (Array.isArray((options as any).allowCredentials)) {
+      (options as any).allowCredentials = (options as any).allowCredentials
+        .map((c: any) => ({ ...c, id: toB64(c?.id), type: c?.type || 'public-key' }))
+        .filter((c: any) => typeof c.id === 'string' && c.id.length > 0);
+      if ((options as any).allowCredentials.length === 0) delete (options as any).allowCredentials;
+    }
+  } catch {}
+  return NextResponse.json({ options, rpID, origin });
+}
+
+export async function PUT(req: Request) {
+  const cookie = req.headers.get('cookie') || '';
+  const mc = /(?:^|;\s*)session_user=([^;]+)/.exec(cookie);
+  const userId = (mc ? decodeURIComponent(mc[1]) : undefined) || req.headers.get('x-user-id') || '';
+  const body = await req.json().catch(() => null);
+  const { response, rpID, origin } = body || {};
+  if (!response || !rpID || !origin) return NextResponse.json({ error: 'INVALID' }, { status: 400 });
+  if (!userId) {
+    const resAnon = await finishLoginAnonymous(response, rpID, origin);
+    const out = NextResponse.json(resAnon, { status: resAnon.verified ? 200 : 400 });
+    if (resAnon.verified && resAnon.userId) {
+      out.headers.set('Set-Cookie', `session_user=${encodeURIComponent(resAnon.userId)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${60 * 60 * 24 * 7}`);
+    }
+    return out;
+  } else {
+    const resUser = await finishAuth(userId, response, rpID, origin);
+    return NextResponse.json(resUser, { status: resUser.verified ? 200 : 400 });
+  }
+}
+
+

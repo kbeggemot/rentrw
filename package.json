@@ -12,12 +12,14 @@
     "format:check": "prettier --check ."
   },
   "dependencies": {
+    "@simplewebauthn/browser": "^10.0.0",
+    "@simplewebauthn/server": "^10.0.1",
+    "@tailwindcss/postcss": "^4",
     "next": "15.4.6",
+    "nodemailer": "^6.9.14",
     "qrcode": "^1.5.4",
     "react": "19.1.0",
     "react-dom": "19.1.0",
-    "nodemailer": "^6.9.14",
-    "@tailwindcss/postcss": "^4",
     "tailwindcss": "^4"
   },
   "devDependencies": {

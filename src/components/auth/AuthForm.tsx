@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { startRegistration as startWebAuthnReg, startAuthentication, browserSupportsWebAuthn, platformAuthenticatorIsAvailable } from '@simplewebauthn/browser';
 import { BrandMark } from '@/components/BrandMark';
 import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/Button';
@@ -16,6 +17,7 @@ export function AuthForm() {
   const [awaitCode, setAwaitCode] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [passwordError, setPasswordError] = useState<string | null>(null);
+  const [canBioLogin, setCanBioLogin] = useState(false);
 
   // На свежей загрузке / при переходе на страницу авторизации — сбрасываем любые промежуточные данные
   useEffect(() => {
@@ -26,6 +28,25 @@ export function AuthForm() {
     setPassword('');
     setConfirm('');
     try { sessionStorage.removeItem('reg.pending'); } catch {}
+  }, []);
+
+  // Определяем, показывать ли кнопку входа по биометрии на этом устройстве
+  useEffect(() => {
+    let ignore = false;
+    (async () => {
+      try {
+        const supported = await browserSupportsWebAuthn();
+        let platform = false;
+        try { platform = await platformAuthenticatorIsAvailable(); } catch { platform = false; }
+        const hasLocal = typeof window !== 'undefined' && window.localStorage?.getItem('hasPasskey') === '1';
+        const hasCookie = typeof document !== 'undefined' && /(?:^|;\s*)has_passkey=1(?:;|$)/.test(document.cookie || '');
+        // Доверяем только платформенной поддержке ИПЛЮС наличие локальной отметки/куки
+        if (!ignore) setCanBioLogin(Boolean(supported && platform && (hasLocal || hasCookie)));
+      } catch {
+        if (!ignore) setCanBioLogin(false);
+      }
+    })();
+    return () => { ignore = true; };
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -75,6 +96,22 @@ export function AuthForm() {
         setConfirm('');
       } else {
         try { sessionStorage.removeItem('reg.pending'); } catch {}
+        try {
+          // Автопредложение: если ключа ещё нет, предложим добавить биометрию
+          const st = await fetch('/api/auth/webauthn/status', { method: 'GET' });
+          const s = await st.json();
+          if (!s?.hasAny) {
+            const init = await fetch('/api/auth/webauthn/register', { method: 'POST' });
+            const { options, rpID, origin } = await init.json();
+            try {
+              const attResp = await startWebAuthnReg(options);
+              await fetch('/api/auth/webauthn/register', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ response: attResp, rpID, origin }) });
+            } catch (e) {
+              // тихо игнорируем, чтобы не мешать логину
+              console.warn('webauthn register skip', e);
+            }
+          }
+        } catch {}
         window.location.href = '/dashboard';
       }
     } catch (e) {
@@ -190,6 +227,59 @@ export function AuthForm() {
           Забыли пароль?
         </button>
       </div>
+      {/* Кнопка входа по биометрии на экране логина */}
+      {!isRegister && canBioLogin && (
+        <div className="mt-4">
+          <Button
+            type="button"
+            variant="secondary"
+            fullWidth
+            onClick={async () => {
+              try {
+                const ok = (await browserSupportsWebAuthn()) && (await platformAuthenticatorIsAvailable());
+                if (!ok) { alert('Биометрия недоступна на этом устройстве'); return; }
+                const init = await fetch('/api/auth/webauthn/auth', { method: 'POST' });
+                const { options, rpID, origin } = await init.json();
+                try {
+                  const toB64 = (v: any) => {
+                    if (typeof v === 'string') return v;
+                    if (v && ArrayBuffer.isView(v)) return Buffer.from(v as Uint8Array).toString('base64url');
+                    if (v instanceof ArrayBuffer) return Buffer.from(new Uint8Array(v)).toString('base64url');
+                    return v;
+                  };
+                  if (options?.challenge) options.challenge = toB64(options.challenge);
+                  if (Array.isArray(options?.allowCredentials)) {
+                    options.allowCredentials = options.allowCredentials.map((c: any) => ({
+                      ...c,
+                      id: toB64(c.id),
+                      type: c.type || 'public-key',
+                    }));
+                  }
+                } catch {}
+                const assertion = await startAuthentication(options);
+                const fin = await fetch('/api/auth/webauthn/auth', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ response: assertion, rpID, origin }) });
+                if (!fin.ok) {
+                  const t = await fin.text();
+                  let msg = 'Не удалось выполнить вход по биометрии';
+                  try { const j = t ? JSON.parse(t) : null; if (j?.error) msg += `\n${j.error}`; } catch {}
+                  alert(msg);
+                  return;
+                }
+                window.location.href = '/dashboard';
+              } catch (e) {
+                console.warn('webauthn login failed', e);
+                const detail = e instanceof Error ? `${e.name || 'Error'}: ${e.message}` : '';
+                alert(`Не удалось выполнить вход по биометрии${detail ? `\n${detail}` : ''}`);
+              }
+            }}
+          >
+            Войти по Face ID / Touch ID
+          </Button>
+        </div>
+      )}
+      {/* WebAuthn quick actions for authenticated session (registration of biometric key) */}
+      {/* Кнопки биометрии специально скрыты на экране логина.
+          Предложение добавления ключа выполнится автоматически сразу после успешного входа. */}
     </div>
   );
 }
