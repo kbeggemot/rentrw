@@ -23,7 +23,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
             <path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
           </svg>
         </button>
-        <div className="text-sm font-medium">RentRW</div>
+        <div className={`text-sm font-medium transition-opacity ${open ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>Касса</div>
       </div>
       {/* Desktop sidebar (visible from md and up) */}
       <div className="hidden md:block">
@@ -33,7 +33,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
       {open ? (
         <div className="md:hidden fixed inset-0 z-40">
           <div className="absolute inset-0 bg-black/40" onClick={() => setOpen(false)} />
-          <div className="absolute left-0 top-0 h-full w-64 bg-background border-r border-gray-200 dark:border-gray-800 shadow-lg p-0">
+          <div className="absolute left-0 top-0 h-full w-64 bg-background border-r border-gray-200 dark:border-gray-800 shadow-lg p-0 flex flex-col">
             <div className="flex items-center justify-between p-2 border-b border-gray-200 dark:border-gray-800">
               <div className="text-sm font-medium">Меню</div>
               <button aria-label="Закрыть меню" className="p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-900" onClick={() => setOpen(false)}>
@@ -42,7 +42,9 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                 </svg>
               </button>
             </div>
-            <Sidebar />
+            <div className="flex-1 overflow-auto">
+              <Sidebar />
+            </div>
           </div>
         </div>
       ) : null}

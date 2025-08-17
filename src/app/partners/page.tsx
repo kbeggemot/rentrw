@@ -14,7 +14,12 @@ export default async function PartnersPage() {
   const res = await fetch(`${baseUrl}/api/partners`, { cache: 'no-store', headers: { cookie: cookieHeader } });
   const data = await res.json().catch(() => ({}));
   const partners = Array.isArray(data?.partners) ? data.partners : [];
-  return <PartnersClient initial={partners} />;
+  return (
+    <>
+      <h1 className="md:hidden sr-only">Партнёры</h1>
+      <PartnersClient initial={partners} />
+    </>
+  );
 }
 
 

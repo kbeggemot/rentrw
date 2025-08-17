@@ -14,7 +14,12 @@ export default async function DashboardPage() {
   const res = await fetch(`${baseUrl}/api/settings/token`, { cache: 'no-store', headers: { cookie: cookieHeader } });
   const data = await res.json().catch(() => ({}));
   const hasToken = !!data?.token;
-  return <DashboardClient hasTokenInitial={hasToken} />;
+  return (
+    <>
+      <h1 className="md:hidden sr-only">Касса</h1>
+      <DashboardClient hasTokenInitial={hasToken} />
+    </>
+  );
 }
 
 

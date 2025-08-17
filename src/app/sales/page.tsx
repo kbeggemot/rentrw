@@ -14,7 +14,12 @@ export default async function SalesPage() {
 	const res = await fetch(`${baseUrl}/api/sales`, { cache: 'no-store', headers: { cookie: cookieHeader } });
 	const data = await res.json().catch(() => ({}));
 	const initial = Array.isArray(data?.sales) ? data.sales : [];
-	return <SalesClient initial={initial} />;
+	return (
+		<>
+			<h1 className="md:hidden sr-only">Продажи</h1>
+			<SalesClient initial={initial} />
+		</>
+	);
 }
 
 

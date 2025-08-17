@@ -104,7 +104,7 @@ export default function SalesClient({ initial }: { initial: Sale[] }) {
 
   return (
     <div className="max-w-5xl mx-auto">
-      <h1 className="text-2xl font-bold mb-4">Продажи</h1>
+      <h1 className="hidden md:block text-2xl font-bold mb-4">Продажи</h1>
       <div className="mb-3 flex flex-col gap-3">
         <div className="flex flex-wrap gap-3 items-end">
           <div>

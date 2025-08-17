@@ -38,7 +38,12 @@ export default async function SettingsPage() {
     keys: Array.isArray(k?.items) ? k.items : [],
   };
 
-  return <SettingsClient initial={initial} />;
+  return (
+    <>
+      <h1 className="md:hidden sr-only">Настройки</h1>
+      <SettingsClient initial={initial} />
+    </>
+  );
 }
 
 
