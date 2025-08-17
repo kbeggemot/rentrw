@@ -34,10 +34,10 @@ export default function DashboardClient({ hasTokenInitial }: { hasTokenInitial: 
     }
   };
 
-  // Автопредложение добавить ключ сразу после входа
+  // Автопредложение добавить ключ сразу после входа (отложим на тик после first paint)
   useEffect(() => {
     let cancelled = false;
-    (async () => {
+    const run = async () => {
       try {
         const flag = typeof window !== 'undefined' ? window.sessionStorage.getItem('postLoginPrompt') : null;
         if (!flag) return;
@@ -85,7 +85,9 @@ export default function DashboardClient({ hasTokenInitial }: { hasTokenInitial: 
           console.warn('webauthn auto-prompt failed', e);
         }
       } catch {}
-    })();
+    };
+    // слегка откладываем, чтобы не тормозить TTI
+    const t = setTimeout(() => { if (!cancelled) run(); }, 300);
     return () => { cancelled = true; };
   }, []);
 

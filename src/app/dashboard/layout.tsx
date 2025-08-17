@@ -1,14 +1,11 @@
 "use client";
 import type { ReactNode } from 'react';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Sidebar } from '@/components/layout/Sidebar';
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState(false);
-  useEffect(() => {
-    // Запускаем фоновое обновление продаж при входе в ЛК
-    void fetch('/api/sales?refresh=1', { cache: 'no-store' }).catch(() => {});
-  }, []);
+  // Убрано фонового обновление продаж при заходе в кассу, чтобы ускорить загрузку страницы.
   return (
     <div className="min-h-screen grid grid-rows-[auto_1fr] md:grid-cols-[16rem_1fr] md:grid-rows-1">
       {/* Top bar with burger on mobile and narrow desktop */}

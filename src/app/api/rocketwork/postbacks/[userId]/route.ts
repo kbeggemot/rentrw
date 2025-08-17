@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { listPartners, upsertPartner } from '@/server/partnerStore';
 import { updateSaleFromStatus } from '@/server/taskStore';
+import { promises as fs } from 'fs';
+import path from 'path';
 
 export const runtime = 'nodejs';
 
@@ -37,6 +39,14 @@ export async function POST(req: Request) {
     let body: any = null;
     try { body = raw ? JSON.parse(raw) : {}; } catch { body = {}; }
 
+    // Debug: append incoming postback to file
+    try {
+      const dataDir = path.join(process.cwd(), '.data');
+      await fs.mkdir(dataDir, { recursive: true });
+      const line = JSON.stringify({ ts: new Date().toISOString(), userId, body }, null, 2) + '\n';
+      await fs.appendFile(path.join(dataDir, 'postbacks.log'), line, 'utf8');
+    } catch {}
+
     const subscription: string = String(body?.subscription || '').toLowerCase();
     const event: string = String(body?.event || '').toLowerCase();
     const data: any = body?.data ?? body;
@@ -58,10 +68,14 @@ export async function POST(req: Request) {
       else if (/task\.transfered?/.test(event)) status = 'transfered';
       else if (/task\.pending/.test(event)) status = 'pending';
 
-      // Extract known URLs from payload when present
-      const ofdUrl = pick<string>(data, 'acquiring_order.ofd_receipt_url')
+      // Extract known URLs from payload when present (try multiple shapes)
+      const ofdUrl = pick<string>(data, 'acquiring_order.ofd_url')
+        ?? pick<string>(data, 'task.acquiring_order.ofd_url')
+        ?? pick<string>(data, 'ofd_url')
+        ?? pick<string>(data, 'acquiring_order.ofd_receipt_url')
         ?? pick<string>(data, 'ofd_receipt_url');
-      const additionalCommissionOfdUrl = pick<string>(data, 'additional_commission_ofd_url');
+      const additionalCommissionOfdUrl = pick<string>(data, 'additional_commission_ofd_url')
+        ?? pick<string>(data, 'task.additional_commission_ofd_url');
       const npdReceiptUri = pick<string>(data, 'receipt_uri')
         ?? pick<string>(data, 'task.receipt_uri');
 
