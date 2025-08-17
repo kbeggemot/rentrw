@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getMaskedToken, saveApiToken, deleteApiToken, getDecryptedApiToken } from '@/server/secureStore';
-import { setUserOrgName } from '@/server/userStore';
+import { setUserOrgName, setUserOrgInn } from '@/server/userStore';
 import { enqueueSubscriptionJob, ensureSubscriptions, startSubscriptionWorker } from '@/server/subscriptionWorker';
 
 export const runtime = 'nodejs';
@@ -97,7 +97,9 @@ export async function POST(req: Request) {
         const txt = await r.text();
         let d: any = null; try { d = txt ? JSON.parse(txt) : null; } catch { d = txt; }
         const orgName: string | undefined = (d?.company_name as string | undefined) ?? undefined;
+        const orgInn: string | undefined = (d?.inn as string | undefined) ?? (d?.company_inn as string | undefined) ?? undefined;
         try { await setUserOrgName(userId, orgName ?? null); } catch {}
+        try { await setUserOrgInn(userId, orgInn ?? null); } catch {}
       } catch {}
     } catch {}
 

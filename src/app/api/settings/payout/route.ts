@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import { getUserPayoutRequisites, updateUserPayoutRequisites } from '@/server/userStore';
+import { getUserPayoutRequisites, updateUserPayoutRequisites, getUserOrgInn } from '@/server/userStore';
+import { getDecryptedApiToken } from '@/server/secureStore';
 
 export const runtime = 'nodejs';
 
@@ -34,6 +35,17 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'INVALID_PAYLOAD' }, { status: 400 });
     }
     await updateUserPayoutRequisites(userId, { bik, account });
+    // Create/update executor in RW after saving requisites
+    try {
+      const inn = await getUserOrgInn(userId);
+      const token = await getDecryptedApiToken(userId);
+      if (inn && token) {
+        const base = process.env.ROCKETWORK_API_BASE_URL || 'https://app.rocketwork.ru/api/';
+        const url = new URL('executors', base.endsWith('/') ? base : base + '/').toString();
+        const payload = { type: 'Withdrawal', inn } as Record<string, unknown>;
+        await fetch(url, { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify(payload), cache: 'no-store' });
+      }
+    } catch {}
     const reqs = await getUserPayoutRequisites(userId);
     return NextResponse.json({ bik: reqs.bik, account: reqs.account, orgName: reqs.orgName });
   } catch (error) {

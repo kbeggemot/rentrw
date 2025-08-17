@@ -6,6 +6,8 @@ import { getNextOrderId } from '@/server/orderStore';
 import { saveTaskId, recordSaleOnCreate } from '@/server/taskStore';
 import { getUserAgentSettings } from '@/server/userStore';
 import type { RocketworkTask } from '@/types/rocketwork';
+import { getUserPayoutRequisites, getUserOrgInn } from '@/server/userStore';
+import { recordWithdrawalCreate } from '@/server/withdrawalStore';
 
 export const runtime = 'nodejs';
 
@@ -31,8 +33,44 @@ export async function POST(req: Request) {
     const token = await getDecryptedApiToken(userId);
     if (!token) return NextResponse.json({ error: 'API токен не задан' }, { status: 400 });
 
-    const body = (await req.json()) as BodyIn;
-    const amountRub = Number(body.amountRub);
+    const body = (await req.json()) as BodyIn | any;
+    // Withdrawal support
+    if (body?.type === 'Withdrawal') {
+      // Forced balance refresh skipped here; endpoint creates withdrawal task
+      const inn = await getUserOrgInn(userId);
+      const { bik, account } = await getUserPayoutRequisites(userId);
+      const amountRub = Number(body?.amountRub || 0);
+      const amountCents = Math.round(amountRub * 100);
+      if (!inn) return NextResponse.json({ error: 'NO_INN' }, { status: 400 });
+      if (!bik || !account) return NextResponse.json({ error: 'NO_PAYOUT_REQUISITES' }, { status: 400 });
+      const payload = {
+        type: 'Withdrawal',
+        amount_gross: amountCents,
+        executor_inn: inn,
+        payment_info: {
+          bank_account: {
+            bic: bik,
+            account_number: account,
+          },
+        },
+      } as Record<string, unknown>;
+      const base = process.env.ROCKETWORK_API_BASE_URL || DEFAULT_BASE_URL;
+      const url = new URL('tasks', base.endsWith('/') ? base : base + '/').toString();
+      const res = await fetch(url, { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify(payload), cache: 'no-store' });
+      const text = await res.text();
+      let data: any = null; try { data = text ? JSON.parse(text) : null; } catch { data = text; }
+      if (!res.ok) {
+        const message = (data?.error as string | undefined) || text || 'External API error';
+        return NextResponse.json({ error: message }, { status: res.status });
+      }
+      const taskId = (data?.task?.id ?? data?.id ?? data?.task_id) as string | number | undefined;
+      if (taskId !== undefined) {
+        try { await recordWithdrawalCreate(userId, taskId, amountRub); } catch {}
+      }
+      return NextResponse.json({ ok: true, task_id: taskId, data }, { status: 201 });
+    }
+
+    const amountRub = Number((body as BodyIn).amountRub);
     const commissionPercent = body.commissionPercent !== undefined ? Number(body.commissionPercent) : undefined;
     const description = String(body.description || '').trim();
     const method = body.method === 'card' ? 'card' : 'qr';

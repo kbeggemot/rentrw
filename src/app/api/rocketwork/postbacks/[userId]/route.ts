@@ -3,6 +3,7 @@ import { listPartners, upsertPartner } from '@/server/partnerStore';
 import { updateSaleFromStatus } from '@/server/taskStore';
 import { promises as fs } from 'fs';
 import path from 'path';
+import { updateWithdrawal } from '@/server/withdrawalStore';
 
 export const runtime = 'nodejs';
 
@@ -85,6 +86,21 @@ export async function POST(req: Request) {
         additionalCommissionOfdUrl: additionalCommissionOfdUrl || undefined,
         npdReceiptUri: npdReceiptUri || undefined,
       });
+      // If this is a Withdrawal and it became paid, write a marker file for UI
+      try {
+        const kind = String(pick<string>(data, 'type') || pick<string>(data, 'task.type') || '').toLowerCase();
+        const aoStatus = String(pick<string>(data, 'acquiring_order.status') || pick<string>(data, 'task.acquiring_order.status') || '').toLowerCase();
+        if (kind === 'withdrawal') {
+          // Persist store for history
+          try { await updateWithdrawal(userId, taskId, { status: status || aoStatus }); } catch {}
+        }
+        if (kind === 'withdrawal' && (status === 'paid' || aoStatus === 'paid')) {
+          const dataDir = path.join(process.cwd(), '.data');
+          await fs.mkdir(dataDir, { recursive: true });
+          await fs.writeFile(path.join(dataDir, `withdrawal_${userId}_${String(taskId)}.json`), JSON.stringify({ userId, taskId, paidAt: new Date().toISOString() }), 'utf8');
+          try { await updateWithdrawal(userId, taskId, { status: 'paid', paidAt: new Date().toISOString() }); } catch {}
+        }
+      } catch {}
       return NextResponse.json({ ok: true });
     }
 

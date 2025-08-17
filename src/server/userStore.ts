@@ -16,6 +16,7 @@ export type UserRecord = {
   payoutBik?: string; // digits only
   payoutAccount?: string; // digits only
   payoutOrgName?: string; // read-only, from Rocket Work account
+  payoutOrgInn?: string; // read-only, from Rocket Work account (ИНН)
 };
 
 const DATA_DIR = path.join(process.cwd(), '.data');
@@ -179,6 +180,20 @@ export async function setUserOrgName(userId: string, orgName: string | null): Pr
   if (idx === -1) throw new Error('USER_NOT_FOUND');
   users[idx].payoutOrgName = (orgName && orgName.trim().length > 0) ? orgName.trim() : undefined;
   await writeUsers(users);
+}
+
+export async function setUserOrgInn(userId: string, orgInn: string | null): Promise<void> {
+  const users = await readUsers();
+  const idx = users.findIndex((u) => u.id === userId);
+  if (idx === -1) throw new Error('USER_NOT_FOUND');
+  const digits = (orgInn || '').replace(/\D/g, '');
+  users[idx].payoutOrgInn = digits && digits.length > 0 ? digits : undefined;
+  await writeUsers(users);
+}
+
+export async function getUserOrgInn(userId: string): Promise<string | null> {
+  const u = await getUserById(userId);
+  return u?.payoutOrgInn ?? null;
 }
 
 
