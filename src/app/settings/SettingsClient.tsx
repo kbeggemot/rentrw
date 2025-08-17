@@ -22,6 +22,7 @@ export default function SettingsClient({ initial }: { initial: SettingsPrefetch 
   const [currentMasked, setCurrentMasked] = useState<string | null>(initial.tokenMasked);
   const [token, setToken] = useState('');
   const [saving, setSaving] = useState(false);
+  const [deletingToken, setDeletingToken] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
   const [keys, setKeys] = useState<Passkey[] | null>(initial.keys);
@@ -92,6 +93,24 @@ export default function SettingsClient({ initial }: { initial: SettingsPrefetch 
     }
   };
 
+  const deleteToken = async () => {
+    setDeletingToken(true);
+    setMessage(null);
+    try {
+      const res = await fetch('/api/settings/token', { method: 'DELETE' });
+      const t = await res.text();
+      let d: any = null; try { d = t ? JSON.parse(t) : null; } catch {}
+      if (!res.ok) throw new Error(d?.error || t || 'DELETE_FAILED');
+      setCurrentMasked(null);
+      setToken('');
+      setMessage('Токен удалён');
+    } catch (e) {
+      setMessage('Не удалось удалить токен');
+    } finally {
+      setDeletingToken(false);
+    }
+  };
+
   const setupBiometry = async () => {
     setBioLoading(true);
     try {
@@ -149,13 +168,19 @@ export default function SettingsClient({ initial }: { initial: SettingsPrefetch 
       <h1 className="hidden md:block text-2xl font-bold mb-4">Настройки</h1>
       <form onSubmit={submit} className="space-y-4">
         <div>
-          <label className="block text-sm text-gray-700 dark:text-gray-300 mb-1">Текущий токен</label>
-          <Input type="text" value={currentMasked ?? ''} readOnly placeholder="Токен не задан" />
-        </div>
-        <div className="flex items-center gap-3">
-          <Button type="submit" disabled={token.length === 0} loading={saving}>Сохранить</Button>
-          <Input type="password" placeholder="Введите новый токен" value={token} onChange={(e) => setToken(e.target.value)} />
-          {message ? (<div className="text-sm text-gray-600 dark:text-gray-300">{message}</div>) : null}
+          <label className="block text-sm text-gray-700 dark:text-gray-300 mb-1">Токен Рокет Ворк</label>
+          {currentMasked ? (
+            <div className="flex items-center gap-3">
+              <Input type="text" value={currentMasked} readOnly />
+              <Button type="button" variant="secondary" loading={deletingToken} onClick={deleteToken}>Удалить токен</Button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-3">
+              <Input type="password" placeholder="Введите токен" value={token} onChange={(e) => setToken(e.target.value)} />
+              <Button type="submit" disabled={token.length === 0} loading={saving}>Сохранить</Button>
+            </div>
+          )}
+          {message ? (<div className="text-sm text-gray-600 dark:text-gray-300 mt-2">{message}</div>) : null}
         </div>
 
         <div className="pt-6">
