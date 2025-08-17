@@ -56,6 +56,7 @@ export default function SettingsClient({ initial }: { initial: SettingsPrefetch 
   const [bik, setBik] = useState<string>(initial.payoutBik ?? '');
   const [account, setAccount] = useState<string>(initial.payoutAccount ?? '');
   const [savingPayout, setSavingPayout] = useState(false);
+  const [orgName, setOrgName] = useState<string>(initial.payoutOrgName ?? '');
 
   // Only fetch keys again if initial was empty and we need to populate
   useEffect(() => {
@@ -98,6 +99,12 @@ export default function SettingsClient({ initial }: { initial: SettingsPrefetch 
       setCurrentMasked(data?.token ?? null);
       setToken('');
       setMessage('Токен сохранён');
+      // refresh payout org name after token save
+      try {
+        const pr = await fetch('/api/settings/payout', { cache: 'no-store' });
+        const pd = await pr.json();
+        if (typeof pd?.orgName === 'string') setOrgName(pd.orgName || '');
+      } catch {}
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Ошибка';
       setMessage(message);
@@ -117,6 +124,7 @@ export default function SettingsClient({ initial }: { initial: SettingsPrefetch 
       setCurrentMasked(null);
       setToken('');
       setMessage('Токен удалён');
+      setOrgName('');
     } catch (e) {
       setMessage('Не удалось удалить токен');
     } finally {
@@ -346,7 +354,7 @@ export default function SettingsClient({ initial }: { initial: SettingsPrefetch 
         <div className="mt-8">
           <h2 className="text-lg font-semibold mb-2">Реквизиты для вывода</h2>
           <div className="flex flex-col gap-3 max-w-md">
-            <Input label="Наименование организации" value={initial.payoutOrgName ?? ''} readOnly placeholder="Будет заполнено автоматически после сохранения токена" />
+            <Input label="Наименование организации" value={orgName} readOnly placeholder="Будет заполнено автоматически после сохранения токена" />
             <Input label="БИК" placeholder="044525225" value={bik} onChange={(e) => setBik(e.target.value)} />
             <Input label="Номер счёта" placeholder="40702…" value={account} onChange={(e) => setAccount(e.target.value)} />
             <div>
@@ -354,7 +362,9 @@ export default function SettingsClient({ initial }: { initial: SettingsPrefetch 
                 setSavingPayout(true);
                 try {
                   const r = await fetch('/api/settings/payout', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ bik, account }) });
+                  const d = await r.json().catch(() => null);
                   if (!r.ok) throw new Error('SAVE_FAILED');
+                  if (d && typeof d.orgName === 'string') setOrgName(d.orgName || '');
                   setMessage('Реквизиты сохранены');
                 } catch {
                   setMessage('Не удалось сохранить реквизиты');

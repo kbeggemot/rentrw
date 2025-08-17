@@ -20,7 +20,7 @@ export function Sidebar() {
   };
 
   return (
-    <aside className="w-full md:w-64 shrink-0 border-b md:border-b-0 md:border-r border-gray-200 dark:border-gray-800 flex flex-col h-full md:min-h-screen">
+    <aside className="w-full md:w-64 shrink-0 border-b md:border-b-0 md:border-r border-gray-200 dark:border-gray-800 flex flex-col h-full md:h-screen md:sticky md:top-0 md:self-start md:overflow-auto">
       <nav className="flex flex-col items-stretch gap-1 p-2">
         <Link
           href="/dashboard"

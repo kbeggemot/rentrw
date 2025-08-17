@@ -123,6 +123,7 @@ export async function DELETE(req: Request) {
     const userId = getUserId(req);
     if (!userId) return NextResponse.json({ error: 'NO_USER' }, { status: 401 });
     await deleteApiToken(userId);
+    try { await setUserOrgName(userId, null); } catch {}
     return NextResponse.json({ ok: true });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Server error';
