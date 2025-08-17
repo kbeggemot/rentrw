@@ -35,7 +35,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'INVALID_PAYLOAD' }, { status: 400 });
     }
     await updateUserPayoutRequisites(userId, { bik, account });
-    // Create/update executor in RW after saving requisites
+    // Create/update executor in RW after saving requisites and wait for confirmation
     try {
       const inn = await getUserOrgInn(userId);
       const token = await getDecryptedApiToken(userId);
@@ -43,9 +43,17 @@ export async function POST(req: Request) {
         const base = process.env.ROCKETWORK_API_BASE_URL || 'https://app.rocketwork.ru/api/';
         const url = new URL('executors', base.endsWith('/') ? base : base + '/').toString();
         const payload = { type: 'Withdrawal', inn } as Record<string, unknown>;
-        await fetch(url, { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify(payload), cache: 'no-store' });
+        const rw = await fetch(url, { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify(payload), cache: 'no-store' });
+        const txt = await rw.text();
+        if (!rw.ok) {
+          let err: any = null; try { err = txt ? JSON.parse(txt) : null; } catch {}
+          const message = (err?.error as string | undefined) || txt || 'EXECUTOR_CREATE_FAILED';
+          return NextResponse.json({ error: 'EXECUTOR_CREATE_FAILED', details: message }, { status: 502 });
+        }
       }
-    } catch {}
+    } catch {
+      return NextResponse.json({ error: 'EXECUTOR_CREATE_FAILED' }, { status: 502 });
+    }
     const reqs = await getUserPayoutRequisites(userId);
     return NextResponse.json({ bik: reqs.bik, account: reqs.account, orgName: reqs.orgName });
   } catch (error) {

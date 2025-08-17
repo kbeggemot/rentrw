@@ -362,12 +362,15 @@ export default function SettingsClient({ initial }: { initial: SettingsPrefetch 
                 setSavingPayout(true);
                 try {
                   const r = await fetch('/api/settings/payout', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ bik, account }) });
-                  const d = await r.json().catch(() => null);
-                  if (!r.ok) throw new Error('SAVE_FAILED');
+                  const t = await r.text();
+                  let d: any = null; try { d = t ? JSON.parse(t) : null; } catch {}
+                  if (!r.ok) throw new Error(d?.error || t || 'SAVE_FAILED');
                   if (d && typeof d.orgName === 'string') setOrgName(d.orgName || '');
                   setMessage('Реквизиты сохранены');
-                } catch {
-                  setMessage('Не удалось сохранить реквизиты');
+                } catch (e) {
+                  const raw = e instanceof Error ? e.message : 'ERROR';
+                  if (raw === 'EXECUTOR_CREATE_FAILED') setMessage('Не удалось подтвердить реквизиты в Рокет Ворк. Попробуйте позже.');
+                  else setMessage('Не удалось сохранить реквизиты');
                 } finally {
                   setSavingPayout(false);
                 }
