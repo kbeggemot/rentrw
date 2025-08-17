@@ -16,6 +16,9 @@ export type SettingsPrefetch = {
   agentDescription: string;
   defaultCommission: DefaultCommission;
   keys: Passkey[];
+  payoutBik: string | null;
+  payoutAccount: string | null;
+  payoutOrgName: string | null;
 };
 
 export default function SettingsClient({ initial }: { initial: SettingsPrefetch }) {
@@ -49,6 +52,11 @@ export default function SettingsClient({ initial }: { initial: SettingsPrefetch 
   const [savingAgentDesc, setSavingAgentDesc] = useState(false);
   const [bioLoading, setBioLoading] = useState(false);
 
+  // payout requisites
+  const [bik, setBik] = useState<string>(initial.payoutBik ?? '');
+  const [account, setAccount] = useState<string>(initial.payoutAccount ?? '');
+  const [savingPayout, setSavingPayout] = useState(false);
+
   // Only fetch keys again if initial was empty and we need to populate
   useEffect(() => {
     if (initial.keys.length > 0) return;
@@ -81,7 +89,12 @@ export default function SettingsClient({ initial }: { initial: SettingsPrefetch 
       const text = await res.text();
       let data: { token?: string; error?: string } | null = null;
       try { data = text ? (JSON.parse(text) as { token?: string; error?: string }) : null; } catch {}
-      if (!res.ok) throw new Error(data?.error || text || 'Ошибка сохранения');
+      if (!res.ok) {
+        const code = data?.error || text || 'ERROR';
+        if (code === 'INVALID_TOKEN') throw new Error('Указан некорректный токен');
+        if (code === 'TECH_ERROR') throw new Error('Техническая ошибка. Попробуйте ещё раз');
+        throw new Error('Ошибка сохранения');
+      }
       setCurrentMasked(data?.token ?? null);
       setToken('');
       setMessage('Токен сохранён');
@@ -183,7 +196,7 @@ export default function SettingsClient({ initial }: { initial: SettingsPrefetch 
           {message ? (<div className="text-sm text-gray-600 dark:text-gray-300 mt-2">{message}</div>) : null}
         </div>
 
-        <div className="pt-6">
+        <div>
           <label className="block text-sm text-gray-700 dark:text-gray-300 mb-1">Email</label>
           {!emailEditing ? (
             <div className="flex items-center gap-3">
@@ -269,7 +282,7 @@ export default function SettingsClient({ initial }: { initial: SettingsPrefetch 
           )}
         </div>
         {emailMasked && !emailVerified ? (
-          <div className="pt-3">
+          <div className="mt-2">
             <label className="block text-sm text-gray-700 dark:text-gray-300 mb-1">Подтверждение email</label>
             <div className="flex items-end gap-3">
               <Input
@@ -325,83 +338,109 @@ export default function SettingsClient({ initial }: { initial: SettingsPrefetch 
           )
         ) : null}
 
-        <div className="pt-6">
+        <div>
           <label className="block text-sm text-gray-700 dark:text-gray-300 mb-1">Учётная запись</label>
           <Input type="text" value={accountPhone ?? ''} readOnly placeholder="Нет данных" />
         </div>
 
-        <div className="pt-6">
-          <label className="block text-sm text-gray-700 dark:text-gray-300 mb-1">Описание ваших услуг как агента</label>
-          <textarea
-            className="w-full rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-foreground"
-            rows={3}
-            value={agentDesc}
-            onChange={(e) => setAgentDesc(e.target.value)}
-          />
-          <div className="mt-2">
-            <Button
-              type="button"
-              variant="secondary"
-              loading={savingAgentDesc}
-              onClick={async () => {
-                setSavingAgentDesc(true);
+        <div>
+          <h2 className="text-lg font-semibold mb-2">Реквизиты для вывода</h2>
+          <div className="flex flex-col gap-3 max-w-md">
+            <Input label="Наименование организации" value={initial.payoutOrgName ?? ''} readOnly placeholder="Будет заполнено автоматически после сохранения токена" />
+            <Input label="БИК" placeholder="044525225" value={bik} onChange={(e) => setBik(e.target.value)} />
+            <Input label="Номер счёта" placeholder="40702…" value={account} onChange={(e) => setAccount(e.target.value)} />
+            <div>
+              <Button type="button" variant="secondary" loading={savingPayout} onClick={async () => {
+                setSavingPayout(true);
                 try {
-                  const r = await fetch('/api/settings/agent', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ agentDescription: agentDesc }),
-                  });
+                  const r = await fetch('/api/settings/payout', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ bik, account }) });
                   if (!r.ok) throw new Error('SAVE_FAILED');
-                  setMessage('Описание сохранено');
+                  setMessage('Реквизиты сохранены');
                 } catch {
-                  setMessage('Не удалось сохранить описание');
+                  setMessage('Не удалось сохранить реквизиты');
                 } finally {
-                  setSavingAgentDesc(false);
+                  setSavingPayout(false);
                 }
-              }}
-            >Сохранить описание</Button>
-          </div>
-        </div>
-
-        <div className="pt-4">
-          <div className="text-sm text-gray-700 dark:text-gray-300 mb-2">Ваша стандартная агентская ставка</div>
-          <div className="flex flex-wrap items-end gap-3">
-            <div className="flex items-center gap-3">
-              <label className="inline-flex items-center gap-2 text-sm">
-                <input type="radio" name="agentType" value="percent" checked={agentType === 'percent'} onChange={() => setAgentType('percent')} />
-                <span>%</span>
-              </label>
-              <label className="inline-flex items-center gap-2 text-sm">
-                <input type="radio" name="agentType" value="fixed" checked={agentType === 'fixed'} onChange={() => setAgentType('fixed')} />
-                <span>₽</span>
-              </label>
+              }}>Сохранить реквизиты</Button>
             </div>
-            <Input type="number" step="0.01" placeholder={agentType === 'percent' ? '0' : '0.00'} value={agentValue} onChange={(e) => setAgentValue(e.target.value)} className="w-32" />
-            <Button
-              type="button"
-              variant="secondary"
-              loading={savingAgent}
-              onClick={async () => {
-                setSavingAgent(true);
-                try {
-                  const payload = {
-                    agentDescription: agentDesc,
-                    defaultCommission: agentValue.trim().length > 0 ? { type: agentType, value: Number(agentValue) } : undefined,
-                  };
-                  const r = await fetch('/api/settings/agent', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-                  if (!r.ok) throw new Error('SAVE_FAILED');
-                  setMessage('Сохранено');
-                } catch {
-                  setMessage('Не удалось сохранить');
-                } finally {
-                  setSavingAgent(false);
-                }
-              }}
-            >Сохранить</Button>
           </div>
         </div>
 
-        <div className="pt-8">
+        <div>
+          <h2 className="text-lg font-semibold mb-2">Агентские настройки</h2>
+          <div className="mb-4">
+            <label className="block text-sm text-gray-700 dark:text-gray-300 mb-1">Описание ваших услуг как агента</label>
+            <textarea
+              className="w-full rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-foreground"
+              rows={3}
+              value={agentDesc}
+              onChange={(e) => setAgentDesc(e.target.value)}
+            />
+            <div className="mt-2">
+              <Button
+                type="button"
+                variant="secondary"
+                loading={savingAgentDesc}
+                onClick={async () => {
+                  setSavingAgentDesc(true);
+                  try {
+                    const r = await fetch('/api/settings/agent', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ agentDescription: agentDesc }),
+                    });
+                    if (!r.ok) throw new Error('SAVE_FAILED');
+                    setMessage('Описание сохранено');
+                  } catch {
+                    setMessage('Не удалось сохранить описание');
+                  } finally {
+                    setSavingAgentDesc(false);
+                  }
+                }}
+              >Сохранить описание</Button>
+            </div>
+          </div>
+
+          <div className="mt-3">
+            <div className="text-sm text-gray-700 dark:text-gray-300 mb-2">Ваша стандартная агентская ставка</div>
+            <div className="flex flex-wrap items-end gap-3">
+              <div className="flex items-center gap-3">
+                <label className="inline-flex items-center gap-2 text-sm">
+                  <input type="radio" name="agentType" value="percent" checked={agentType === 'percent'} onChange={() => setAgentType('percent')} />
+                  <span>%</span>
+                </label>
+                <label className="inline-flex items-center gap-2 text-sm">
+                  <input type="radio" name="agentType" value="fixed" checked={agentType === 'fixed'} onChange={() => setAgentType('fixed')} />
+                  <span>₽</span>
+                </label>
+              </div>
+              <Input type="number" step="0.01" placeholder={agentType === 'percent' ? '0' : '0.00'} value={agentValue} onChange={(e) => setAgentValue(e.target.value)} className="w-32" />
+              <Button
+                type="button"
+                variant="secondary"
+                loading={savingAgent}
+                onClick={async () => {
+                  setSavingAgent(true);
+                  try {
+                    const payload = {
+                      agentDescription: agentDesc,
+                      defaultCommission: agentValue.trim().length > 0 ? { type: agentType, value: Number(agentValue) } : undefined,
+                    };
+                    const r = await fetch('/api/settings/agent', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+                    if (!r.ok) throw new Error('SAVE_FAILED');
+                    setMessage('Сохранено');
+                  } catch {
+                    setMessage('Не удалось сохранить');
+                  } finally {
+                    setSavingAgent(false);
+                  }
+                }}
+              >Сохранить</Button>
+            </div>
+          </div>
+        </div>
+
+        <div>
           <h2 className="text-lg font-semibold mb-2">Ключи входа (Face ID / Touch ID)</h2>
           {keysLoading ? (
             <div className="text-sm text-gray-600 dark:text-gray-300">Загрузка…</div>

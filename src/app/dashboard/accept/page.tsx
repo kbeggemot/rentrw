@@ -55,14 +55,21 @@ function AcceptPaymentContent() {
   const [attempt, setAttempt] = useState<number>(0);
   const pollAbortRef = useRef<{ aborted: boolean }>({ aborted: false });
   const pollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const statusTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const loadingRef = useRef<boolean>(false);
   const paymentUrlRef = useRef<string | null>(null);
+
+  const [aoStatus, setAoStatus] = useState<string | null>(null);
+  const [purchaseReceiptUrl, setPurchaseReceiptUrl] = useState<string | null>(null);
+  const [commissionReceiptUrl, setCommissionReceiptUrl] = useState<string | null>(null);
+  const [taskIsAgent, setTaskIsAgent] = useState<boolean | null>(null);
 
   useEffect(() => {
     const ref = pollAbortRef.current;
     return () => {
       ref.aborted = true;
       if (pollTimerRef.current) clearTimeout(pollTimerRef.current);
+      if (statusTimerRef.current) clearTimeout(statusTimerRef.current);
     };
   }, []);
 
@@ -112,7 +119,7 @@ function AcceptPaymentContent() {
         const status = (stData?.acquiring_order?.status as string | undefined)
           ?? (stData?.task?.acquiring_order?.status as string | undefined);
         if (status) {
-          const msg = `Ожидаем ссылку… (статус: ${status})`;
+          const msg = 'Ожидаем ссылку…';
           setMessage((prev) => (prev === msg ? prev : msg));
         }
         if (stRes.ok && found) {
@@ -130,6 +137,43 @@ function AcceptPaymentContent() {
       pollTimerRef.current = setTimeout(() => tick(n + 1), 1500);
     };
     tick(1);
+  };
+
+  // Watch task status and receipts after task is created
+  const startStatusWatcher = (taskId: string | number) => {
+    if (statusTimerRef.current) clearTimeout(statusTimerRef.current);
+    const run = async () => {
+      try {
+        const stRes = await fetch(`/api/rocketwork/tasks/${taskId}?t=${Date.now()}`, { cache: 'no-store' });
+        const stText = await stRes.text();
+        let stData: any = null; try { stData = stText ? JSON.parse(stText) : null; } catch { stData = stText; }
+        const status: string | undefined = (stData?.acquiring_order?.status as string | undefined) ?? undefined;
+        if (status) setAoStatus(status);
+        const purchase = (stData?.ofd_url as string | undefined) ?? (stData?.acquiring_order?.ofd_url as string | undefined) ?? null;
+        const addOfd = (stData?.additional_commission_ofd_url as string | undefined) ?? null;
+        if (purchase) setPurchaseReceiptUrl(purchase);
+        if (addOfd) setCommissionReceiptUrl(addOfd);
+        // If paid/transferred — hide payment link and QR
+        const st = String(status || '').toLowerCase();
+        if (st === 'paid' || st === 'transfered' || st === 'transferred') {
+          if (paymentUrlRef.current) {
+            setPaymentUrl(null);
+          }
+          // после успеха — полностью убираем QR и заголовок
+          if (qrDataUrl) setQrDataUrl(null);
+          setMessage(null);
+          setMessageKind('info');
+        }
+      } catch {}
+      // keep watching until both receipts are present (or not agent)
+      const needCommission = isAgentSale;
+      const missingPurchase = !purchaseReceiptUrl;
+      const missingCommission = needCommission && !commissionReceiptUrl;
+      if (missingPurchase || missingCommission) {
+        statusTimerRef.current = setTimeout(run, 2000);
+      }
+    };
+    run();
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -178,9 +222,20 @@ function AcceptPaymentContent() {
       setLoading(true);
       // схлопываем параметры под спойлер, раз локальная валидация прошла
       setCollapsed(true);
+      // сбрасываем состояние предыдущей попытки (ссылка, QR, статусы, чеки)
+      if (pollTimerRef.current) clearTimeout(pollTimerRef.current);
+      if (statusTimerRef.current) clearTimeout(statusTimerRef.current);
       paymentUrlRef.current = null;
       setPaymentUrl(null);
+      setQrDataUrl(null);
+      setAoStatus(null);
+      setPurchaseReceiptUrl(null);
+      setCommissionReceiptUrl(null);
+      setTaskIsAgent(null);
+      setLastTaskId(null);
       setAttempt(0);
+      // зафиксируем тип текущей сделки — используем для отображения чеков после успеха
+      setTaskIsAgent(isAgentSale);
       const res = await fetch('/api/rocketwork/tasks', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -204,6 +259,7 @@ function AcceptPaymentContent() {
       if (taskId !== undefined) {
         setLastTaskId(taskId);
         startPolling(taskId);
+        startStatusWatcher(taskId);
       } else {
         setLoading(false);
         setMessage('Не удалось получить идентификатор задачи');
@@ -345,7 +401,7 @@ function AcceptPaymentContent() {
         ) : null}
           </>
         ) : null}
-        <Button type="submit" disabled={loading}>{loading ? 'Создаю…' : (paymentUrl ? 'Повторить' : 'Продолжить')}</Button>
+        <Button type="submit" disabled={loading}>{loading ? 'Создаю…' : (lastTaskId ? 'Повторить' : 'Продолжить')}</Button>
         {paymentUrl ? (
           <div className="mt-4 space-y-3">
             <div className="flex gap-2 items-end">
@@ -372,11 +428,36 @@ function AcceptPaymentContent() {
                 Копировать
               </Button>
             </div>
-            {qrDataUrl ? (
-              <div>
-                <div className="text-sm text-gray-600 dark:text-gray-400 mb-1">QR для оплаты</div>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={qrDataUrl} alt="QR code" className="w-48 h-48 border rounded" />
+            
+          </div>
+        ) : null}
+        {/* после успеха QR скрывается полностью */}
+        {qrDataUrl && !(aoStatus && ['paid','transfered','transferred'].includes(String(aoStatus).toLowerCase())) ? (
+          <div className="mt-4">
+            <div className="text-sm text-gray-600 dark:text-gray-400 mb-1">QR для оплаты</div>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={qrDataUrl} alt="QR code" className="w-48 h-48 border rounded" />
+          </div>
+        ) : null}
+        {aoStatus && (aoStatus.toLowerCase() === 'paid' || aoStatus.toLowerCase() === 'transfered' || aoStatus.toLowerCase() === 'transferred') ? (
+          <div className="mt-4 space-y-3">
+            <div className="text-green-700 dark:text-green-400 text-sm">Успешно оплачено</div>
+            <div className="flex gap-2 items-end">
+              <Input label="Чек на покупку" value={purchaseReceiptUrl ?? ''} readOnly placeholder="Ожидаем чек…" className="flex-1" onFocus={(e) => e.currentTarget.select()} />
+              {purchaseReceiptUrl ? (
+                <Button type="button" variant="secondary" onClick={async () => { try { if (purchaseReceiptUrl) await navigator.clipboard.writeText(purchaseReceiptUrl); setMessage('Ссылка скопирована'); setTimeout(() => setMessage(null), 1500); } catch {} }}>Копировать</Button>
+              ) : (
+                <div className="w-9 h-9 flex items-center justify-center"><span className="inline-block w-4 h-4 rounded-full border-2 border-gray-300 border-t-gray-600 animate-spin" /></div>
+              )}
+            </div>
+            {taskIsAgent ? (
+              <div className="flex gap-2 items-end">
+                <Input label="Чек на комиссию" value={commissionReceiptUrl ?? ''} readOnly placeholder="Ожидаем чек…" className="flex-1" onFocus={(e) => e.currentTarget.select()} />
+                {commissionReceiptUrl ? (
+                  <Button type="button" variant="secondary" onClick={async () => { try { if (commissionReceiptUrl) await navigator.clipboard.writeText(commissionReceiptUrl); setMessage('Ссылка скопирована'); setTimeout(() => setMessage(null), 1500); } catch {} }}>Копировать</Button>
+                ) : (
+                  <div className="w-9 h-9 flex items-center justify-center"><span className="inline-block w-4 h-4 rounded-full border-2 border-gray-300 border-t-gray-600 animate-spin" /></div>
+                )}
               </div>
             ) : null}
           </div>
@@ -404,7 +485,7 @@ function AcceptPaymentContent() {
                 } catch {}
               }}
             >Проверить вручную</Button>
-            {lastTaskId ? <span className="text-gray-500">task: {String(lastTaskId)} · попытка {attempt}</span> : null}
+            <span className="text-gray-500">попытка {attempt}</span>
           </div>
         ) : null}
         {message ? (

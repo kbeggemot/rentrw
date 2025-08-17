@@ -57,13 +57,7 @@ export default function SalesClient({ initial }: { initial: Sale[] }) {
     }
   };
 
-  const refreshAll = async () => {
-    setLoading(true);
-    try {
-      await fetch('/api/sales/refresh-all', { method: 'POST' });
-    } catch {}
-    await load(true);
-  };
+  // удалено: глобальное "обновить всё" по просьбе
 
   const filtered = useMemo(() => {
     const q = query.trim();
@@ -157,7 +151,6 @@ export default function SalesClient({ initial }: { initial: Sale[] }) {
         </div>
         <div className="flex gap-2">
           <Button variant="secondary" onClick={() => load(true)} disabled={loading}>{loading ? 'Обновляю…' : 'Обновить'}</Button>
-          <Button variant="secondary" onClick={refreshAll} disabled={loading}>{loading ? 'Обновляю…' : 'Обновить все'}</Button>
         </div>
       </div>
       <div className="overflow-x-auto bg-white dark:bg-gray-950 border border-gray-200 dark:border-gray-800 rounded-lg">

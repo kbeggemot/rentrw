@@ -12,6 +12,10 @@ export type UserRecord = {
   agentDescription?: string;
   defaultAgentCommission?: { type: 'percent' | 'fixed'; value: number };
   webauthnOptOut?: boolean; // user chose not to be prompted for FaceID/TouchID
+  // payout requisites (per user)
+  payoutBik?: string; // digits only
+  payoutAccount?: string; // digits only
+  payoutOrgName?: string; // read-only, from Rocket Work account
 };
 
 const DATA_DIR = path.join(process.cwd(), '.data');
@@ -149,6 +153,31 @@ export async function updateUserAgentSettings(
   if (typeof settings.defaultCommission !== 'undefined') {
     users[idx].defaultAgentCommission = settings.defaultCommission ?? undefined;
   }
+  await writeUsers(users);
+}
+
+export async function getUserPayoutRequisites(userId: string): Promise<{ bik: string | null; account: string | null; orgName: string | null }> {
+  const u = await getUserById(userId);
+  return { bik: u?.payoutBik ?? null, account: u?.payoutAccount ?? null, orgName: u?.payoutOrgName ?? null };
+}
+
+export async function updateUserPayoutRequisites(userId: string, reqs: { bik?: string | null; account?: string | null }): Promise<void> {
+  const users = await readUsers();
+  const idx = users.findIndex((u) => u.id === userId);
+  if (idx === -1) throw new Error('USER_NOT_FOUND');
+  // normalize to digits only if provided
+  const normBik = typeof reqs.bik === 'string' ? reqs.bik.replace(/\D/g, '') : reqs.bik;
+  const normAcc = typeof reqs.account === 'string' ? reqs.account.replace(/\D/g, '') : reqs.account;
+  if (typeof normBik !== 'undefined') users[idx].payoutBik = normBik ?? undefined;
+  if (typeof normAcc !== 'undefined') users[idx].payoutAccount = normAcc ?? undefined;
+  await writeUsers(users);
+}
+
+export async function setUserOrgName(userId: string, orgName: string | null): Promise<void> {
+  const users = await readUsers();
+  const idx = users.findIndex((u) => u.id === userId);
+  if (idx === -1) throw new Error('USER_NOT_FOUND');
+  users[idx].payoutOrgName = (orgName && orgName.trim().length > 0) ? orgName.trim() : undefined;
   await writeUsers(users);
 }
 
