@@ -127,7 +127,11 @@ function SettingsContent() {
       const attResp = await startWebAuthnReg(options);
       const put = await fetch('/api/auth/webauthn/register', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ response: attResp, rpID, origin }) });
       if (!put.ok) throw new Error('Не удалось подключить Face ID / Touch ID');
-      try { localStorage.setItem('hasPasskey', '1'); } catch {}
+      try {
+        localStorage.setItem('hasPasskey', '1');
+        const id = (attResp as any)?.id;
+        if (typeof id === 'string' && id.length > 0) localStorage.setItem('passkeyId', id);
+      } catch {}
       try { document.cookie = 'has_passkey=1; Path=/; SameSite=Lax; Max-Age=31536000'; } catch {}
       // обновить список ключей
       setKeysLoading(true);

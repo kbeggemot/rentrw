@@ -40,8 +40,22 @@ export function AuthForm() {
         try { platform = await platformAuthenticatorIsAvailable(); } catch { platform = false; }
         const hasLocal = typeof window !== 'undefined' && window.localStorage?.getItem('hasPasskey') === '1';
         const hasCookie = typeof document !== 'undefined' && /(?:^|;\s*)has_passkey=1(?:;|$)/.test(document.cookie || '');
-        // Доверяем только платформенной поддержке ИПЛЮС наличие локальной отметки/куки
-        if (!ignore) setCanBioLogin(Boolean(supported && platform && (hasLocal || hasCookie)));
+        // Доп. проверка: если в localStorage лежит id ключа — спросим у сервера, существует ли он
+        let existsRemote = true;
+        try {
+          const keyId = typeof window !== 'undefined' ? window.localStorage?.getItem('passkeyId') : null;
+          if (keyId) {
+            const r = await fetch(`/api/auth/webauthn/exists?id=${encodeURIComponent(keyId)}`, { cache: 'no-store' });
+            const d = await r.json();
+            existsRemote = !!d?.exists;
+            if (!existsRemote) {
+              try { window.localStorage.removeItem('hasPasskey'); window.localStorage.removeItem('passkeyId'); } catch {}
+              try { document.cookie = 'has_passkey=; Path=/; Max-Age=0; SameSite=Lax'; } catch {}
+            }
+          }
+        } catch {}
+        // Доверяем только платформенной поддержке + флаг на устройстве + ключ существует на сервере
+        if (!ignore) setCanBioLogin(Boolean(supported && platform && (hasLocal || hasCookie) && existsRemote));
       } catch {
         if (!ignore) setCanBioLogin(false);
       }
@@ -106,10 +120,29 @@ export function AuthForm() {
             try {
               const attResp = await startWebAuthnReg(options);
               await fetch('/api/auth/webauthn/register', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ response: attResp, rpID, origin }) });
+              try {
+                const id = (attResp as any)?.id;
+                if (typeof id === 'string' && id.length > 0) localStorage.setItem('passkeyId', id);
+                localStorage.setItem('hasPasskey', '1');
+                document.cookie = 'has_passkey=1; Path=/; SameSite=Lax; Max-Age=31536000';
+              } catch {}
             } catch (e) {
               // тихо игнорируем, чтобы не мешать логину
               console.warn('webauthn register skip', e);
             }
+          } else {
+            // Если ключ уже есть, но мы не знаем его id на устройстве — подтянем из списка
+            try {
+              const hasId = typeof window !== 'undefined' && localStorage.getItem('passkeyId');
+              if (!hasId) {
+                const lr = await fetch('/api/auth/webauthn/list', { cache: 'no-store' });
+                const ld = await lr.json();
+                const firstId = Array.isArray(ld?.items) && ld.items.length > 0 ? ld.items[0]?.id : null;
+                if (firstId) {
+                  try { localStorage.setItem('passkeyId', firstId); localStorage.setItem('hasPasskey', '1'); document.cookie = 'has_passkey=1; Path=/; SameSite=Lax; Max-Age=31536000'; } catch {}
+                }
+              }
+            } catch {}
           }
         } catch {}
         window.location.href = '/dashboard';
@@ -238,6 +271,21 @@ export function AuthForm() {
               try {
                 const ok = (await browserSupportsWebAuthn()) && (await platformAuthenticatorIsAvailable());
                 if (!ok) { alert('Биометрия недоступна на этом устройстве'); return; }
+                // Доп.проверка перед кликом: ключ ещё существует на сервере?
+                try {
+                  const keyId = typeof window !== 'undefined' ? window.localStorage?.getItem('passkeyId') : null;
+                  if (keyId) {
+                    const r = await fetch(`/api/auth/webauthn/exists?id=${encodeURIComponent(keyId)}`, { cache: 'no-store' });
+                    const d = await r.json();
+                    if (!d?.exists) {
+                      try { window.localStorage.removeItem('hasPasskey'); window.localStorage.removeItem('passkeyId'); } catch {}
+                      try { document.cookie = 'has_passkey=; Path=/; Max-Age=0; SameSite=Lax'; } catch {}
+                      setCanBioLogin(false);
+                      alert('Ключ входа удалён. Подключите Face ID / Touch ID заново в настройках.');
+                      return;
+                    }
+                  }
+                } catch {}
                 const init = await fetch('/api/auth/webauthn/auth', { method: 'POST' });
                 const { options, rpID, origin } = await init.json();
                 try {
@@ -261,7 +309,15 @@ export function AuthForm() {
                 if (!fin.ok) {
                   const t = await fin.text();
                   let msg = 'Не удалось выполнить вход по биометрии';
-                  try { const j = t ? JSON.parse(t) : null; if (j?.error) msg += `\n${j.error}`; } catch {}
+                  try {
+                    const j = t ? JSON.parse(t) : null;
+                    if (j?.error) msg += `\n${j.error}`;
+                    if (j?.error === 'CRED_NOT_FOUND') {
+                      try { window.localStorage.removeItem('hasPasskey'); window.localStorage.removeItem('passkeyId'); } catch {}
+                      try { document.cookie = 'has_passkey=; Path=/; Max-Age=0; SameSite=Lax'; } catch {}
+                      setCanBioLogin(false);
+                    }
+                  } catch {}
                   alert(msg);
                   return;
                 }
