@@ -255,7 +255,7 @@ function AcceptPaymentContent() {
           required
         />
         <Input
-          label="E-mail покупателя (необязательно)"
+          label="Email покупателя (необязательно)"
           type="email"
           placeholder="user@example.com"
           value={buyerEmail}

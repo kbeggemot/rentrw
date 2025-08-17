@@ -38,7 +38,7 @@ export function Sidebar() {
             isActive('/partners') ? 'bg-gray-100 dark:bg-gray-900 font-medium' : 'hover:bg-gray-50 dark:hover:bg-gray-900'
           }`}
         >
-          Партнеры
+          Партнёры
         </Link>
         <Link
           href="/settings?view=1"

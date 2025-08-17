@@ -58,7 +58,7 @@ export async function POST(req: Request) {
       chosen = await getExecutorById(phone);
     }
     if (chosen.res.status === 404) {
-      return NextResponse.json({ error: 'Партнер не найден в РВ' }, { status: 404 });
+      return NextResponse.json({ error: 'Партнёр не найден в РВ' }, { status: 404 });
     }
     if (!chosen.res.ok) {
       const msg = (chosen.data?.error as string | undefined) || 'Ошибка RW';

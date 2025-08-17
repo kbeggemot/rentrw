@@ -118,7 +118,7 @@ export async function POST(req: Request) {
         ((exData as any).executor && (exData as any).executor.inn == null)
       );
       if (notFoundByStatus || notFoundByBody) {
-        return NextResponse.json({ error: 'Партнер не завершил регистрацию в Рокет Ворк' }, { status: 400 });
+        return NextResponse.json({ error: 'Партнёр не завершил регистрацию в Рокет Ворк' }, { status: 400 });
       }
       if (!exRes.ok) {
         const msg = (exData?.error as string | undefined) || 'Ошибка проверки исполнителя';
@@ -127,15 +127,15 @@ export async function POST(req: Request) {
       const seStatus: string | undefined = (exData?.selfemployed_status as string | undefined)
         ?? (exData?.executor?.selfemployed_status as string | undefined);
       if (!seStatus) {
-        return NextResponse.json({ error: 'Партнер не завершил регистрацию в Рокет Ворк' }, { status: 400 });
+        return NextResponse.json({ error: 'Партнёр не завершил регистрацию в Рокет Ворк' }, { status: 400 });
       }
       if (seStatus !== 'validated') {
-        return NextResponse.json({ error: 'Партнер не может принять оплату, т.к. не является самозанятым' }, { status: 400 });
+        return NextResponse.json({ error: 'Партнёр не может принять оплату, так как не является самозанятым' }, { status: 400 });
       }
       // validated: ensure payment info is present
       const paymentInfo = (exData as any)?.executor?.payment_info ?? (exData as any)?.payment_info ?? null;
       if (paymentInfo == null) {
-        return NextResponse.json({ error: 'Партнер не может принять оплату, т.к. не указал свои платежные данные' }, { status: 400 });
+        return NextResponse.json({ error: 'Партнёр не может принять оплату, так как не указал свои платёжные данные' }, { status: 400 });
       }
       verifiedPartnerPhone = partnerPhone;
     }

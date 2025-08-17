@@ -67,7 +67,7 @@ export async function POST(req: Request) {
     const ui = base ? `${base}/settings` : '/settings';
     await sendEmail({
       to: targetEmail!,
-      subject: 'Подтверждение e-mail в RentRW',
+      subject: 'Подтверждение email в RentRW',
       text: `Ваш код подтверждения: ${code}\n\nЕсли вы его не запрашивали, просто проигнорируйте это письмо.`,
     });
     return NextResponse.json({ email: maskEmail(targetEmail!), verification: 'sent', debug: {

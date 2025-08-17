@@ -21,6 +21,14 @@ export function AuthForm() {
   const [showOptOutModal, setShowOptOutModal] = useState(false);
   const [optOutChecked, setOptOutChecked] = useState(true);
 
+  function getLocalOptOutIntent(): boolean {
+    try { return localStorage.getItem('webauthn.optout.intent') === '1'; } catch { return false; }
+  }
+  function setLocalOptOutIntent(v: boolean) {
+    try { if (v) localStorage.setItem('webauthn.optout.intent', '1'); else localStorage.removeItem('webauthn.optout.intent'); } catch {}
+  }
+  // duplicate state removed
+
   // На свежей загрузке / при переходе на страницу авторизации — сбрасываем любые промежуточные данные
   useEffect(() => {
     setAwaitCode(false);
@@ -37,6 +45,7 @@ export function AuthForm() {
     let ignore = false;
     (async () => {
       try {
+        if (getLocalOptOutIntent()) { if (!ignore) { setCanBioLogin(false); } return; }
         const supported = await browserSupportsWebAuthn();
         let platform = false;
         try { platform = await platformAuthenticatorIsAvailable(); } catch { platform = false; }
@@ -90,7 +99,7 @@ export function AuthForm() {
       if (!ok) {
         setLoading(false);
         setPasswordError(null);
-        setError('Укажите корректный e-mail');
+        setError('Укажите корректный email');
         return;
       }
     }
@@ -115,46 +124,14 @@ export function AuthForm() {
         setConfirm('');
       } else {
         try { sessionStorage.removeItem('reg.pending'); } catch {}
-        try {
-          // Автопредложение: если ключа ещё нет, предложим добавить биометрию
-          const st = await fetch('/api/auth/webauthn/status', { method: 'GET' });
-          const s = await st.json();
-          if (!s?.hasAny) {
-            const init = await fetch('/api/auth/webauthn/register', { method: 'POST' });
-            const { options, rpID, origin } = await init.json();
-            try {
-              const attResp = await startWebAuthnReg(options);
-              await fetch('/api/auth/webauthn/register', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ response: attResp, rpID, origin }) });
-              try {
-                const id = (attResp as any)?.id;
-                if (typeof id === 'string' && id.length > 0) localStorage.setItem('passkeyId', id);
-                localStorage.setItem('hasPasskey', '1');
-                document.cookie = 'has_passkey=1; Path=/; SameSite=Lax; Max-Age=31536000';
-              } catch {}
-            } catch (e) {
-              // тихо игнорируем, чтобы не мешать логину
-              console.warn('webauthn register skip', e);
-            }
-          } else {
-            // Если ключ уже есть, но мы не знаем его id на устройстве — подтянем из списка
-            try {
-              const hasId = typeof window !== 'undefined' && localStorage.getItem('passkeyId');
-              if (!hasId) {
-                const lr = await fetch('/api/auth/webauthn/list', { cache: 'no-store' });
-                const ld = await lr.json();
-                const firstId = Array.isArray(ld?.items) && ld.items.length > 0 ? ld.items[0]?.id : null;
-                if (firstId) {
-                  try { localStorage.setItem('passkeyId', firstId); localStorage.setItem('hasPasskey', '1'); document.cookie = 'has_passkey=1; Path=/; SameSite=Lax; Max-Age=31536000'; } catch {}
-                }
-              }
-            } catch {}
-          }
-        } catch {}
+        // Сразу переходим в дашборд; предложение биометрии выполнится автоматически на дашборде
+        try { sessionStorage.setItem('postLoginPrompt', '1'); } catch {}
         window.location.href = '/dashboard';
+        return;
       }
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'AUTH_ERROR';
-      if (msg === 'EMAIL_TAKEN') setError('Такой e-mail уже используется');
+      if (msg === 'EMAIL_TAKEN') setError('Такой email уже используется');
       else if (msg === 'USER_EXISTS') setError('Пользователь с таким телефоном уже существует');
       else if (msg === 'INVALID_CODE') setError('Неверный код подтверждения');
       else setError('Ошибка. Попробуйте ещё раз.');
@@ -182,7 +159,7 @@ export function AuthForm() {
         ) : null}
         {isRegister && !awaitCode ? (
           <Input
-            label="E-mail"
+            label="Email"
             type="email"
             placeholder="user@example.com"
             value={email}
@@ -330,10 +307,13 @@ export function AuthForm() {
               } catch (e) {
                 // Пользователь отменил системный диалог/таймаут → не шумим
                 const name = e && (e as any).name;
-                if (name === 'NotAllowedError') {
+                const msg = (e && (e as any).message) ? String((e as any).message) : '';
+                const isCancel = name === 'NotAllowedError' || name === 'AbortError' || /not allowed/i.test(msg) || /timed out/i.test(msg) || /aborted/i.test(msg) || /user.*cancel/i.test(msg);
+                if (isCancel) {
                   console.warn('webauthn cancelled', e);
                   // Предложим не показывать повторно
                   setShowOptOutModal(true);
+                  setPendingRedirect('/dashboard');
                   return;
                 }
                 console.warn('webauthn login failed', e);
@@ -349,21 +329,30 @@ export function AuthForm() {
       {showOptOutModal && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
           <div className="bg-white dark:bg-gray-950 rounded-lg p-5 w-full max-w-md shadow-lg">
-            <h3 className="text-lg font-semibold mb-2">Подтверждение</h3>
-            <p className="text-sm text-gray-700 dark:text-gray-300 mb-3">Вход по Face ID / Touch ID можно подключить позже — в настройках устройства.</p>
+            <h3 className="text-lg font-semibold mb-2">Биометрический вход</h3>
+            <p className="text-sm text-gray-700 dark:text-gray-300 mb-3">Этот способ можно подключить позже — в настройках.</p>
             <label className="flex items-center gap-2 text-sm mb-4">
               <input type="checkbox" checked={optOutChecked} onChange={(e) => setOptOutChecked(e.target.checked)} />
-              <span>Больше не показывать это сообщение</span>
+              <span>Больше не предлагать подключение Face ID/Touch ID</span>
             </label>
             <div className="flex justify-end gap-2">
-              <Button type="button" variant="ghost" onClick={() => setShowOptOutModal(false)}>Закрыть</Button>
               <Button type="button" onClick={async () => {
                 try {
-                  if (optOutChecked) await fetch('/api/auth/webauthn/optout', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ optOut: true }) });
+                  if (optOutChecked) {
+                    const isLoggedIn = document.cookie.includes('session_user=');
+                    if (isLoggedIn) {
+                      await fetch('/api/auth/webauthn/optout', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ optOut: true }) });
+                    } else {
+                      setLocalOptOutIntent(true);
+                    }
+                  } else {
+                    setLocalOptOutIntent(false);
+                  }
                 } catch {}
                 setShowOptOutModal(false);
                 if (optOutChecked) setCanBioLogin(false);
-              }}>Ок</Button>
+                if (pendingRedirect) { const to = pendingRedirect; setPendingRedirect(null); window.location.href = to; }
+              }}>Понятно</Button>
             </div>
           </div>
         </div>
