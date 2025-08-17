@@ -38,24 +38,21 @@ export function AuthForm() {
         const supported = await browserSupportsWebAuthn();
         let platform = false;
         try { platform = await platformAuthenticatorIsAvailable(); } catch { platform = false; }
-        const hasLocal = typeof window !== 'undefined' && window.localStorage?.getItem('hasPasskey') === '1';
-        const hasCookie = typeof document !== 'undefined' && /(?:^|;\s*)has_passkey=1(?:;|$)/.test(document.cookie || '');
-        // Доп. проверка: если в localStorage лежит id ключа — спросим у сервера, существует ли он
-        let existsRemote = true;
+        const keyId = typeof window !== 'undefined' ? window.localStorage?.getItem('passkeyId') : null;
+        let existsRemote = false;
         try {
-          const keyId = typeof window !== 'undefined' ? window.localStorage?.getItem('passkeyId') : null;
           if (keyId) {
             const r = await fetch(`/api/auth/webauthn/exists?id=${encodeURIComponent(keyId)}`, { cache: 'no-store' });
             const d = await r.json();
             existsRemote = !!d?.exists;
             if (!existsRemote) {
-              try { window.localStorage.removeItem('hasPasskey'); window.localStorage.removeItem('passkeyId'); } catch {}
+              try { window.localStorage.removeItem('passkeyId'); window.localStorage.removeItem('hasPasskey'); } catch {}
               try { document.cookie = 'has_passkey=; Path=/; Max-Age=0; SameSite=Lax'; } catch {}
             }
           }
         } catch {}
-        // Доверяем только платформенной поддержке + флаг на устройстве + ключ существует на сервере
-        if (!ignore) setCanBioLogin(Boolean(supported && platform && (hasLocal || hasCookie) && existsRemote));
+        // Показываем кнопку только если реально есть известный ключ на устройстве
+        if (!ignore) setCanBioLogin(Boolean(supported && platform && keyId && existsRemote));
       } catch {
         if (!ignore) setCanBioLogin(false);
       }

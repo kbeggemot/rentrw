@@ -457,7 +457,7 @@ function SettingsContent() {
                 <div key={k.id} className="flex items-center justify-between border border-gray-200 dark:border-gray-800 rounded px-3 py-2">
                   <div className="text-sm break-all">
                     <div className="font-mono text-xs text-gray-700 dark:text-gray-300">{k.id}</div>
-                    <div className="text-xs text-gray-500">counter: {k.counter}</div>
+                    {/* counter hidden: platform passkeys often always 0 */}
                   </div>
                   <Button type="button" variant="secondary" onClick={() => removeKey(k.id)}>Удалить</Button>
                 </div>
