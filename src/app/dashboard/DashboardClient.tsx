@@ -48,7 +48,22 @@ export default function DashboardClient({ hasTokenInitial }: { hasTokenInitial: 
         const st = await fetch('/api/auth/webauthn/status', { cache: 'no-store' });
         if (!st.ok) return;
         const s = await st.json();
-        if (s?.optOut || s?.hasAny) return;
+        // Если ключи уже есть на аккаунте — синхронизируем локальный passkeyId и cookie и выходим
+        if (s?.hasAny) {
+          try {
+            const hasIdLocal = typeof window !== 'undefined' ? localStorage.getItem('passkeyId') : null;
+            if (!hasIdLocal) {
+              const lr = await fetch('/api/auth/webauthn/list', { cache: 'no-store' });
+              const ld = await lr.json();
+              const firstId = Array.isArray(ld?.items) && ld.items.length > 0 ? ld.items[0]?.id : null;
+              if (firstId) {
+                try { localStorage.setItem('passkeyId', firstId); localStorage.setItem('hasPasskey', '1'); document.cookie = 'has_passkey=1; Path=/; SameSite=Lax; Max-Age=31536000'; } catch {}
+              }
+            }
+          } catch {}
+          return;
+        }
+        if (s?.optOut) return;
         const init = await fetch('/api/auth/webauthn/register', { method: 'POST' });
         const { options, rpID, origin } = await init.json();
         if (cancelled) return;
