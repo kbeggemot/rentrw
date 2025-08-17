@@ -101,14 +101,7 @@ export default function DashboardPage() {
       <header className="mb-4">
         <h1 className="text-2xl font-bold">Касса</h1>
         <p className="text-sm text-gray-600 dark:text-gray-400">Принимайте оплату быстро и удобно</p>
-        {showBioCta ? (
-          <div className="mt-3 text-sm bg-white dark:bg-gray-950 border border-gray-200 dark:border-gray-800 rounded p-3 flex items-center gap-3">
-            <span className="text-gray-700 dark:text-gray-300">Подключите вход по Face ID / Touch ID на этом устройстве</span>
-            <Button type="button" variant="secondary" onClick={setupBiometry} loading={bioProcessing}>
-              Подключить
-            </Button>
-          </div>
-        ) : null}
+        {/* Убрали CTA подключения Face ID / Touch ID с главной страницы */}
       </header>
       {hasToken === false ? (
         <div className="bg-white dark:bg-gray-950 border border-gray-200 dark:border-gray-800 rounded-lg p-6 shadow-sm">

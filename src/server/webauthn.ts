@@ -74,7 +74,7 @@ export async function startRegistration(user: UserRecord, opts?: { rpID?: string
     pubKeyCredParams: [ { type: 'public-key', alg: -7 }, { type: 'public-key', alg: -257 } ],
     timeout: 60000,
     attestation: 'none',
-    authenticatorSelection: { userVerification: 'preferred', residentKey: 'required' },
+    authenticatorSelection: { userVerification: 'required', residentKey: 'required', authenticatorAttachment: 'platform' },
     excludeCredentials: [],
   };
   try { await fs.mkdir(DATA_DIR, { recursive: true }); await fs.writeFile(path.join(DATA_DIR, 'last_webauthn_register_options.json'), JSON.stringify(optionsJSON, null, 2), 'utf8'); } catch {}

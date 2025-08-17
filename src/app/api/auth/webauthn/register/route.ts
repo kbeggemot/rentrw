@@ -17,6 +17,10 @@ export async function POST(req: Request) {
   const computedOrigin = hdrOrigin || `${hdrProto}://${hdrHost}`;
   const computedRpID = hdrHost.split(':')[0];
   const { options, rpID, origin } = await startRegistration(user, { rpID: computedRpID, origin: computedOrigin });
+  // Ограничим только платформенными аутентификаторами и потребуем residentKey/userVerification
+  try {
+    (options as any).authenticatorSelection = { userVerification: 'required', residentKey: 'required', authenticatorAttachment: 'platform' };
+  } catch {}
   try { console.log('webauthn.register.options', { hasChallenge: !!(options as any)?.challenge, userId: (options as any)?.user?.id, exclude: (options as any)?.excludeCredentials?.length }); } catch {}
   const res = NextResponse.json({ options, rpID, origin });
   res.headers.append('Set-Cookie', 'has_passkey=1; Path=/; SameSite=Lax; Max-Age=31536000');
