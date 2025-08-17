@@ -350,7 +350,7 @@ export function AuthForm() {
                 } catch {}
                 setShowOptOutModal(false);
                 if (optOutChecked) setCanBioLogin(false);
-                if (pendingRedirect) { const to = pendingRedirect; setPendingRedirect(null); window.location.href = to; }
+                // Редирект обрабатывается текущей страницей; здесь ничего не делаем
               }}>Понятно</Button>
             </div>
           </div>
