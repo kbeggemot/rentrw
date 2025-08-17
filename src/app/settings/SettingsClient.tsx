@@ -343,7 +343,7 @@ export default function SettingsClient({ initial }: { initial: SettingsPrefetch 
           <Input type="text" value={accountPhone ?? ''} readOnly placeholder="Нет данных" />
         </div>
 
-        <div>
+        <div className="mt-8">
           <h2 className="text-lg font-semibold mb-2">Реквизиты для вывода</h2>
           <div className="flex flex-col gap-3 max-w-md">
             <Input label="Наименование организации" value={initial.payoutOrgName ?? ''} readOnly placeholder="Будет заполнено автоматически после сохранения токена" />
@@ -366,7 +366,7 @@ export default function SettingsClient({ initial }: { initial: SettingsPrefetch 
           </div>
         </div>
 
-        <div>
+        <div className="mt-8">
           <h2 className="text-lg font-semibold mb-2">Агентские настройки</h2>
           <div className="mb-4">
             <label className="block text-sm text-gray-700 dark:text-gray-300 mb-1">Описание ваших услуг как агента</label>
@@ -440,7 +440,7 @@ export default function SettingsClient({ initial }: { initial: SettingsPrefetch 
           </div>
         </div>
 
-        <div>
+        <div className="mt-8">
           <h2 className="text-lg font-semibold mb-2">Ключи входа (Face ID / Touch ID)</h2>
           {keysLoading ? (
             <div className="text-sm text-gray-600 dark:text-gray-300">Загрузка…</div>
