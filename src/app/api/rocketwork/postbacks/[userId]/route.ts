@@ -26,9 +26,11 @@ function buildFio(rec: any): string | null {
   return fio.length > 0 ? fio : null;
 }
 
-export async function POST(req: Request, ctx: { params: { userId: string } }) {
+export async function POST(req: Request) {
   try {
-    const userId = ctx?.params?.userId;
+    const urlObj = new URL(req.url);
+    const segs = urlObj.pathname.split('/');
+    const userId = decodeURIComponent(segs[segs.length - 1] || '');
     if (!userId) return NextResponse.json({ error: 'NO_USER' }, { status: 400 });
 
     const raw = await req.text();
