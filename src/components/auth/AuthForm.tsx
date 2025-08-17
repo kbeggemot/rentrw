@@ -313,7 +313,6 @@ export function AuthForm() {
                   console.warn('webauthn cancelled', e);
                   // Предложим не показывать повторно
                   setShowOptOutModal(true);
-                  setPendingRedirect('/dashboard');
                   return;
                 }
                 console.warn('webauthn login failed', e);
