@@ -139,7 +139,12 @@ function SettingsContent() {
       const kd = await kr.json();
       setKeys(Array.isArray(kd?.items) ? kd.items : []);
     } catch (e) {
-      alert(e instanceof Error ? e.message : 'Ошибка WebAuthn');
+      const name = e && (e as any).name;
+      if (name === 'NotAllowedError') {
+        console.warn('webauthn register cancelled', e);
+      } else {
+        alert(e instanceof Error ? e.message : 'Ошибка WebAuthn');
+      }
     } finally {
       setBioLoading(false);
       setKeysLoading(false);

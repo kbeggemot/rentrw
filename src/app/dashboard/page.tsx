@@ -89,8 +89,13 @@ export default function DashboardPage() {
       } catch {}
       try { document.cookie = 'has_passkey=1; Path=/; SameSite=Lax; Max-Age=31536000'; } catch {}
     } catch (e) {
-      const msg = e instanceof Error ? `${e.name || 'Error'}: ${e.message}` : 'Ошибка WebAuthn';
-      alert(`Не удалось подключить Face ID / Touch ID.\n${msg}`);
+      const name = e && (e as any).name;
+      if (name === 'NotAllowedError') {
+        console.warn('webauthn register cancelled', e);
+      } else {
+        const msg = e instanceof Error ? `${e.name || 'Error'}: ${e.message}` : 'Ошибка WebAuthn';
+        alert(`Не удалось подключить Face ID / Touch ID.\n${msg}`);
+      }
     } finally {
       setBioProcessing(false);
     }

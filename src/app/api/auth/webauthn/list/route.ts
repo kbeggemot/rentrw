@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { promises as fs } from 'fs';
 import path from 'path';
+import { setWebauthnOptOut } from '@/server/userStore';
 
 export const runtime = 'nodejs';
 
@@ -46,6 +47,7 @@ export async function DELETE(req: Request) {
 	const res = NextResponse.json({ ok: true, removed: id, remain: next.length });
 	if (next.length === 0) {
 		res.headers.append('Set-Cookie', 'has_passkey=; Path=/; Max-Age=0; SameSite=Lax');
+		try { await setWebauthnOptOut(userId, false); } catch {}
 	}
 	return res;
 }

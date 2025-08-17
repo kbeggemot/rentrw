@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { promises as fs } from 'fs';
 import path from 'path';
+import { getUserById } from '@/server/userStore';
 
 export const runtime = 'nodejs';
 
@@ -14,9 +15,11 @@ export async function GET(req: Request) {
     const raw = await fs.readFile(file, 'utf8').catch(() => '{}');
     const data = JSON.parse(raw || '{}');
     const hasAny = Array.isArray(data?.[userId]) && data[userId].length > 0;
-    return NextResponse.json({ hasAny });
+    const u = await getUserById(userId);
+    const optOut = !!u?.webauthnOptOut;
+    return NextResponse.json({ hasAny, optOut });
   } catch {
-    return NextResponse.json({ hasAny: false });
+    return NextResponse.json({ hasAny: false, optOut: false });
   }
 }
 

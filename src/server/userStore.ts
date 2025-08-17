@@ -11,6 +11,7 @@ export type UserRecord = {
   emailVerified?: boolean;
   agentDescription?: string;
   defaultAgentCommission?: { type: 'percent' | 'fixed'; value: number };
+  webauthnOptOut?: boolean; // user chose not to be prompted for FaceID/TouchID
 };
 
 const DATA_DIR = path.join(process.cwd(), '.data');
@@ -97,6 +98,14 @@ export async function getUserById(userId: string): Promise<UserRecord | null> {
   const users = await readUsers();
   const u = users.find((x) => x.id === userId);
   return u ?? null;
+}
+
+export async function setWebauthnOptOut(userId: string, value: boolean): Promise<void> {
+  const users = await readUsers();
+  const idx = users.findIndex((u) => u.id === userId);
+  if (idx === -1) throw new Error('USER_NOT_FOUND');
+  users[idx].webauthnOptOut = value;
+  await writeUsers(users);
 }
 
 export async function updateUserEmail(userId: string, email: string): Promise<void> {

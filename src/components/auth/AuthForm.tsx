@@ -18,6 +18,8 @@ export function AuthForm() {
   const [error, setError] = useState<string | null>(null);
   const [passwordError, setPasswordError] = useState<string | null>(null);
   const [canBioLogin, setCanBioLogin] = useState(false);
+  const [showOptOutModal, setShowOptOutModal] = useState(false);
+  const [optOutChecked, setOptOutChecked] = useState(true);
 
   // На свежей загрузке / при переходе на страницу авторизации — сбрасываем любые промежуточные данные
   useEffect(() => {
@@ -50,6 +52,12 @@ export function AuthForm() {
               try { document.cookie = 'has_passkey=; Path=/; Max-Age=0; SameSite=Lax'; } catch {}
             }
           }
+          // Если пользователь включил глобальную отметку отказа, не показываем кнопку
+          try {
+            const st = await fetch('/api/auth/webauthn/status', { cache: 'no-store' });
+            const s = await st.json();
+            if (s?.optOut) { if (!ignore) setCanBioLogin(false); return; }
+          } catch {}
         } catch {}
         // Показываем кнопку только если реально есть известный ключ на устройстве
         if (!ignore) setCanBioLogin(Boolean(supported && platform && keyId && existsRemote));
@@ -320,6 +328,14 @@ export function AuthForm() {
                 }
                 window.location.href = '/dashboard';
               } catch (e) {
+                // Пользователь отменил системный диалог/таймаут → не шумим
+                const name = e && (e as any).name;
+                if (name === 'NotAllowedError') {
+                  console.warn('webauthn cancelled', e);
+                  // Предложим не показывать повторно
+                  setShowOptOutModal(true);
+                  return;
+                }
                 console.warn('webauthn login failed', e);
                 const detail = e instanceof Error ? `${e.name || 'Error'}: ${e.message}` : '';
                 alert(`Не удалось выполнить вход по биометрии${detail ? `\n${detail}` : ''}`);
@@ -328,6 +344,28 @@ export function AuthForm() {
           >
             Войти по Face ID / Touch ID
           </Button>
+        </div>
+      )}
+      {showOptOutModal && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-gray-950 rounded-lg p-5 w-full max-w-md shadow-lg">
+            <h3 className="text-lg font-semibold mb-2">Подтверждение</h3>
+            <p className="text-sm text-gray-700 dark:text-gray-300 mb-3">Вход по Face ID / Touch ID можно подключить позже — в настройках устройства.</p>
+            <label className="flex items-center gap-2 text-sm mb-4">
+              <input type="checkbox" checked={optOutChecked} onChange={(e) => setOptOutChecked(e.target.checked)} />
+              <span>Больше не показывать это сообщение</span>
+            </label>
+            <div className="flex justify-end gap-2">
+              <Button type="button" variant="ghost" onClick={() => setShowOptOutModal(false)}>Закрыть</Button>
+              <Button type="button" onClick={async () => {
+                try {
+                  if (optOutChecked) await fetch('/api/auth/webauthn/optout', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ optOut: true }) });
+                } catch {}
+                setShowOptOutModal(false);
+                if (optOutChecked) setCanBioLogin(false);
+              }}>Ок</Button>
+            </div>
+          </div>
         </div>
       )}
       {/* WebAuthn quick actions for authenticated session (registration of biometric key) */}
