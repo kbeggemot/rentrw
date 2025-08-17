@@ -57,6 +57,22 @@ export default function SettingsClient({ initial }: { initial: SettingsPrefetch 
   const [account, setAccount] = useState<string>(initial.payoutAccount ?? '');
   const [savingPayout, setSavingPayout] = useState(false);
   const [orgName, setOrgName] = useState<string>(initial.payoutOrgName ?? '');
+  const [toast, setToast] = useState<{ msg: string; kind: 'success' | 'error' | 'info' } | null>(null);
+  const showToast = (msg: string, kind: 'success' | 'error' | 'info' = 'info') => { setToast({ msg, kind }); setTimeout(() => setToast(null), 3000); };
+
+  // Local validation helpers for Russian bank requisites
+  const onlyDigits = (s: string) => (s || '').replace(/\D/g, '');
+  const isValidBik = (s: string) => onlyDigits(s).length === 9;
+  const isValidAccount = (bikStr: string, accStr: string): boolean => {
+    const bik = onlyDigits(bikStr);
+    const acc = onlyDigits(accStr);
+    if (bik.length !== 9 || acc.length !== 20) return false;
+    const base = (bik.slice(-3) + acc).split('').map((d) => Number(d));
+    if (base.length !== 23 || base.some((d) => Number.isNaN(d))) return false;
+    const coeff: number[] = Array.from({ length: 23 }, (_, i) => [7, 1, 3][i % 3]);
+    const sum = base.reduce((a, d, i) => a + d * coeff[i], 0);
+    return sum % 10 === 0;
+  };
 
   // Only fetch keys again if initial was empty and we need to populate
   useEffect(() => {
@@ -99,6 +115,7 @@ export default function SettingsClient({ initial }: { initial: SettingsPrefetch 
       setCurrentMasked(data?.token ?? null);
       setToken('');
       setMessage('Токен сохранён');
+      try { showToast('Токен сохранён', 'success'); } catch {}
       // refresh payout org name after token save
       try {
         const pr = await fetch('/api/settings/payout', { cache: 'no-store' });
@@ -108,6 +125,7 @@ export default function SettingsClient({ initial }: { initial: SettingsPrefetch 
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Ошибка';
       setMessage(message);
+      showToast(message, 'error');
     } finally {
       setSaving(false);
     }
@@ -124,9 +142,11 @@ export default function SettingsClient({ initial }: { initial: SettingsPrefetch 
       setCurrentMasked(null);
       setToken('');
       setMessage('Токен удалён');
+      try { showToast('Токен удалён', 'success'); } catch {}
       setOrgName('');
     } catch (e) {
       setMessage('Не удалось удалить токен');
+      showToast('Не удалось удалить токен', 'error');
     } finally {
       setDeletingToken(false);
     }
@@ -159,7 +179,7 @@ export default function SettingsClient({ initial }: { initial: SettingsPrefetch 
       if (name === 'NotAllowedError') {
         console.warn('webauthn register cancelled', e);
       } else {
-        alert(e instanceof Error ? e.message : 'Ошибка WebAuthn');
+        showToast(e instanceof Error ? e.message : 'Ошибка WebAuthn', 'error');
       }
     } finally {
       setBioLoading(false);
@@ -180,7 +200,7 @@ export default function SettingsClient({ initial }: { initial: SettingsPrefetch 
         try { document.cookie = 'has_passkey=; Path=/; Max-Age=0; SameSite=Lax'; } catch {}
       }
     } catch (e) {
-      alert(e instanceof Error ? e.message : 'Ошибка');
+      showToast(e instanceof Error ? e.message : 'Ошибка', 'error');
     }
   };
 
@@ -201,7 +221,6 @@ export default function SettingsClient({ initial }: { initial: SettingsPrefetch 
               <Button type="submit" disabled={token.length === 0} loading={saving}>Сохранить</Button>
             </div>
           )}
-          {message ? (<div className="text-sm text-gray-600 dark:text-gray-300 mt-2">{message}</div>) : null}
         </div>
 
         <div>
@@ -266,6 +285,7 @@ export default function SettingsClient({ initial }: { initial: SettingsPrefetch 
                     setEmailValue('');
                     setEmailPending(true);
                     setMessage('Код подтверждения отправлен на email');
+                    try { showToast('Код подтверждения отправлен на email', 'success'); } catch {}
                   } catch (e) {
                     const msg = e instanceof Error ? e.message : 'ERROR';
                     if (msg === 'EMAIL_TAKEN') {
@@ -317,6 +337,7 @@ export default function SettingsClient({ initial }: { initial: SettingsPrefetch 
                     setEmailVerified(true);
                     setEmailCode('');
                     setMessage('Email подтверждён');
+                    try { showToast('Email подтверждён', 'success'); } catch {}
                   } catch (e) {
                     setEmailMsgKind('error');
                     const raw = e instanceof Error ? e.message : 'Ошибка';
@@ -361,16 +382,26 @@ export default function SettingsClient({ initial }: { initial: SettingsPrefetch 
               <Button type="button" variant="secondary" loading={savingPayout} onClick={async () => {
                 setSavingPayout(true);
                 try {
+                  // Client-side validation first
+                  const b = onlyDigits(bik);
+                  const a = onlyDigits(account);
+                  if (b.length !== 9) throw new Error('INVALID_BIK');
+                  if (a.length !== 20) throw new Error('INVALID_ACC');
+                  if (!isValidAccount(b, a)) throw new Error('INVALID_ACC_KEY');
                   const r = await fetch('/api/settings/payout', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ bik, account }) });
                   const t = await r.text();
                   let d: any = null; try { d = t ? JSON.parse(t) : null; } catch {}
                   if (!r.ok) throw new Error(d?.error || t || 'SAVE_FAILED');
                   if (d && typeof d.orgName === 'string') setOrgName(d.orgName || '');
                   setMessage('Реквизиты сохранены');
+                  try { showToast('Реквизиты сохранены', 'success'); } catch {}
                 } catch (e) {
                   const raw = e instanceof Error ? e.message : 'ERROR';
-                  if (raw === 'EXECUTOR_CREATE_FAILED') setMessage('Не удалось подтвердить реквизиты в Рокет Ворк. Попробуйте позже.');
-                  else setMessage('Не удалось сохранить реквизиты');
+                  if (raw === 'INVALID_BIK') { setMessage('Введите корректный БИК (9 цифр)'); showToast('Введите корректный БИК (9 цифр)', 'error'); }
+                  else if (raw === 'INVALID_ACC') { setMessage('Введите корректный номер счёта (20 цифр)'); showToast('Введите корректный номер счёта (20 цифр)', 'error'); }
+                  else if (raw === 'INVALID_ACC_KEY') { setMessage('Некорректные реквизиты: неверный контрольный ключ счёта. Проверьте БИК и номер счёта.'); showToast('Неверный контрольный ключ счёта. Проверьте БИК и номер счёта.', 'error'); }
+                  else if (raw === 'EXECUTOR_CREATE_FAILED') { setMessage('Не удалось подтвердить реквизиты в Рокет Ворк. Попробуйте позже.'); showToast('Не удалось подтвердить реквизиты в Рокет Ворк. Попробуйте позже.', 'error'); }
+                  else { setMessage('Не удалось сохранить реквизиты'); showToast('Не удалось сохранить реквизиты', 'error'); }
                 } finally {
                   setSavingPayout(false);
                 }
@@ -404,6 +435,7 @@ export default function SettingsClient({ initial }: { initial: SettingsPrefetch 
                     });
                     if (!r.ok) throw new Error('SAVE_FAILED');
                     setMessage('Описание сохранено');
+                    try { showToast('Описание сохранено', 'success'); } catch {}
                   } catch {
                     setMessage('Не удалось сохранить описание');
                   } finally {
@@ -442,6 +474,7 @@ export default function SettingsClient({ initial }: { initial: SettingsPrefetch 
                     const r = await fetch('/api/settings/agent', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
                     if (!r.ok) throw new Error('SAVE_FAILED');
                     setMessage('Сохранено');
+                    try { showToast('Настройки сохранены', 'success'); } catch {}
                   } catch {
                     setMessage('Не удалось сохранить');
                   } finally {
@@ -481,6 +514,9 @@ export default function SettingsClient({ initial }: { initial: SettingsPrefetch 
           )}
         </div>
       </form>
+      {toast ? (
+        <div className={`fixed bottom-4 right-4 z-50 px-4 py-3 rounded-md shadow-lg text-sm ${toast.kind === 'success' ? 'bg-green-600 text-white' : toast.kind === 'error' ? 'bg-red-600 text-white' : 'bg-gray-900 text-white'}`}>{toast.msg}</div>
+      ) : null}
     </div>
   );
 }

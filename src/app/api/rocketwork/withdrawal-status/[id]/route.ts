@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getDecryptedApiToken } from '@/server/secureStore';
+import { updateWithdrawal } from '@/server/withdrawalStore';
 import { promises as fs } from 'fs';
 import path from 'path';
 
@@ -43,9 +44,10 @@ export async function GET(req: Request) {
     }
     const obj = (data && typeof data === 'object' && 'task' in data) ? (data as any).task : data;
     const type = String(obj?.type || '').toLowerCase();
-    const aoStatus = String(obj?.acquiring_order?.status || '').toLowerCase();
     const rootStatus = String(obj?.status || '').toLowerCase();
-    const done = type === 'withdrawal' && (aoStatus === 'paid' || rootStatus === 'paid');
+    // For Withdrawal we rely ONLY on root task.status
+    const done = type === 'withdrawal' && rootStatus === 'paid';
+    const currentStatus = obj?.status || null;
     if (done) {
       try {
         const marker = path.join(process.cwd(), '.data', `withdrawal_${userId}_${String(taskId)}.json`);
@@ -53,7 +55,8 @@ export async function GET(req: Request) {
         await fs.writeFile(marker, JSON.stringify({ userId, taskId, paidAt: new Date().toISOString() }), 'utf8');
       } catch {}
     }
-    return NextResponse.json({ done, status: obj?.acquiring_order?.status || obj?.status, type: obj?.type ?? null });
+    try { await updateWithdrawal(userId, taskId, { status: currentStatus, paidAt: done ? new Date().toISOString() : undefined }); } catch {}
+    return NextResponse.json({ done, status: currentStatus, type: obj?.type ?? null });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Server error';
     return NextResponse.json({ error: message }, { status: 500 });

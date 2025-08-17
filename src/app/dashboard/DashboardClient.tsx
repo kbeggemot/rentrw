@@ -1,7 +1,7 @@
 "use client";
 
 import Link from 'next/link';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@/components/ui/Button';
 import { startRegistration as startWebAuthnReg, browserSupportsWebAuthn, platformAuthenticatorIsAvailable } from '@simplewebauthn/browser';
 
@@ -68,6 +68,74 @@ export default function DashboardClient({ hasTokenInitial }: { hasTokenInitial: 
       setHistory([]);
     }
   };
+
+  // On mount: load history and restore pending task (for spinner) if any
+  useEffect(() => {
+    (async () => {
+      try {
+        const r = await fetch('/api/rocketwork/withdrawals', { cache: 'no-store' });
+        const d = await r.json();
+        const items = Array.isArray(d?.items) ? d.items : [];
+        setHistory(items);
+        const pending = items.find((it: any) => String(it?.status || '').toLowerCase() !== 'paid');
+        if (pending && pending.taskId) setWithdrawPendingTask(pending.taskId);
+        // Fallback to localStorage state if server store is empty yet
+        try {
+          const ls = localStorage.getItem('pendingWithdrawalTask');
+          if (!pending && ls) setWithdrawPendingTask(ls);
+        } catch {}
+      } catch {}
+    })();
+  }, []);
+
+  // Centralized polling for current pending task (persists across reloads) with backoff
+  const pollingRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (!withdrawPendingTask || withdrawDone) return;
+    if (pollingRef.current) return;
+    let cancelled = false;
+    let tries = 0;
+    const startDelay = 2000; // 2s
+    const maxDelay = 60000; // 60s cap
+
+    const schedule = (delay: number) => {
+      if (cancelled) return;
+      pollingRef.current = window.setTimeout(async () => {
+        if (cancelled) return;
+        tries += 1;
+        try {
+          const st = await fetch(`/api/rocketwork/withdrawal-status/${encodeURIComponent(String(withdrawPendingTask))}`, { cache: 'no-store' });
+          const d2 = await st.json();
+          if (d2?.done) {
+            if (pollingRef.current) { window.clearTimeout(pollingRef.current); pollingRef.current = null; }
+            setWithdrawDone(true);
+            setWithdrawPendingTask(null);
+            try { localStorage.removeItem('pendingWithdrawalTask'); } catch {}
+            await fetchBalance();
+            await refreshHistory();
+            showToast('Вывод завершён. Баланс обновлён.', 'success');
+            setWithdrawAmount('');
+            return;
+          }
+          // If RW returned error status, show toast and stop polling
+          if (String(d2?.status || '').toLowerCase() === 'error') {
+            if (pollingRef.current) { window.clearTimeout(pollingRef.current); pollingRef.current = null; }
+            setWithdrawPendingTask(null);
+            await refreshHistory();
+            showToast('Вывод отклонён. Недостаточно средств на счёте', 'error');
+            return;
+          }
+        } catch {}
+        const nextDelay = Math.min(maxDelay, Math.round(startDelay * Math.pow(1.5, tries)));
+        schedule(nextDelay);
+      }, delay) as unknown as number;
+    };
+    schedule(startDelay);
+    return () => {
+      cancelled = true;
+      if (pollingRef.current) { window.clearTimeout(pollingRef.current); pollingRef.current = null; }
+    };
+  }, [withdrawPendingTask, withdrawDone]);
 
   // Автопредложение добавить ключ сразу после входа (отложим на тик после first paint)
   useEffect(() => {
@@ -191,27 +259,7 @@ export default function DashboardClient({ hasTokenInitial }: { hasTokenInitial: 
                     if (!res.ok) throw new Error(d?.error || 'Ошибка вывода');
                     const taskId = d?.task_id;
                     setWithdrawPendingTask(taskId ?? '');
-                    // Start polling status every 2s until done
-                    if (taskId) {
-                      let tries = 0;
-                      const timer = setInterval(async () => {
-                        tries += 1;
-                        try {
-                          const st = await fetch(`/api/rocketwork/withdrawal-status/${encodeURIComponent(String(taskId))}`, { cache: 'no-store' });
-                          const d2 = await st.json();
-                          if (d2?.done) {
-                            clearInterval(timer);
-                            setWithdrawDone(true);
-                            setWithdrawPendingTask(null);
-                            await fetchBalance();
-                            await refreshHistory();
-                            showToast('Вывод завершён. Баланс обновлён.', 'success');
-                            setWithdrawAmount('');
-                          }
-                        } catch {}
-                        if (tries > 60) clearInterval(timer); // stop after ~2 minutes
-                      }, 2000);
-                    }
+                    try { if (taskId) localStorage.setItem('pendingWithdrawalTask', String(taskId)); } catch {}
                   } catch (e) {
                     const raw = e instanceof Error ? e.message : 'ERROR';
                     if (raw === 'NO_PAYOUT_REQUISITES') {
@@ -233,7 +281,7 @@ export default function DashboardClient({ hasTokenInitial }: { hasTokenInitial: 
             {withdrawPendingTask ? (
               <div className="mt-3 text-sm text-gray-600 dark:text-gray-300 flex items-center gap-2">
                 <svg className="animate-spin" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
-                Ждём завершения вывода… (task {String(withdrawPendingTask)})
+                Ждём завершения вывода…
               </div>
             ) : null}
             {/* success toast shown separately */}

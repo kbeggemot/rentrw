@@ -39,13 +39,12 @@ export async function POST(req: Request) {
       // Forced balance refresh skipped here; endpoint creates withdrawal task
       const inn = await getUserOrgInn(userId);
       const { bik, account } = await getUserPayoutRequisites(userId);
-      const amountRub = Number(body?.amountRub || 0);
-      const amountCents = Math.round(amountRub * 100);
+      const amountRub = Number(body?.amountRub || 0); // RW expects RUB, not cents
       if (!inn) return NextResponse.json({ error: 'NO_INN' }, { status: 400 });
       if (!bik || !account) return NextResponse.json({ error: 'NO_PAYOUT_REQUISITES' }, { status: 400 });
       const payload = {
         type: 'Withdrawal',
-        amount_gross: amountCents,
+        amount_gross: amountRub,
         executor_inn: inn,
         payment_info: {
           bank_account: {
@@ -56,8 +55,19 @@ export async function POST(req: Request) {
       } as Record<string, unknown>;
       const base = process.env.ROCKETWORK_API_BASE_URL || DEFAULT_BASE_URL;
       const url = new URL('tasks', base.endsWith('/') ? base : base + '/').toString();
+      // Debug log of withdrawal request/response
+      try {
+        const dataDir = path.join(process.cwd(), '.data');
+        await fs.mkdir(dataDir, { recursive: true });
+        await fs.writeFile(path.join(dataDir, 'last_withdrawal_request.json'), JSON.stringify({ ts: new Date().toISOString(), url, payload }, null, 2), 'utf8');
+      } catch {}
       const res = await fetch(url, { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify(payload), cache: 'no-store' });
       const text = await res.text();
+      try {
+        const dataDir = path.join(process.cwd(), '.data');
+        await fs.mkdir(dataDir, { recursive: true });
+        await fs.writeFile(path.join(dataDir, 'last_withdrawal_response.json'), JSON.stringify({ ts: new Date().toISOString(), status: res.status, text }, null, 2), 'utf8');
+      } catch {}
       let data: any = null; try { data = text ? JSON.parse(text) : null; } catch { data = text; }
       if (!res.ok) {
         const message = (data?.error as string | undefined) || text || 'External API error';
