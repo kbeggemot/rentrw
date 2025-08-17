@@ -77,12 +77,25 @@ export default function DashboardClient({ hasTokenInitial }: { hasTokenInitial: 
         const d = await r.json();
         const items = Array.isArray(d?.items) ? d.items : [];
         setHistory(items);
-        const pending = items.find((it: any) => String(it?.status || '').toLowerCase() !== 'paid');
-        if (pending && pending.taskId) setWithdrawPendingTask(pending.taskId);
+        const isFinal = (s: any) => {
+          const st = String(s || '').toLowerCase();
+          return st === 'paid' || st === 'error' || st === 'canceled' || st === 'cancelled' || st === 'failed' || st === 'refunded';
+        };
+        const active = items.find((it: any) => !isFinal(it?.status));
+        if (active && active.taskId) setWithdrawPendingTask(active.taskId);
         // Fallback to localStorage state if server store is empty yet
         try {
           const ls = localStorage.getItem('pendingWithdrawalTask');
-          if (!pending && ls) setWithdrawPendingTask(ls);
+          if (!active && ls) {
+            // verify it's still active before showing spinner
+            try {
+              const st = await fetch(`/api/rocketwork/withdrawal-status/${encodeURIComponent(ls)}`, { cache: 'no-store' });
+              const d2 = await st.json();
+              const status = String(d2?.status || '').toLowerCase();
+              if (status && status !== 'paid' && status !== 'error') setWithdrawPendingTask(ls);
+              else { try { localStorage.removeItem('pendingWithdrawalTask'); } catch {} }
+            } catch {}
+          }
         } catch {}
       } catch {}
     })();
