@@ -40,7 +40,7 @@ export function AuthForm() {
     try { sessionStorage.removeItem('reg.pending'); } catch {}
   }, []);
 
-  // Определяем, показывать ли кнопку входа по биометрии на этом устройстве
+  // Определяем, показывать ли кнопку входа по биометрии на этом устройстве (вернул прежнюю логику)
   useEffect(() => {
     let ignore = false;
     (async () => {
