@@ -7,6 +7,7 @@ import { saveTaskId, recordSaleOnCreate } from '@/server/taskStore';
 import { getUserAgentSettings } from '@/server/userStore';
 import type { RocketworkTask } from '@/types/rocketwork';
 import { getUserPayoutRequisites, getUserOrgInn } from '@/server/userStore';
+import { listWithdrawals } from '@/server/withdrawalStore';
 import { recordWithdrawalCreate } from '@/server/withdrawalStore';
 
 export const runtime = 'nodejs';
@@ -42,6 +43,18 @@ export async function POST(req: Request) {
       const amountRub = Number(body?.amountRub || 0); // RW expects RUB, not cents
       if (!inn) return NextResponse.json({ error: 'NO_INN' }, { status: 400 });
       if (!bik || !account) return NextResponse.json({ error: 'NO_PAYOUT_REQUISITES' }, { status: 400 });
+      // Prevent concurrent withdrawals: allow only if no active (non-final) withdrawal exists
+      try {
+        const history = await listWithdrawals(userId);
+        const isFinal = (s: any) => {
+          const st = String(s || '').toLowerCase();
+          return st === 'paid' || st === 'error' || st === 'canceled' || st === 'cancelled' || st === 'failed' || st === 'refunded';
+        };
+        const active = history.find((it) => !isFinal(it?.status));
+        if (active) {
+          return NextResponse.json({ error: 'WITHDRAWAL_IN_PROGRESS', taskId: active.taskId }, { status: 409 });
+        }
+      } catch {}
       const payload = {
         type: 'Withdrawal',
         amount_gross: amountRub,

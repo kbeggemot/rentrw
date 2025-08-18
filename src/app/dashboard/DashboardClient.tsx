@@ -258,6 +258,7 @@ export default function DashboardClient({ hasTokenInitial }: { hasTokenInitial: 
               <Button
                 variant="secondary"
                 loading={withdrawing}
+                disabled={withdrawing || Boolean(withdrawPendingTask)}
                 onClick={async () => {
                   // Always refresh balance first and use the returned value to avoid stale state
                   const fresh = await fetchBalance();
@@ -270,6 +271,7 @@ export default function DashboardClient({ hasTokenInitial }: { hasTokenInitial: 
                     const res = await fetch('/api/rocketwork/tasks', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'Withdrawal', amountRub: amountNum }) });
                     const d = await res.json();
                     if (!res.ok) throw new Error(d?.error || 'Ошибка вывода');
+                    if (d?.error === 'WITHDRAWAL_IN_PROGRESS') { showToast('Уже есть незавершённый вывод. Дождитесь завершения.', 'error'); return; }
                     const taskId = d?.task_id;
                     setWithdrawPendingTask(taskId ?? '');
                     try { if (taskId) localStorage.setItem('pendingWithdrawalTask', String(taskId)); } catch {}
