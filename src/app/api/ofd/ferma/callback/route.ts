@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { upsertOfdReceipt } from '@/server/ofdStore';
+import { updateSaleOfdUrlsByOrderId } from '@/server/taskStore';
 
 export const runtime = 'nodejs';
 
@@ -20,7 +21,7 @@ export async function POST(req: Request) {
     if (expected && secret !== expected) {
       return NextResponse.json({ error: 'UNAUTHORIZED' }, { status: 401 });
     }
-    const userId = getUserId(req) || 'default';
+    const userId = reqUrl.searchParams.get('uid') || getUserId(req) || 'default';
     const text = await req.text();
     let body: any = null; try { body = text ? JSON.parse(text) : {}; } catch { body = {}; }
     // Expect ReceiptId and links in callback (adjust to actual schema if differs)
@@ -28,6 +29,11 @@ export async function POST(req: Request) {
     const fn: string | undefined = body?.Data?.Fn || body?.Fn;
     const fd: string | number | undefined = body?.Data?.Fd || body?.Fd;
     const fp: string | number | undefined = body?.Data?.Fp || body?.Fp;
+    const invoiceIdRaw: string | number | undefined = body?.Data?.InvoiceId || body?.InvoiceId || body?.Request?.InvoiceId;
+    // Try to detect PaymentItems[].PaymentType (1=prepay, 2=offset)
+    const pt = (body?.Data?.CustomerReceipt?.PaymentItems?.[0]?.PaymentType
+      ?? body?.CustomerReceipt?.PaymentItems?.[0]?.PaymentType
+      ?? body?.PaymentItems?.[0]?.PaymentType) as number | undefined;
     // Build demo link pattern if parts are known
     let receiptUrl: string | undefined;
     if (fn && fd != null && fp != null) {
@@ -35,6 +41,15 @@ export async function POST(req: Request) {
     }
     if (receiptId) {
       await upsertOfdReceipt({ userId, receiptId, fn: fn ?? null, fd: fd ?? null, fp: fp ?? null, url: receiptUrl ?? null, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), payload: body });
+    }
+    // If we can map by InvoiceId to orderId — update sale record URLs
+    const orderId = typeof invoiceIdRaw === 'string' ? Number(invoiceIdRaw) : (typeof invoiceIdRaw === 'number' ? invoiceIdRaw : NaN);
+    if (Number.isFinite(orderId) && receiptUrl) {
+      if (pt === 1) {
+        try { await updateSaleOfdUrlsByOrderId(userId, Number(orderId), { ofdUrl: receiptUrl }); } catch {}
+      } else if (pt === 2) {
+        try { await updateSaleOfdUrlsByOrderId(userId, Number(orderId), { ofdFullUrl: receiptUrl }); } catch {}
+      }
     }
     return NextResponse.json({ ok: true });
   } catch (error) {

@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { getDecryptedApiToken } from '@/server/secureStore';
 import { promises as fs } from 'fs';
 import path from 'path';
-import { updateSaleFromStatus } from '@/server/taskStore';
+import { updateSaleFromStatus, findSaleByTaskId } from '@/server/taskStore';
 import type { RocketworkTask } from '@/types/rocketwork';
 
 export const runtime = 'nodejs';
@@ -104,7 +104,7 @@ export async function GET(_: Request) {
       }
     } catch {}
 
-    // Persist into sales store
+    // Persist into sales store; if deferred flow, prefer ofdFullUrl presence for UI
     try {
       const ofdUrl = (normalized?.ofd_url as string | undefined)
         ?? (normalized?.acquiring_order?.ofd_url as string | undefined)
@@ -113,10 +113,21 @@ export async function GET(_: Request) {
         ?? null;
       const npdReceipt = (normalized?.receipt_uri as string | undefined) ?? null;
       await updateSaleFromStatus(userId, taskId, { status: normalized?.acquiring_order?.status, ofdUrl, additionalCommissionOfdUrl: addOfd, npdReceiptUri: npdReceipt });
+      // If no RW ofd_url (because we turned it off) and we already have prepayment/full URLs from OFD callback store,
+      // the client will still display '-' here; that's expected until callback arrives.
     } catch {}
 
     // Также проставим заголовок, чтобы клиент не кешировал
-    return new NextResponse(JSON.stringify(normalized), { status: 200, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store, no-cache, max-age=0, must-revalidate' } });
+    // Augment response with UI hint which column to watch
+    try {
+      const sale = await findSaleByTaskId(userId, taskId);
+      const mskToday = new Date().toLocaleDateString('ru-RU', { timeZone: 'Europe/Moscow' }).split('.').reverse().join('-');
+      const isToday = sale?.serviceEndDate === mskToday;
+      const hint = { ofdTarget: isToday ? 'full' : 'prepay' };
+      return new NextResponse(JSON.stringify({ ...(normalized as any), __hint: hint }), { status: 200, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store, no-cache, max-age=0, must-revalidate' } });
+    } catch {
+      return new NextResponse(JSON.stringify(normalized), { status: 200, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store, no-cache, max-age=0, must-revalidate' } });
+    }
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Server error';
     return NextResponse.json({ error: message }, { status: 500 });

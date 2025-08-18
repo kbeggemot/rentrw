@@ -158,4 +158,10 @@ export async function listAllSales(): Promise<SaleRecord[]> {
   return arr.sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
 }
 
+export async function findSaleByTaskId(userId: string, taskId: number | string): Promise<SaleRecord | null> {
+  const store = await readTasks();
+  const arr = (store.sales ?? []).filter((s) => s.userId === userId && s.taskId == taskId);
+  return arr.length > 0 ? arr[0] : null;
+}
+
 
