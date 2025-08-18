@@ -7,6 +7,11 @@ import { saveTaskId, recordSaleOnCreate } from '@/server/taskStore';
 import { getUserAgentSettings } from '@/server/userStore';
 import type { RocketworkTask } from '@/types/rocketwork';
 import { getUserPayoutRequisites, getUserOrgInn } from '@/server/userStore';
+import { fermaGetAuthTokenCached, fermaCreateReceipt } from '@/server/ofdFerma';
+import { buildFermaReceiptPayload, PAYMENT_METHOD_PREPAY_FULL, PAYMENT_METHOD_FULL_PAYMENT } from '@/app/api/ofd/ferma/build-payload';
+import { enqueueOffsetJob, startOfdScheduleWorker } from '@/server/ofdScheduleWorker';
+import { updateSaleOfdUrlsByOrderId } from '@/server/taskStore';
+import { headers as nextHeaders } from 'next/headers';
 import { listWithdrawals } from '@/server/withdrawalStore';
 import { recordWithdrawalCreate } from '@/server/withdrawalStore';
 
@@ -241,6 +246,19 @@ export async function POST(req: Request) {
       },
     };
 
+    // Map VAT selection from UI into RW acquiring_order.vat for downstream OFD
+    const vatRate: string | undefined = typeof (body as any)?.vatRate === 'string' ? (body as any).vatRate : undefined;
+    if (vatRate) {
+      const map: Record<string, string> = {
+        none: 'VatNo',
+        '0': 'Vat0',
+        '10': 'Vat10',
+        '20': 'Vat20',
+      };
+      const rwVat = map[vatRate] || 'VatNo';
+      (payload.acquiring_order as any).vat = rwVat;
+    }
+
     if (body.agentSale) {
       // Place additional_commission_* at the ROOT of payload per RW requirements
       if (body.commissionType === 'percent' && body.commissionValue !== undefined) {
@@ -290,6 +308,14 @@ export async function POST(req: Request) {
       );
     } catch {}
 
+    // Apply deferred full-settlement logic (serviceEndDate != today in Europe/Moscow)
+    const mskToday = new Date().toLocaleDateString('ru-RU', { timeZone: 'Europe/Moscow' }).split('.').reverse().join('-');
+    const endDate: string | undefined = typeof (body as any)?.serviceEndDate === 'string' ? (body as any).serviceEndDate : undefined;
+    const needDeferredFull = endDate && endDate !== mskToday;
+    if (needDeferredFull) {
+      (payload.acquiring_order as any).with_ofd_receipt = false;
+    }
+
     const res = await fetch(url, {
       method: 'POST',
       headers: {
@@ -332,7 +358,54 @@ export async function POST(req: Request) {
         commissionType: body.agentSale ? body.commissionType : undefined,
         commissionValue: commissionValueForRecord,
         serviceEndDate: typeof (body as any)?.serviceEndDate === 'string' ? (body as any).serviceEndDate : undefined,
+        vatRate: vatRate || undefined,
       });
+
+      if (needDeferredFull) {
+        try {
+          // start worker (idempotent)
+          startOfdScheduleWorker();
+          // Build and send prepayment receipt now
+          const baseUrl = process.env.FERMA_BASE_URL || 'https://ferma.ofd.ru/';
+          const tokenOfd = await fermaGetAuthTokenCached(process.env.FERMA_LOGIN || '', process.env.FERMA_PASSWORD || '', { baseUrl });
+          const hdrs = await nextHeaders();
+          const proto = hdrs.get('x-forwarded-proto') || 'http';
+          const host = hdrs.get('x-forwarded-host') || hdrs.get('host') || 'localhost:3000';
+          const secret = process.env.OFD_CALLBACK_SECRET || '';
+          const callbackUrl = `${proto}://${host}/api/ofd/ferma/callback${secret ? `?secret=${encodeURIComponent(secret)}&` : '?'}uid=${encodeURIComponent(userId)}`;
+          const invoiceId = String(orderId);
+          const usedVat = (vatRate || 'none') as any;
+          if (body.agentSale) {
+            // partner prepayment
+            const partnerPhone = String(body.agentPhone || '').trim();
+            const phoneDigits = partnerPhone.replace(/\D/g, '');
+            let partnerInn: string | undefined;
+            try {
+              const exUrl = new URL(`executors/${encodeURIComponent(phoneDigits)}`, base.endsWith('/') ? base : base + '/').toString();
+              const exRes = await fetch(exUrl, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }, cache: 'no-store' });
+              const exTxt = await exRes.text();
+              let ex: any = null; try { ex = exTxt ? JSON.parse(exTxt) : null; } catch { ex = exTxt; }
+              partnerInn = (ex?.executor?.inn as string | undefined) ?? (ex?.inn as string | undefined);
+            } catch {}
+            if (!partnerInn) throw new Error('NO_PARTNER_INN');
+            const pp = buildFermaReceiptPayload({ party: 'partner', partyInn: partnerInn, description, amountRub: amountRub, vatRate: usedVat, methodCode: PAYMENT_METHOD_PREPAY_FULL, orderId, docType: 'IncomePrepayment', buyerEmail: clientEmail, invoiceId, callbackUrl, withPrepaymentItem: true });
+            await fermaCreateReceipt(pp, { baseUrl, authToken: tokenOfd });
+            await updateSaleOfdUrlsByOrderId(userId, orderId, { ofdUrl: null });
+            // enqueue offset at 12:00 MSK of endDate
+            const dueDate = new Date(`${endDate}T09:00:00Z`); // 12:00 MSK ~= 09:00 UTC
+            await enqueueOffsetJob({ userId, orderId, dueAt: dueDate.toISOString(), party: 'partner', partnerInn, description, amountRub, vatRate: usedVat, buyerEmail: clientEmail || undefined });
+          } else {
+            const orgInn = await getUserOrgInn(userId);
+            const orgData = await getUserPayoutRequisites(userId);
+            if (!orgInn) throw new Error('NO_ORG_INN');
+            const pp = buildFermaReceiptPayload({ party: 'org', partyInn: orgInn, description, amountRub: amountRub, vatRate: usedVat, methodCode: PAYMENT_METHOD_PREPAY_FULL, orderId, docType: 'IncomePrepayment', buyerEmail: clientEmail, invoiceId, callbackUrl, withPrepaymentItem: true, paymentAgentInfo: { AgentType: 'AGENT', SupplierInn: orgInn, SupplierName: orgData.orgName || 'Организация' } });
+            await fermaCreateReceipt(pp, { baseUrl, authToken: tokenOfd });
+            await updateSaleOfdUrlsByOrderId(userId, orderId, { ofdUrl: null });
+            const dueDate = new Date(`${endDate}T09:00:00Z`); // 12:00 MSK
+            await enqueueOffsetJob({ userId, orderId, dueAt: dueDate.toISOString(), party: 'org', description, amountRub, vatRate: usedVat, buyerEmail: clientEmail || undefined });
+          }
+        } catch {}
+      }
     }
 
     return NextResponse.json({ ok: true, order_id: orderId, task_id: taskId, data }, { status: 201 });

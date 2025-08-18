@@ -5,6 +5,7 @@ export type PartnerRecord = {
   phone: string;
   fio: string | null;
   status: string | null; // e.g., validated, pending, etc.
+  inn?: string | null;
   updatedAt: string; // ISO
 };
 

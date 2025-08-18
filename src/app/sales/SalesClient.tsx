@@ -12,6 +12,7 @@ type Sale = {
   retainedCommissionRub: number;
   status?: string | null;
   ofdUrl?: string | null;
+  ofdFullUrl?: string | null;
   additionalCommissionOfdUrl?: string | null;
   npdReceiptUri?: string | null;
   serviceEndDate?: string | null;
@@ -184,7 +185,7 @@ export default function SalesClient({ initial }: { initial: Sale[] }) {
                 <td className="px-3 py-2">{s.isAgent ? new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB' }).format(s.retainedCommissionRub) : '-'}</td>
                 <td className="px-3 py-2">{s.status ?? '-'}</td>
                 <td className="px-3 py-2">{s.ofdUrl ? <a className="text-blue-600 hover:underline" href={s.ofdUrl} target="_blank" rel="noreferrer">Открыть</a> : '-'}</td>
-                <td className="px-3 py-2">-</td>
+                <td className="px-3 py-2">{s.ofdFullUrl ? <a className="text-blue-600 hover:underline" href={s.ofdFullUrl} target="_blank" rel="noreferrer">Открыть</a> : '-'}</td>
                 <td className="px-3 py-2">{s.additionalCommissionOfdUrl ? <a className="text-blue-600 hover:underline" href={s.additionalCommissionOfdUrl} target="_blank" rel="noreferrer">Открыть</a> : '-'}</td>
                 <td className="px-3 py-2">{s.npdReceiptUri ? <a className="text-blue-600 hover:underline" href={s.npdReceiptUri} target="_blank" rel="noreferrer">Открыть</a> : '-'}</td>
                 <td className="px-3 py-2">{s.serviceEndDate ?? '-'}</td>

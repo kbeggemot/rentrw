@@ -118,18 +118,21 @@ export async function POST(req: Request) {
       if (!phone) return NextResponse.json({ ok: true });
       const status: string | null = (executor?.selfemployed_status ?? null) as string | null;
       const fio = buildFio(executor);
+      const inn: string | null = (executor?.inn as string | undefined) ?? null;
 
       // Merge with existing data, ignoring nulls
       const current = (await listPartners(userId)).find((p) => p.phone === phone) ?? {
         phone,
         fio: null,
         status: null,
+        inn: null,
         updatedAt: new Date().toISOString(),
       };
       const next = {
         phone,
         fio: fio ?? current.fio,
         status: status ?? current.status,
+        inn: inn ?? current.inn,
         updatedAt: new Date().toISOString(),
       };
       await upsertPartner(userId, next);

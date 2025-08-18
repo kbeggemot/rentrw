@@ -44,6 +44,7 @@ function AcceptPaymentContent() {
   const [commissionType, setCommissionType] = useState<'percent' | 'fixed'>('percent');
   const [buyerEmail, setBuyerEmail] = useState('');
   const [serviceEndDate, setServiceEndDate] = useState<string>(() => new Date().toISOString().slice(0,10));
+  const [vatRate, setVatRate] = useState<string>('none');
   const [method, setMethod] = useState<PaymentMethod>('qr');
   const [message, setMessage] = useState<string | null>(null);
   const [messageKind, setMessageKind] = useState<'info' | 'error' | 'success'>('info');
@@ -251,6 +252,7 @@ function AcceptPaymentContent() {
           commissionType: isAgentSale ? commissionType : undefined,
           commissionValue: isAgentSale ? numComm : undefined,
           serviceEndDate,
+          vatRate,
         }),
       });
       const text = await res.text();
@@ -319,6 +321,15 @@ function AcceptPaymentContent() {
           value={buyerEmail}
           onChange={(e) => setBuyerEmail(e.target.value)}
         />
+        <div>
+          <div className="text-sm text-gray-700 dark:text-gray-300 mb-2">НДС</div>
+          <select className="border rounded px-2 py-1 text-sm bg-white dark:bg-gray-950" value={vatRate} onChange={(e) => setVatRate(e.target.value)}>
+            <option value="none">Без НДС</option>
+            <option value="0">НДС 0%</option>
+            <option value="10">НДС 10%</option>
+            <option value="20">НДС 20%</option>
+          </select>
+        </div>
         <Input
           label="Дата окончания оказания услуги"
           type="date"

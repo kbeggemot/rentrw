@@ -1,0 +1,119 @@
+import { promises as fs } from 'fs';
+import path from 'path';
+import { fermaGetAuthTokenCached, fermaCreateReceipt } from './ofdFerma';
+import { buildFermaReceiptPayload, PAYMENT_METHOD_FULL_PAYMENT, VatRate } from '@/app/api/ofd/ferma/build-payload';
+import { getUserOrgInn, getUserPayoutRequisites } from './userStore';
+
+type OffsetJob = {
+  id: string; // `${userId}:${orderId}`
+  userId: string;
+  orderId: number;
+  dueAt: string; // ISO UTC when to fire
+  party: 'partner' | 'org';
+  partnerInn?: string; // required if party=partner
+  description: string;
+  amountRub: number;
+  vatRate: VatRate;
+  buyerEmail?: string | null;
+};
+
+type Store = { jobs: OffsetJob[] };
+
+const DATA_DIR = path.join(process.cwd(), '.data');
+const FILE = path.join(DATA_DIR, 'ofd_jobs.json');
+
+async function readStore(): Promise<Store> {
+  try {
+    const raw = await fs.readFile(FILE, 'utf8');
+    const data = JSON.parse(raw) as Partial<Store>;
+    return { jobs: Array.isArray(data.jobs) ? data.jobs : [] };
+  } catch {
+    return { jobs: [] };
+  }
+}
+
+async function writeStore(store: Store): Promise<void> {
+  await fs.mkdir(DATA_DIR, { recursive: true });
+  await fs.writeFile(FILE, JSON.stringify(store, null, 2), 'utf8');
+}
+
+export async function enqueueOffsetJob(job: Omit<OffsetJob, 'id'>): Promise<void> {
+  const store = await readStore();
+  const id = `${job.userId}:${job.orderId}`;
+  const exists = store.jobs.some((j) => j.id === id);
+  if (!exists) store.jobs.push({ ...job, id });
+  await writeStore(store);
+}
+
+let started = false;
+let timer: NodeJS.Timer | null = null;
+
+export function startOfdScheduleWorker(): void {
+  if (started) return;
+  started = true;
+  timer = setInterval(() => {
+    runDueOffsetJobs().catch(() => void 0);
+  }, 60 * 1000);
+}
+
+export async function runDueOffsetJobs(): Promise<void> {
+  const store = await readStore();
+  const now = Date.now();
+  const remain: OffsetJob[] = [];
+  for (const job of store.jobs) {
+    const due = Date.parse(job.dueAt);
+    if (!Number.isFinite(due) || due > now) { remain.push(job); continue; }
+    try {
+      const baseUrl = process.env.FERMA_BASE_URL || 'https://ferma.ofd.ru/';
+      const token = await fermaGetAuthTokenCached(process.env.FERMA_LOGIN || '', process.env.FERMA_PASSWORD || '', { baseUrl });
+      const proto = process.env.VERCEL_URL ? 'https' : 'https';
+      const host = process.env.BASE_HOST || process.env.VERCEL_URL || process.env.RENDER_EXTERNAL_URL || 'localhost:3000';
+      const secret = process.env.OFD_CALLBACK_SECRET || '';
+      const callbackUrl = `https://${host}/api/ofd/ferma/callback${secret ? `?secret=${encodeURIComponent(secret)}&` : '?'}uid=${encodeURIComponent(job.userId)}`;
+      let payload: any;
+      if (job.party === 'partner') {
+        if (!job.partnerInn) throw new Error('NO_PARTNER_INN');
+        payload = buildFermaReceiptPayload({
+          party: 'partner',
+          partyInn: job.partnerInn,
+          description: job.description,
+          amountRub: job.amountRub,
+          vatRate: job.vatRate,
+          methodCode: PAYMENT_METHOD_FULL_PAYMENT,
+          orderId: job.orderId,
+          docType: 'Income',
+          buyerEmail: job.buyerEmail || null,
+          invoiceId: String(job.orderId),
+          callbackUrl,
+          withAdvanceOffset: true,
+        });
+      } else {
+        const orgInn = await getUserOrgInn(job.userId);
+        const orgData = await getUserPayoutRequisites(job.userId);
+        if (!orgInn) throw new Error('NO_ORG_INN');
+        payload = buildFermaReceiptPayload({
+          party: 'org',
+          partyInn: orgInn,
+          description: job.description,
+          amountRub: job.amountRub,
+          vatRate: job.vatRate,
+          methodCode: PAYMENT_METHOD_FULL_PAYMENT,
+          orderId: job.orderId,
+          docType: 'Income',
+          buyerEmail: job.buyerEmail || null,
+          invoiceId: String(job.orderId),
+          callbackUrl,
+          withAdvanceOffset: true,
+          paymentAgentInfo: { AgentType: 'AGENT', SupplierInn: orgInn, SupplierName: orgData.orgName || 'Организация' },
+        });
+      }
+      await fermaCreateReceipt(payload, { baseUrl, authToken: token });
+    } catch {
+      // keep the job for next attempt
+      remain.push(job);
+    }
+  }
+  await writeStore({ jobs: remain });
+}
+
+
