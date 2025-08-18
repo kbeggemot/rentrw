@@ -171,3 +171,63 @@ export async function findSaleByTaskId(userId: string, taskId: number | string):
 }
 
 
+// Ensure a sale record exists for a RW task that may have been created outside our UI.
+// orderId is resolved from task.acquiring_order.order when available; otherwise, the next sequence number.
+export async function ensureSaleFromTask(params: {
+  userId: string;
+  taskId: number | string;
+  task: Partial<{
+    acquiring_order?: { order?: string | number; status?: string | null; ofd_url?: string | null } | null;
+    amount_gross?: number | string | null;
+    additional_commission_value?: unknown;
+    created_at?: string | null;
+  }>;
+}): Promise<void> {
+  const { userId, taskId, task } = params;
+  const store = await readTasks();
+  if (!store.sales) store.sales = [];
+  const exists = store.sales.some((s) => s.userId === userId && s.taskId == taskId);
+  if (exists) return;
+  // Determine orderId
+  let resolvedOrderId: number | null = null;
+  const raw = (task?.acquiring_order as any)?.order;
+  const num = typeof raw === 'string' ? Number(raw) : (typeof raw === 'number' ? raw : NaN);
+  if (Number.isFinite(num)) resolvedOrderId = Number(num);
+  if (resolvedOrderId == null) {
+    const max = (store.sales || []).reduce((m, s) => Math.max(m, Number(s.orderId || 0)), 0);
+    resolvedOrderId = max + 1;
+  }
+  const amountRub = (() => {
+    const ag = task?.amount_gross as any;
+    const n = typeof ag === 'string' ? Number(ag) : (typeof ag === 'number' ? ag : 0);
+    return Number.isFinite(n) ? Number(n) : 0;
+  })();
+  const isAgent = Boolean(task?.additional_commission_value);
+  const now = new Date().toISOString();
+  const status = (task?.acquiring_order as any)?.status ?? null;
+  const ofd = (task?.acquiring_order as any)?.ofd_url ?? null;
+  store.sales.push({
+    taskId,
+    orderId: resolvedOrderId!,
+    userId,
+    amountGrossRub: amountRub || 0,
+    isAgent,
+    retainedCommissionRub: 0,
+    status: (typeof status === 'string' ? status : null) as any,
+    ofdUrl: (typeof ofd === 'string' ? ofd : null) as any,
+    ofdFullUrl: null,
+    ofdPrepayId: null,
+    ofdFullId: null,
+    additionalCommissionOfdUrl: null,
+    npdReceiptUri: null,
+    serviceEndDate: null,
+    vatRate: null,
+    createdAt: task?.created_at || now,
+    updatedAt: now,
+  });
+  // Also record in tasks list for convenience
+  store.tasks.push({ id: taskId, orderId: resolvedOrderId!, createdAt: now });
+  await writeTasks(store);
+}
+
+

@@ -43,6 +43,8 @@ export async function GET(req: Request) {
             let data: unknown = null;
             try { data = text ? JSON.parse(text) : null; } catch { data = text; }
             let normalized: RocketworkTask = (data && typeof data === 'object' && 'task' in (data as Record<string, unknown>)) ? ((data as any).task as RocketworkTask) : (data as RocketworkTask);
+            // In case a sale is missing for an externally created task, ensure presence
+            try { const { ensureSaleFromTask } = await import('@/server/taskStore'); await ensureSaleFromTask({ userId, taskId: s.taskId, task: normalized as any }); } catch {}
             // If paid/transferred but no receipts, try a few times
             let tries = 0;
             const status = normalized?.acquiring_order?.status as string | undefined;
