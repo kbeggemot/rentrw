@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { upsertOfdReceipt } from '@/server/ofdStore';
 import { updateSaleOfdUrlsByOrderId } from '@/server/taskStore';
+import { promises as fs } from 'fs';
+import path from 'path';
 
 export const runtime = 'nodejs';
 
@@ -51,6 +53,27 @@ export async function POST(req: Request) {
         try { await updateSaleOfdUrlsByOrderId(userId, Number(orderId), { ofdFullUrl: receiptUrl }); } catch {}
       }
     }
+    // Debug logs (prod-safe; secret redacted)
+    try {
+      const dataDir = path.join(process.cwd(), '.data');
+      await fs.mkdir(dataDir, { recursive: true });
+      const redacted = new URL(req.url);
+      redacted.searchParams.delete('secret');
+      const entry = {
+        ts: new Date().toISOString(),
+        url: redacted.toString(),
+        userId,
+        invoiceId: invoiceIdRaw ?? null,
+        paymentType: pt ?? null,
+        receiptId: receiptId ?? null,
+        fn: fn ?? null,
+        fd: fd ?? null,
+        fp: fp ?? null,
+        receiptUrl: receiptUrl ?? null,
+      } as Record<string, unknown>;
+      await fs.writeFile(path.join(dataDir, 'ofd_callback_last.json'), JSON.stringify(entry, null, 2), 'utf8');
+      await fs.appendFile(path.join(dataDir, 'ofd_callbacks.log'), JSON.stringify(entry) + '\n', 'utf8');
+    } catch {}
     return NextResponse.json({ ok: true });
   } catch (error) {
     const msg = error instanceof Error ? error.message : 'Server error';
