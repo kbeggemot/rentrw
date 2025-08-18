@@ -18,6 +18,7 @@ export type SaleRecord = {
   isAgent: boolean;
   retainedCommissionRub: number;
   source?: 'ui' | 'external';
+  rwOrderId?: number | null;
   status?: string | null;
   ofdUrl?: string | null;
   ofdFullUrl?: string | null;
@@ -85,6 +86,7 @@ export async function recordSaleOnCreate(params: {
     isAgent,
     retainedCommissionRub: Math.max(0, Math.round((retained + Number.EPSILON) * 100) / 100),
     source: 'ui',
+    rwOrderId: null,
     status: null,
     ofdUrl: null,
     ofdFullUrl: null,
@@ -216,6 +218,7 @@ export async function ensureSaleFromTask(params: {
     isAgent,
     retainedCommissionRub: 0,
     source: 'external',
+    rwOrderId: Number.isFinite(num) ? Number(num) : null,
     status: (typeof status === 'string' ? status : null) as any,
     ofdUrl: (typeof ofd === 'string' ? ofd : null) as any,
     ofdFullUrl: null,
@@ -231,6 +234,20 @@ export async function ensureSaleFromTask(params: {
   // Also record in tasks list for convenience
   store.tasks.push({ id: taskId, orderId: resolvedOrderId!, createdAt: now });
   await writeTasks(store);
+}
+
+export async function updateSaleRwOrderId(userId: string, taskId: number | string, rwOrderId: number | null): Promise<void> {
+  const store = await readTasks();
+  if (!store.sales) store.sales = [];
+  const idx = store.sales.findIndex((s) => s.userId === userId && s.taskId == taskId);
+  if (idx !== -1) {
+    const current = store.sales[idx];
+    const next = { ...current } as SaleRecord;
+    next.rwOrderId = rwOrderId;
+    next.updatedAt = new Date().toISOString();
+    store.sales[idx] = next;
+    await writeTasks(store);
+  }
 }
 
 

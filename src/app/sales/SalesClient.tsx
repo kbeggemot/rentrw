@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/Input';
 type Sale = {
   taskId: string | number;
   orderId: number;
+  rwOrderId?: number | null;
   amountGrossRub: number;
   isAgent: boolean;
   retainedCommissionRub: number;
@@ -174,6 +175,7 @@ export default function SalesClient({ initial }: { initial: Sale[] }) {
             <tr>
               <th className="text-left px-3 py-2">№</th>
               <th className="text-left px-3 py-2">order_id</th>
+              <th className="text-left px-3 py-2">RW order</th>
               <th className="text-left px-3 py-2">Сумма</th>
               <th className="text-left px-3 py-2">Агентская</th>
               <th className="text-left px-3 py-2">Удержана комиссия</th>
@@ -195,6 +197,7 @@ export default function SalesClient({ initial }: { initial: Sale[] }) {
               <tr key={String(s.taskId)} className="border-t border-gray-100 dark:border-gray-800">
                 <td className="px-3 py-2">{s.taskId}</td>
                 <td className="px-3 py-2">{s.orderId}</td>
+                <td className="px-3 py-2">{s.rwOrderId ?? '-'}</td>
                 <td className="px-3 py-2">{new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB' }).format(s.amountGrossRub)}</td>
                 <td className="px-3 py-2">{s.isAgent ? 'Да' : 'Нет'}</td>
                 <td className="px-3 py-2">{s.isAgent ? new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB' }).format(s.retainedCommissionRub) : '-'}</td>

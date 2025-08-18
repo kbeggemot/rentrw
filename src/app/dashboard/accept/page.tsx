@@ -164,8 +164,8 @@ function AcceptPaymentContent() {
         try {
           const hint = (stData?.__hint as any) || {};
           const target: string | undefined = hint?.ofdTarget;
-          const orderId: number | undefined = Number(stData?.acquiring_order?.order || stData?.order || NaN);
-          if (!purchase && target === 'prepay' && Number.isFinite(orderId)) {
+          const orderId: number | undefined = Number(stData?.acquiring_order?.order || stData?.order || NaN || hint?.orderId);
+          if (!purchase && Number.isFinite(orderId)) {
             if (ofdTimerRef.current) clearTimeout(ofdTimerRef.current);
             const watch = async () => {
               try {
@@ -176,7 +176,7 @@ function AcceptPaymentContent() {
                 if (url) {
                   setPurchaseReceiptUrl(url);
                 } else {
-                  ofdTimerRef.current = setTimeout(watch, 2000);
+                  ofdTimerRef.current = setTimeout(watch, target === 'prepay' ? 2000 : 2500);
                 }
               } catch {
                 ofdTimerRef.current = setTimeout(watch, 2500);
