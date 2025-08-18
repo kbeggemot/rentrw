@@ -389,8 +389,10 @@ export async function POST(req: Request) {
             } catch {}
             if (!partnerInn) throw new Error('NO_PARTNER_INN');
             const pp = buildFermaReceiptPayload({ party: 'partner', partyInn: partnerInn, description, amountRub: amountRub, vatRate: usedVat, methodCode: PAYMENT_METHOD_PREPAY_FULL, orderId, docType: 'IncomePrepayment', buyerEmail: clientEmail, invoiceId, callbackUrl, withPrepaymentItem: true });
-            await fermaCreateReceipt(pp, { baseUrl, authToken: tokenOfd });
-            await updateSaleOfdUrlsByOrderId(userId, orderId, { ofdUrl: null });
+            {
+              const created = await fermaCreateReceipt(pp, { baseUrl, authToken: tokenOfd });
+              await updateSaleOfdUrlsByOrderId(userId, orderId, { ofdUrl: null, ofdPrepayId: created.id || null });
+            }
             // enqueue offset at 12:00 MSK of endDate
             const dueDate = new Date(`${endDate}T09:00:00Z`); // 12:00 MSK ~= 09:00 UTC
             await enqueueOffsetJob({ userId, orderId, dueAt: dueDate.toISOString(), party: 'partner', partnerInn, description, amountRub, vatRate: usedVat, buyerEmail: clientEmail || undefined });
@@ -399,8 +401,10 @@ export async function POST(req: Request) {
             const orgData = await getUserPayoutRequisites(userId);
             if (!orgInn) throw new Error('NO_ORG_INN');
             const pp = buildFermaReceiptPayload({ party: 'org', partyInn: orgInn, description, amountRub: amountRub, vatRate: usedVat, methodCode: PAYMENT_METHOD_PREPAY_FULL, orderId, docType: 'IncomePrepayment', buyerEmail: clientEmail, invoiceId, callbackUrl, withPrepaymentItem: true, paymentAgentInfo: { AgentType: 'AGENT', SupplierInn: orgInn, SupplierName: orgData.orgName || 'Организация' } });
-            await fermaCreateReceipt(pp, { baseUrl, authToken: tokenOfd });
-            await updateSaleOfdUrlsByOrderId(userId, orderId, { ofdUrl: null });
+            {
+              const created = await fermaCreateReceipt(pp, { baseUrl, authToken: tokenOfd });
+              await updateSaleOfdUrlsByOrderId(userId, orderId, { ofdUrl: null, ofdPrepayId: created.id || null });
+            }
             const dueDate = new Date(`${endDate}T09:00:00Z`); // 12:00 MSK
             await enqueueOffsetJob({ userId, orderId, dueAt: dueDate.toISOString(), party: 'org', description, amountRub, vatRate: usedVat, buyerEmail: clientEmail || undefined });
           }

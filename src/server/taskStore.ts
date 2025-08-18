@@ -20,6 +20,8 @@ export type SaleRecord = {
   status?: string | null;
   ofdUrl?: string | null;
   ofdFullUrl?: string | null;
+  ofdPrepayId?: string | null;
+  ofdFullId?: string | null;
   additionalCommissionOfdUrl?: string | null;
   npdReceiptUri?: string | null; // receipt_uri from root task (НПД)
   serviceEndDate?: string | null; // YYYY-MM-DD
@@ -84,6 +86,8 @@ export async function recordSaleOnCreate(params: {
     status: null,
     ofdUrl: null,
     ofdFullUrl: null,
+    ofdPrepayId: null,
+    ofdFullId: null,
     additionalCommissionOfdUrl: null,
     npdReceiptUri: null,
     serviceEndDate: serviceEndDate ?? null,
@@ -131,7 +135,7 @@ export async function updateSaleOfdUrls(userId: string, taskId: number | string,
   }
 }
 
-export async function updateSaleOfdUrlsByOrderId(userId: string, orderId: number, patch: Partial<Pick<SaleRecord, 'ofdUrl' | 'ofdFullUrl'>>): Promise<void> {
+export async function updateSaleOfdUrlsByOrderId(userId: string, orderId: number, patch: Partial<Pick<SaleRecord, 'ofdUrl' | 'ofdFullUrl' | 'ofdPrepayId' | 'ofdFullId'>>): Promise<void> {
   const store = await readTasks();
   if (!store.sales) store.sales = [];
   const idx = store.sales.findIndex((s) => s.orderId === orderId && s.userId === userId);
@@ -140,6 +144,8 @@ export async function updateSaleOfdUrlsByOrderId(userId: string, orderId: number
     const next = { ...current } as SaleRecord;
     if (typeof patch.ofdUrl !== 'undefined') next.ofdUrl = patch.ofdUrl ?? null;
     if (typeof patch.ofdFullUrl !== 'undefined') next.ofdFullUrl = patch.ofdFullUrl ?? null;
+    if (typeof patch.ofdPrepayId !== 'undefined') next.ofdPrepayId = patch.ofdPrepayId ?? null;
+    if (typeof patch.ofdFullId !== 'undefined') next.ofdFullId = patch.ofdFullId ?? null;
     next.updatedAt = new Date().toISOString();
     store.sales[idx] = next;
     await writeTasks(store);

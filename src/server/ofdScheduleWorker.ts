@@ -107,7 +107,11 @@ export async function runDueOffsetJobs(): Promise<void> {
           paymentAgentInfo: { AgentType: 'AGENT', SupplierInn: orgInn, SupplierName: orgData.orgName || 'Организация' },
         });
       }
-      await fermaCreateReceipt(payload, { baseUrl, authToken: token });
+      const created = await fermaCreateReceipt(payload, { baseUrl, authToken: token });
+      try {
+        const { updateSaleOfdUrlsByOrderId } = await import('./taskStore');
+        await updateSaleOfdUrlsByOrderId(job.userId, job.orderId, { ofdFullId: created.id || null });
+      } catch {}
     } catch {
       // keep the job for next attempt
       remain.push(job);

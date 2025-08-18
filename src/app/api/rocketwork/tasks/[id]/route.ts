@@ -107,7 +107,9 @@ export async function GET(_: Request) {
     // Persist into sales store; if deferred flow, prefer ofdFullUrl presence for UI
     try {
       const ofdUrl = (normalized?.ofd_url as string | undefined)
+        ?? (normalized?.ofd_receipt_url as string | undefined)
         ?? (normalized?.acquiring_order?.ofd_url as string | undefined)
+        ?? (normalized?.acquiring_order?.ofd_receipt_url as string | undefined)
         ?? null;
       const addOfd = (normalized?.additional_commission_ofd_url as string | undefined)
         ?? null;

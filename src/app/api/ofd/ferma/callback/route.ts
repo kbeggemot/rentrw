@@ -46,11 +46,18 @@ export async function POST(req: Request) {
     }
     // If we can map by InvoiceId to orderId — update sale record URLs
     const orderId = typeof invoiceIdRaw === 'string' ? Number(invoiceIdRaw) : (typeof invoiceIdRaw === 'number' ? invoiceIdRaw : NaN);
-    if (Number.isFinite(orderId) && receiptUrl) {
-      if (pt === 1) {
-        try { await updateSaleOfdUrlsByOrderId(userId, Number(orderId), { ofdUrl: receiptUrl }); } catch {}
-      } else if (pt === 2) {
-        try { await updateSaleOfdUrlsByOrderId(userId, Number(orderId), { ofdFullUrl: receiptUrl }); } catch {}
+    if (Number.isFinite(orderId)) {
+      const patch: any = {};
+      if (receiptUrl) {
+        if (pt === 1) patch.ofdUrl = receiptUrl;
+        else if (pt === 2) patch.ofdFullUrl = receiptUrl;
+      }
+      if (receiptId) {
+        if (pt === 1) patch.ofdPrepayId = receiptId;
+        else if (pt === 2) patch.ofdFullId = receiptId;
+      }
+      if (Object.keys(patch).length > 0) {
+        try { await updateSaleOfdUrlsByOrderId(userId, Number(orderId), patch); } catch {}
       }
     }
     // Debug logs (prod-safe; secret redacted)

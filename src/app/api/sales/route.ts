@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
-import { listSales, updateSaleFromStatus } from '@/server/taskStore';
+import { listSales, updateSaleFromStatus, updateSaleOfdUrlsByOrderId } from '@/server/taskStore';
 import type { RocketworkTask } from '@/types/rocketwork';
 import { getDecryptedApiToken } from '@/server/secureStore';
+import { fermaGetAuthTokenCached, fermaGetReceiptStatus } from '@/server/ofdFerma';
 
 export const runtime = 'nodejs';
 
@@ -83,6 +84,41 @@ export async function GET(req: Request) {
                     break;
                   }
                   extra += 1;
+                }
+              }
+            } catch {}
+            // Also try refreshing OFD receipts directly by stored ReceiptId if present
+            try {
+              if ((s as any).ofdPrepayId || (s as any).ofdFullId) {
+                const baseUrl = process.env.FERMA_BASE_URL || 'https://ferma.ofd.ru/';
+                const tokenOfd = await fermaGetAuthTokenCached(process.env.FERMA_LOGIN || '', process.env.FERMA_PASSWORD || '', { baseUrl });
+                const patch: any = {};
+                if (!s.ofdUrl && (s as any).ofdPrepayId) {
+                  const st = await fermaGetReceiptStatus((s as any).ofdPrepayId, { baseUrl, authToken: tokenOfd });
+                  try {
+                    const obj = st.rawText ? JSON.parse(st.rawText) : {};
+                    const fn = obj?.Data?.Fn || obj?.Fn;
+                    const fd = obj?.Data?.Fd || obj?.Fd;
+                    const fp = obj?.Data?.Fp || obj?.Fp;
+                    if (fn && fd != null && fp != null) {
+                      patch.ofdUrl = `https://check-demo.ofd.ru/rec/${encodeURIComponent(fn)}/${encodeURIComponent(String(fd))}/${encodeURIComponent(String(fp))}`;
+                    }
+                  } catch {}
+                }
+                if (!s.ofdFullUrl && (s as any).ofdFullId) {
+                  const st = await fermaGetReceiptStatus((s as any).ofdFullId, { baseUrl, authToken: tokenOfd });
+                  try {
+                    const obj = st.rawText ? JSON.parse(st.rawText) : {};
+                    const fn = obj?.Data?.Fn || obj?.Fn;
+                    const fd = obj?.Data?.Fd || obj?.Fd;
+                    const fp = obj?.Data?.Fp || obj?.Fp;
+                    if (fn && fd != null && fp != null) {
+                      patch.ofdFullUrl = `https://check-demo.ofd.ru/rec/${encodeURIComponent(fn)}/${encodeURIComponent(String(fd))}/${encodeURIComponent(String(fp))}`;
+                    }
+                  } catch {}
+                }
+                if (Object.keys(patch).length > 0) {
+                  await updateSaleOfdUrlsByOrderId(userId, s.orderId, patch);
                 }
               }
             } catch {}

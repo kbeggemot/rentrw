@@ -118,7 +118,8 @@ function AcceptPaymentContent() {
       if (paymentUrlRef.current) return;
       setAttempt(n);
       try {
-        const stRes = await fetch(`/api/rocketwork/tasks/${taskId}?t=${Date.now()}`, { cache: 'no-store' });
+        const controller = new AbortController();
+        const stRes = await fetch(`/api/rocketwork/tasks/${taskId}?t=${Date.now()}`, { cache: 'no-store', signal: controller.signal });
         const stText = await stRes.text();
         const stData = stText ? JSON.parse(stText) : {};
         const found = (stData?.acquiring_order?.url as string | undefined)
@@ -139,7 +140,7 @@ function AcceptPaymentContent() {
         }
       } catch {}
       // более частые первые опросы, затем плавное увеличение до 2000мс
-      const delay = Math.min(2000, 500 + n * 300);
+      const delay = Math.min(1800, 300 + n * 250);
       pollTimerRef.current = setTimeout(() => tick(n + 1), delay);
     };
     tick(1);
@@ -355,7 +356,7 @@ function AcceptPaymentContent() {
               } catch {}
             }
           } catch {}
-        }, 3000);
+        }, 2000);
         startPolling(taskId);
         startStatusWatcher(taskId);
       } else {
