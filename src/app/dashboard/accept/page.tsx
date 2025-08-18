@@ -43,7 +43,10 @@ function AcceptPaymentContent() {
   const [agentPhone, setAgentPhone] = useState('');
   const [commissionType, setCommissionType] = useState<'percent' | 'fixed'>('percent');
   const [buyerEmail, setBuyerEmail] = useState('');
-  const [serviceEndDate, setServiceEndDate] = useState<string>(() => new Date().toISOString().slice(0,10));
+  const [serviceEndDate, setServiceEndDate] = useState<string>(() => {
+    const msk = new Date().toLocaleDateString('ru-RU', { timeZone: 'Europe/Moscow' }).split('.').reverse().join('-');
+    return msk;
+  });
   const [vatRate, setVatRate] = useState<string>('none');
   const [method, setMethod] = useState<PaymentMethod>('qr');
   const [message, setMessage] = useState<string | null>(null);

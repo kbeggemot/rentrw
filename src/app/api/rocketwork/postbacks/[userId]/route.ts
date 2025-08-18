@@ -4,6 +4,8 @@ import { updateSaleFromStatus } from '@/server/taskStore';
 import { promises as fs } from 'fs';
 import path from 'path';
 import { updateWithdrawal } from '@/server/withdrawalStore';
+import { promises as fs } from 'fs';
+import path from 'path';
 
 export const runtime = 'nodejs';
 
@@ -92,6 +94,15 @@ export async function POST(req: Request) {
         additionalCommissionOfdUrl: additionalCommissionOfdUrl || undefined,
         npdReceiptUri: npdReceiptUri || undefined,
       });
+      // If paid/transfered — write a local marker so UI can hide QR instantly
+      try {
+        const fin = String((status || aoStatusRaw || '') as string).toLowerCase();
+        if (fin === 'paid' || fin === 'transfered' || fin === 'transferred') {
+          const dataDir = path.join(process.cwd(), '.data');
+          await fs.mkdir(dataDir, { recursive: true });
+          await fs.writeFile(path.join(dataDir, `task_paid_${userId}_${String(taskId)}.json`), JSON.stringify({ userId, taskId, status: fin, ts: new Date().toISOString() }), 'utf8');
+        }
+      } catch {}
       // If this is a Withdrawal and it became paid, write a marker file for UI
       try {
         const kind = String(pick<string>(data, 'type') || pick<string>(data, 'task.type') || '').toLowerCase();
