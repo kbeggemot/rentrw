@@ -241,7 +241,8 @@ export async function POST(req: Request) {
         client_email: clientEmail,
         payment_purpose: description,
         vat: 'VatNo',
-        with_ofd_receipt: true,
+        // мы сами формируем чеки в ОФД (и для "сегодня", и для отложенных)
+        with_ofd_receipt: false,
         order: String(orderId),
       },
     };
