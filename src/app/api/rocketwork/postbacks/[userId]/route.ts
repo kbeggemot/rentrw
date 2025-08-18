@@ -80,8 +80,12 @@ export async function POST(req: Request) {
       const npdReceiptUri = pick<string>(data, 'receipt_uri')
         ?? pick<string>(data, 'task.receipt_uri');
 
+      // Fallback to acquiring_order.status from payload when event name is generic
+      const aoStatusRaw = pick<string>(data, 'acquiring_order.status')
+        ?? pick<string>(data, 'task.acquiring_order.status');
+
       await updateSaleFromStatus(userId, taskId, {
-        status,
+        status: status || aoStatusRaw,
         ofdUrl: ofdUrl || undefined,
         additionalCommissionOfdUrl: additionalCommissionOfdUrl || undefined,
         npdReceiptUri: npdReceiptUri || undefined,
@@ -89,7 +93,7 @@ export async function POST(req: Request) {
       // If this is a Withdrawal and it became paid, write a marker file for UI
       try {
         const kind = String(pick<string>(data, 'type') || pick<string>(data, 'task.type') || '').toLowerCase();
-        const aoStatus = String(pick<string>(data, 'acquiring_order.status') || pick<string>(data, 'task.acquiring_order.status') || '').toLowerCase();
+        const aoStatus = String(aoStatusRaw || '').toLowerCase();
         if (kind === 'withdrawal') {
           // Persist store for history
           try { await updateWithdrawal(userId, taskId, { status: status || aoStatus }); } catch {}

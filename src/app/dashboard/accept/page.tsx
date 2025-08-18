@@ -43,6 +43,7 @@ function AcceptPaymentContent() {
   const [agentPhone, setAgentPhone] = useState('');
   const [commissionType, setCommissionType] = useState<'percent' | 'fixed'>('percent');
   const [buyerEmail, setBuyerEmail] = useState('');
+  const [serviceEndDate, setServiceEndDate] = useState<string>(() => new Date().toISOString().slice(0,10));
   const [method, setMethod] = useState<PaymentMethod>('qr');
   const [message, setMessage] = useState<string | null>(null);
   const [messageKind, setMessageKind] = useState<'info' | 'error' | 'success'>('info');
@@ -249,6 +250,7 @@ function AcceptPaymentContent() {
           agentPhone: isAgentSale && agentPhone.trim().length > 0 ? agentPhone.trim() : undefined,
           commissionType: isAgentSale ? commissionType : undefined,
           commissionValue: isAgentSale ? numComm : undefined,
+          serviceEndDate,
         }),
       });
       const text = await res.text();
@@ -316,6 +318,14 @@ function AcceptPaymentContent() {
           placeholder="user@example.com"
           value={buyerEmail}
           onChange={(e) => setBuyerEmail(e.target.value)}
+        />
+        <Input
+          label="Дата окончания оказания услуги"
+          type="date"
+          value={serviceEndDate}
+          onChange={(e) => setServiceEndDate(e.target.value)}
+          required
+          hint="Например: дата выезда клиента"
         />
         <div>
           <div className="text-sm text-gray-700 dark:text-gray-300 mb-2">Способ оплаты</div>

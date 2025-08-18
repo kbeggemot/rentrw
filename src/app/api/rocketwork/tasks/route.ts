@@ -24,6 +24,7 @@ type BodyIn = {
   agentPhone?: string;
   commissionType?: 'percent' | 'fixed';
   commissionValue?: number; // percent or fixed rubles depending on commissionType
+  serviceEndDate?: string; // YYYY-MM-DD
 };
 
 export async function POST(req: Request) {
@@ -330,6 +331,7 @@ export async function POST(req: Request) {
         isAgent: !!body.agentSale,
         commissionType: body.agentSale ? body.commissionType : undefined,
         commissionValue: commissionValueForRecord,
+        serviceEndDate: typeof (body as any)?.serviceEndDate === 'string' ? (body as any).serviceEndDate : undefined,
       });
     }
 

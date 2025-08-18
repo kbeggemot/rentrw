@@ -316,7 +316,7 @@ export default function DashboardClient({ hasTokenInitial }: { hasTokenInitial: 
                     <table className="min-w-full text-sm">
                       <thead className="bg-gray-50 dark:bg-gray-900">
                         <tr>
-                          <th className="text-left px-3 py-2">Task</th>
+                          <th className="text-left px-3 py-2">№</th>
                           <th className="text-left px-3 py-2">Сумма</th>
                           <th className="text-left px-3 py-2">Статус</th>
                           <th className="text-left px-3 py-2">Создан</th>

@@ -21,6 +21,7 @@ export type SaleRecord = {
   ofdUrl?: string | null;
   additionalCommissionOfdUrl?: string | null;
   npdReceiptUri?: string | null; // receipt_uri from root task (НПД)
+  serviceEndDate?: string | null; // YYYY-MM-DD
   createdAt: string;
   updatedAt: string;
 };
@@ -59,8 +60,9 @@ export async function recordSaleOnCreate(params: {
   isAgent: boolean;
   commissionType?: 'percent' | 'fixed';
   commissionValue?: number;
+  serviceEndDate?: string;
 }): Promise<void> {
-  const { userId, taskId, orderId, amountGrossRub, isAgent, commissionType, commissionValue } = params;
+  const { userId, taskId, orderId, amountGrossRub, isAgent, commissionType, commissionValue, serviceEndDate } = params;
   let retained = 0;
   if (isAgent && commissionValue !== undefined) {
     if (commissionType === 'percent') retained = (amountGrossRub * commissionValue) / 100;
@@ -80,6 +82,7 @@ export async function recordSaleOnCreate(params: {
     ofdUrl: null,
     additionalCommissionOfdUrl: null,
     npdReceiptUri: null,
+    serviceEndDate: serviceEndDate ?? null,
     createdAt: now,
     updatedAt: now,
   });

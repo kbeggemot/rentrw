@@ -14,6 +14,7 @@ type Sale = {
   ofdUrl?: string | null;
   additionalCommissionOfdUrl?: string | null;
   npdReceiptUri?: string | null;
+  serviceEndDate?: string | null;
   createdAt: string;
 };
 
@@ -162,9 +163,12 @@ export default function SalesClient({ initial }: { initial: Sale[] }) {
               <th className="text-left px-3 py-2">Агентская</th>
               <th className="text-left px-3 py-2">Удержана комиссия</th>
               <th className="text-left px-3 py-2">Статус</th>
-              <th className="text-left px-3 py-2">Чек на покупку</th>
+              <th className="text-left px-3 py-2">Чек на предоплату покупки</th>
+              <th className="text-left px-3 py-2">Чек на полный расчёт покупки</th>
               <th className="text-left px-3 py-2">Чек на комиссию</th>
               <th className="text-left px-3 py-2">Чек НПД</th>
+              <th className="text-left px-3 py-2">Дата окончания оказания услуги</th>
+              <th className="text-left px-3 py-2">Действия</th>
             </tr>
           </thead>
           <tbody>
@@ -174,14 +178,17 @@ export default function SalesClient({ initial }: { initial: Sale[] }) {
               </tr>
             ) : filtered.map((s) => (
               <tr key={String(s.taskId)} className="border-t border-gray-100 dark:border-gray-800">
-                <td className="px-3 py-2">{s.orderId}</td>
+                <td className="px-3 py-2">{s.taskId}</td>
                 <td className="px-3 py-2">{new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB' }).format(s.amountGrossRub)}</td>
                 <td className="px-3 py-2">{s.isAgent ? 'Да' : 'Нет'}</td>
                 <td className="px-3 py-2">{s.isAgent ? new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB' }).format(s.retainedCommissionRub) : '-'}</td>
                 <td className="px-3 py-2">{s.status ?? '-'}</td>
                 <td className="px-3 py-2">{s.ofdUrl ? <a className="text-blue-600 hover:underline" href={s.ofdUrl} target="_blank" rel="noreferrer">Открыть</a> : '-'}</td>
+                <td className="px-3 py-2">-</td>
                 <td className="px-3 py-2">{s.additionalCommissionOfdUrl ? <a className="text-blue-600 hover:underline" href={s.additionalCommissionOfdUrl} target="_blank" rel="noreferrer">Открыть</a> : '-'}</td>
                 <td className="px-3 py-2">{s.npdReceiptUri ? <a className="text-blue-600 hover:underline" href={s.npdReceiptUri} target="_blank" rel="noreferrer">Открыть</a> : '-'}</td>
+                <td className="px-3 py-2">{s.serviceEndDate ?? '-'}</td>
+                <td className="px-3 py-2"><Button variant="secondary" onClick={() => alert('Будет доступно позже')}>Изменить</Button></td>
               </tr>
             ))}
           </tbody>
