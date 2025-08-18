@@ -125,10 +125,7 @@ function AcceptPaymentContent() {
           ?? (stData?.task?.acquiring_order?.url as string | undefined);
         const status = (stData?.acquiring_order?.status as string | undefined)
           ?? (stData?.task?.acquiring_order?.status as string | undefined);
-        if (status) {
-          const msg = 'Ожидаем ссылку…';
-          setMessage((prev) => (prev === msg ? prev : msg));
-        }
+        if (status) setMessage('Ожидаем ссылку…');
         if (stRes.ok && found) {
           setPaymentUrl(found);
           try {
@@ -141,7 +138,9 @@ function AcceptPaymentContent() {
           return;
         }
       } catch {}
-      pollTimerRef.current = setTimeout(() => tick(n + 1), 1500);
+      // более частые первые опросы, затем плавное увеличение до 2000мс
+      const delay = Math.min(2000, 500 + n * 300);
+      pollTimerRef.current = setTimeout(() => tick(n + 1), delay);
     };
     tick(1);
   };
@@ -292,6 +291,71 @@ function AcceptPaymentContent() {
       const taskId: string | number | undefined = data?.task_id ?? data?.data?.id ?? data?.data?.task?.id;
       if (taskId !== undefined) {
         setLastTaskId(taskId);
+        // быстрый первичный запрос ссылки
+        try {
+          const r0 = await fetch(`/api/rocketwork/tasks/${taskId}?t=${Date.now()}`, { cache: 'no-store' });
+          const t0 = await r0.text();
+          const d0 = t0 ? JSON.parse(t0) : {};
+          const url0 = (d0?.acquiring_order?.url as string | undefined) ?? (d0?.task?.acquiring_order?.url as string | undefined);
+          if (url0) {
+            setPaymentUrl(url0);
+            try { const dataUrl = await QRCode.toDataURL(url0, { margin: 1, scale: 6 }); setQrDataUrl(dataUrl); } catch {}
+            setMessage(null);
+            setLoading(false);
+          } else {
+            // If RW response lacks order id, read our hint carrying saved orderId and poll our sales store for OFD links
+            const hint = (d0?.__hint as any) || {};
+            const orderId: number | undefined = Number(hint?.orderId || d0?.acquiring_order?.order || d0?.order || NaN);
+            if (Number.isFinite(orderId)) {
+              try {
+                const r = await fetch(`/api/sales/by-order/${orderId}?t=${Date.now()}`, { cache: 'no-store' });
+                const d = await r.json();
+                const sale = d?.sale;
+                const url = sale?.ofdUrl || sale?.ofdFullUrl || null;
+                if (url) {
+                  setPaymentUrl(url);
+                  try { const dataUrl = await QRCode.toDataURL(url, { margin: 1, scale: 6 }); setQrDataUrl(dataUrl); } catch {}
+                  setMessage(null);
+                  setLoading(false);
+                }
+              } catch {}
+            }
+          }
+        } catch {}
+        // fallback: если через 3с нет ссылки — пробуем last
+        setTimeout(async () => {
+          if (paymentUrlRef.current || pollAbortRef.current.aborted) return;
+          try {
+            const urlRes = await fetch('/api/rocketwork/tasks/last', { cache: 'no-store' });
+            const txt = await urlRes.text();
+            const st = txt ? JSON.parse(txt) : {};
+            const found = st?.acquiring_order?.url as string | undefined;
+            if (found) {
+              setPaymentUrl(found);
+              try { const dataUrl = await QRCode.toDataURL(found, { margin: 1, scale: 6 }); setQrDataUrl(dataUrl); } catch {}
+              setMessage(null);
+              setLoading(false);
+              return;
+            }
+            const hint = (st?.__hint as any) || {};
+            const orderId: number | undefined = Number(hint?.orderId || st?.acquiring_order?.order || st?.order || NaN);
+            if (Number.isFinite(orderId)) {
+              try {
+                const r = await fetch(`/api/sales/by-order/${orderId}?t=${Date.now()}`, { cache: 'no-store' });
+                const d = await r.json();
+                const sale = d?.sale;
+                const url = sale?.ofdUrl || sale?.ofdFullUrl || null;
+                if (url) {
+                  setPaymentUrl(url);
+                  try { const dataUrl = await QRCode.toDataURL(url, { margin: 1, scale: 6 }); setQrDataUrl(dataUrl); } catch {}
+                  setMessage(null);
+                  setLoading(false);
+                  return;
+                }
+              } catch {}
+            }
+          } catch {}
+        }, 3000);
         startPolling(taskId);
         startStatusWatcher(taskId);
       } else {

@@ -123,7 +123,7 @@ export async function GET(_: Request) {
       const sale = await findSaleByTaskId(userId, taskId);
       const mskToday = new Date().toLocaleDateString('ru-RU', { timeZone: 'Europe/Moscow' }).split('.').reverse().join('-');
       const isToday = sale?.serviceEndDate === mskToday;
-      const hint = { ofdTarget: isToday ? 'full' : 'prepay' };
+      const hint = { ofdTarget: isToday ? 'full' : 'prepay', orderId: sale?.orderId } as Record<string, unknown>;
       return new NextResponse(JSON.stringify({ ...(normalized as any), __hint: hint }), { status: 200, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store, no-cache, max-age=0, must-revalidate' } });
     } catch {
       return new NextResponse(JSON.stringify(normalized), { status: 200, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store, no-cache, max-age=0, must-revalidate' } });
