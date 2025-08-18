@@ -26,7 +26,7 @@ export function Sidebar() {
           href="/dashboard"
           onMouseDown={() => setPressedHref('/dashboard')}
           onTouchStart={() => setPressedHref('/dashboard')}
-          prefetch
+          prefetch={false}
           className={`px-3 py-2 rounded-md text-sm w-full text-left transition-colors ${
             isActive('/dashboard') || pressedHref === '/dashboard'
               ? 'bg-gray-100 dark:bg-gray-900 font-medium'
@@ -39,7 +39,7 @@ export function Sidebar() {
           href="/sales"
           onMouseDown={() => setPressedHref('/sales')}
           onTouchStart={() => setPressedHref('/sales')}
-          prefetch
+          prefetch={false}
           className={`px-3 py-2 rounded-md text-sm w-full text-left transition-colors ${
             isActive('/sales') || pressedHref === '/sales'
               ? 'bg-gray-100 dark:bg-gray-900 font-medium'
@@ -52,7 +52,7 @@ export function Sidebar() {
           href="/partners"
           onMouseDown={() => setPressedHref('/partners')}
           onTouchStart={() => setPressedHref('/partners')}
-          prefetch
+          prefetch={false}
           className={`px-3 py-2 rounded-md text-sm w-full text-left transition-colors ${
             isActive('/partners') || pressedHref === '/partners'
               ? 'bg-gray-100 dark:bg-gray-900 font-medium'
@@ -65,7 +65,7 @@ export function Sidebar() {
           href="/settings?view=1"
           onMouseDown={() => setPressedHref('/settings')}
           onTouchStart={() => setPressedHref('/settings')}
-          prefetch
+          prefetch={false}
           className={`px-3 py-2 rounded-md text-sm w-full text-left transition-colors ${
             isActive('/settings') || pressedHref === '/settings'
               ? 'bg-gray-100 dark:bg-gray-900 font-medium'
