@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { getDecryptedApiToken } from '@/server/secureStore';
 import { promises as fs } from 'fs';
 import path from 'path';
-import { updateSaleFromStatus, findSaleByTaskId, ensureSaleFromTask } from '@/server/taskStore';
+import { updateSaleFromStatus, findSaleByTaskId } from '@/server/taskStore';
 import type { RocketworkTask } from '@/types/rocketwork';
 
 export const runtime = 'nodejs';
@@ -61,8 +61,6 @@ export async function GET(_: Request) {
 
     let maybeObj = typeof data === 'object' && data !== null ? (data as Record<string, unknown>) : null;
     let normalized: RocketworkTask = (maybeObj?.task as RocketworkTask) ?? (data as RocketworkTask);
-    // Ensure we have a sale record even for tasks created outside our UI
-    try { await ensureSaleFromTask({ userId, taskId, task: normalized as any }); } catch {}
 
     // Attempt short polling for receipts if already paid/transferred and receipts missing
     let tries = 0;

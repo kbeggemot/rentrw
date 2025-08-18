@@ -10,6 +10,7 @@ type Sale = {
   amountGrossRub: number;
   isAgent: boolean;
   retainedCommissionRub: number;
+  source?: 'ui' | 'external';
   status?: string | null;
   ofdUrl?: string | null;
   ofdFullUrl?: string | null;
@@ -27,6 +28,7 @@ export default function SalesClient({ initial }: { initial: Sale[] }) {
   const [query, setQuery] = useState('');
   const [status, setStatus] = useState<'all' | 'pending' | 'paying' | 'paid' | 'transfered'>('all');
   const [agent, setAgent] = useState<'all' | 'yes' | 'no'>('all');
+  const [source, setSource] = useState<'all' | 'ui' | 'external'>('ui');
   const [purchaseReceipt, setPurchaseReceipt] = useState<'all' | 'yes' | 'no'>('all');
   const [commissionReceipt, setCommissionReceipt] = useState<'all' | 'yes' | 'no'>('all');
   const [dateFrom, setDateFrom] = useState('');
@@ -69,6 +71,9 @@ export default function SalesClient({ initial }: { initial: Sale[] }) {
     const max = amountMax ? Number(amountMax.replace(',', '.')) : null;
     return sales.filter((s) => {
       if (q && !String(s.orderId).includes(q) && !String(s.taskId).includes(q)) return false;
+      if (source !== 'all') {
+        if (s.source !== source) return false;
+      }
       if (status !== 'all') {
         const st = String(s.status || '').toLowerCase();
         if (st !== status) return false;
@@ -111,6 +116,14 @@ export default function SalesClient({ initial }: { initial: Sale[] }) {
               <option value="paying">paying</option>
               <option value="paid">paid</option>
               <option value="transfered">transfered</option>
+            </select>
+          </div>
+          <div>
+            <div className="text-xs mb-1 text-gray-600 dark:text-gray-400">Источник</div>
+            <select className="border rounded px-2 py-1 text-sm bg-white dark:bg-gray-950" value={source} onChange={(e) => setSource(e.target.value as any)}>
+              <option value="ui">Только из UI</option>
+              <option value="all">Все</option>
+              <option value="external">Только внешние</option>
             </select>
           </div>
           <div>

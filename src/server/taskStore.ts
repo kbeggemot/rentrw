@@ -17,6 +17,7 @@ export type SaleRecord = {
   amountGrossRub: number;
   isAgent: boolean;
   retainedCommissionRub: number;
+  source?: 'ui' | 'external';
   status?: string | null;
   ofdUrl?: string | null;
   ofdFullUrl?: string | null;
@@ -83,6 +84,7 @@ export async function recordSaleOnCreate(params: {
     amountGrossRub,
     isAgent,
     retainedCommissionRub: Math.max(0, Math.round((retained + Number.EPSILON) * 100) / 100),
+    source: 'ui',
     status: null,
     ofdUrl: null,
     ofdFullUrl: null,
@@ -213,6 +215,7 @@ export async function ensureSaleFromTask(params: {
     amountGrossRub: amountRub || 0,
     isAgent,
     retainedCommissionRub: 0,
+    source: 'external',
     status: (typeof status === 'string' ? status : null) as any,
     ofdUrl: (typeof ofd === 'string' ? ofd : null) as any,
     ofdFullUrl: null,

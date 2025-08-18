@@ -24,7 +24,8 @@ export async function GET(req: Request) {
       const token = await getDecryptedApiToken(userId);
       if (token) {
         const base = process.env.ROCKETWORK_API_BASE_URL || 'https://app.rocketwork.ru/api/';
-        const current = await listSales(userId);
+        // Берём только продажи, инициированные нашим UI (source === 'ui')
+        const current = (await listSales(userId)).filter((s: any) => (s as any).source === 'ui');
         // Decide which sales to refresh
         const toRefresh = current.filter((s) => {
           const st = (s.status || '').toLowerCase();
