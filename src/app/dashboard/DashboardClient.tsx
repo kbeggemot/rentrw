@@ -62,8 +62,21 @@ export default function DashboardClient({ hasTokenInitial }: { hasTokenInitial: 
     try {
       const r = await fetch('/api/rocketwork/withdrawals', { cache: 'no-store' });
       const d = await r.json();
-      setHistory(Array.isArray(d?.items) ? d.items : []);
+      const arr: Array<{ taskId: string | number; amountRub: number; status?: string | null; createdAt: string; paidAt?: string | null }> = Array.isArray(d?.items) ? d.items : [];
+      setHistory(arr);
       setPage(1);
+      // Дополнительно: вручную обновим статусы для всех не финальных записей
+      const isFinal = (s: any) => {
+        const st = String(s || '').toLowerCase();
+        return st === 'paid' || st === 'error' || st === 'canceled' || st === 'cancelled' || st === 'failed' || st === 'refunded';
+      };
+      const active = arr.filter((x) => !isFinal(x.status));
+      if (active.length > 0) {
+        await Promise.allSettled(active.map((x) => fetch(`/api/rocketwork/withdrawal-status/${encodeURIComponent(String(x.taskId))}`, { cache: 'no-store' })));
+        const r2 = await fetch('/api/rocketwork/withdrawals', { cache: 'no-store' });
+        const d2 = await r2.json();
+        setHistory(Array.isArray(d2?.items) ? d2.items : []);
+      }
     } catch {
       setHistory([]);
     }
@@ -320,7 +333,6 @@ export default function DashboardClient({ hasTokenInitial }: { hasTokenInitial: 
                           <th className="text-left px-3 py-2">Сумма</th>
                           <th className="text-left px-3 py-2">Статус</th>
                           <th className="text-left px-3 py-2">Создан</th>
-                          <th className="text-left px-3 py-2">Оплачен</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -334,7 +346,6 @@ export default function DashboardClient({ hasTokenInitial }: { hasTokenInitial: 
                             <td className="px-3 py-2">{new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB' }).format(h.amountRub)}</td>
                             <td className="px-3 py-2">{h.status ?? '-'}</td>
                             <td className="px-3 py-2">{new Date(h.createdAt).toLocaleString('ru-RU')}</td>
-                            <td className="px-3 py-2">{h.paidAt ? new Date(h.paidAt).toLocaleString('ru-RU') : '-'}</td>
                           </tr>
                         ))}
                       </tbody>
