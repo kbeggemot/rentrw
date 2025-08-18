@@ -2,8 +2,12 @@ import { NextResponse } from 'next/server';
 import { getDecryptedApiToken } from '@/server/secureStore';
 import { promises as fs } from 'fs';
 import path from 'path';
-import { updateSaleFromStatus, findSaleByTaskId } from '@/server/taskStore';
+import { updateSaleFromStatus, findSaleByTaskId, updateSaleOfdUrlsByOrderId } from '@/server/taskStore';
 import type { RocketworkTask } from '@/types/rocketwork';
+import { fermaGetAuthTokenCached, fermaCreateReceipt } from '@/server/ofdFerma';
+import { buildFermaReceiptPayload, PAYMENT_METHOD_PREPAY_FULL, PAYMENT_METHOD_FULL_PAYMENT } from '@/app/api/ofd/ferma/build-payload';
+import { getUserOrgInn, getUserPayoutRequisites } from '@/server/userStore';
+import { enqueueOffsetJob, startOfdScheduleWorker } from '@/server/ofdScheduleWorker';
 
 export const runtime = 'nodejs';
 
@@ -117,6 +121,76 @@ export async function GET(_: Request) {
       await updateSaleFromStatus(userId, taskId, { status: normalized?.acquiring_order?.status, ofdUrl, additionalCommissionOfdUrl: addOfd, npdReceiptUri: npdReceipt });
       // If no RW ofd_url (because we turned it off) and we already have prepayment/full URLs from OFD callback store,
       // the client will still display '-' here; that's expected until callback arrives.
+    } catch {}
+
+    // Fallback path: if acquiring_order.status is final and sale has no receipt yet, create OFD receipt(s) ourselves
+    try {
+      const aoFin = String(normalized?.acquiring_order?.status || '').toLowerCase();
+      if (aoFin === 'paid' || aoFin === 'transfered' || aoFin === 'transferred') {
+        const sale = await findSaleByTaskId(userId, taskId);
+        if (sale && sale.source !== 'external') {
+          const mskToday = new Date().toLocaleDateString('ru-RU', { timeZone: 'Europe/Moscow' }).split('.').reverse().join('-');
+          const isToday = (sale.serviceEndDate || null) === mskToday;
+          const amountRub = Number(sale.amountGrossRub || 0);
+          const usedVat = (sale.vatRate || 'none') as any;
+          const baseUrl = process.env.FERMA_BASE_URL || 'https://ferma.ofd.ru/';
+          const tokenOfd = await fermaGetAuthTokenCached(process.env.FERMA_LOGIN || '', process.env.FERMA_PASSWORD || '', { baseUrl });
+          const host = process.env.BASE_HOST || process.env.VERCEL_URL || process.env.RENDER_EXTERNAL_URL || '';
+          const secret = process.env.OFD_CALLBACK_SECRET || '';
+          const callbackUrl = host ? `https://${host}/api/ofd/ferma/callback${secret ? `?secret=${encodeURIComponent(secret)}&` : '?'}uid=${encodeURIComponent(userId)}` : undefined;
+
+          if (isToday) {
+            // Need full settlement receipt if not already present
+            if (!sale.ofdFullUrl && !sale.ofdFullId) {
+              if (sale.isAgent) {
+                const partnerInn: string | undefined = (normalized as any)?.executor?.inn as string | undefined;
+                if (partnerInn) {
+                  const payload = buildFermaReceiptPayload({ party: 'partner', partyInn: partnerInn, description: 'Оплата услуги', amountRub, vatRate: usedVat, methodCode: PAYMENT_METHOD_FULL_PAYMENT, orderId: sale.orderId, docType: 'Income', buyerEmail: null, invoiceId: String(sale.orderId), callbackUrl });
+                  const created = await fermaCreateReceipt(payload, { baseUrl, authToken: tokenOfd });
+                  await updateSaleOfdUrlsByOrderId(userId, sale.orderId, { ofdFullId: created.id || null });
+                }
+              } else {
+                const orgInn = await getUserOrgInn(userId);
+                const orgData = await getUserPayoutRequisites(userId);
+                if (orgInn) {
+                  const payload = buildFermaReceiptPayload({ party: 'org', partyInn: orgInn, description: 'Оплата услуги', amountRub, vatRate: usedVat, methodCode: PAYMENT_METHOD_FULL_PAYMENT, orderId: sale.orderId, docType: 'Income', buyerEmail: null, invoiceId: String(sale.orderId), callbackUrl, paymentAgentInfo: { AgentType: 'AGENT', SupplierInn: orgInn, SupplierName: orgData.orgName || 'Организация' } });
+                  const created = await fermaCreateReceipt(payload, { baseUrl, authToken: tokenOfd });
+                  await updateSaleOfdUrlsByOrderId(userId, sale.orderId, { ofdFullId: created.id || null });
+                }
+              }
+            }
+          } else {
+            // Prepayment receipt if not present, and schedule offset
+            if (!sale.ofdUrl && !sale.ofdPrepayId) {
+              if (sale.isAgent) {
+                const partnerInn: string | undefined = (normalized as any)?.executor?.inn as string | undefined;
+                if (partnerInn) {
+                  const payload = buildFermaReceiptPayload({ party: 'partner', partyInn: partnerInn, description: 'Оплата услуги', amountRub, vatRate: usedVat, methodCode: PAYMENT_METHOD_PREPAY_FULL, orderId: sale.orderId, docType: 'IncomePrepayment', buyerEmail: null, invoiceId: String(sale.orderId), callbackUrl, withPrepaymentItem: true });
+                  const created = await fermaCreateReceipt(payload, { baseUrl, authToken: tokenOfd });
+                  await updateSaleOfdUrlsByOrderId(userId, sale.orderId, { ofdPrepayId: created.id || null });
+                }
+              } else {
+                const orgInn = await getUserOrgInn(userId);
+                const orgData = await getUserPayoutRequisites(userId);
+                if (orgInn) {
+                  const payload = buildFermaReceiptPayload({ party: 'org', partyInn: orgInn, description: 'Оплата услуги', amountRub, vatRate: usedVat, methodCode: PAYMENT_METHOD_PREPAY_FULL, orderId: sale.orderId, docType: 'IncomePrepayment', buyerEmail: null, invoiceId: String(sale.orderId), callbackUrl, withPrepaymentItem: true, paymentAgentInfo: { AgentType: 'AGENT', SupplierInn: orgInn, SupplierName: orgData.orgName || 'Организация' } });
+                  const created = await fermaCreateReceipt(payload, { baseUrl, authToken: tokenOfd });
+                  await updateSaleOfdUrlsByOrderId(userId, sale.orderId, { ofdPrepayId: created.id || null });
+                }
+              }
+            }
+            if (sale.serviceEndDate) {
+              startOfdScheduleWorker();
+              const dueDate = new Date(`${sale.serviceEndDate}T09:00:00Z`);
+              let partnerInn: string | undefined;
+              if (sale.isAgent) {
+                partnerInn = (normalized as any)?.executor?.inn as string | undefined;
+              }
+              await enqueueOffsetJob({ userId, orderId: sale.orderId, dueAt: dueDate.toISOString(), party: sale.isAgent ? 'partner' : 'org', partnerInn, description: 'Оплата услуги', amountRub, vatRate: usedVat, buyerEmail: null });
+            }
+          }
+        }
+      }
     } catch {}
 
     // Также проставим заголовок, чтобы клиент не кешировал
