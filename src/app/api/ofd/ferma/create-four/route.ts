@@ -132,7 +132,8 @@ export async function POST(req: Request) {
     }
     const authOpts = { baseUrl, authToken: auth.authToken } as const;
     const only = typeof (body as any)?.only === 'string' ? String((body as any).only) : null;
-    let results: Array<{ rawStatus: number; rawText: string }> = [];
+    type Simple = { rawStatus: number; rawText: string };
+    let results: Simple[] = [];
     if (only === 'partnerOffset') {
       const r = await fermaCreateReceipt(fullPartner, authOpts);
       results = [{ rawStatus: r.rawStatus || 0, rawText: r.rawText || '' }];
@@ -146,12 +147,13 @@ export async function POST(req: Request) {
       const r = await fermaCreateReceipt(fullOrg, authOpts);
       results = [{ rawStatus: r.rawStatus || 0, rawText: r.rawText || '' }];
     } else {
-      results = await Promise.all([
+      const arr = await Promise.all([
         fermaCreateReceipt(prepayPartner, authOpts),
         fermaCreateReceipt(fullPartner, authOpts),
         fermaCreateReceipt(prepayOrg, authOpts),
         fermaCreateReceipt(fullOrg, authOpts),
       ]);
+      results = arr.map((r) => ({ rawStatus: r.rawStatus || 0, rawText: r.rawText || '' }));
     }
 
     // Persist ids for callback lookup convenience
