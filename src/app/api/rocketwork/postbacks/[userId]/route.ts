@@ -80,9 +80,11 @@ export async function POST(req: Request) {
       const npdReceiptUri = pick<string>(data, 'receipt_uri')
         ?? pick<string>(data, 'task.receipt_uri');
 
-      // Fallback to acquiring_order.status from payload when event name is generic
+      // Fallback statuses from payload when event name is generic
       const aoStatusRaw = pick<string>(data, 'acquiring_order.status')
         ?? pick<string>(data, 'task.acquiring_order.status');
+      const rootStatusRaw = pick<string>(data, 'status')
+        ?? pick<string>(data, 'task.status');
 
       await updateSaleFromStatus(userId, taskId, {
         status: status || aoStatusRaw,
@@ -94,11 +96,12 @@ export async function POST(req: Request) {
       try {
         const kind = String(pick<string>(data, 'type') || pick<string>(data, 'task.type') || '').toLowerCase();
         const aoStatus = String(aoStatusRaw || '').toLowerCase();
+        const rootStatus = String(rootStatusRaw || '').toLowerCase();
         if (kind === 'withdrawal') {
           // Persist store for history
-          try { await updateWithdrawal(userId, taskId, { status: status || aoStatus }); } catch {}
+          try { await updateWithdrawal(userId, taskId, { status: (rootStatusRaw || status || aoStatus) }); } catch {}
         }
-        if (kind === 'withdrawal' && (status === 'paid' || aoStatus === 'paid')) {
+        if (kind === 'withdrawal' && (status === 'paid' || aoStatus === 'paid' || rootStatus === 'paid')) {
           const dataDir = path.join(process.cwd(), '.data');
           await fs.mkdir(dataDir, { recursive: true });
           await fs.writeFile(path.join(dataDir, `withdrawal_${userId}_${String(taskId)}.json`), JSON.stringify({ userId, taskId, paidAt: new Date().toISOString() }), 'utf8');
