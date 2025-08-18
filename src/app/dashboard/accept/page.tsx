@@ -58,6 +58,7 @@ function AcceptPaymentContent() {
   const pollAbortRef = useRef<{ aborted: boolean }>({ aborted: false });
   const pollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const statusTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const ofdTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const loadingRef = useRef<boolean>(false);
   const paymentUrlRef = useRef<string | null>(null);
 
@@ -72,6 +73,7 @@ function AcceptPaymentContent() {
       ref.aborted = true;
       if (pollTimerRef.current) clearTimeout(pollTimerRef.current);
       if (statusTimerRef.current) clearTimeout(statusTimerRef.current);
+      if (ofdTimerRef.current) clearTimeout(ofdTimerRef.current);
     };
   }, []);
 
@@ -155,6 +157,31 @@ function AcceptPaymentContent() {
         const addOfd = (stData?.additional_commission_ofd_url as string | undefined) ?? null;
         if (purchase) setPurchaseReceiptUrl(purchase);
         if (addOfd) setCommissionReceiptUrl(addOfd);
+        // If RW OFD is disabled (deferred full), watch our own sales store for OFD receipts
+        try {
+          const hint = (stData?.__hint as any) || {};
+          const target: string | undefined = hint?.ofdTarget;
+          const orderId: number | undefined = Number(stData?.acquiring_order?.order || stData?.order || NaN);
+          if (!purchase && target === 'prepay' && Number.isFinite(orderId)) {
+            if (ofdTimerRef.current) clearTimeout(ofdTimerRef.current);
+            const watch = async () => {
+              try {
+                const r = await fetch(`/api/sales/by-order/${orderId}?t=${Date.now()}`, { cache: 'no-store' });
+                const d = await r.json();
+                const sale = d?.sale;
+                const url = sale?.ofdUrl || sale?.ofdFullUrl || null;
+                if (url) {
+                  setPurchaseReceiptUrl(url);
+                } else {
+                  ofdTimerRef.current = setTimeout(watch, 2000);
+                }
+              } catch {
+                ofdTimerRef.current = setTimeout(watch, 2500);
+              }
+            };
+            watch();
+          }
+        } catch {}
         // If paid/transferred — hide payment link and QR
         const st = String(status || '').toLowerCase();
         if (st === 'paid' || st === 'transfered' || st === 'transferred') {
