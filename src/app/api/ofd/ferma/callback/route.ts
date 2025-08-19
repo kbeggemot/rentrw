@@ -36,10 +36,13 @@ export async function POST(req: Request) {
     const pt = (body?.Data?.CustomerReceipt?.PaymentItems?.[0]?.PaymentType
       ?? body?.CustomerReceipt?.PaymentItems?.[0]?.PaymentType
       ?? body?.PaymentItems?.[0]?.PaymentType) as number | undefined;
-    // Build demo link pattern if parts are known
+    // Build viewer link if parts are known
     let receiptUrl: string | undefined;
-    if (fn && fd != null && fp != null) {
-      receiptUrl = `https://check-demo.ofd.ru/rec/${encodeURIComponent(fn)}/${encodeURIComponent(String(fd))}/${encodeURIComponent(String(fp))}`;
+    if (fn && fd != null && fp != null) { receiptUrl = buildReceiptViewUrl(fn, fd, fp); }
+    // Also check direct URL if Ferma provides it
+    if (!receiptUrl) {
+      const directUrl: string | undefined = body?.Data?.Device?.OfdReceiptUrl || body?.Device?.OfdReceiptUrl;
+      if (typeof directUrl === 'string' && directUrl.length > 0) receiptUrl = directUrl;
     }
     // If callback does not include Fn/Fd/Fp — fetch receipt status from Ferma to build link (with short retries)
     if (!receiptUrl && receiptId) {
