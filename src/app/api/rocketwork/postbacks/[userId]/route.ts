@@ -136,9 +136,11 @@ export async function POST(req: Request) {
             const usedVat = (sale.vatRate || 'none') as any;
             const baseUrl = process.env.FERMA_BASE_URL || 'https://ferma.ofd.ru/';
             const tokenOfd = await fermaGetAuthTokenCached(process.env.FERMA_LOGIN || '', process.env.FERMA_PASSWORD || '', { baseUrl });
-            const host = process.env.BASE_HOST || process.env.VERCEL_URL || process.env.RENDER_EXTERNAL_URL || '';
+            // Build callback URL from current request headers
+            const protoHdr = req.headers.get('x-forwarded-proto') || 'http';
+            const hostHdr = req.headers.get('x-forwarded-host') || req.headers.get('host') || 'localhost:3000';
             const secret = process.env.OFD_CALLBACK_SECRET || '';
-            const callbackUrl = host ? `https://${host}/api/ofd/ferma/callback${secret ? `?secret=${encodeURIComponent(secret)}&` : '?'}uid=${encodeURIComponent(userId)}` : undefined;
+            const callbackUrl = `${protoHdr}://${hostHdr}/api/ofd/ferma/callback${secret ? `?secret=${encodeURIComponent(secret)}&` : '?'}uid=${encodeURIComponent(userId)}`;
 
             if (sale.isAgent) {
               // Try to resolve partner INN through RW task
