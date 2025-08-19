@@ -137,8 +137,10 @@ export async function POST(req: Request) {
             const baseUrl = process.env.FERMA_BASE_URL || 'https://ferma.ofd.ru/';
             const tokenOfd = await fermaGetAuthTokenCached(process.env.FERMA_LOGIN || '', process.env.FERMA_PASSWORD || '', { baseUrl });
             // Build callback URL from current request headers
-            const protoHdr = req.headers.get('x-forwarded-proto') || 'http';
+            const rawProto = req.headers.get('x-forwarded-proto') || 'http';
             const hostHdr = req.headers.get('x-forwarded-host') || req.headers.get('host') || 'localhost:3000';
+            const isPublicHost = !/localhost|127\.0\.0\.1|(^10\.)|(^192\.168\.)/.test(hostHdr);
+            const protoHdr = (rawProto === 'http' && isPublicHost) ? 'https' : rawProto;
             const secret = process.env.OFD_CALLBACK_SECRET || '';
             const callbackUrl = `${protoHdr}://${hostHdr}/api/ofd/ferma/callback${secret ? `?secret=${encodeURIComponent(secret)}&` : '?'}uid=${encodeURIComponent(userId)}`;
 
