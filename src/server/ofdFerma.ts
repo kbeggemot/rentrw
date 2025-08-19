@@ -39,7 +39,7 @@ function joinUrl(base: string, pathname: string): string {
 }
 
 function shouldLog(): boolean {
-  return process.env.OFD_FERMA_LOG_DEBUG === '1';
+  return process.env.OFD_FERMA_LOG_DEBUG === '1' || process.env.NODE_ENV !== 'production';
 }
 
 // In-memory cache for AuthToken per baseUrl+login
