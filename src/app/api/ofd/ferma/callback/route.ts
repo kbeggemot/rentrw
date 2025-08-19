@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { upsertOfdReceipt } from '@/server/ofdStore';
 import { updateSaleOfdUrlsByOrderId } from '@/server/taskStore';
+import { fermaGetAuthTokenCached, fermaGetReceiptStatus } from '@/server/ofdFerma';
 import { writeText } from '@/server/storage';
 
 export const runtime = 'nodejs';
@@ -40,20 +41,49 @@ export async function POST(req: Request) {
     if (fn && fd != null && fp != null) {
       receiptUrl = `https://check-demo.ofd.ru/rec/${encodeURIComponent(fn)}/${encodeURIComponent(String(fd))}/${encodeURIComponent(String(fp))}`;
     }
+    // If callback does not include Fn/Fd/Fp — fetch receipt status from Ferma to build link
+    if (!receiptUrl && receiptId) {
+      try {
+        const baseUrl = process.env.FERMA_BASE_URL || 'https://ferma.ofd.ru/';
+        const token = await fermaGetAuthTokenCached(process.env.FERMA_LOGIN || '', process.env.FERMA_PASSWORD || '', { baseUrl });
+        const st = await fermaGetReceiptStatus(receiptId, { baseUrl, authToken: token });
+        const obj = st.rawText ? JSON.parse(st.rawText) : {};
+        const fn2 = obj?.Data?.Fn || obj?.Fn;
+        const fd2 = obj?.Data?.Fd || obj?.Fd;
+        const fp2 = obj?.Data?.Fp || obj?.Fp;
+        if (fn2 && fd2 != null && fp2 != null) {
+          receiptUrl = `https://check-demo.ofd.ru/rec/${encodeURIComponent(fn2)}/${encodeURIComponent(String(fd2))}/${encodeURIComponent(String(fp2))}`;
+        }
+      } catch {}
+    }
     if (receiptId) {
       await upsertOfdReceipt({ userId, receiptId, fn: fn ?? null, fd: fd ?? null, fp: fp ?? null, url: receiptUrl ?? null, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), payload: body });
     }
     // If we can map by InvoiceId to orderId — update sale record URLs
-    const orderId = typeof invoiceIdRaw === 'string' ? Number(invoiceIdRaw) : (typeof invoiceIdRaw === 'number' ? invoiceIdRaw : NaN);
+    // InvoiceId может быть с префиксом: PREFIX-123 → извлекаем последнее число
+    let orderId = NaN as number;
+    if (typeof invoiceIdRaw === 'string') {
+      const m = invoiceIdRaw.match(/(\d+)/g);
+      orderId = m && m.length > 0 ? Number(m[m.length - 1]) : NaN;
+    } else if (typeof invoiceIdRaw === 'number') {
+      orderId = invoiceIdRaw;
+    }
     if (Number.isFinite(orderId)) {
       const patch: any = {};
       if (receiptUrl) {
         if (pt === 1) patch.ofdUrl = receiptUrl;
         else if (pt === 2) patch.ofdFullUrl = receiptUrl;
+        else {
+          // fallback: если тип неизвестен, считаем как "полный расчёт"
+          patch.ofdFullUrl = receiptUrl;
+        }
       }
       if (receiptId) {
         if (pt === 1) patch.ofdPrepayId = receiptId;
         else if (pt === 2) patch.ofdFullId = receiptId;
+        else {
+          patch.ofdFullId = receiptId;
+        }
       }
       if (Object.keys(patch).length > 0) {
         try { await updateSaleOfdUrlsByOrderId(userId, Number(orderId), patch); } catch {}
