@@ -193,6 +193,14 @@ function AcceptPaymentContent() {
                     const r = await fetch(`/api/sales/by-order/${orderId}?t=${Date.now()}`, { cache: 'no-store' });
                     const d = await r.json();
                     const sale = d?.sale;
+                    // если в локальном сторе статус уже финальный — прячем ссылку/QR на всякий случай
+                    const stLocal = String(sale?.status || '').toLowerCase();
+                    if (stLocal === 'paid' || stLocal === 'transfered' || stLocal === 'transferred') {
+                      setPaymentUrl(null);
+                      setQrDataUrl(null);
+                      setMessage(null);
+                      setMessageKind('info');
+                    }
                     const purchaseUrl = sale?.ofdUrl || sale?.ofdFullUrl || null;
                     if (purchaseUrl) {
                       setPurchaseReceiptUrl(purchaseUrl);
