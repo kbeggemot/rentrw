@@ -156,7 +156,7 @@ function AcceptPaymentContent() {
           ?? (stData?.task?.acquiring_order?.status as string | undefined);
         // guard again after async
         if (attemptIdRef.current !== attemptId || activeTaskIdRef.current !== taskId) return;
-        if (status) setMessage('Ожидаем ссылку…');
+        if (status && !paymentUrlRef.current) setMessage('Ожидаем ссылку…');
         const st = String(status || '').toLowerCase();
         if (st === 'paid' || st === 'transfered' || st === 'transferred') {
           setAoStatus(status || 'paid');
