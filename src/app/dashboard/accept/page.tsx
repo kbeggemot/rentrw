@@ -202,6 +202,12 @@ function AcceptPaymentContent() {
           ?? undefined;
         if (attemptIdRef.current !== attemptId || activeTaskIdRef.current !== taskId) return;
         if (status) { setAoStatus(status); updateDebug(); }
+        // If RW already returned commission receipt URL, set it immediately
+        try {
+          const addUrl: string | undefined = (stData?.additional_commission_ofd_url as string | undefined)
+            ?? (stData?.task?.additional_commission_ofd_url as string | undefined);
+          if (addUrl) setCommissionReceiptUrl(addUrl);
+        } catch {}
         // If paid/transferred — hide payment link and QR, then start OFD polling for THIS task
         const st = String(status || '').toLowerCase();
         if (st === 'paid' || st === 'transfered' || st === 'transferred') {
