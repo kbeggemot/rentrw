@@ -64,6 +64,9 @@ function AcceptPaymentContent() {
   const ofdTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const loadingRef = useRef<boolean>(false);
   const paymentUrlRef = useRef<string | null>(null);
+  const attemptIdRef = useRef<number>(0);
+  const activeTaskIdRef = useRef<string | number | null>(null);
+  const ofdStartedForTaskIdRef = useRef<string | number | null>(null);
 
   const [aoStatus, setAoStatus] = useState<string | null>(null);
   const [purchaseReceiptUrl, setPurchaseReceiptUrl] = useState<string | null>(null);
@@ -106,7 +109,7 @@ function AcceptPaymentContent() {
   }, [paymentUrl]);
 
   // Явный старт опроса после получения taskId, чтобы исключить конфликты эффектов
-  const startPolling = (taskId: string | number) => {
+  const startPolling = (taskId: string | number, attemptId: number) => {
     if (pollTimerRef.current) {
       clearTimeout(pollTimerRef.current);
     }
@@ -115,6 +118,8 @@ function AcceptPaymentContent() {
     setAttempt(0);
     const tick = async (n: number) => {
       if (pollAbortRef.current.aborted) return;
+      if (attemptIdRef.current !== attemptId) return;
+      if (activeTaskIdRef.current !== taskId) return;
       if (paymentUrlRef.current) return;
       setAttempt(n);
       try {
@@ -147,54 +152,62 @@ function AcceptPaymentContent() {
   };
 
   // Watch task status and receipts after task is created
-  const startStatusWatcher = (taskId: string | number) => {
+  const startStatusWatcher = (taskId: string | number, attemptId: number, isAgentForTask: boolean) => {
     if (statusTimerRef.current) clearTimeout(statusTimerRef.current);
     const run = async () => {
+      if (attemptIdRef.current !== attemptId) return;
+      if (activeTaskIdRef.current !== taskId) return;
       try {
         const stRes = await fetch(`/api/rocketwork/tasks/${taskId}?t=${Date.now()}`, { cache: 'no-store' });
         const stText = await stRes.text();
         let stData: any = null; try { stData = stText ? JSON.parse(stText) : null; } catch { stData = stText; }
         const status: string | undefined = (stData?.acquiring_order?.status as string | undefined) ?? undefined;
         if (status) setAoStatus(status);
-        // Always prefer our own OFD (Ferma) storage over RW. Poll by orderId until link appears.
-        try {
-          const hint = (stData?.__hint as any) || {};
-          const target: string | undefined = hint?.ofdTarget;
-          const orderId: number | undefined = Number(hint?.orderId || stData?.acquiring_order?.order || stData?.order || NaN);
-          if (Number.isFinite(orderId)) {
-            if (ofdTimerRef.current) clearTimeout(ofdTimerRef.current);
-            const watch = async () => {
-              try {
-                const r = await fetch(`/api/sales/by-order/${orderId}?t=${Date.now()}`, { cache: 'no-store' });
-                const d = await r.json();
-                const sale = d?.sale;
-                const url = sale?.ofdUrl || sale?.ofdFullUrl || null;
-                if (url) {
-                  setPurchaseReceiptUrl(url);
-                } else {
-                  ofdTimerRef.current = setTimeout(watch, target === 'prepay' ? 2000 : 2500);
-                }
-              } catch {
-                ofdTimerRef.current = setTimeout(watch, 2500);
-              }
-            };
-            watch();
-          }
-        } catch {}
-        // If paid/transferred — hide payment link and QR
+        // If paid/transferred — hide payment link and QR, then start OFD polling for THIS task
         const st = String(status || '').toLowerCase();
         if (st === 'paid' || st === 'transfered' || st === 'transferred') {
           if (paymentUrlRef.current) {
             setPaymentUrl(null);
           }
           // после успеха — полностью убираем QR и заголовок
-          if (qrDataUrl) setQrDataUrl(null);
+          setQrDataUrl(null);
           setMessage(null);
           setMessageKind('info');
+
+          // Запустить наблюдение за чеками только один раз для текущей задачи
+          if (ofdStartedForTaskIdRef.current !== taskId) {
+            ofdStartedForTaskIdRef.current = taskId;
+            try {
+              const hint = (stData?.__hint as any) || {};
+              const target: string | undefined = hint?.ofdTarget;
+              const orderId: number | undefined = Number(hint?.orderId || stData?.acquiring_order?.order || stData?.order || NaN);
+              if (Number.isFinite(orderId)) {
+                if (ofdTimerRef.current) clearTimeout(ofdTimerRef.current);
+                const watch = async () => {
+                  if (attemptIdRef.current !== attemptId) return;
+                  if (activeTaskIdRef.current !== taskId) return;
+                  try {
+                    const r = await fetch(`/api/sales/by-order/${orderId}?t=${Date.now()}`, { cache: 'no-store' });
+                    const d = await r.json();
+                    const sale = d?.sale;
+                    const purchaseUrl = sale?.ofdUrl || sale?.ofdFullUrl || null;
+                    if (purchaseUrl) {
+                      setPurchaseReceiptUrl(purchaseUrl);
+                    } else {
+                      ofdTimerRef.current = setTimeout(watch, target === 'prepay' ? 2000 : 2500);
+                    }
+                  } catch {
+                    ofdTimerRef.current = setTimeout(watch, 2500);
+                  }
+                };
+                watch();
+              }
+            } catch {}
+          }
         }
       } catch {}
       // keep watching until both receipts are present (or not agent)
-      const needCommission = isAgentSale;
+      const needCommission = isAgentForTask;
       const missingPurchase = !purchaseReceiptUrl;
       const missingCommission = needCommission && !commissionReceiptUrl;
       if (missingPurchase || missingCommission) {
@@ -251,8 +264,15 @@ function AcceptPaymentContent() {
       // схлопываем параметры под спойлер, раз локальная валидация прошла
       setCollapsed(true);
       // сбрасываем состояние предыдущей попытки (ссылка, QR, статусы, чеки)
+      attemptIdRef.current += 1;
+      const myAttempt = attemptIdRef.current;
+      // жестко останавливаем все предыдущие тики
+      pollAbortRef.current.aborted = true;
       if (pollTimerRef.current) clearTimeout(pollTimerRef.current);
       if (statusTimerRef.current) clearTimeout(statusTimerRef.current);
+      if (ofdTimerRef.current) clearTimeout(ofdTimerRef.current);
+      ofdStartedForTaskIdRef.current = null;
+      activeTaskIdRef.current = null;
       paymentUrlRef.current = null;
       setPaymentUrl(null);
       setQrDataUrl(null);
@@ -288,6 +308,7 @@ function AcceptPaymentContent() {
       const taskId: string | number | undefined = data?.task_id ?? data?.data?.id ?? data?.data?.task?.id;
       if (taskId !== undefined) {
         setLastTaskId(taskId);
+        activeTaskIdRef.current = taskId;
         // быстрый первичный запрос ссылки
         try {
           const r0 = await fetch(`/api/rocketwork/tasks/${taskId}?t=${Date.now()}`, { cache: 'no-store' });
@@ -299,62 +320,10 @@ function AcceptPaymentContent() {
             try { const dataUrl = await QRCode.toDataURL(url0, { margin: 1, scale: 6 }); setQrDataUrl(dataUrl); } catch {}
             setMessage(null);
             setLoading(false);
-          } else {
-            // If RW response lacks order id, read our hint carrying saved orderId and poll our sales store for OFD links
-            const hint = (d0?.__hint as any) || {};
-            const orderId: number | undefined = Number(hint?.orderId || d0?.acquiring_order?.order || d0?.order || NaN);
-            if (Number.isFinite(orderId)) {
-              try {
-                const r = await fetch(`/api/sales/by-order/${orderId}?t=${Date.now()}`, { cache: 'no-store' });
-                const d = await r.json();
-                const sale = d?.sale;
-                const url = sale?.ofdUrl || sale?.ofdFullUrl || null;
-                if (url) {
-                  setPaymentUrl(url);
-                  try { const dataUrl = await QRCode.toDataURL(url, { margin: 1, scale: 6 }); setQrDataUrl(dataUrl); } catch {}
-                  setMessage(null);
-                  setLoading(false);
-                }
-              } catch {}
-            }
           }
         } catch {}
-        // fallback: если через 3с нет ссылки — пробуем last
-        setTimeout(async () => {
-          if (paymentUrlRef.current || pollAbortRef.current.aborted) return;
-          try {
-            const urlRes = await fetch('/api/rocketwork/tasks/last', { cache: 'no-store' });
-            const txt = await urlRes.text();
-            const st = txt ? JSON.parse(txt) : {};
-            const found = st?.acquiring_order?.url as string | undefined;
-            if (found) {
-              setPaymentUrl(found);
-              try { const dataUrl = await QRCode.toDataURL(found, { margin: 1, scale: 6 }); setQrDataUrl(dataUrl); } catch {}
-              setMessage(null);
-              setLoading(false);
-              return;
-            }
-            const hint = (st?.__hint as any) || {};
-            const orderId: number | undefined = Number(hint?.orderId || st?.acquiring_order?.order || st?.order || NaN);
-            if (Number.isFinite(orderId)) {
-              try {
-                const r = await fetch(`/api/sales/by-order/${orderId}?t=${Date.now()}`, { cache: 'no-store' });
-                const d = await r.json();
-                const sale = d?.sale;
-                const url = sale?.ofdUrl || sale?.ofdFullUrl || null;
-                if (url) {
-                  setPaymentUrl(url);
-                  try { const dataUrl = await QRCode.toDataURL(url, { margin: 1, scale: 6 }); setQrDataUrl(dataUrl); } catch {}
-                  setMessage(null);
-                  setLoading(false);
-                  return;
-                }
-              } catch {}
-            }
-          } catch {}
-        }, 2000);
-        startPolling(taskId);
-        startStatusWatcher(taskId);
+        startPolling(taskId, myAttempt);
+        startStatusWatcher(taskId, myAttempt, isAgentSale);
       } else {
         setLoading(false);
         setMessage('Не удалось получить идентификатор задачи');
@@ -581,10 +550,11 @@ function AcceptPaymentContent() {
               variant="secondary"
               onClick={async () => {
                 try {
-                  const urlRes = await fetch('/api/rocketwork/tasks/last', { cache: 'no-store' });
+                  if (!lastTaskId) return;
+                  const urlRes = await fetch(`/api/rocketwork/tasks/${lastTaskId}?t=${Date.now()}`, { cache: 'no-store' });
                   const txt = await urlRes.text();
                   const st = txt ? JSON.parse(txt) : {};
-                  const found = st?.acquiring_order?.url as string | undefined;
+                  const found = (st?.acquiring_order?.url as string | undefined) ?? (st?.task?.acquiring_order?.url as string | undefined);
                   if (found) {
                     setPaymentUrl(found);
                     try {
