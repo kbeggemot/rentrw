@@ -1,4 +1,4 @@
-import { promises as fs } from 'fs';
+import { readText, writeText } from './storage';
 import path from 'path';
 
 const DATA_DIR = path.join(process.cwd(), '.data');
@@ -38,18 +38,14 @@ type TaskStoreData = {
 };
 
 async function readTasks(): Promise<TaskStoreData> {
-  try {
-    const raw = await fs.readFile(TASKS_FILE, 'utf8');
-    const parsed = JSON.parse(raw) as Partial<TaskStoreData>;
-    return { tasks: Array.isArray(parsed.tasks) ? parsed.tasks : [], sales: Array.isArray((parsed as any).sales) ? (parsed as any).sales : [] };
-  } catch {
-    return { tasks: [], sales: [] };
-  }
+  const raw = await readText(TASKS_FILE);
+  if (!raw) return { tasks: [], sales: [] };
+  const parsed = JSON.parse(raw) as Partial<TaskStoreData>;
+  return { tasks: Array.isArray(parsed.tasks) ? parsed.tasks : [], sales: Array.isArray((parsed as any).sales) ? (parsed as any).sales : [] };
 }
 
 async function writeTasks(data: TaskStoreData): Promise<void> {
-  await fs.mkdir(DATA_DIR, { recursive: true });
-  await fs.writeFile(TASKS_FILE, JSON.stringify(data, null, 2), 'utf8');
+  await writeText(TASKS_FILE, JSON.stringify(data, null, 2));
 }
 
 export async function saveTaskId(id: number | string, orderId: number): Promise<void> {

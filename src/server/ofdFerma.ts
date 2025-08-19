@@ -1,5 +1,4 @@
-import { promises as fs } from 'fs';
-import path from 'path';
+import { writeText } from './storage';
 
 type FermaAuth = {
   baseUrl: string;
@@ -88,21 +87,13 @@ export async function fermaCreateReceipt(payload: unknown, opts?: Partial<FermaA
 
   // Debug log
   if (shouldLog()) {
-    try {
-      const dir = path.join(process.cwd(), '.data');
-      await fs.mkdir(dir, { recursive: true });
-      await fs.writeFile(path.join(dir, 'ofd_last_request.json'), JSON.stringify({ ts: new Date().toISOString(), url, body: payload }, null, 2), 'utf8');
-    } catch {}
+    try { await writeText('.data/ofd_last_request.json', JSON.stringify({ ts: new Date().toISOString(), url, body: payload }, null, 2)); } catch {}
   }
 
   const res = await fetch(url, { method: 'POST', headers, body, cache: 'no-store' });
   const text = await res.text();
   if (shouldLog()) {
-    try {
-      const dir = path.join(process.cwd(), '.data');
-      await fs.mkdir(dir, { recursive: true });
-      await fs.writeFile(path.join(dir, 'ofd_last_response.json'), JSON.stringify({ ts: new Date().toISOString(), status: res.status, text }, null, 2), 'utf8');
-    } catch {}
+    try { await writeText('.data/ofd_last_response.json', JSON.stringify({ ts: new Date().toISOString(), status: res.status, text }, null, 2)); } catch {}
   }
 
   let data: any = null; try { data = text ? JSON.parse(text) : null; } catch { data = text; }
@@ -137,11 +128,7 @@ export async function fermaCreateAuthToken(login?: string, password?: string, op
   const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, body, cache: 'no-store' });
   const text = await res.text();
   if (shouldLog()) {
-    try {
-      const dir = path.join(process.cwd(), '.data');
-      await fs.mkdir(dir, { recursive: true });
-      await fs.writeFile(path.join(dir, 'ofd_auth_token_last.json'), JSON.stringify({ ts: new Date().toISOString(), url, status: res.status, request: { Login: login || env.login, Password: '***' }, text }, null, 2), 'utf8');
-    } catch {}
+    try { await writeText('.data/ofd_auth_token_last.json', JSON.stringify({ ts: new Date().toISOString(), url, status: res.status, request: { Login: login || env.login, Password: '***' }, text }, null, 2)); } catch {}
   }
   let data: any = null; try { data = text ? JSON.parse(text) : null; } catch { data = text; }
   const token = data?.Data?.AuthToken || data?.AuthToken || data?.token || undefined;

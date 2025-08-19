@@ -1,5 +1,4 @@
-import { promises as fs } from 'fs';
-import path from 'path';
+import { readText, writeText } from './storage';
 import { randomBytes, scryptSync, timingSafeEqual } from 'crypto';
 
 export type UserRecord = {
@@ -19,22 +18,17 @@ export type UserRecord = {
   payoutOrgInn?: string; // read-only, from Rocket Work account (ИНН)
 };
 
-const DATA_DIR = path.join(process.cwd(), '.data');
-const USERS_FILE = path.join(DATA_DIR, 'users.json');
+const USERS_FILE = '.data/users.json';
 
 async function readUsers(): Promise<UserRecord[]> {
-  try {
-    const raw = await fs.readFile(USERS_FILE, 'utf8');
-    const parsed = JSON.parse(raw) as { users?: UserRecord[] };
-    return Array.isArray(parsed?.users) ? parsed.users : [];
-  } catch {
-    return [];
-  }
+  const raw = await readText(USERS_FILE);
+  if (!raw) return [];
+  const parsed = JSON.parse(raw) as { users?: UserRecord[] };
+  return Array.isArray(parsed?.users) ? parsed.users : [];
 }
 
 async function writeUsers(users: UserRecord[]): Promise<void> {
-  await fs.mkdir(DATA_DIR, { recursive: true });
-  await fs.writeFile(USERS_FILE, JSON.stringify({ users }, null, 2), 'utf8');
+  await writeText(USERS_FILE, JSON.stringify({ users }, null, 2));
 }
 
 export async function findUserByPhone(phone: string): Promise<UserRecord | undefined> {

@@ -1,4 +1,4 @@
-import { promises as fs } from 'fs';
+import { readText, writeText } from './storage';
 import path from 'path';
 import { fermaGetAuthTokenCached, fermaCreateReceipt } from './ofdFerma';
 import { buildFermaReceiptPayload, PAYMENT_METHOD_FULL_PAYMENT, VatRate } from '@/app/api/ofd/ferma/build-payload';
@@ -23,18 +23,14 @@ const DATA_DIR = path.join(process.cwd(), '.data');
 const FILE = path.join(DATA_DIR, 'ofd_jobs.json');
 
 async function readStore(): Promise<Store> {
-  try {
-    const raw = await fs.readFile(FILE, 'utf8');
-    const data = JSON.parse(raw) as Partial<Store>;
-    return { jobs: Array.isArray(data.jobs) ? data.jobs : [] };
-  } catch {
-    return { jobs: [] };
-  }
+  const raw = await readText(FILE);
+  if (!raw) return { jobs: [] };
+  const data = JSON.parse(raw) as Partial<Store>;
+  return { jobs: Array.isArray(data.jobs) ? data.jobs : [] };
 }
 
 async function writeStore(store: Store): Promise<void> {
-  await fs.mkdir(DATA_DIR, { recursive: true });
-  await fs.writeFile(FILE, JSON.stringify(store, null, 2), 'utf8');
+  await writeText(FILE, JSON.stringify(store, null, 2));
 }
 
 export async function enqueueOffsetJob(job: Omit<OffsetJob, 'id'>): Promise<void> {

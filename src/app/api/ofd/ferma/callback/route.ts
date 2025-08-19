@@ -1,8 +1,7 @@
 import { NextResponse } from 'next/server';
 import { upsertOfdReceipt } from '@/server/ofdStore';
 import { updateSaleOfdUrlsByOrderId } from '@/server/taskStore';
-import { promises as fs } from 'fs';
-import path from 'path';
+import { writeText } from '@/server/storage';
 
 export const runtime = 'nodejs';
 
@@ -62,8 +61,6 @@ export async function POST(req: Request) {
     }
     // Debug logs (prod-safe; secret redacted)
     try {
-      const dataDir = path.join(process.cwd(), '.data');
-      await fs.mkdir(dataDir, { recursive: true });
       const redacted = new URL(req.url);
       redacted.searchParams.delete('secret');
       const entry = {
@@ -78,8 +75,8 @@ export async function POST(req: Request) {
         fp: fp ?? null,
         receiptUrl: receiptUrl ?? null,
       } as Record<string, unknown>;
-      await fs.writeFile(path.join(dataDir, 'ofd_callback_last.json'), JSON.stringify(entry, null, 2), 'utf8');
-      await fs.appendFile(path.join(dataDir, 'ofd_callbacks.log'), JSON.stringify(entry) + '\n', 'utf8');
+      await writeText('.data/ofd_callback_last.json', JSON.stringify(entry, null, 2));
+      await writeText('.data/ofd_callbacks.log', (JSON.stringify(entry) + '\n'));
     } catch {}
     return NextResponse.json({ ok: true });
   } catch (error) {
