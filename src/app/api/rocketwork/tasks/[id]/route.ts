@@ -150,7 +150,9 @@ export async function GET(_: Request) {
               if (sale.isAgent) {
                 const partnerInn: string | undefined = (normalized as any)?.executor?.inn as string | undefined;
                 if (partnerInn) {
-                  const payload = buildFermaReceiptPayload({ party: 'partner', partyInn: partnerInn, description: 'Оплата услуги', amountRub, vatRate: usedVat, methodCode: PAYMENT_METHOD_FULL_PAYMENT, orderId: sale.orderId, docType: 'Income', buyerEmail: defaultEmail, invoiceId: String(sale.orderId), callbackUrl });
+                  const { getInvoiceIdString } = await import('@/server/orderStore');
+                  const invoiceIdFull = await getInvoiceIdString(sale.orderId);
+                  const payload = buildFermaReceiptPayload({ party: 'partner', partyInn: partnerInn, description: 'Оплата услуги', amountRub, vatRate: usedVat, methodCode: PAYMENT_METHOD_FULL_PAYMENT, orderId: sale.orderId, docType: 'Income', buyerEmail: defaultEmail, invoiceId: invoiceIdFull, callbackUrl });
                   const created = await fermaCreateReceipt(payload, { baseUrl, authToken: tokenOfd });
                   await updateSaleOfdUrlsByOrderId(userId, sale.orderId, { ofdFullId: created.id || null });
                 }
@@ -158,7 +160,9 @@ export async function GET(_: Request) {
                 const orgInn = await getUserOrgInn(userId);
                 const orgData = await getUserPayoutRequisites(userId);
                 if (orgInn) {
-                  const payload = buildFermaReceiptPayload({ party: 'org', partyInn: orgInn, description: 'Оплата услуги', amountRub, vatRate: usedVat, methodCode: PAYMENT_METHOD_FULL_PAYMENT, orderId: sale.orderId, docType: 'Income', buyerEmail: defaultEmail, invoiceId: String(sale.orderId), callbackUrl, paymentAgentInfo: { AgentType: 'AGENT', SupplierInn: orgInn, SupplierName: orgData.orgName || 'Организация' } });
+                  const { getInvoiceIdString } = await import('@/server/orderStore');
+                  const invoiceIdFull = await getInvoiceIdString(sale.orderId);
+                  const payload = buildFermaReceiptPayload({ party: 'org', partyInn: orgInn, description: 'Оплата услуги', amountRub, vatRate: usedVat, methodCode: PAYMENT_METHOD_FULL_PAYMENT, orderId: sale.orderId, docType: 'Income', buyerEmail: defaultEmail, invoiceId: invoiceIdFull, callbackUrl, paymentAgentInfo: { AgentType: 'AGENT', SupplierInn: orgInn, SupplierName: orgData.orgName || 'Организация' } });
                   const created = await fermaCreateReceipt(payload, { baseUrl, authToken: tokenOfd });
                   await updateSaleOfdUrlsByOrderId(userId, sale.orderId, { ofdFullId: created.id || null });
                 }
@@ -170,7 +174,9 @@ export async function GET(_: Request) {
               if (sale.isAgent) {
                 const partnerInn: string | undefined = (normalized as any)?.executor?.inn as string | undefined;
                 if (partnerInn) {
-                  const payload = buildFermaReceiptPayload({ party: 'partner', partyInn: partnerInn, description: 'Оплата услуги', amountRub, vatRate: usedVat, methodCode: PAYMENT_METHOD_PREPAY_FULL, orderId: sale.orderId, docType: 'IncomePrepayment', buyerEmail: defaultEmail, invoiceId: String(sale.orderId), callbackUrl, withPrepaymentItem: true });
+                  const { getInvoiceIdString } = await import('@/server/orderStore');
+                  const invoiceIdFull = await getInvoiceIdString(sale.orderId);
+                  const payload = buildFermaReceiptPayload({ party: 'partner', partyInn: partnerInn, description: 'Оплата услуги', amountRub, vatRate: usedVat, methodCode: PAYMENT_METHOD_PREPAY_FULL, orderId: sale.orderId, docType: 'IncomePrepayment', buyerEmail: defaultEmail, invoiceId: invoiceIdFull, callbackUrl, withPrepaymentItem: true });
                   const created = await fermaCreateReceipt(payload, { baseUrl, authToken: tokenOfd });
                   await updateSaleOfdUrlsByOrderId(userId, sale.orderId, { ofdPrepayId: created.id || null });
                 }
@@ -178,7 +184,9 @@ export async function GET(_: Request) {
                 const orgInn = await getUserOrgInn(userId);
                 const orgData = await getUserPayoutRequisites(userId);
                 if (orgInn) {
-                  const payload = buildFermaReceiptPayload({ party: 'org', partyInn: orgInn, description: 'Оплата услуги', amountRub, vatRate: usedVat, methodCode: PAYMENT_METHOD_PREPAY_FULL, orderId: sale.orderId, docType: 'IncomePrepayment', buyerEmail: defaultEmail, invoiceId: String(sale.orderId), callbackUrl, withPrepaymentItem: true, paymentAgentInfo: { AgentType: 'AGENT', SupplierInn: orgInn, SupplierName: orgData.orgName || 'Организация' } });
+                  const { getInvoiceIdString } = await import('@/server/orderStore');
+                  const invoiceIdFull = await getInvoiceIdString(sale.orderId);
+                  const payload = buildFermaReceiptPayload({ party: 'org', partyInn: orgInn, description: 'Оплата услуги', amountRub, vatRate: usedVat, methodCode: PAYMENT_METHOD_PREPAY_FULL, orderId: sale.orderId, docType: 'IncomePrepayment', buyerEmail: defaultEmail, invoiceId: invoiceIdFull, callbackUrl, withPrepaymentItem: true, paymentAgentInfo: { AgentType: 'AGENT', SupplierInn: orgInn, SupplierName: orgData.orgName || 'Организация' } });
                   const created = await fermaCreateReceipt(payload, { baseUrl, authToken: tokenOfd });
                   await updateSaleOfdUrlsByOrderId(userId, sale.orderId, { ofdPrepayId: created.id || null });
                 }

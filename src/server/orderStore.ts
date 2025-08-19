@@ -1,17 +1,20 @@
 import { readText, writeText } from './storage';
 
-type OrderStoreData = { lastOrderId: number };
+type OrderStoreData = { lastOrderId: number; prefix?: string };
 
 const ORDER_FILE = '.data/order.json';
+
+const DEFAULT_PREFIX = process.env.OFD_INVOICE_PREFIX || process.env.INVOICE_PREFIX || 'fhrff351d';
 
 async function readOrder(): Promise<OrderStoreData> {
   try {
     const raw = await readText(ORDER_FILE);
     const parsed = raw ? (JSON.parse(raw) as Partial<OrderStoreData>) : {};
     const last = typeof parsed.lastOrderId === 'number' && Number.isFinite(parsed.lastOrderId) ? parsed.lastOrderId : 0;
-    return { lastOrderId: last };
+    const prefix = typeof parsed.prefix === 'string' && parsed.prefix.length > 0 ? parsed.prefix : DEFAULT_PREFIX;
+    return { lastOrderId: last, prefix } as OrderStoreData;
   } catch {
-    return { lastOrderId: 0 };
+    return { lastOrderId: 0, prefix: DEFAULT_PREFIX } as OrderStoreData;
   }
 }
 
@@ -22,8 +25,14 @@ async function writeOrder(data: OrderStoreData): Promise<void> {
 export async function getNextOrderId(): Promise<number> {
   const current = await readOrder();
   const next = (current.lastOrderId ?? 0) + 1;
-  await writeOrder({ lastOrderId: next });
+  await writeOrder({ lastOrderId: next, prefix: current.prefix });
   return next;
+}
+
+export async function getInvoiceIdString(orderId: number): Promise<string> {
+  const cur = await readOrder();
+  const prefix = cur.prefix || DEFAULT_PREFIX;
+  return `${prefix}-${orderId}`;
 }
 
 

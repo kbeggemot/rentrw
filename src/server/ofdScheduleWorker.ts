@@ -62,13 +62,14 @@ export async function runDueOffsetJobs(): Promise<void> {
     try {
       const baseUrl = process.env.FERMA_BASE_URL || 'https://ferma.ofd.ru/';
       const token = await fermaGetAuthTokenCached(process.env.FERMA_LOGIN || '', process.env.FERMA_PASSWORD || '', { baseUrl });
-      const proto = process.env.VERCEL_URL ? 'https' : 'https';
       const host = process.env.BASE_HOST || process.env.VERCEL_URL || process.env.RENDER_EXTERNAL_URL || 'localhost:3000';
       const secret = process.env.OFD_CALLBACK_SECRET || '';
       const callbackUrl = `https://${host}/api/ofd/ferma/callback${secret ? `?secret=${encodeURIComponent(secret)}&` : '?'}uid=${encodeURIComponent(job.userId)}`;
       let payload: any;
       if (job.party === 'partner') {
         if (!job.partnerInn) throw new Error('NO_PARTNER_INN');
+        const { getInvoiceIdString } = await import('./orderStore');
+        const invoiceIdFull = await getInvoiceIdString(job.orderId);
         payload = buildFermaReceiptPayload({
           party: 'partner',
           partyInn: job.partnerInn,
@@ -79,7 +80,7 @@ export async function runDueOffsetJobs(): Promise<void> {
           orderId: job.orderId,
           docType: 'Income',
           buyerEmail: job.buyerEmail || null,
-          invoiceId: String(job.orderId),
+          invoiceId: invoiceIdFull,
           callbackUrl,
           withAdvanceOffset: true,
         });
@@ -87,6 +88,8 @@ export async function runDueOffsetJobs(): Promise<void> {
         const orgInn = await getUserOrgInn(job.userId);
         const orgData = await getUserPayoutRequisites(job.userId);
         if (!orgInn) throw new Error('NO_ORG_INN');
+        const { getInvoiceIdString } = await import('./orderStore');
+        const invoiceIdFull = await getInvoiceIdString(job.orderId);
         payload = buildFermaReceiptPayload({
           party: 'org',
           partyInn: orgInn,
@@ -97,7 +100,7 @@ export async function runDueOffsetJobs(): Promise<void> {
           orderId: job.orderId,
           docType: 'Income',
           buyerEmail: job.buyerEmail || null,
-          invoiceId: String(job.orderId),
+          invoiceId: invoiceIdFull,
           callbackUrl,
           withAdvanceOffset: true,
           paymentAgentInfo: { AgentType: 'AGENT', SupplierInn: orgInn, SupplierName: orgData.orgName || 'Организация' },
