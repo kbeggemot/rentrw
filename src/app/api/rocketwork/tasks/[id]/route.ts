@@ -153,7 +153,12 @@ export async function GET(_: Request) {
                 if (partnerInn) {
                   const { getInvoiceIdString } = await import('@/server/orderStore');
                   const invoiceIdFull = await getInvoiceIdString(sale.orderId);
-                  const payload = buildFermaReceiptPayload({ party: 'partner', partyInn: partnerInn, description: itemLabel, amountRub, vatRate: usedVat, methodCode: PAYMENT_METHOD_FULL_PAYMENT, orderId: sale.orderId, docType: 'Income', buyerEmail: defaultEmail, invoiceId: invoiceIdFull, callbackUrl });
+                  const partnerName = ((normalized as any)?.executor && [
+                    (normalized as any)?.executor?.last_name,
+                    (normalized as any)?.executor?.first_name,
+                    (normalized as any)?.executor?.second_name,
+                  ].filter(Boolean).join(' ').trim()) || undefined;
+                  const payload = buildFermaReceiptPayload({ party: 'partner', partyInn: partnerInn, description: itemLabel, amountRub, vatRate: usedVat, methodCode: PAYMENT_METHOD_FULL_PAYMENT, orderId: sale.orderId, docType: 'Income', buyerEmail: defaultEmail, invoiceId: invoiceIdFull, callbackUrl, paymentAgentInfo: { AgentType: 'AGENT', SupplierInn: partnerInn, SupplierName: partnerName || 'Исполнитель' } });
                   const created = await fermaCreateReceipt(payload, { baseUrl, authToken: tokenOfd });
                   await updateSaleOfdUrlsByOrderId(userId, sale.orderId, { ofdFullId: created.id || null });
                 }
@@ -177,7 +182,12 @@ export async function GET(_: Request) {
                 if (partnerInn) {
                   const { getInvoiceIdString } = await import('@/server/orderStore');
                   const invoiceIdFull = await getInvoiceIdString(sale.orderId);
-                  const payload = buildFermaReceiptPayload({ party: 'partner', partyInn: partnerInn, description: itemLabel, amountRub, vatRate: usedVat, methodCode: PAYMENT_METHOD_PREPAY_FULL, orderId: sale.orderId, docType: 'IncomePrepayment', buyerEmail: defaultEmail, invoiceId: invoiceIdFull, callbackUrl, withPrepaymentItem: true });
+                  const partnerName2 = ((normalized as any)?.executor && [
+                    (normalized as any)?.executor?.last_name,
+                    (normalized as any)?.executor?.first_name,
+                    (normalized as any)?.executor?.second_name,
+                  ].filter(Boolean).join(' ').trim()) || undefined;
+                  const payload = buildFermaReceiptPayload({ party: 'partner', partyInn: partnerInn, description: itemLabel, amountRub, vatRate: usedVat, methodCode: PAYMENT_METHOD_PREPAY_FULL, orderId: sale.orderId, docType: 'IncomePrepayment', buyerEmail: defaultEmail, invoiceId: invoiceIdFull, callbackUrl, withPrepaymentItem: true, paymentAgentInfo: { AgentType: 'AGENT', SupplierInn: partnerInn, SupplierName: partnerName2 || 'Исполнитель' } });
                   const created = await fermaCreateReceipt(payload, { baseUrl, authToken: tokenOfd });
                   await updateSaleOfdUrlsByOrderId(userId, sale.orderId, { ofdPrepayId: created.id || null });
                 }

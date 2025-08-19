@@ -137,6 +137,29 @@ export async function GET(req: Request) {
                   await updateSaleOfdUrlsByOrderId(userId, s.orderId, patch);
                 }
               }
+              // Fallback for historical sales: try by InvoiceId
+              if (!s.ofdUrl && !s.ofdFullUrl) {
+                try {
+                  const { getInvoiceIdString } = await import('@/server/orderStore');
+                  const invoiceIdFull = await getInvoiceIdString(s.orderId);
+                  const baseUrl = process.env.FERMA_BASE_URL || 'https://ferma.ofd.ru/';
+                  const tokenOfd = await fermaGetAuthTokenCached(process.env.FERMA_LOGIN || '', process.env.FERMA_PASSWORD || '', { baseUrl });
+                  const st = await fermaGetReceiptStatus(invoiceIdFull, { baseUrl, authToken: tokenOfd });
+                  const obj = st.rawText ? JSON.parse(st.rawText) : {};
+                  const direct = obj?.Data?.Device?.OfdReceiptUrl as string | undefined;
+                  const rid = obj?.Data?.ReceiptId as string | undefined;
+                  const fn = obj?.Data?.Fn || obj?.Fn; const fd = obj?.Data?.Fd || obj?.Fd; const fp = obj?.Data?.Fp || obj?.Fp;
+                  const url = direct && direct.length > 0 ? direct : (fn && fd != null && fp != null ? buildReceiptViewUrl(fn, fd, fp) : undefined);
+                  if (url) {
+                    const mskToday = new Date().toLocaleDateString('ru-RU', { timeZone: 'Europe/Moscow' }).split('.').reverse().join('-');
+                    const isToday = s.serviceEndDate === mskToday;
+                    const patch2: any = {};
+                    if (isToday) { patch2.ofdFullUrl = url; if (rid) patch2.ofdFullId = rid; }
+                    else { patch2.ofdUrl = url; if (rid) patch2.ofdPrepayId = rid; }
+                    await updateSaleOfdUrlsByOrderId(userId, s.orderId, patch2);
+                  }
+                } catch {}
+              }
             } catch {}
           } catch {}
         }

@@ -161,13 +161,15 @@ export async function POST(req: Request) {
                   if (isToday) {
                     const { getInvoiceIdString } = await import('@/server/orderStore');
                     const invoiceIdFull = await getInvoiceIdString(sale.orderId);
-                    const payload = buildFermaReceiptPayload({ party: 'partner', partyInn: partnerInn, description: itemLabel, amountRub: amountRub, vatRate: usedVat, methodCode: PAYMENT_METHOD_FULL_PAYMENT, orderId: sale.orderId, docType: 'Income', buyerEmail: defaultEmail, invoiceId: invoiceIdFull, callbackUrl, withAdvanceOffset: false });
+                    const partnerName = (taskObj?.executor && [taskObj?.executor?.last_name, taskObj?.executor?.first_name, taskObj?.executor?.second_name].filter(Boolean).join(' ').trim()) || undefined;
+                    const payload = buildFermaReceiptPayload({ party: 'partner', partyInn: partnerInn, description: itemLabel, amountRub: amountRub, vatRate: usedVat, methodCode: PAYMENT_METHOD_FULL_PAYMENT, orderId: sale.orderId, docType: 'Income', buyerEmail: defaultEmail, invoiceId: invoiceIdFull, callbackUrl, withAdvanceOffset: false, paymentAgentInfo: { AgentType: 'AGENT', SupplierInn: partnerInn, SupplierName: partnerName || 'Исполнитель' } });
                     const created = await fermaCreateReceipt(payload, { baseUrl, authToken: tokenOfd });
                     await updateSaleOfdUrlsByOrderId(userId, sale.orderId, { ofdFullId: created.id || null });
                   } else {
                     const { getInvoiceIdString } = await import('@/server/orderStore');
                     const invoiceIdFull = await getInvoiceIdString(sale.orderId);
-                    const payload = buildFermaReceiptPayload({ party: 'partner', partyInn: partnerInn, description: itemLabel, amountRub: amountRub, vatRate: usedVat, methodCode: PAYMENT_METHOD_PREPAY_FULL, orderId: sale.orderId, docType: 'IncomePrepayment', buyerEmail: defaultEmail, invoiceId: invoiceIdFull, callbackUrl, withPrepaymentItem: true });
+                    const partnerName2 = (taskObj?.executor && [taskObj?.executor?.last_name, taskObj?.executor?.first_name, taskObj?.executor?.second_name].filter(Boolean).join(' ').trim()) || undefined;
+                    const payload = buildFermaReceiptPayload({ party: 'partner', partyInn: partnerInn, description: itemLabel, amountRub: amountRub, vatRate: usedVat, methodCode: PAYMENT_METHOD_PREPAY_FULL, orderId: sale.orderId, docType: 'IncomePrepayment', buyerEmail: defaultEmail, invoiceId: invoiceIdFull, callbackUrl, withPrepaymentItem: true, paymentAgentInfo: { AgentType: 'AGENT', SupplierInn: partnerInn, SupplierName: partnerName2 || 'Исполнитель' } });
                     const created = await fermaCreateReceipt(payload, { baseUrl, authToken: tokenOfd });
                     await updateSaleOfdUrlsByOrderId(userId, sale.orderId, { ofdPrepayId: created.id || null });
                     // schedule offset at 12:00 MSK
