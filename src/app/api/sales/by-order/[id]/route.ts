@@ -49,7 +49,7 @@ export async function GET(req: Request) {
           // If Fn/Fd/Fp absent yet — retry quickly a few times
           if (!patch.ofdFullUrl) {
             let tries = 0;
-            while (!patch.ofdFullUrl && tries < 5) {
+            while (!patch.ofdFullUrl && tries < 20) {
               const st2 = await fermaGetReceiptStatus(sale.ofdFullId!, { baseUrl, authToken: token });
               const obj2 = st2.rawText ? JSON.parse(st2.rawText) : {};
               const fn2 = obj2?.Data?.Fn || obj2?.Fn;
@@ -57,7 +57,7 @@ export async function GET(req: Request) {
               const fp2 = obj2?.Data?.Fp || obj2?.Fp;
               if (fn2 && fd2 != null && fp2 != null) { patch.ofdFullUrl = buildReceiptViewUrl(fn2, fd2, fp2); break; }
               tries += 1;
-              await new Promise((r) => setTimeout(r, 800));
+              await new Promise((r) => setTimeout(r, 1000));
             }
           }
         } catch {}

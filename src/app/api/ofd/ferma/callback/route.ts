@@ -47,7 +47,7 @@ export async function POST(req: Request) {
       try {
         const token = await fermaGetAuthTokenCached(process.env.FERMA_LOGIN || '', process.env.FERMA_PASSWORD || '', { baseUrl });
         let tries = 0;
-        while (!receiptUrl && tries < 5) {
+        while (!receiptUrl && tries < 20) {
           try {
             const st = await fermaGetReceiptStatus(receiptId, { baseUrl, authToken: token });
             const obj = st.rawText ? JSON.parse(st.rawText) : {};
@@ -57,7 +57,7 @@ export async function POST(req: Request) {
             if (fn2 && fd2 != null && fp2 != null) { receiptUrl = buildReceiptViewUrl(fn2, fd2, fp2); break; }
           } catch {}
           tries += 1;
-          await new Promise((r) => setTimeout(r, 800));
+          await new Promise((r) => setTimeout(r, 1000));
         }
       } catch {}
     }
