@@ -1,16 +1,21 @@
 import { NextResponse } from 'next/server';
-import { promises as fs } from 'fs';
+import { readFile as readFileFs } from 'fs/promises';
 import path from 'path';
+import { readFile as readFromStorage } from '@/server/storage';
 
 export const runtime = 'nodejs';
 
-async function readFileSafe(file: string): Promise<{ ok: boolean; text?: string }>{
+async function readFileSafe(relPath: string): Promise<{ ok: boolean; text?: string }>{
   try {
-    const txt = await fs.readFile(file, 'utf8');
-    return { ok: true, text: txt };
-  } catch {
-    return { ok: false };
-  }
+    const txt = await readFromStorage(relPath);
+    if (txt != null) return { ok: true, text: txt };
+  } catch {}
+  try {
+    const abs = path.join(process.cwd(), relPath);
+    const txt = await readFileFs(abs, 'utf8');
+    return { ok: true, text: txt as unknown as string };
+  } catch {}
+  return { ok: false };
 }
 
 function tail(text: string, lines: number): string {
@@ -21,13 +26,12 @@ function tail(text: string, lines: number): string {
 
 export async function GET(): Promise<Response> {
   try {
-    const dataDir = path.join(process.cwd(), '.data');
     const files = {
-      lastRequest: path.join(dataDir, 'ofd_last_request.json'),
-      lastResponse: path.join(dataDir, 'ofd_last_response.json'),
-      lastAuth: path.join(dataDir, 'ofd_auth_token_last.json'),
-      lastCallback: path.join(dataDir, 'ofd_callback_last.json'),
-      callbacksLog: path.join(dataDir, 'ofd_callbacks.log'),
+      lastRequest: '.data/ofd_last_request.json',
+      lastResponse: '.data/ofd_last_response.json',
+      lastAuth: '.data/ofd_auth_token_last.json',
+      lastCallback: '.data/ofd_callback_last.json',
+      callbacksLog: '.data/ofd_callbacks.log',
     } as const;
 
     const [reqR, resR, authR, cbR, logR] = await Promise.all([
@@ -38,12 +42,13 @@ export async function GET(): Promise<Response> {
       readFileSafe(files.callbacksLog),
     ]);
 
-    // Redact possible secrets
     const redact = (txt?: string): string | undefined => {
       if (!txt) return txt;
       return txt
-        .replace(/(AuthToken"\s*:\s*")[^"]+(")/gi, '$1***$2')
-        .replace(/(Password"\s*:\s*")[^"]+(")/gi, '$1***$2');
+        .replace(/(AuthToken"\s*:\s*")[^"]+(" )/gi, '$1***$2')
+        .replace(/(AuthToken"\s*:\s*")[^"]+("$)/gi, '$1***$2')
+        .replace(/(Password"\s*:\s*")[^"]+(" )/gi, '$1***$2')
+        .replace(/(Password"\s*:\s*")[^"]+("$)/gi, '$1***$2');
     };
 
     const out = {
