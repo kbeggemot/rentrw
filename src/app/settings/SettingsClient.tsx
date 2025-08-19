@@ -93,6 +93,24 @@ export default function SettingsClient({ initial, userId }: { initial: SettingsP
     })();
   }, [initial.keys.length]);
 
+  // Hard-refresh critical settings on mount to avoid any stale SSR
+  useEffect(() => {
+    (async () => {
+      try {
+        const [tR, aR, pR, eR] = await Promise.all([
+          fetch('/api/settings/token', { cache: 'no-store' }),
+          fetch('/api/settings/account', { cache: 'no-store' }),
+          fetch('/api/settings/payout', { cache: 'no-store' }),
+          fetch('/api/settings/email', { cache: 'no-store' }),
+        ]);
+        try { const td = await tR.json(); if (typeof td?.token === 'string') setCurrentMasked(td.token); } catch {}
+        try { const ad = await aR.json(); setAccountPhone(ad?.phone ?? null); } catch {}
+        try { const pd = await pR.json(); if (typeof pd?.orgName === 'string') setOrgName(pd.orgName || ''); if (typeof pd?.bik === 'string') setBik(pd.bik || ''); if (typeof pd?.account === 'string') setAccount(pd.account || ''); } catch {}
+        try { const ed = await eR.json(); setEmailMasked(ed?.email ?? null); setEmailVerified(!!ed?.verified); } catch {}
+      } catch {}
+    })();
+  }, []);
+
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
