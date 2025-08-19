@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getUserById, updateUserEmail, setUserEmailVerified } from '@/server/userStore';
 import { promises as fs } from 'fs';
-import path from 'path';
+import { readText, writeText } from '@/server/storage';
 
 export const runtime = 'nodejs';
 
@@ -14,8 +14,8 @@ export async function POST(req: Request) {
     const code = String(body?.code || '').trim();
     if (!code) return NextResponse.json({ error: 'NO_CODE' }, { status: 400 });
 
-    const file = path.join(process.cwd(), '.data', `email_code_${userId}.txt`);
-    const raw = await fs.readFile(file, 'utf8').catch(() => null);
+    const file = `.data/email_code_${userId}.txt`;
+    const raw = await readText(file);
     if (!raw) return NextResponse.json({ error: 'NO_PENDING' }, { status: 400 });
     let parsed: { email?: string; code?: string; ts?: number } = {};
     try { parsed = JSON.parse(raw); } catch {}
@@ -30,7 +30,7 @@ export async function POST(req: Request) {
       // In case email changed in between, set it back
       await updateUserEmail(userId, parsed.email!);
     }
-    await fs.unlink(file).catch(() => {});
+    await writeText(file, '');
     await setUserEmailVerified(userId, true);
     return NextResponse.json({ ok: true });
   } catch (error) {

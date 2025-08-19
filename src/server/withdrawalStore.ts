@@ -1,5 +1,4 @@
-import { promises as fs } from 'fs';
-import path from 'path';
+import { readText, writeText } from './storage';
 
 export type WithdrawalRecord = {
   userId: string;
@@ -13,22 +12,17 @@ export type WithdrawalRecord = {
 
 type Store = { items: WithdrawalRecord[] };
 
-const DATA_DIR = path.join(process.cwd(), '.data');
-const FILE = path.join(DATA_DIR, 'withdrawals.json');
+const FILE = '.data/withdrawals.json';
 
 async function readStore(): Promise<Store> {
-  try {
-    const raw = await fs.readFile(FILE, 'utf8');
-    const data = JSON.parse(raw) as Partial<Store>;
-    return { items: Array.isArray(data.items) ? data.items : [] };
-  } catch {
-    return { items: [] };
-  }
+  const raw = await readText(FILE);
+  if (!raw) return { items: [] };
+  const data = JSON.parse(raw) as Partial<Store>;
+  return { items: Array.isArray(data.items) ? data.items : [] };
 }
 
 async function writeStore(store: Store): Promise<void> {
-  await fs.mkdir(DATA_DIR, { recursive: true });
-  await fs.writeFile(FILE, JSON.stringify(store, null, 2), 'utf8');
+  await writeText(FILE, JSON.stringify(store, null, 2));
 }
 
 export async function recordWithdrawalCreate(userId: string, taskId: string | number, amountRub: number): Promise<void> {

@@ -1,13 +1,8 @@
-import { promises as fs } from 'fs';
-import path from 'path';
+import { readText, writeText } from './storage';
 import { randomBytes, scryptSync, createCipheriv, createDecipheriv } from 'crypto';
 
-const DATA_DIR = path.join(process.cwd(), '.data');
-function userDir(userId: string) {
-  return path.join(DATA_DIR, 'users', userId);
-}
 function userStoreFile(userId: string) {
-  return path.join(userDir(userId), 'secure.json');
+  return `.data/users/${userId}/secure.json`;
 }
 const SCRYPT_SALT = 'rentrw_scrypt_salt_v1';
 
@@ -60,21 +55,13 @@ export async function decryptToken(payload: EncryptedPayload): Promise<string> {
 }
 
 async function readStore(userId: string): Promise<SecureStoreData> {
-  try {
-    const raw = await fs.readFile(userStoreFile(userId), 'utf8');
-    return JSON.parse(raw) as SecureStoreData;
-  } catch (error) {
-    const err = error as NodeJS.ErrnoException | undefined;
-    if (err && (err.code === 'ENOENT' || err.code === 'ENOTDIR')) {
-      return {};
-    }
-    throw error;
-  }
+  const raw = await readText(userStoreFile(userId));
+  if (!raw) return {} as SecureStoreData;
+  return JSON.parse(raw) as SecureStoreData;
 }
 
 async function writeStore(userId: string, data: SecureStoreData): Promise<void> {
-  await fs.mkdir(userDir(userId), { recursive: true });
-  await fs.writeFile(userStoreFile(userId), JSON.stringify(data, null, 2), 'utf8');
+  await writeText(userStoreFile(userId), JSON.stringify(data, null, 2));
 }
 
 export async function saveApiToken(userId: string, plainToken: string): Promise<void> {

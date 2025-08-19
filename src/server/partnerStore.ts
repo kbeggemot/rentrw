@@ -1,5 +1,4 @@
-import { promises as fs } from 'fs';
-import path from 'path';
+import { readText, writeText } from './storage';
 
 export type PartnerRecord = {
   phone: string;
@@ -9,27 +8,22 @@ export type PartnerRecord = {
   updatedAt: string; // ISO
 };
 
-const DATA_DIR = path.join(process.cwd(), '.data');
-const PARTNERS_FILE = path.join(DATA_DIR, 'partners.json');
+const PARTNERS_FILE = '.data/partners.json';
 
 type PartnerStoreData = {
   users: Record<string, PartnerRecord[]>; // userId -> partners
 };
 
 async function readStore(): Promise<PartnerStoreData> {
-  try {
-    const raw = await fs.readFile(PARTNERS_FILE, 'utf8');
-    const parsed = JSON.parse(raw) as Partial<PartnerStoreData>;
-    const users = parsed && typeof parsed === 'object' && parsed.users && typeof parsed.users === 'object' ? parsed.users as Record<string, PartnerRecord[]> : {};
-    return { users };
-  } catch {
-    return { users: {} };
-  }
+  const raw = await readText(PARTNERS_FILE);
+  if (!raw) return { users: {} };
+  const parsed = JSON.parse(raw) as Partial<PartnerStoreData>;
+  const users = parsed && typeof parsed === 'object' && parsed.users && typeof parsed.users === 'object' ? (parsed.users as Record<string, PartnerRecord[]>) : {};
+  return { users };
 }
 
 async function writeStore(data: PartnerStoreData): Promise<void> {
-  await fs.mkdir(DATA_DIR, { recursive: true });
-  await fs.writeFile(PARTNERS_FILE, JSON.stringify(data, null, 2), 'utf8');
+  await writeText(PARTNERS_FILE, JSON.stringify(data, null, 2));
 }
 
 export async function listPartners(userId: string): Promise<PartnerRecord[]> {
