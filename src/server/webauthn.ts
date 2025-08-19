@@ -1,5 +1,5 @@
 import type { UserRecord } from './userStore';
-import { promises as fs } from 'fs';
+import { readText, writeText } from './storage';
 import path from 'path';
 import { generateRegistrationOptions, verifyRegistrationResponse, generateAuthenticationOptions, verifyAuthenticationResponse } from '@simplewebauthn/server';
 import { randomBytes } from 'crypto';
@@ -15,13 +15,12 @@ type UserCredentials = {
   [userId: string]: Credential[];
 };
 
-const DATA_DIR = path.join(process.cwd(), '.data');
-const CREDS_FILE = path.join(DATA_DIR, 'webauthn_creds.json');
+const CREDS_FILE = '.data/webauthn_creds.json';
 
 async function readCreds(): Promise<UserCredentials> {
-  try { const raw = await fs.readFile(CREDS_FILE, 'utf8'); return JSON.parse(raw) as UserCredentials; } catch { return {}; }
+  try { const raw = await readText(CREDS_FILE); return raw ? (JSON.parse(raw) as UserCredentials) : {}; } catch { return {}; }
 }
-async function writeCreds(data: UserCredentials): Promise<void> { await fs.mkdir(DATA_DIR, { recursive: true }); await fs.writeFile(CREDS_FILE, JSON.stringify(data, null, 2), 'utf8'); }
+async function writeCreds(data: UserCredentials): Promise<void> { await writeText(CREDS_FILE, JSON.stringify(data, null, 2)); }
 
 function toBase64Url(input: string | Uint8Array | ArrayBuffer | undefined): string | undefined {
   if (!input) return undefined;
@@ -77,7 +76,7 @@ export async function startRegistration(user: UserRecord, opts?: { rpID?: string
     authenticatorSelection: { userVerification: 'required', residentKey: 'required', authenticatorAttachment: 'platform' },
     excludeCredentials: [],
   };
-  try { await fs.mkdir(DATA_DIR, { recursive: true }); await fs.writeFile(path.join(DATA_DIR, 'last_webauthn_register_options.json'), JSON.stringify(optionsJSON, null, 2), 'utf8'); } catch {}
+  try { await writeText('.data/last_webauthn_register_options.json', JSON.stringify(optionsJSON, null, 2)); } catch {}
   return { options: optionsJSON, origin, rpID };
 }
 
@@ -111,9 +110,7 @@ export async function finishAuth(userId: string, response: any, rpID: string, or
   const arr = creds[userId] || [];
   let respId = toBase64Url(response.id);
   const selected = arr.find(c => isSameCredentialId(c.id, respId || ''));
-  try {
-    await fs.writeFile(path.join(DATA_DIR, 'last_webauthn_auth_user.json'), JSON.stringify({ userId, rpID, origin, respId, available: arr.map(c => c.id) }, null, 2), 'utf8');
-  } catch {}
+  try { await writeText('.data/last_webauthn_auth_user.json', JSON.stringify({ userId, rpID, origin, respId, available: arr.map(c => c.id) }, null, 2)); } catch {}
   if (!selected) return { verified: false, error: 'CRED_NOT_FOUND' };
   const verification = await verifyAuthenticationResponse({
     response,
@@ -154,9 +151,7 @@ export async function finishLoginAnonymous(response: any, rpID: string, origin: 
     const found = (list || []).find(c => isSameCredentialId(c.id, respId));
     return found ? { userId: uid, cred: found } : acc;
   }, null);
-  try {
-    await fs.writeFile(path.join(DATA_DIR, 'last_webauthn_auth_user.json'), JSON.stringify({ mode: 'anon', rpID, origin, respId, allIds: Object.values(all).flat().map(c => c.id) }, null, 2), 'utf8');
-  } catch {}
+  try { await writeText('.data/last_webauthn_auth_user.json', JSON.stringify({ mode: 'anon', rpID, origin, respId, allIds: Object.values(all).flat().map(c => c.id) }, null, 2)); } catch {}
   if (!chosen) return { verified: false, error: 'CRED_NOT_FOUND' };
   const { userId, cred } = chosen;
   const verification = await verifyAuthenticationResponse({
