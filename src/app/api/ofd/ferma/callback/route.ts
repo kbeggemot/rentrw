@@ -41,17 +41,24 @@ export async function POST(req: Request) {
     if (fn && fd != null && fp != null) {
       receiptUrl = `https://check-demo.ofd.ru/rec/${encodeURIComponent(fn)}/${encodeURIComponent(String(fd))}/${encodeURIComponent(String(fp))}`;
     }
-    // If callback does not include Fn/Fd/Fp — fetch receipt status from Ferma to build link
+    // If callback does not include Fn/Fd/Fp — fetch receipt status from Ferma to build link (with short retries)
     if (!receiptUrl && receiptId) {
+      const baseUrl = process.env.FERMA_BASE_URL || 'https://ferma.ofd.ru/';
       try {
-        const baseUrl = process.env.FERMA_BASE_URL || 'https://ferma.ofd.ru/';
         const token = await fermaGetAuthTokenCached(process.env.FERMA_LOGIN || '', process.env.FERMA_PASSWORD || '', { baseUrl });
-        const st = await fermaGetReceiptStatus(receiptId, { baseUrl, authToken: token });
-        const obj = st.rawText ? JSON.parse(st.rawText) : {};
-        const fn2 = obj?.Data?.Fn || obj?.Fn;
-        const fd2 = obj?.Data?.Fd || obj?.Fd;
-        const fp2 = obj?.Data?.Fp || obj?.Fp;
-        if (fn2 && fd2 != null && fp2 != null) { receiptUrl = buildReceiptViewUrl(fn2, fd2, fp2); }
+        let tries = 0;
+        while (!receiptUrl && tries < 5) {
+          try {
+            const st = await fermaGetReceiptStatus(receiptId, { baseUrl, authToken: token });
+            const obj = st.rawText ? JSON.parse(st.rawText) : {};
+            const fn2 = obj?.Data?.Fn || obj?.Fn;
+            const fd2 = obj?.Data?.Fd || obj?.Fd;
+            const fp2 = obj?.Data?.Fp || obj?.Fp;
+            if (fn2 && fd2 != null && fp2 != null) { receiptUrl = buildReceiptViewUrl(fn2, fd2, fp2); break; }
+          } catch {}
+          tries += 1;
+          await new Promise((r) => setTimeout(r, 800));
+        }
       } catch {}
     }
     if (receiptId) {
