@@ -131,8 +131,11 @@ function AcceptPaymentContent() {
           ?? (stData?.task?.acquiring_order?.url as string | undefined);
         const status = (stData?.acquiring_order?.status as string | undefined)
           ?? (stData?.task?.acquiring_order?.status as string | undefined);
+        // guard again after async
+        if (attemptIdRef.current !== attemptId || activeTaskIdRef.current !== taskId) return;
         if (status) setMessage('Ожидаем ссылку…');
         if (stRes.ok && found) {
+          if (attemptIdRef.current !== attemptId || activeTaskIdRef.current !== taskId) return;
           setPaymentUrl(found);
           try {
             const dataUrl = await QRCode.toDataURL(found, { margin: 1, scale: 6 });
@@ -162,13 +165,13 @@ function AcceptPaymentContent() {
         const stText = await stRes.text();
         let stData: any = null; try { stData = stText ? JSON.parse(stText) : null; } catch { stData = stText; }
         const status: string | undefined = (stData?.acquiring_order?.status as string | undefined) ?? undefined;
+        if (attemptIdRef.current !== attemptId || activeTaskIdRef.current !== taskId) return;
         if (status) setAoStatus(status);
         // If paid/transferred — hide payment link and QR, then start OFD polling for THIS task
         const st = String(status || '').toLowerCase();
         if (st === 'paid' || st === 'transfered' || st === 'transferred') {
-          if (paymentUrlRef.current) {
-            setPaymentUrl(null);
-          }
+          if (attemptIdRef.current !== attemptId || activeTaskIdRef.current !== taskId) return;
+          if (paymentUrlRef.current) { setPaymentUrl(null); }
           // после успеха — полностью убираем QR и заголовок
           setQrDataUrl(null);
           setMessage(null);
