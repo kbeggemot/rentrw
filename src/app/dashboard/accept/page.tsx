@@ -67,6 +67,17 @@ function AcceptPaymentContent() {
   const attemptIdRef = useRef<number>(0);
   const activeTaskIdRef = useRef<string | number | null>(null);
   const ofdStartedForTaskIdRef = useRef<string | number | null>(null);
+  const updateDebug = () => {
+    try {
+      if (typeof window !== 'undefined') {
+        (window as any).__activeTaskId = activeTaskIdRef.current ?? null;
+        (window as any).__lastTaskId = lastTaskId ?? null;
+        (window as any).__attemptId = attemptIdRef.current ?? null;
+        (window as any).__aoStatus = aoStatus ?? null;
+        (window as any).__paymentUrl = paymentUrlRef.current ?? null;
+      }
+    } catch {}
+  };
 
   const [aoStatus, setAoStatus] = useState<string | null>(null);
   const [purchaseReceiptUrl, setPurchaseReceiptUrl] = useState<string | null>(null);
@@ -106,6 +117,7 @@ function AcceptPaymentContent() {
 
   useEffect(() => {
     paymentUrlRef.current = paymentUrl;
+    updateDebug();
   }, [paymentUrl]);
 
   // Глобальная страховка: как только статус финальный или появился любой чек — скрываем QR/ссылку
@@ -180,7 +192,7 @@ function AcceptPaymentContent() {
           ?? (stData?.task?.acquiring_order?.status as string | undefined)
           ?? undefined;
         if (attemptIdRef.current !== attemptId || activeTaskIdRef.current !== taskId) return;
-        if (status) setAoStatus(status);
+        if (status) { setAoStatus(status); updateDebug(); }
         // If paid/transferred — hide payment link and QR, then start OFD polling for THIS task
         const st = String(status || '').toLowerCase();
         if (st === 'paid' || st === 'transfered' || st === 'transferred') {
@@ -376,6 +388,7 @@ function AcceptPaymentContent() {
       if (taskId !== undefined) {
         setLastTaskId(taskId);
         activeTaskIdRef.current = taskId;
+        updateDebug();
         // быстрый первичный запрос ссылки
         try {
           const r0 = await fetch(`/api/rocketwork/tasks/${taskId}?t=${Date.now()}`, { cache: 'no-store' });
