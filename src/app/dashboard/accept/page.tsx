@@ -144,7 +144,6 @@ function AcceptPaymentContent() {
       if (pollAbortRef.current.aborted) return;
       if (attemptIdRef.current !== attemptId) return;
       if (activeTaskIdRef.current !== taskId) return;
-      if (paymentUrlRef.current) return;
       setAttempt(n);
       try {
         const controller = new AbortController();
@@ -158,17 +157,27 @@ function AcceptPaymentContent() {
         // guard again after async
         if (attemptIdRef.current !== attemptId || activeTaskIdRef.current !== taskId) return;
         if (status) setMessage('Ожидаем ссылку…');
-        if (stRes.ok && found) {
-          if (attemptIdRef.current !== attemptId || activeTaskIdRef.current !== taskId) return;
-          setPaymentUrl(found);
-          try {
-            const dataUrl = await QRCode.toDataURL(found, { margin: 1, scale: 6 });
-            setQrDataUrl(dataUrl);
-          } catch {}
+        const st = String(status || '').toLowerCase();
+        if (st === 'paid' || st === 'transfered' || st === 'transferred') {
+          setAoStatus(status || 'paid');
+          setPaymentUrl(null);
+          setQrDataUrl(null);
           setMessage(null);
-          loadingRef.current = false;
           setLoading(false);
           return;
+        }
+        if (stRes.ok && found) {
+          if (attemptIdRef.current !== attemptId || activeTaskIdRef.current !== taskId) return;
+          if (!paymentUrlRef.current) {
+            setPaymentUrl(found);
+            try {
+              const dataUrl = await QRCode.toDataURL(found, { margin: 1, scale: 6 });
+              setQrDataUrl(dataUrl);
+            } catch {}
+            setMessage(null);
+            loadingRef.current = false;
+            setLoading(false);
+          }
         }
       } catch {}
       // более частые первые опросы, затем плавное увеличение до 2000мс
