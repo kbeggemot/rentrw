@@ -14,6 +14,7 @@ export type SaleRecord = {
   taskId: number | string;
   orderId: number;
   userId: string;
+  description?: string | null;
   amountGrossRub: number;
   isAgent: boolean;
   retainedCommissionRub: number;
@@ -58,6 +59,7 @@ export async function recordSaleOnCreate(params: {
   userId: string;
   taskId: number | string;
   orderId: number;
+  description?: string;
   amountGrossRub: number;
   isAgent: boolean;
   commissionType?: 'percent' | 'fixed';
@@ -65,7 +67,7 @@ export async function recordSaleOnCreate(params: {
   serviceEndDate?: string;
   vatRate?: string;
 }): Promise<void> {
-  const { userId, taskId, orderId, amountGrossRub, isAgent, commissionType, commissionValue, serviceEndDate, vatRate } = params;
+  const { userId, taskId, orderId, description, amountGrossRub, isAgent, commissionType, commissionValue, serviceEndDate, vatRate } = params;
   let retained = 0;
   if (isAgent && commissionValue !== undefined) {
     if (commissionType === 'percent') retained = (amountGrossRub * commissionValue) / 100;
@@ -78,6 +80,7 @@ export async function recordSaleOnCreate(params: {
     taskId,
     orderId,
     userId,
+    description: description ?? null,
     amountGrossRub,
     isAgent,
     retainedCommissionRub: Math.max(0, Math.round((retained + Number.EPSILON) * 100) / 100),

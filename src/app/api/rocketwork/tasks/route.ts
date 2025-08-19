@@ -354,6 +354,7 @@ export async function POST(req: Request) {
         userId,
         taskId,
         orderId,
+        description,
         amountGrossRub: amountRub,
         isAgent: !!body.agentSale,
         commissionType: body.agentSale ? body.commissionType : undefined,
