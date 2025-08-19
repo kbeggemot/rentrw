@@ -9,7 +9,7 @@ export default function DashboardClient({ hasTokenInitial }: { hasTokenInitial: 
   const [balance, setBalance] = useState<string | null>(null);
   const [balanceRaw, setBalanceRaw] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
-  const [hasToken] = useState<boolean>(hasTokenInitial);
+  const [hasToken, setHasToken] = useState<boolean>(hasTokenInitial);
   const [withdrawing, setWithdrawing] = useState(false);
   const [withdrawPendingTask, setWithdrawPendingTask] = useState<string | number | null>(null);
   const [withdrawAmount, setWithdrawAmount] = useState('');
@@ -31,6 +31,20 @@ export default function DashboardClient({ hasTokenInitial }: { hasTokenInitial: 
     // auto-hide after 3s
     setTimeout(() => setToast(null), 3000);
   };
+
+  // Sync with server-provided flag if it changes across navigations
+  useEffect(() => { setHasToken(hasTokenInitial); }, [hasTokenInitial]);
+
+  // Additional client-side confirmation to avoid stale SSR (no-store)
+  useEffect(() => {
+    (async () => {
+      try {
+        const r = await fetch('/api/settings/token', { cache: 'no-store' });
+        const d = await r.json();
+        setHasToken(!!d?.token);
+      } catch {}
+    })();
+  }, []);
 
   const fetchBalance = async (): Promise<number | null> => {
     setLoading(true);
