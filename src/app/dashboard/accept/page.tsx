@@ -108,6 +108,18 @@ function AcceptPaymentContent() {
     paymentUrlRef.current = paymentUrl;
   }, [paymentUrl]);
 
+  // Глобальная страховка: как только статус финальный или появился любой чек — скрываем QR/ссылку
+  useEffect(() => {
+    const final = aoStatus && ['paid','transfered','transferred'].includes(String(aoStatus).toLowerCase());
+    if (final || purchaseReceiptUrl || commissionReceiptUrl) {
+      if (paymentUrlRef.current) setPaymentUrl(null);
+      setQrDataUrl(null);
+      setMessage(null);
+      setMessageKind('info');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [aoStatus, purchaseReceiptUrl, commissionReceiptUrl]);
+
   // Явный старт опроса после получения taskId, чтобы исключить конфликты эффектов
   const startPolling = (taskId: string | number, attemptId: number) => {
     if (pollTimerRef.current) {
