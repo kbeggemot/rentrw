@@ -1,8 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getUserById, updateUserEmail } from '@/server/userStore';
 import { sendEmail } from '@/server/email';
-import { promises as fs } from 'fs';
-import path from 'path';
+import { writeText } from '@/server/storage';
 
 export const runtime = 'nodejs';
 
@@ -60,9 +59,7 @@ export async function POST(req: Request) {
     }
     // issue verification code
     const code = String(Math.floor(100000 + Math.random() * 900000));
-    const dataDir = path.join(process.cwd(), '.data');
-    await fs.mkdir(dataDir, { recursive: true });
-    await fs.writeFile(path.join(dataDir, `email_code_${userId}.txt`), JSON.stringify({ email: targetEmail, code, ts: Date.now() }), 'utf8');
+    await writeText(`.data/email_code_${userId}.txt`, JSON.stringify({ email: targetEmail, code, ts: Date.now() }));
     const base = process.env.NEXT_PUBLIC_BASE_URL || '';
     const ui = base ? `${base}/settings` : '/settings';
     await sendEmail({

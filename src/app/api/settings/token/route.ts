@@ -34,7 +34,8 @@ export async function POST(req: Request) {
     if (!token || typeof token !== 'string') {
       return NextResponse.json({ error: 'Invalid token' }, { status: 400 });
     }
-    // 1) Validate token against account endpoint BEFORE saving subscriptions
+    // 1) Try to validate token against account endpoint.
+    //    If 401 → reject. If network/other error → continue to save (degraded mode).
     const base = process.env.ROCKETWORK_API_BASE_URL || 'https://app.rocketwork.ru/api/';
     try {
       const ping = await fetch(new URL('account', base.endsWith('/') ? base : base + '/').toString(), {
@@ -45,14 +46,12 @@ export async function POST(req: Request) {
       if (ping.status === 401) {
         return NextResponse.json({ error: 'INVALID_TOKEN' }, { status: 400 });
       }
-      if (!ping.ok) {
-        return NextResponse.json({ error: 'TECH_ERROR' }, { status: 502 });
-      }
+      // Non-OK but not 401 → allow save, continue in degraded mode
     } catch {
-      return NextResponse.json({ error: 'TECH_ERROR' }, { status: 502 });
+      // Network error → allow save, continue in degraded mode
     }
 
-    // 2) Save token (it's valid)
+    // 2) Save token
     await saveApiToken(userId, token);
     // After saving token, ensure Rocket Work webhook subscriptions are created
     try {
