@@ -61,8 +61,7 @@ export async function POST(req: Request) {
       const callbackBase = `${cbBaseProto}://${cbBaseHost}`;
       const callbackUrl = new URL(`/api/rocketwork/postbacks/${encodeURIComponent(userId)}`, callbackBase).toString();
 
-      const plain = await getDecryptedApiToken(userId);
-      const headers = { Authorization: `Bearer ${plain}`, 'Content-Type': 'application/json', Accept: 'application/json' } as Record<string, string>;
+      const headers = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', Accept: 'application/json' } as Record<string, string>;
 
       // Helper to upsert a subscription for a stream
       async function upsert(stream: 'tasks' | 'executors') {
@@ -92,7 +91,7 @@ export async function POST(req: Request) {
       // fetch org name for payout, save to user
       try {
         const accUrl = new URL('account', base.endsWith('/') ? base : base + '/').toString();
-        const r = await fetch(accUrl, { headers: { Authorization: `Bearer ${plain}`, Accept: 'application/json' }, cache: 'no-store' });
+        const r = await fetch(accUrl, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }, cache: 'no-store' });
         const txt = await r.text();
         let d: any = null; try { d = txt ? JSON.parse(txt) : null; } catch { d = txt; }
         const orgName: string | undefined = (d?.company_name as string | undefined) ?? undefined;
@@ -111,7 +110,8 @@ export async function POST(req: Request) {
       const ok = await ensureSubscriptions(userId, baseUrl);
       if (!ok) await enqueueSubscriptionJob(userId, baseUrl);
     } catch {}
-    const masked = await getMaskedToken(userId);
+    const last4 = token.slice(-4);
+    const masked = `••••••••${last4}`;
     return NextResponse.json({ token: masked }, { status: 201 });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Server error';

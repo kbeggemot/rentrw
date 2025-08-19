@@ -13,14 +13,15 @@ type EncryptedPayload = {
 };
 
 type SecureStoreData = {
+  // Encrypted form (preferred)
   token?: EncryptedPayload;
+  // Fallback plaintext for environments where TOKEN_SECRET is not configured
+  plainToken?: string;
 };
 
-function getKey(): Buffer {
+function getKey(): Buffer | null {
   const secret = process.env.TOKEN_SECRET;
-  if (!secret) {
-    throw new Error('Missing TOKEN_SECRET environment variable');
-  }
+  if (!secret) return null;
   return scryptSync(secret, SCRYPT_SALT, 32);
 }
 
@@ -34,6 +35,10 @@ function decode(payload: string): Buffer {
 
 export async function encryptToken(plainToken: string): Promise<EncryptedPayload> {
   const key = getKey();
+  if (!key) {
+    // Should not be called if no key; caller will store plaintext.
+    throw new Error('Missing TOKEN_SECRET environment variable');
+  }
   const iv = randomBytes(12);
   const cipher = createCipheriv('aes-256-gcm', key, iv);
   const encrypted = Buffer.concat([cipher.update(plainToken, 'utf8'), cipher.final()]);
@@ -43,6 +48,7 @@ export async function encryptToken(plainToken: string): Promise<EncryptedPayload
 
 export async function decryptToken(payload: EncryptedPayload): Promise<string> {
   const key = getKey();
+  if (!key) throw new Error('Missing TOKEN_SECRET environment variable');
   const iv = decode(payload.iv);
   const tag = decode(payload.tag);
   const decipher = createDecipheriv('aes-256-gcm', key, iv);
@@ -65,14 +71,23 @@ async function writeStore(userId: string, data: SecureStoreData): Promise<void> 
 }
 
 export async function saveApiToken(userId: string, plainToken: string): Promise<void> {
-  const encrypted = await encryptToken(plainToken);
   const data = await readStore(userId);
-  data.token = encrypted;
+  const key = getKey();
+  if (key) {
+    const encrypted = await encryptToken(plainToken);
+    delete data.plainToken;
+    data.token = encrypted;
+  } else {
+    // Fallback to plaintext if no TOKEN_SECRET is configured
+    data.plainToken = plainToken;
+    delete data.token;
+  }
   await writeStore(userId, data);
 }
 
 export async function getDecryptedApiToken(userId: string): Promise<string | null> {
   const data = await readStore(userId);
+  if (data.plainToken) return data.plainToken;
   if (!data.token) return null;
   try {
     return await decryptToken(data.token);
@@ -83,7 +98,7 @@ export async function getDecryptedApiToken(userId: string): Promise<string | nul
 
 export async function hasToken(userId: string): Promise<boolean> {
   const data = await readStore(userId);
-  return Boolean(data.token);
+  return Boolean(data.token || data.plainToken);
 }
 
 export async function getMaskedToken(userId: string): Promise<string | null> {

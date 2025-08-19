@@ -21,7 +21,7 @@ export type SettingsPrefetch = {
   payoutOrgName: string | null;
 };
 
-export default function SettingsClient({ initial }: { initial: SettingsPrefetch }) {
+export default function SettingsClient({ initial, userId }: { initial: SettingsPrefetch; userId?: string }) {
   const [currentMasked, setCurrentMasked] = useState<string | null>(initial.tokenMasked);
   const [token, setToken] = useState('');
   const [saving, setSaving] = useState(false);

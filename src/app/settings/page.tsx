@@ -7,6 +7,7 @@ export default async function SettingsPage() {
   const proto = h.get('x-forwarded-proto') || 'http';
   const host = h.get('x-forwarded-host') || h.get('host') || 'localhost:3000';
   const baseUrl = `${proto}://${host}`;
+  const userId = cookieStore.get('session_user')?.value || '';
   const cookieHeader = cookieStore
     .getAll()
     .map((c) => `${c.name}=${encodeURIComponent(c.value)}`)
@@ -46,7 +47,7 @@ export default async function SettingsPage() {
   return (
     <>
       <h1 className="md:hidden sr-only">Настройки</h1>
-      <SettingsClient initial={initial} />
+      <SettingsClient initial={initial} userId={userId} />
     </>
   );
 }
