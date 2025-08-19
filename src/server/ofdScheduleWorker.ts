@@ -11,6 +11,7 @@ type OffsetJob = {
   dueAt: string; // ISO UTC when to fire
   party: 'partner' | 'org';
   partnerInn?: string; // required if party=partner
+  partnerName?: string; // optional: SupplierName for partner
   description: string;
   amountRub: number;
   vatRate: VatRate;
@@ -83,6 +84,7 @@ export async function runDueOffsetJobs(): Promise<void> {
           invoiceId: invoiceIdFull,
           callbackUrl,
           withAdvanceOffset: true,
+          paymentAgentInfo: { AgentType: 'AGENT', SupplierInn: job.partnerInn, SupplierName: job.partnerName || 'Исполнитель' },
         });
       } else {
         const orgInn = await getUserOrgInn(job.userId);
