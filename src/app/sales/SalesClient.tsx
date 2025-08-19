@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 
@@ -58,6 +58,11 @@ export default function SalesClient({ initial }: { initial: Sale[] }) {
       if (!refresh) setLoading(false);
     }
   };
+
+  // Force refresh once on mount to avoid stale SSR list
+  useEffect(() => {
+    load(false).catch(() => {});
+  }, []);
 
   // удалено: глобальное "обновить всё" по просьбе
 

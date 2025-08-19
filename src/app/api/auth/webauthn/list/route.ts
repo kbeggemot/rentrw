@@ -1,24 +1,20 @@
 import { NextResponse } from 'next/server';
-import { promises as fs } from 'fs';
+import { readText, writeText } from '@/server/storage';
 import path from 'path';
 import { setWebauthnOptOut } from '@/server/userStore';
 
 export const runtime = 'nodejs';
 
-const CREDS_FILE = path.join(process.cwd(), '.data', 'webauthn_creds.json');
+const CREDS_FILE = '.data/webauthn_creds.json';
 
 async function readAll(): Promise<Record<string, Array<{ id: string; counter: number }>>> {
-	try {
-		const raw = await fs.readFile(CREDS_FILE, 'utf8');
-		return JSON.parse(raw || '{}') as Record<string, Array<{ id: string; counter: number }>>;
-	} catch {
-		return {} as Record<string, Array<{ id: string; counter: number }>>;
-	}
+	const raw = await readText(CREDS_FILE);
+	if (!raw) return {} as Record<string, Array<{ id: string; counter: number }>>;
+	try { return JSON.parse(raw || '{}') as Record<string, Array<{ id: string; counter: number }>>; } catch { return {} as Record<string, Array<{ id: string; counter: number }>>; }
 }
 
 async function writeAll(data: Record<string, Array<{ id: string; counter: number }>>): Promise<void> {
-	await fs.mkdir(path.dirname(CREDS_FILE), { recursive: true });
-	await fs.writeFile(CREDS_FILE, JSON.stringify(data, null, 2), 'utf8');
+	await writeText(CREDS_FILE, JSON.stringify(data, null, 2));
 }
 
 export async function GET(req: Request) {
