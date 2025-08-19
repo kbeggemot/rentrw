@@ -114,19 +114,32 @@ export async function fermaGetReceiptStatus(id: string, opts?: Partial<FermaAuth
   const envAuth = getAuth();
   const auth = { ...envAuth, ...opts } as FermaAuth & { statusPath?: string };
   if (!auth.baseUrl) throw new Error('FERMA_BASE_URL not configured');
-  const pathTpl = opts?.statusPath || process.env.FERMA_STATUS_PATH || '/api/kkt/cloud/receipt/{id}';
-  const pathActual = pathTpl.replace('{id}', encodeURIComponent(id));
-  let url = joinUrl(auth.baseUrl, pathActual);
+  const pathTpl = opts?.statusPath || process.env.FERMA_STATUS_PATH || '/api/kkt/cloud/status';
+  const isGetByPath = /\{id\}/.test(pathTpl);
+  let url = joinUrl(auth.baseUrl, isGetByPath ? pathTpl.replace('{id}', encodeURIComponent(id)) : pathTpl);
   if (auth.authToken) {
     const u = new URL(url);
     u.searchParams.set('AuthToken', auth.authToken);
     url = u.toString();
   }
   const headers = authHeaders(auth);
-  const res = await fetch(url, { method: 'GET', headers, cache: 'no-store' });
-  const text = await res.text();
+  let text = '';
+  if (isGetByPath) {
+    const res = await fetch(url, { method: 'GET', headers, cache: 'no-store' });
+    text = await res.text();
+    let data: any = null; try { data = text ? JSON.parse(text) : null; } catch { data = text; }
+    return { status: (data && (data.status || data.state)) || undefined, rawStatus: res.status, rawText: text };
+  }
+  // POST status by ReceiptId first, then fallback to InvoiceId if not found
+  const statusBody = (payload: any) => JSON.stringify({ Request: payload });
+  let res = await fetch(url, { method: 'POST', headers, body: statusBody({ ReceiptId: id }), cache: 'no-store' });
+  text = await res.text();
+  if (res.status === 404 || /not\s*found/i.test(text) || /не\s*найден/i.test(text)) {
+    res = await fetch(url, { method: 'POST', headers, body: statusBody({ InvoiceId: id }), cache: 'no-store' });
+    text = await res.text();
+  }
   let data: any = null; try { data = text ? JSON.parse(text) : null; } catch { data = text; }
-  return { status: (data && (data.status || data.state)) || undefined, rawStatus: res.status, rawText: text };
+  return { status: (data && (data.status || data.state)) || (data && data.Status) || undefined, rawStatus: res.status, rawText: text };
 }
 
 export async function fermaCreateAuthToken(login?: string, password?: string, opts?: { baseUrl?: string }): Promise<{ authToken?: string; expires?: string; rawStatus: number; rawText: string }> {
