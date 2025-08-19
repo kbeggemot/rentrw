@@ -112,7 +112,7 @@ function AcceptPaymentContent() {
   useEffect(() => {
     const final = aoStatus && ['paid','transfered','transferred'].includes(String(aoStatus).toLowerCase());
     if (final || purchaseReceiptUrl || commissionReceiptUrl) {
-      if (paymentUrlRef.current) setPaymentUrl(null);
+      setPaymentUrl(null);
       setQrDataUrl(null);
       setMessage(null);
       setMessageKind('info');
@@ -176,14 +176,16 @@ function AcceptPaymentContent() {
         const stRes = await fetch(`/api/rocketwork/tasks/${taskId}?t=${Date.now()}`, { cache: 'no-store' });
         const stText = await stRes.text();
         let stData: any = null; try { stData = stText ? JSON.parse(stText) : null; } catch { stData = stText; }
-        const status: string | undefined = (stData?.acquiring_order?.status as string | undefined) ?? undefined;
+        const status: string | undefined = (stData?.acquiring_order?.status as string | undefined)
+          ?? (stData?.task?.acquiring_order?.status as string | undefined)
+          ?? undefined;
         if (attemptIdRef.current !== attemptId || activeTaskIdRef.current !== taskId) return;
         if (status) setAoStatus(status);
         // If paid/transferred — hide payment link and QR, then start OFD polling for THIS task
         const st = String(status || '').toLowerCase();
         if (st === 'paid' || st === 'transfered' || st === 'transferred') {
           if (attemptIdRef.current !== attemptId || activeTaskIdRef.current !== taskId) return;
-          if (paymentUrlRef.current) { setPaymentUrl(null); }
+          setPaymentUrl(null);
           // после успеха — полностью убираем QR и заголовок
           setQrDataUrl(null);
           setMessage(null);
