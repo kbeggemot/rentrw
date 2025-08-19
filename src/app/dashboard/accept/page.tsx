@@ -179,16 +179,9 @@ function AcceptPaymentContent() {
         const status: string | undefined = (stData?.acquiring_order?.status as string | undefined) ?? undefined;
         if (attemptIdRef.current !== attemptId || activeTaskIdRef.current !== taskId) return;
         if (status) setAoStatus(status);
-        // If paid/transferred (or RW indicates completion or any receipt present) — hide payment link and QR, then start OFD polling for THIS task
+        // If paid/transferred — hide payment link and QR, then start OFD polling for THIS task
         const st = String(status || '').toLowerCase();
-        const rootStatus = String((stData as any)?.status || '').toLowerCase();
-        const ofdAny = Boolean((stData as any)?.ofd_url
-          || (stData as any)?.ofd_receipt_url
-          || (stData as any)?.additional_commission_ofd_url
-          || (stData as any)?.receipt_uri
-          || (stData as any)?.acquiring_order?.ofd_url
-          || (stData as any)?.acquiring_order?.ofd_receipt_url);
-        if (st === 'paid' || st === 'transfered' || st === 'transferred' || rootStatus === 'completed' || ofdAny) {
+        if (st === 'paid' || st === 'transfered' || st === 'transferred') {
           if (attemptIdRef.current !== attemptId || activeTaskIdRef.current !== taskId) return;
           if (paymentUrlRef.current) { setPaymentUrl(null); }
           // после успеха — полностью убираем QR и заголовок
@@ -197,7 +190,7 @@ function AcceptPaymentContent() {
           setMessageKind('info');
 
           // Запустить наблюдение за чеками только один раз для текущей задачи
-          if ((st === 'paid' || st === 'transfered' || st === 'transferred' || rootStatus === 'completed') && ofdStartedForTaskIdRef.current !== taskId) {
+          if ((st === 'paid' || st === 'transfered' || st === 'transferred') && ofdStartedForTaskIdRef.current !== taskId) {
             ofdStartedForTaskIdRef.current = taskId;
             try {
               const hint = (stData?.__hint as any) || {};
