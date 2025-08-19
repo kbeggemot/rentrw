@@ -32,7 +32,7 @@ export async function GET(req: Request) {
           // a) always refresh pending, paying, paid
           const needA = st === 'pending' || st === 'paying' || st === 'paid';
           // b) refresh transferred/transfered only if receipts are missing
-          const missingReceipts = !s.ofdUrl || (s.isAgent && (!s.additionalCommissionOfdUrl || !s.npdReceiptUri));
+          const missingReceipts = (!s.ofdUrl && !s.ofdFullUrl) || (s.isAgent && (!s.additionalCommissionOfdUrl || !s.npdReceiptUri));
           const needB = (st === 'transferred' || st === 'transfered') && missingReceipts;
           return needA || needB;
         });
@@ -104,6 +104,10 @@ export async function GET(req: Request) {
                     const fd = obj?.Data?.Fd || obj?.Fd;
                     const fp = obj?.Data?.Fp || obj?.Fp;
                     if (fn && fd != null && fp != null) { patch.ofdUrl = buildReceiptViewUrl(fn, fd, fp); }
+                    if (!patch.ofdUrl) {
+                      const direct = obj?.Data?.Device?.OfdReceiptUrl;
+                      if (typeof direct === 'string' && direct.length > 0) { patch.ofdUrl = direct; }
+                    }
                   } catch {}
                 }
                 if (!s.ofdFullUrl && (s as any).ofdFullId) {

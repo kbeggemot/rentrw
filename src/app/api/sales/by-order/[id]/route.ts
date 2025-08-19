@@ -36,6 +36,10 @@ export async function GET(req: Request) {
           const fd = obj?.Data?.Fd || obj?.Fd;
           const fp = obj?.Data?.Fp || obj?.Fp;
           if (fn && fd != null && fp != null) { patch.ofdUrl = buildReceiptViewUrl(fn, fd, fp); }
+          if (!patch.ofdUrl) {
+            const direct = obj?.Data?.Device?.OfdReceiptUrl;
+            if (typeof direct === 'string' && direct.length > 0) patch.ofdUrl = direct;
+          }
         } catch {}
       }
       if (!sale.ofdFullUrl && sale.ofdFullId) {
