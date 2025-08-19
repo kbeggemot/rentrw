@@ -202,9 +202,13 @@ function AcceptPaymentContent() {
                       setMessageKind('info');
                     }
                     const purchaseUrl = sale?.ofdUrl || sale?.ofdFullUrl || null;
-                    if (purchaseUrl) {
-                      setPurchaseReceiptUrl(purchaseUrl);
-                    } else {
+                    const commissionUrl = sale?.additionalCommissionOfdUrl || null;
+                    if (purchaseUrl) setPurchaseReceiptUrl(purchaseUrl);
+                    if (commissionUrl) setCommissionReceiptUrl(commissionUrl);
+                    const needCommission = isAgentForTask;
+                    const missingPurchase = !purchaseUrl;
+                    const missingCommission = needCommission && !commissionUrl;
+                    if (missingPurchase || missingCommission) {
                       ofdTimerRef.current = setTimeout(watch, target === 'prepay' ? 2000 : 2500);
                     }
                   } catch {
