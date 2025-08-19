@@ -97,7 +97,10 @@ export async function fermaCreateReceipt(payload: unknown, opts?: Partial<FermaA
   }
 
   let data: any = null; try { data = text ? JSON.parse(text) : null; } catch { data = text; }
-  const id = (data && typeof data === 'object' && (data.id || data.uuid)) ? (data.id || data.uuid) : undefined;
+  // Try multiple places for receipt id, including duplicate error payloads
+  const existingId = (data && data.Data && (data.Data.ExistingReceiptId || (Array.isArray(data.Data.ExistingReceiptIds) ? data.Data.ExistingReceiptIds[0] : undefined))) || undefined;
+  const receiptId = (data && (data.id || data.uuid || data.ReceiptId)) || (data && data.Data && (data.Data.ReceiptId)) || undefined;
+  const id = receiptId || existingId;
   return { id, status: (data && (data.status || data.state)) || undefined, rawStatus: res.status, rawText: text };
 }
 

@@ -60,6 +60,13 @@ export function AuthForm() {
               try { window.localStorage.removeItem('passkeyId'); window.localStorage.removeItem('hasPasskey'); } catch {}
               try { document.cookie = 'has_passkey=; Path=/; Max-Age=0; SameSite=Lax'; } catch {}
             }
+          } else {
+            // If we don't have a local keyId but server reports keys exist, still show button
+            try {
+              const st = await fetch('/api/auth/webauthn/status', { cache: 'no-store' });
+              const s = await st.json();
+              existsRemote = !!s?.hasAny;
+            } catch {}
           }
           // Если пользователь включил глобальную отметку отказа, не показываем кнопку
           try {
