@@ -132,6 +132,8 @@ export async function GET(_: Request) {
           const mskToday = new Date().toLocaleDateString('ru-RU', { timeZone: 'Europe/Moscow' }).split('.').reverse().join('-');
           const isToday = (sale.serviceEndDate || null) === mskToday;
           const amountRub = Number(sale.amountGrossRub || 0);
+          const retainedRub = Number(sale.retainedCommissionRub || 0);
+          const amountNetRub = sale.isAgent ? Math.max(0, amountRub - retainedRub) : amountRub;
           const usedVat = (sale.vatRate || 'none') as any;
           const itemLabel = (sale.description && sale.description.trim().length > 0) ? sale.description.trim() : 'Оплата услуги';
           const baseUrl = process.env.FERMA_BASE_URL || 'https://ferma.ofd.ru/';
@@ -158,7 +160,7 @@ export async function GET(_: Request) {
                     (normalized as any)?.executor?.first_name,
                     (normalized as any)?.executor?.second_name,
                   ].filter(Boolean).join(' ').trim()) || undefined;
-                  const payload = buildFermaReceiptPayload({ party: 'partner', partyInn: partnerInn, description: itemLabel, amountRub, vatRate: usedVat, methodCode: PAYMENT_METHOD_FULL_PAYMENT, orderId: sale.orderId, docType: 'Income', buyerEmail: defaultEmail, invoiceId: invoiceIdFull, callbackUrl, paymentAgentInfo: { AgentType: 'AGENT', SupplierInn: partnerInn, SupplierName: partnerName || 'Исполнитель' } });
+                  const payload = buildFermaReceiptPayload({ party: 'partner', partyInn: partnerInn, description: itemLabel, amountRub: amountNetRub, vatRate: usedVat, methodCode: PAYMENT_METHOD_FULL_PAYMENT, orderId: sale.orderId, docType: 'Income', buyerEmail: defaultEmail, invoiceId: invoiceIdFull, callbackUrl, paymentAgentInfo: { AgentType: 'AGENT', SupplierInn: partnerInn, SupplierName: partnerName || 'Исполнитель' } });
                   const created = await fermaCreateReceipt(payload, { baseUrl, authToken: tokenOfd });
                   await updateSaleOfdUrlsByOrderId(userId, sale.orderId, { ofdFullId: created.id || null });
                 }
@@ -187,7 +189,7 @@ export async function GET(_: Request) {
                     (normalized as any)?.executor?.first_name,
                     (normalized as any)?.executor?.second_name,
                   ].filter(Boolean).join(' ').trim()) || undefined;
-                  const payload = buildFermaReceiptPayload({ party: 'partner', partyInn: partnerInn, description: itemLabel, amountRub, vatRate: usedVat, methodCode: PAYMENT_METHOD_PREPAY_FULL, orderId: sale.orderId, docType: 'IncomePrepayment', buyerEmail: defaultEmail, invoiceId: invoiceIdFull, callbackUrl, withPrepaymentItem: true, paymentAgentInfo: { AgentType: 'AGENT', SupplierInn: partnerInn, SupplierName: partnerName2 || 'Исполнитель' } });
+                  const payload = buildFermaReceiptPayload({ party: 'partner', partyInn: partnerInn, description: itemLabel, amountRub: amountNetRub, vatRate: usedVat, methodCode: PAYMENT_METHOD_PREPAY_FULL, orderId: sale.orderId, docType: 'IncomePrepayment', buyerEmail: defaultEmail, invoiceId: invoiceIdFull, callbackUrl, withPrepaymentItem: true, paymentAgentInfo: { AgentType: 'AGENT', SupplierInn: partnerInn, SupplierName: partnerName2 || 'Исполнитель' } });
                   const created = await fermaCreateReceipt(payload, { baseUrl, authToken: tokenOfd });
                   await updateSaleOfdUrlsByOrderId(userId, sale.orderId, { ofdPrepayId: created.id || null });
                 }
@@ -210,7 +212,7 @@ export async function GET(_: Request) {
               if (sale.isAgent) {
                 partnerInn = (normalized as any)?.executor?.inn as string | undefined;
               }
-              await enqueueOffsetJob({ userId, orderId: sale.orderId, dueAt: dueDate.toISOString(), party: sale.isAgent ? 'partner' : 'org', partnerInn, description: 'Оплата услуги', amountRub, vatRate: usedVat, buyerEmail: null });
+              await enqueueOffsetJob({ userId, orderId: sale.orderId, dueAt: dueDate.toISOString(), party: sale.isAgent ? 'partner' : 'org', partnerInn, description: 'Оплата услуги', amountRub: sale.isAgent ? amountNetRub : amountRub, vatRate: usedVat, buyerEmail: null });
             }
           }
         }
