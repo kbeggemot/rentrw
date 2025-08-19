@@ -232,6 +232,44 @@ function AcceptPaymentContent() {
             } catch {}
           }
         }
+        // Regardless of current RW status, if we know orderId and have not started watching yet, start watching local sale store
+        try {
+          const hint2 = (stData?.__hint as any) || {};
+          const orderId2: number | undefined = Number(hint2?.orderId || stData?.acquiring_order?.order || stData?.order || NaN);
+          if (ofdStartedForTaskIdRef.current !== taskId && Number.isFinite(orderId2)) {
+            ofdStartedForTaskIdRef.current = taskId;
+            const target2: string | undefined = hint2?.ofdTarget;
+            const watch2 = async () => {
+              if (attemptIdRef.current !== attemptId) return;
+              if (activeTaskIdRef.current !== taskId) return;
+              try {
+                const r = await fetch(`/api/sales/by-order/${orderId2}?t=${Date.now()}`, { cache: 'no-store' });
+                const d = await r.json();
+                const sale = d?.sale;
+                const stLocal = String(sale?.status || '').toLowerCase();
+                if (stLocal === 'paid' || stLocal === 'transfered' || stLocal === 'transferred') {
+                  setPaymentUrl(null);
+                  setQrDataUrl(null);
+                  setMessage(null);
+                  setMessageKind('info');
+                }
+                const purchaseUrl = sale?.ofdUrl || sale?.ofdFullUrl || null;
+                const commissionUrl = sale?.additionalCommissionOfdUrl || null;
+                if (purchaseUrl) setPurchaseReceiptUrl(purchaseUrl);
+                if (commissionUrl) setCommissionReceiptUrl(commissionUrl);
+                const needCommission = isAgentForTask;
+                const missingPurchase = !purchaseUrl;
+                const missingCommission = needCommission && !commissionUrl;
+                if (missingPurchase || missingCommission || !(stLocal === 'paid' || stLocal === 'transfered' || stLocal === 'transferred')) {
+                  ofdTimerRef.current = setTimeout(watch2, target2 === 'prepay' ? 2000 : 2500);
+                }
+              } catch {
+                ofdTimerRef.current = setTimeout(watch2, 2500);
+              }
+            };
+            watch2();
+          }
+        } catch {}
       } catch {}
       // keep watching until both receipts are present (or not agent)
       const needCommission = isAgentForTask;
