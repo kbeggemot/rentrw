@@ -222,6 +222,7 @@ function AcceptPaymentContent() {
                     // если в локальном сторе статус уже финальный — прячем ссылку/QR на всякий случай
                     const stLocal = String(sale?.status || '').toLowerCase();
                     if (stLocal === 'paid' || stLocal === 'transfered' || stLocal === 'transferred') {
+                      setAoStatus('paid');
                       setPaymentUrl(null);
                       setQrDataUrl(null);
                       setMessage(null);
@@ -262,6 +263,7 @@ function AcceptPaymentContent() {
                 const sale = d?.sale;
                 const stLocal = String(sale?.status || '').toLowerCase();
                 if (stLocal === 'paid' || stLocal === 'transfered' || stLocal === 'transferred') {
+                  setAoStatus('paid');
                   setPaymentUrl(null);
                   setQrDataUrl(null);
                   setMessage(null);
