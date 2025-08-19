@@ -1,5 +1,4 @@
-import { promises as fs } from 'fs';
-import path from 'path';
+import { writeText } from './storage';
 
 type SendEmailParams = {
   to: string;
@@ -14,15 +13,17 @@ type SendEmailParams = {
  * Otherwise writes message into .data/outbox for manual inspection in dev.
  */
 export async function sendEmail(params: SendEmailParams): Promise<void> {
+  if (String(process.env.EMAIL_DISABLE || '').trim() === '1') {
+    // Explicitly disabled: no-op (useful on platforms без диска/SMTP)
+    return;
+  }
   const host = process.env.SMTP_HOST;
   const from = process.env.SMTP_FROM || 'no-reply@rentrw.local';
   const fromName = process.env.SMTP_FROM_NAME || 'RentRW';
 
   if (!host) {
     // Fallback: write to local outbox
-    const outDir = path.join(process.cwd(), '.data', 'outbox');
-    await fs.mkdir(outDir, { recursive: true });
-    const fname = `email-${Date.now()}.txt`;
+    const fname = `.data/outbox/email-${Date.now()}.txt`;
     const content = [
       `From: ${from}`,
       `To: ${params.to}`,
@@ -30,7 +31,7 @@ export async function sendEmail(params: SendEmailParams): Promise<void> {
       '',
       params.text || params.html || '',
     ].join('\n');
-    await fs.writeFile(path.join(outDir, fname), content, 'utf8');
+    await writeText(fname, content);
     return;
   }
 
