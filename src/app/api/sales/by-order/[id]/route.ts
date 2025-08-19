@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import { listSales } from '@/server/taskStore';
+import { listSales, updateSaleOfdUrlsByOrderId } from '@/server/taskStore';
+import { fermaGetAuthTokenCached, fermaGetReceiptStatus } from '@/server/ofdFerma';
 
 export const runtime = 'nodejs';
 
@@ -22,6 +23,42 @@ export async function GET(req: Request) {
     if (!Number.isFinite(orderId)) return NextResponse.json({ error: 'BAD_ORDER' }, { status: 400 });
     const sales = await listSales(userId);
     const sale = sales.find((s) => s.orderId === orderId) || null;
+    if (sale) {
+      const baseUrl = process.env.FERMA_BASE_URL || 'https://ferma.ofd.ru/';
+      const token = await fermaGetAuthTokenCached(process.env.FERMA_LOGIN || '', process.env.FERMA_PASSWORD || '', { baseUrl });
+      const patch: any = {};
+      // If have ids but no URLs yet — query Ferma directly
+      if (!sale.ofdUrl && sale.ofdPrepayId) {
+        try {
+          const st = await fermaGetReceiptStatus(sale.ofdPrepayId, { baseUrl, authToken: token });
+          const obj = st.rawText ? JSON.parse(st.rawText) : {};
+          const fn = obj?.Data?.Fn || obj?.Fn;
+          const fd = obj?.Data?.Fd || obj?.Fd;
+          const fp = obj?.Data?.Fp || obj?.Fp;
+          if (fn && fd != null && fp != null) {
+            patch.ofdUrl = `https://check-demo.ofd.ru/rec/${encodeURIComponent(fn)}/${encodeURIComponent(String(fd))}/${encodeURIComponent(String(fp))}`;
+          }
+        } catch {}
+      }
+      if (!sale.ofdFullUrl && sale.ofdFullId) {
+        try {
+          const st = await fermaGetReceiptStatus(sale.ofdFullId, { baseUrl, authToken: token });
+          const obj = st.rawText ? JSON.parse(st.rawText) : {};
+          const fn = obj?.Data?.Fn || obj?.Fn;
+          const fd = obj?.Data?.Fd || obj?.Fd;
+          const fp = obj?.Data?.Fp || obj?.Fp;
+          if (fn && fd != null && fp != null) {
+            patch.ofdFullUrl = `https://check-demo.ofd.ru/rec/${encodeURIComponent(fn)}/${encodeURIComponent(String(fd))}/${encodeURIComponent(String(fp))}`;
+          }
+        } catch {}
+      }
+      if (Object.keys(patch).length > 0) {
+        try { await updateSaleOfdUrlsByOrderId(userId, orderId, patch); } catch {}
+        // merge into local response
+        (sale as any).ofdUrl = typeof patch.ofdUrl === 'string' ? patch.ofdUrl : sale.ofdUrl;
+        (sale as any).ofdFullUrl = typeof patch.ofdFullUrl === 'string' ? patch.ofdFullUrl : sale.ofdFullUrl;
+      }
+    }
     if (!sale) return NextResponse.json({ error: 'NOT_FOUND' }, { status: 404 });
     return NextResponse.json({ sale }, { status: 200 });
   } catch (error) {
