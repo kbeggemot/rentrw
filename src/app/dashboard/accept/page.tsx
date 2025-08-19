@@ -156,16 +156,12 @@ function AcceptPaymentContent() {
         let stData: any = null; try { stData = stText ? JSON.parse(stText) : null; } catch { stData = stText; }
         const status: string | undefined = (stData?.acquiring_order?.status as string | undefined) ?? undefined;
         if (status) setAoStatus(status);
-        const purchase = (stData?.ofd_url as string | undefined) ?? (stData?.acquiring_order?.ofd_url as string | undefined) ?? null;
-        const addOfd = (stData?.additional_commission_ofd_url as string | undefined) ?? null;
-        if (purchase) setPurchaseReceiptUrl(purchase);
-        if (addOfd) setCommissionReceiptUrl(addOfd);
-        // If RW OFD is disabled (deferred full), watch our own sales store for OFD receipts
+        // Always prefer our own OFD (Ferma) storage over RW. Poll by orderId until link appears.
         try {
           const hint = (stData?.__hint as any) || {};
           const target: string | undefined = hint?.ofdTarget;
-          const orderId: number | undefined = Number(stData?.acquiring_order?.order || stData?.order || NaN || hint?.orderId);
-          if (!purchase && Number.isFinite(orderId)) {
+          const orderId: number | undefined = Number(hint?.orderId || stData?.acquiring_order?.order || stData?.order || NaN);
+          if (Number.isFinite(orderId)) {
             if (ofdTimerRef.current) clearTimeout(ofdTimerRef.current);
             const watch = async () => {
               try {
