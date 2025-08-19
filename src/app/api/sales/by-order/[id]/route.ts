@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { listSales, updateSaleOfdUrlsByOrderId } from '@/server/taskStore';
-import { fermaGetAuthTokenCached, fermaGetReceiptStatus } from '@/server/ofdFerma';
+import { fermaGetAuthTokenCached, fermaGetReceiptStatus, buildReceiptViewUrl } from '@/server/ofdFerma';
 
 export const runtime = 'nodejs';
 
@@ -35,9 +35,7 @@ export async function GET(req: Request) {
           const fn = obj?.Data?.Fn || obj?.Fn;
           const fd = obj?.Data?.Fd || obj?.Fd;
           const fp = obj?.Data?.Fp || obj?.Fp;
-          if (fn && fd != null && fp != null) {
-            patch.ofdUrl = `https://check-demo.ofd.ru/rec/${encodeURIComponent(fn)}/${encodeURIComponent(String(fd))}/${encodeURIComponent(String(fp))}`;
-          }
+          if (fn && fd != null && fp != null) { patch.ofdUrl = buildReceiptViewUrl(fn, fd, fp); }
         } catch {}
       }
       if (!sale.ofdFullUrl && sale.ofdFullId) {
@@ -47,9 +45,7 @@ export async function GET(req: Request) {
           const fn = obj?.Data?.Fn || obj?.Fn;
           const fd = obj?.Data?.Fd || obj?.Fd;
           const fp = obj?.Data?.Fp || obj?.Fp;
-          if (fn && fd != null && fp != null) {
-            patch.ofdFullUrl = `https://check-demo.ofd.ru/rec/${encodeURIComponent(fn)}/${encodeURIComponent(String(fd))}/${encodeURIComponent(String(fp))}`;
-          }
+          if (fn && fd != null && fp != null) { patch.ofdFullUrl = buildReceiptViewUrl(fn, fd, fp); }
         } catch {}
       }
       if (Object.keys(patch).length > 0) {

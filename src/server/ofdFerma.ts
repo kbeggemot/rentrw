@@ -42,6 +42,12 @@ function shouldLog(): boolean {
   return process.env.OFD_FERMA_LOG_DEBUG === '1' || process.env.NODE_ENV !== 'production';
 }
 
+export function buildReceiptViewUrl(fn: string | number, fd: string | number, fp: string | number): string {
+  const base = process.env.FERMA_BASE_URL || process.env.OFD_FERMA_BASE_URL || 'https://ferma.ofd.ru/';
+  const viewerBase = /ferma-test/i.test(base) ? 'https://check-demo.ofd.ru' : 'https://check.ofd.ru';
+  return `${viewerBase}/rec/${encodeURIComponent(String(fn))}/${encodeURIComponent(String(fd))}/${encodeURIComponent(String(fp))}`;
+}
+
 // In-memory cache for AuthToken per baseUrl+login
 const tokenCache = new Map<string, { token: string; expiresAtMs: number }>();
 

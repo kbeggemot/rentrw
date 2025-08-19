@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { upsertOfdReceipt } from '@/server/ofdStore';
 import { updateSaleOfdUrlsByOrderId } from '@/server/taskStore';
-import { fermaGetAuthTokenCached, fermaGetReceiptStatus } from '@/server/ofdFerma';
+import { fermaGetAuthTokenCached, fermaGetReceiptStatus, buildReceiptViewUrl } from '@/server/ofdFerma';
 import { writeText } from '@/server/storage';
 
 export const runtime = 'nodejs';
@@ -51,9 +51,7 @@ export async function POST(req: Request) {
         const fn2 = obj?.Data?.Fn || obj?.Fn;
         const fd2 = obj?.Data?.Fd || obj?.Fd;
         const fp2 = obj?.Data?.Fp || obj?.Fp;
-        if (fn2 && fd2 != null && fp2 != null) {
-          receiptUrl = `https://check-demo.ofd.ru/rec/${encodeURIComponent(fn2)}/${encodeURIComponent(String(fd2))}/${encodeURIComponent(String(fp2))}`;
-        }
+        if (fn2 && fd2 != null && fp2 != null) { receiptUrl = buildReceiptViewUrl(fn2, fd2, fp2); }
       } catch {}
     }
     if (receiptId) {
