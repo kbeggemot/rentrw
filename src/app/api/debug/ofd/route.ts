@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { readFile as readFileFs } from 'fs/promises';
 import path from 'path';
-import { readFile as readFromStorage } from '@/server/storage';
+import { readText as readFromStorage } from '@/server/storage';
 
 export const runtime = 'nodejs';
 
