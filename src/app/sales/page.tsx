@@ -1,20 +1,11 @@
-import { cookies, headers } from 'next/headers';
+import { cookies } from 'next/headers';
 import SalesClient from './SalesClient';
+import { listSales } from '@/server/taskStore';
 
 export default async function SalesPage() {
 	const cookieStore = await cookies();
-	const h = await headers();
-	const proto = h.get('x-forwarded-proto') || 'http';
-	const host = h.get('x-forwarded-host') || h.get('host') || 'localhost:3000';
-	const baseUrl = `${proto}://${host}`;
-	const cookieHeader = cookieStore
-		.getAll()
-		.map((c) => `${c.name}=${encodeURIComponent(c.value)}`)
-		.join('; ');
-	// На SSR сразу делаем refresh=1, чтобы таблица была заполнена без клиентского авто‑refresh
-	const res = await fetch(`${baseUrl}/api/sales?refresh=1`, { cache: 'no-store', headers: { cookie: cookieHeader } });
-	const data = await res.json().catch(() => ({}));
-	const initial = Array.isArray(data?.sales) ? data.sales : [];
+	const userId = cookieStore.get('session_user')?.value || '';
+	const initial = userId ? await listSales(userId) : [];
 	return (
 		<>
 			<h1 className="md:hidden sr-only">Продажи</h1>
