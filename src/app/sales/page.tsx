@@ -11,7 +11,8 @@ export default async function SalesPage() {
 		.getAll()
 		.map((c) => `${c.name}=${encodeURIComponent(c.value)}`)
 		.join('; ');
-	const res = await fetch(`${baseUrl}/api/sales`, { cache: 'no-store', headers: { cookie: cookieHeader } });
+	// На SSR сразу делаем refresh=1, чтобы таблица была заполнена без клиентского авто‑refresh
+	const res = await fetch(`${baseUrl}/api/sales?refresh=1`, { cache: 'no-store', headers: { cookie: cookieHeader } });
 	const data = await res.json().catch(() => ({}));
 	const initial = Array.isArray(data?.sales) ? data.sales : [];
 	return (
