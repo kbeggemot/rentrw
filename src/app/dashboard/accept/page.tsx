@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useMemo } from 'react';
 import { useSearchParams } from 'next/navigation';
 import QRCode from 'qrcode';
 import { Input } from '@/components/ui/Input';
@@ -483,6 +483,14 @@ function AcceptPaymentContent() {
     return null;
   }
 
+  // Memoize QR element to avoid re-render flashing when unrelated state updates
+  const qrElement = useMemo(() => {
+    if (!qrDataUrl) return null;
+    return (
+      <img src={qrDataUrl} alt="QR code" className="w-48 h-48 border rounded" />
+    );
+  }, [qrDataUrl]);
+
   return (
     <div className="max-w-2xl mx-auto">
       <h1 className="text-2xl font-bold mb-4">Принять оплату</h1>
@@ -656,7 +664,7 @@ function AcceptPaymentContent() {
           <div className="mt-4">
             <div className="text-sm text-gray-600 dark:text-gray-400 mb-1">QR для оплаты</div>
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={qrDataUrl} alt="QR code" className="w-48 h-48 border rounded" />
+            {qrElement}
           </div>
         ) : null}
         {aoStatus && (aoStatus.toLowerCase() === 'paid' || aoStatus.toLowerCase() === 'transfered' || aoStatus.toLowerCase() === 'transferred') ? (
