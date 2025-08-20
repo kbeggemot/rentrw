@@ -12,9 +12,19 @@ export default async function SettingsPage() {
     const agent = userId ? await getUserAgentSettings(userId) : { agentDescription: null, defaultCommission: null };
     const payout = userId ? await getUserPayoutRequisites(userId) : { bik: null, account: null, orgName: null };
 
+    function maskEmail(email: string): string {
+      const [local, domainFull] = email.split('@');
+      if (!domainFull) return email;
+      const [domain, ...rest] = domainFull.split('.');
+      const tld = rest.join('.');
+      const localMasked = local.length <= 2 ? local[0] + '*' : local[0] + '*'.repeat(Math.max(1, local.length - 2)) + local[local.length - 1];
+      const domainMasked = domain.length <= 2 ? domain[0] + '*' : domain[0] + '*'.repeat(Math.max(1, domain.length - 2)) + domain[domain.length - 1];
+      return tld ? `${localMasked}@${domainMasked}.${tld}` : `${localMasked}@${domainMasked}`;
+    }
+
     let initial: SettingsPrefetch = {
       tokenMasked: maskedToken,
-      emailMasked: user?.email ?? null,
+      emailMasked: user?.email ? maskEmail(user.email) : null,
       emailVerified: Boolean(user?.emailVerified),
       accountPhone: user?.phone ?? null,
       agentDescription: agent.agentDescription ?? '',

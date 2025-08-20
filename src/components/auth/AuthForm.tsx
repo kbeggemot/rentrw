@@ -40,7 +40,7 @@ export function AuthForm() {
     try { sessionStorage.removeItem('reg.pending'); } catch {}
   }, []);
 
-  // Определяем, показывать ли кнопку входа по биометрии на этом устройстве (вернул прежнюю логику)
+  // Определяем, показывать ли кнопку входа по биометрии (показываем сразу, если есть токен и ключ)
   useEffect(() => {
     let ignore = false;
     (async () => {
@@ -49,6 +49,13 @@ export function AuthForm() {
         const supported = await browserSupportsWebAuthn();
         let platform = false;
         try { platform = await platformAuthenticatorIsAvailable(); } catch { platform = false; }
+        // Требуем наличие токена API, чтобы не показывать лишнюю кнопку
+        let hasToken = false;
+        try {
+          const r = await fetch('/api/settings/token', { cache: 'no-store', credentials: 'include' });
+          const d = await r.json();
+          hasToken = typeof d?.token === 'string';
+        } catch {}
         const keyId = typeof window !== 'undefined' ? window.localStorage?.getItem('passkeyId') : null;
         let existsRemote = false;
         try {
@@ -75,8 +82,8 @@ export function AuthForm() {
             if (s?.optOut) { if (!ignore) setCanBioLogin(false); return; }
           } catch {}
         } catch {}
-        // Показываем кнопку только если реально есть известный ключ на устройстве
-        if (!ignore) setCanBioLogin(Boolean(supported && platform && keyId && existsRemote));
+        // Показываем кнопку сразу, если есть токен, поддержка, и реальный ключ
+        if (!ignore) setCanBioLogin(Boolean(hasToken && supported && platform && keyId && existsRemote));
       } catch {
         if (!ignore) setCanBioLogin(false);
       }

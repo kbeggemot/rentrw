@@ -93,14 +93,13 @@ export default function SettingsClient({ initial, userId }: { initial: SettingsP
     })();
   }, [initial.keys.length]);
 
-  // Hard-refresh critical settings on mount to avoid any stale SSR
-  // Не делаем авто‑refresh на монтировании — данные уже есть с SSR
+  // Hard-refresh critical settings only if SSR came empty; avoid email flip-flop
   useEffect(() => {
     const need = (
       currentMasked == null ||
       emailMasked == null ||
       accountPhone == null ||
-      (agentDesc ?? '').length === 0 && initial.defaultCommission == null ||
+      ((agentDesc ?? '').length === 0 && initial.defaultCommission == null) ||
       bik.length === 0 ||
       account.length === 0 ||
       orgName.length === 0
@@ -117,8 +116,8 @@ export default function SettingsClient({ initial, userId }: { initial: SettingsP
         ]);
         // token
         try { const d = await tRes.json(); if (typeof d?.token === 'string' || d?.token === null) setCurrentMasked(d.token ?? null); } catch {}
-        // email
-        try { const d = await eRes.json(); setEmailMasked(d?.email ?? null); setEmailVerified(!!d?.verified); } catch {}
+        // email — use masked value from API, do not reveal full address client-side
+        try { const d = await eRes.json(); if (typeof d?.email === 'string' || d?.email === null) setEmailMasked(d?.email ?? null); setEmailVerified(!!d?.verified); } catch {}
         // account
         try { const d = await aRes.json(); setAccountPhone(d?.phone ?? null); } catch {}
         // agent
