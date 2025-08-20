@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { listSales, updateSaleFromStatus, updateSaleOfdUrlsByOrderId } from '@/server/taskStore';
+import { listSales, updateSaleFromStatus, updateSaleOfdUrlsByOrderId, setSaleCreatedAtRw } from '@/server/taskStore';
 import type { RocketworkTask } from '@/types/rocketwork';
 import { getDecryptedApiToken } from '@/server/secureStore';
 import { fermaGetAuthTokenCached, fermaGetReceiptStatus, buildReceiptViewUrl } from '@/server/ofdFerma';
@@ -34,7 +34,9 @@ export async function GET(req: Request) {
           // b) refresh transferred/transfered only if receipts are missing
           const missingReceipts = (!s.ofdUrl && !s.ofdFullUrl) || (s.isAgent && (!s.additionalCommissionOfdUrl || !s.npdReceiptUri));
           const needB = (st === 'transferred' || st === 'transfered') && missingReceipts;
-          return needA || needB;
+          // c) also refresh any sale that lacks createdAtRw to retrieve RW creation time
+          const needC = !s.createdAtRw;
+          return needA || needB || needC;
         });
         for (const s of toRefresh) {
           try {
@@ -64,6 +66,10 @@ export async function GET(req: Request) {
               ?? null;
             const npdReceipt = (normalized?.receipt_uri as string | undefined) ?? null;
             await updateSaleFromStatus(userId, s.taskId, { status: normalized?.acquiring_order?.status, ofdUrl, additionalCommissionOfdUrl: addOfd, npdReceiptUri: npdReceipt });
+            try {
+              const createdAtRw: string | undefined = (normalized as any)?.created_at || undefined;
+              if (createdAtRw) await setSaleCreatedAtRw(userId, s.taskId, createdAtRw);
+            } catch {}
 
             try {
               const aoStatus = String(normalized?.acquiring_order?.status || '').toLowerCase();

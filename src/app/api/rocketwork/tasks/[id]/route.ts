@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { getDecryptedApiToken } from '@/server/secureStore';
 import { promises as fs } from 'fs';
 import path from 'path';
-import { updateSaleFromStatus, findSaleByTaskId, updateSaleOfdUrlsByOrderId } from '@/server/taskStore';
+import { updateSaleFromStatus, findSaleByTaskId, updateSaleOfdUrlsByOrderId, setSaleCreatedAtRw } from '@/server/taskStore';
 import type { RocketworkTask } from '@/types/rocketwork';
 import { fermaGetAuthTokenCached, fermaCreateReceipt } from '@/server/ofdFerma';
 import { buildFermaReceiptPayload, PAYMENT_METHOD_PREPAY_FULL, PAYMENT_METHOD_FULL_PAYMENT } from '@/app/api/ofd/ferma/build-payload';
@@ -119,6 +119,10 @@ export async function GET(_: Request) {
         ?? null;
       const npdReceipt = (normalized?.receipt_uri as string | undefined) ?? null;
       await updateSaleFromStatus(userId, taskId, { status: normalized?.acquiring_order?.status, ofdUrl, additionalCommissionOfdUrl: addOfd, npdReceiptUri: npdReceipt });
+      try {
+        const createdAtRw: string | undefined = (normalized as any)?.created_at || undefined;
+        if (createdAtRw) await setSaleCreatedAtRw(userId, taskId, createdAtRw);
+      } catch {}
       // If no RW ofd_url (because we turned it off) and we already have prepayment/full URLs from OFD callback store,
       // the client will still display '-' here; that's expected until callback arrives.
     } catch {}

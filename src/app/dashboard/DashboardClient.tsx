@@ -276,7 +276,7 @@ export default function DashboardClient({ hasTokenInitial }: { hasTokenInitial: 
                   type="number"
                   min="0"
                   step="0.01"
-                  className="w-full rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-foreground"
+                  className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 h-9 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-foreground"
                   placeholder="0.00"
                   value={withdrawAmount}
                   onChange={(e) => setWithdrawAmount(e.target.value)}

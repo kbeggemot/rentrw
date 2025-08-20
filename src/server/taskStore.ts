@@ -29,6 +29,7 @@ export type SaleRecord = {
   npdReceiptUri?: string | null; // receipt_uri from root task (НПД)
   serviceEndDate?: string | null; // YYYY-MM-DD
   vatRate?: string | null; // e.g. none|0|10|20
+  createdAtRw?: string | null; // created_at from RW task (ISO)
   createdAt: string;
   updatedAt: string;
 };
@@ -95,6 +96,7 @@ export async function recordSaleOnCreate(params: {
     npdReceiptUri: null,
     serviceEndDate: serviceEndDate ?? null,
     vatRate: vatRate ?? null,
+    createdAtRw: null,
     createdAt: now,
     updatedAt: now,
   });
@@ -149,6 +151,20 @@ export async function updateSaleOfdUrlsByOrderId(userId: string, orderId: number
     if (typeof patch.ofdFullUrl !== 'undefined') next.ofdFullUrl = patch.ofdFullUrl ?? null;
     if (typeof patch.ofdPrepayId !== 'undefined') next.ofdPrepayId = patch.ofdPrepayId ?? null;
     if (typeof patch.ofdFullId !== 'undefined') next.ofdFullId = patch.ofdFullId ?? null;
+    next.updatedAt = new Date().toISOString();
+    store.sales[idx] = next;
+    await writeTasks(store);
+  }
+}
+
+export async function setSaleCreatedAtRw(userId: string, taskId: number | string, createdAtRw: string | null): Promise<void> {
+  const store = await readTasks();
+  if (!store.sales) store.sales = [];
+  const idx = store.sales.findIndex((s) => s.userId === userId && s.taskId == taskId);
+  if (idx !== -1) {
+    const current = store.sales[idx];
+    const next = { ...current } as SaleRecord;
+    if (!next.createdAtRw && createdAtRw) next.createdAtRw = createdAtRw;
     next.updatedAt = new Date().toISOString();
     store.sales[idx] = next;
     await writeTasks(store);
@@ -227,6 +243,7 @@ export async function ensureSaleFromTask(params: {
     npdReceiptUri: null,
     serviceEndDate: null,
     vatRate: null,
+    createdAtRw: (task?.created_at as string | undefined) ?? null,
     createdAt: task?.created_at || now,
     updatedAt: now,
   });

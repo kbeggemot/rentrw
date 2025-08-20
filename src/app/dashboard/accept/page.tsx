@@ -83,6 +83,30 @@ function AcceptPaymentContent() {
   const [purchaseReceiptUrl, setPurchaseReceiptUrl] = useState<string | null>(null);
   const [commissionReceiptUrl, setCommissionReceiptUrl] = useState<string | null>(null);
   const [taskIsAgent, setTaskIsAgent] = useState<boolean | null>(null);
+  const [toast, setToast] = useState<{ msg: string; kind: 'success' | 'error' | 'info' } | null>(null);
+  const showToast = (msg: string, kind: 'success' | 'error' | 'info' = 'info') => {
+    setToast({ msg, kind });
+    setTimeout(() => setToast(null), 2500);
+  };
+
+  const validateMinNet = () => {
+    const MIN_AMOUNT = 10;
+    const numAmount = Number(amount.replace(',', '.'));
+    if (!Number.isFinite(numAmount)) return;
+    if (isAgentSale) {
+      const numComm = Number(commission.replace(',', '.'));
+      if (!Number.isFinite(numComm)) return; // нет комиссии — пока не валидируем
+      const retained = commissionType === 'percent' ? (numAmount * (numComm / 100)) : numComm;
+      const net = numAmount - retained;
+      if (net < MIN_AMOUNT) {
+        showToast('Сумма оплаты за вычетом комиссии должна быть не менее 10 рублей', 'error');
+      }
+    } else {
+      if (numAmount < MIN_AMOUNT) {
+        showToast('Сумма должна быть не менее 10 рублей', 'error');
+      }
+    }
+  };
 
   useEffect(() => {
     const ref = pollAbortRef.current;
@@ -326,6 +350,8 @@ function AcceptPaymentContent() {
       setMessageKind('error');
       return;
     }
+    // Business rule: минимальная сумма оплаты – не менее 10 ₽ (для агентских – после вычета комиссии)
+    const MIN_AMOUNT = 10;
     if (isAgentSale) {
       if (!agentDesc || agentDesc.trim().length === 0) {
         setMessage('Заполните описание ваших услуг, как Агента, в настройках');
@@ -352,6 +378,18 @@ function AcceptPaymentContent() {
       if (agentPhone.trim().length === 0) {
         setMessage('Укажите телефон партнёра');
         setMessageKind('error');
+        return;
+      }
+      // Validate net amount after commission
+      const retained = commissionType === 'percent' ? (numAmount * (numComm / 100)) : numComm;
+      const net = numAmount - retained;
+      if (!(net >= MIN_AMOUNT)) {
+        showToast('Сумма оплаты за вычетом комиссии должна быть не менее 10 рублей', 'error');
+        return;
+      }
+    } else {
+      if (!(numAmount >= MIN_AMOUNT)) {
+        showToast('Сумма должна быть не менее 10 рублей', 'error');
         return;
       }
     }
@@ -463,6 +501,7 @@ function AcceptPaymentContent() {
           placeholder="0.00"
           value={amount}
           onChange={(e) => setAmount(e.target.value)}
+          onBlur={validateMinNet}
           required
         />
         <Textarea
@@ -564,6 +603,7 @@ function AcceptPaymentContent() {
                 placeholder={commissionType === 'percent' ? '0' : '0.00'}
                 value={commission}
                 onChange={(e) => setCommission(e.target.value)}
+                onBlur={validateMinNet}
                 required
                 hint={commissionType === 'percent' ? 'Укажите дробное значение при необходимости, например 2.5' : 'Укажите фиксированную сумму в рублях'}
               />
@@ -673,6 +713,9 @@ function AcceptPaymentContent() {
           <div className={`mt-2 text-sm ${messageKind === 'error' ? 'text-red-600' : messageKind === 'success' ? 'text-green-600' : 'text-gray-700 dark:text-gray-300'}`}>{message}</div>
         ) : null}
       </form>
+      {toast ? (
+        <div className={`fixed bottom-4 right-4 z-50 px-4 py-3 rounded-md shadow-lg text-sm ${toast.kind === 'success' ? 'bg-green-600 text-white' : toast.kind === 'error' ? 'bg-red-600 text-white' : 'bg-gray-900 text-white'}`}>{toast.msg}</div>
+      ) : null}
     </div>
   );
 }

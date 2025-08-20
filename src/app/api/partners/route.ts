@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getDecryptedApiToken } from '@/server/secureStore';
-import { listPartners, upsertPartner } from '@/server/partnerStore';
+import { listPartners, upsertPartner, softDeletePartner } from '@/server/partnerStore';
 
 export const runtime = 'nodejs';
 
@@ -99,6 +99,22 @@ export async function POST(req: Request) {
     });
 
     return NextResponse.json({ ok: true, partner: { phone, fio, status } }, { status: 201 });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Server error';
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
+}
+
+export async function DELETE(req: Request) {
+  try {
+    const url = new URL(req.url);
+    const phone = url.searchParams.get('phone');
+    if (!phone) return NextResponse.json({ error: 'NO_PHONE' }, { status: 400 });
+    const cookie = req.headers.get('cookie') || '';
+    const mc = /(?:^|;\s*)session_user=([^;]+)/.exec(cookie);
+    const userId = (mc ? decodeURIComponent(mc[1]) : undefined) || req.headers.get('x-user-id') || 'default';
+    await softDeletePartner(userId, phone);
+    return NextResponse.json({ ok: true });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Server error';
     return NextResponse.json({ error: message }, { status: 500 });
