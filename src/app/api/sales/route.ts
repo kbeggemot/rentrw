@@ -161,9 +161,11 @@ export async function GET(req: Request) {
                   const url = direct && direct.length > 0 ? direct : (fn && fd != null && fp != null ? buildReceiptViewUrl(fn, fd, fp) : undefined);
                   if (url) {
                     const mskToday = new Date().toLocaleDateString('ru-RU', { timeZone: 'Europe/Moscow' }).split('.').reverse().join('-');
-                    const isToday = s.serviceEndDate === mskToday;
+                    const endStr = (s.serviceEndDate || '') as string;
+                    // если дата окончания услуги уже наступила (<= сегодня по МСК) — считаем это полным расчётом
+                    const isFull = endStr && endStr <= mskToday;
                     const patch2: any = {};
-                    if (isToday) { patch2.ofdFullUrl = url; if (rid) patch2.ofdFullId = rid; }
+                    if (isFull) { patch2.ofdFullUrl = url; if (rid) patch2.ofdFullId = rid; }
                     else { patch2.ofdUrl = url; if (rid) patch2.ofdPrepayId = rid; }
                     await updateSaleOfdUrlsByOrderId(userId, s.orderId, patch2);
                   }
