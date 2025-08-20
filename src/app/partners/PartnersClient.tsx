@@ -1,7 +1,7 @@
 "use client";
 
 import Link from 'next/link';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 
@@ -23,7 +23,7 @@ export default function PartnersClient({ initial }: { initial: Partner[] }) {
   const reload = async () => {
     setLoading(true);
     try {
-      const res = await fetch('/api/partners', { cache: 'no-store' });
+      const res = await fetch('/api/partners', { cache: 'no-store', credentials: 'include' });
       const data = await res.json();
       setPartners(Array.isArray(data?.partners) ? data.partners : []);
     } catch {
@@ -39,7 +39,7 @@ export default function PartnersClient({ initial }: { initial: Partner[] }) {
     if (ph.length === 0) return;
     setLoading(true);
     try {
-      const res = await fetch('/api/partners', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ phone: ph }) });
+      const res = await fetch('/api/partners', { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ phone: ph }) });
       const text = await res.text();
       let data: any = null; try { data = text ? JSON.parse(text) : null; } catch { data = text; }
       if (!res.ok) throw new Error((data && data.error) || text || 'Ошибка');
@@ -52,6 +52,12 @@ export default function PartnersClient({ initial }: { initial: Partner[] }) {
       setLoading(false);
     }
   };
+
+  // iOS Safari: авто‑подтяжка партнёров при входе на страницу
+  useEffect(() => {
+    reload().catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <div className="max-w-4xl mx-auto">
