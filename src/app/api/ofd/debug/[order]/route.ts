@@ -11,11 +11,12 @@ function getUserId(req: NextRequest): string | null {
   return hdr && hdr.trim().length > 0 ? hdr.trim() : null;
 }
 
-export async function GET(req: NextRequest, { params }: { params: { order: string } }) {
+// Note: avoid strict typing on the second arg because Next.js route analyzer may reject custom types
+export async function GET(req: NextRequest, ctx: any) {
   try {
     const userId = getUserId(req);
     if (!userId) return NextResponse.json({ error: 'NO_USER' }, { status: 401 });
-    const orderId = Number(params.order);
+    const orderId = Number(ctx?.params?.order);
     if (!Number.isFinite(orderId)) return NextResponse.json({ error: 'BAD_ORDER' }, { status: 400 });
 
     const sales = await listSales(userId);
