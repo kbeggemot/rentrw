@@ -49,13 +49,13 @@ export function AuthForm() {
         const supported = await browserSupportsWebAuthn();
         let platform = false;
         try { platform = await platformAuthenticatorIsAvailable(); } catch { platform = false; }
-        // Требуем наличие токена API, чтобы не показывать лишнюю кнопку
+        // Наличие токена может быть недоступно до логина — ориентируемся на наличие ключа
         let hasToken = false;
         try {
           const r = await fetch('/api/settings/token', { cache: 'no-store', credentials: 'include' });
           const d = await r.json();
           hasToken = typeof d?.token === 'string';
-        } catch {}
+        } catch { hasToken = true; }
         const keyId = typeof window !== 'undefined' ? window.localStorage?.getItem('passkeyId') : null;
         let existsRemote = false;
         try {
@@ -83,7 +83,7 @@ export function AuthForm() {
           } catch {}
         } catch {}
         // Показываем кнопку сразу, если есть токен, поддержка, и реальный ключ
-        if (!ignore) setCanBioLogin(Boolean(hasToken && supported && platform && keyId && existsRemote));
+        if (!ignore) setCanBioLogin(Boolean(supported && platform && keyId && existsRemote && !getLocalOptOutIntent()));
       } catch {
         if (!ignore) setCanBioLogin(false);
       }
