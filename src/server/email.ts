@@ -22,9 +22,8 @@ export async function sendEmail(params: SendEmailParams): Promise<void> {
   const from = process.env.SMTP_FROM || 'no-reply@rentrw.local';
   const fromName = process.env.SMTP_FROM_NAME || 'RentRW';
 
-  if (!host) {
-    // Fallback: write to local outbox
-    const fname = `.data/outbox/email-${Date.now()}.txt`;
+  async function sendViaOutbox(suffix = '') {
+    const fname = `.data/outbox/email-${Date.now()}${suffix ? `-${suffix}` : ''}.txt`;
     const content = [
       `From: ${from}`,
       `To: ${params.to}`,
@@ -33,6 +32,51 @@ export async function sendEmail(params: SendEmailParams): Promise<void> {
       params.text || params.html || '',
     ].join('\n');
     await writeText(fname, content);
+  }
+
+  async function sendViaSendgrid(): Promise<void> {
+    const apiKey = process.env.SENDGRID_API_KEY;
+    if (!apiKey) throw new Error('SENDGRID_API_KEY not set');
+    const payload: any = {
+      personalizations: [
+        { to: [{ email: params.to }], subject: params.subject },
+      ],
+      from: { email: from, name: fromName },
+      content: [
+        params.html
+          ? { type: 'text/html', value: params.html }
+          : { type: 'text/plain', value: params.text || '' },
+      ],
+    };
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), Number(process.env.SENDGRID_TIMEOUT || 15000));
+    try {
+      const res = await fetch('https://api.sendgrid.com/v3/mail/send', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+        signal: controller.signal,
+      });
+      if (!res.ok) {
+        const txt = await res.text().catch(() => '');
+        try { await writeText('.data/last_sendgrid_error.json', JSON.stringify({ ts: new Date().toISOString(), status: res.status, text: txt }, null, 2)); } catch {}
+        throw new Error(`SendGrid error ${res.status}`);
+      }
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  // If SMTP host is not configured but SendGrid is — use SendGrid; else write to outbox (dev)
+  if (!host) {
+    if (process.env.SENDGRID_API_KEY) {
+      await sendViaSendgrid();
+      return;
+    }
+    await sendViaOutbox();
     return;
   }
 
@@ -87,19 +131,15 @@ export async function sendEmail(params: SendEmailParams): Promise<void> {
       envelope: { from, to: params.to },
     });
   } catch (e) {
-    // Persist last error and also fallback to outbox to avoid losing the code in dev
-    try {
-      await writeText('.data/last_smtp_send_error.json', JSON.stringify({ ts: new Date().toISOString(), to: params.to, subject: params.subject, error: String(e) }, null, 2));
-      const fname = `.data/outbox/email-${Date.now()}-FAILED.txt`;
-      const content = [
-        `From: ${from}`,
-        `To: ${params.to}`,
-        `Subject: ${params.subject}`,
-        '',
-        params.text || params.html || '',
-      ].join('\n');
-      await writeText(fname, content);
-    } catch {}
+    // Persist error
+    try { await writeText('.data/last_smtp_send_error.json', JSON.stringify({ ts: new Date().toISOString(), to: params.to, subject: params.subject, error: String(e) }, null, 2)); } catch {}
+    // Try SendGrid fallback if configured
+    if (process.env.SENDGRID_API_KEY) {
+      await sendViaSendgrid();
+      return;
+    }
+    // Fallback to outbox to not lose codes in dev
+    await sendViaOutbox('FAILED');
     throw e;
   }
 }

@@ -118,18 +118,20 @@ export function AuthForm() {
       }
     }
     try {
-      const endpoint = isRegister ? (awaitCode ? '/api/auth/register/confirm' : '/api/auth/register') : '/api/auth/login';
+      const emailFlag = (typeof window !== 'undefined' && (window as any).__CFG__?.EMAIL_VER_REQ) ? '1' : (process.env.NEXT_PUBLIC_EMAIL_VERIFICATION_REQUIRED || '0');
+      const endpoint = isRegister ? (emailFlag === '1' ? (awaitCode ? '/api/auth/register/confirm' : '/api/auth/register') : '/api/auth/register') : '/api/auth/login';
       const res = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(isRegister ? (awaitCode ? { phone, code: confirm.trim() } : { phone, password, email: email.trim() }) : { phone, password }),
+        body: JSON.stringify(isRegister ? (endpoint.endsWith('/confirm') ? { phone, code: confirm.trim() } : { phone, password, email: email.trim() }) : { phone, password }),
       });
       const text = await res.text();
       let data: { error?: string } | null = null;
       try { data = text ? (JSON.parse(text) as { error?: string }) : null; } catch {}
       if (!res.ok) throw new Error(data?.error || 'AUTH_ERROR');
-      if (isRegister && !awaitCode) {
-        // move to code step
+      const requireEmail = emailFlag === '1';
+      if (isRegister && requireEmail && !awaitCode) {
+        // Перешли на шаг подтверждения
         setAwaitCode(true);
         setIsRegister(true);
         try { sessionStorage.setItem('reg.pending', JSON.stringify({ phone, email: email.trim(), awaitCode: true })); } catch {}

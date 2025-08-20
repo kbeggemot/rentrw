@@ -12,19 +12,29 @@ export async function POST(req: Request) {
     const password: string | undefined = body?.password;
     const email: string | undefined = body?.email;
     if (!phone || !password || !email) return NextResponse.json({ error: 'INVALID' }, { status: 400 });
-    // Step 1: ensure email unique across users
+    // Флаг: требовать подтверждение email (по умолчанию выключено)
+    const requireEmail = String(process.env.EMAIL_VERIFICATION_REQUIRED || '').trim() === '1';
+    if (!requireEmail) {
+      // упрощённая регистрация: без подтверждения email, сразу создаём пользователя
+      if (await isEmailInUse(email)) {
+        return NextResponse.json({ error: 'EMAIL_TAKEN' }, { status: 400 });
+      }
+      const user = await createUser(phone, password, email);
+      const res = NextResponse.json({ ok: true, user: { id: user.id, phone: user.phone, email: user.email } });
+      res.headers.set('Set-Cookie', `session_user=${user.id}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${60 * 60 * 24 * 7}`);
+      return res;
+    }
+
+    // Требуем подтверждение email: отправляем код, сохраняем pending
     if (await isEmailInUse(email)) {
       return NextResponse.json({ error: 'EMAIL_TAKEN' }, { status: 400 });
     }
-    // Step 2: send code and store pending
     const code = String(Math.floor(100000 + Math.random() * 900000));
     await upsertPending({ phone, email, password, code, expiresAt: Date.now() + 15 * 60 * 1000 });
-    const origin = process.env.NEXT_PUBLIC_BASE_URL || new URL(req.url).origin;
     try {
       await sendEmail({ to: email, subject: 'Подтверждение регистрации RentRW', text: `Код подтверждения: ${code}`, html: `<p>Код подтверждения: <b>${code}</b></p><p>Если вы не запрашивали регистрацию, проигнорируйте это письмо.</p>` });
       return NextResponse.json({ ok: true, step: 'confirm', phone, email });
-    } catch (e) {
-      // Вернём диагностическую подсказку для админа (без раскрытия чувствительных данных)
+    } catch {
       return NextResponse.json({ error: 'EMAIL_SEND_FAILED' }, { status: 502 });
     }
   } catch (error) {

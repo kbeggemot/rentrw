@@ -25,9 +25,12 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-      >
+      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`} suppressHydrationWarning>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `window.__CFG__=${JSON.stringify({ EMAIL_VER_REQ: process.env.EMAIL_VERIFICATION_REQUIRED === '1' })}`,
+          }}
+        />
         {children}
       </body>
     </html>
