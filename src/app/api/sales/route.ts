@@ -146,8 +146,8 @@ export async function GET(req: Request) {
                   await updateSaleOfdUrlsByOrderId(userId, s.orderId, patch);
                 }
               }
-              // Fallback for historical sales: try by InvoiceId
-              if (!s.ofdUrl && !s.ofdFullUrl) {
+              // Fallback: try by InvoiceId when a receipt link is missing
+              if (!s.ofdFullUrl || !s.ofdUrl) {
                 try {
                   const { getInvoiceIdString } = await import('@/server/orderStore');
                   const invoiceIdFull = await getInvoiceIdString(s.orderId);
