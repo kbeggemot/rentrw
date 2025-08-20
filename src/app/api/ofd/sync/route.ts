@@ -15,7 +15,10 @@ export async function GET(req: Request) {
   try {
     const userId = getUserId(req);
     if (!userId) return NextResponse.json({ error: 'NO_USER' }, { status: 401 });
-    const sales = await listSales(userId);
+    const url = new URL(req.url);
+    const onlyOrder = url.searchParams.get('order');
+    const salesAll = await listSales(userId);
+    const sales = onlyOrder ? salesAll.filter((s) => String(s.orderId) === String(onlyOrder)) : salesAll;
     const baseUrl = process.env.FERMA_BASE_URL || 'https://ferma.ofd.ru/';
     const tokenOfd = await fermaGetAuthTokenCached(process.env.FERMA_LOGIN || '', process.env.FERMA_PASSWORD || '', { baseUrl });
     let updated = 0;
@@ -39,7 +42,7 @@ export async function GET(req: Request) {
         }
       } catch {}
     }
-    return NextResponse.json({ ok: true, updated });
+    return NextResponse.json({ ok: true, updated, processed: sales.map((x) => x.orderId) });
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'ERROR';
     return NextResponse.json({ error: msg }, { status: 500 });
