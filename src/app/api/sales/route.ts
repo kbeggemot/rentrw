@@ -3,6 +3,7 @@ import { listSales, updateSaleFromStatus, updateSaleOfdUrlsByOrderId, setSaleCre
 import type { RocketworkTask } from '@/types/rocketwork';
 import { getDecryptedApiToken } from '@/server/secureStore';
 import { fermaGetAuthTokenCached, fermaGetReceiptStatus, buildReceiptViewUrl } from '@/server/ofdFerma';
+import { startOfdScheduleWorker } from '@/server/ofdScheduleWorker';
 
 export const runtime = 'nodejs';
 
@@ -16,6 +17,8 @@ function getUserId(req: Request): string | null {
 
 export async function GET(req: Request) {
   try {
+    // Ensure background OFD worker is running when sales endpoint is hit
+    try { startOfdScheduleWorker(); } catch {}
     const userId = getUserId(req);
     if (!userId) return NextResponse.json({ error: 'NO_USER' }, { status: 401 });
     const urlObj = new URL(req.url);

@@ -48,6 +48,8 @@ let timer: NodeJS.Timer | null = null;
 export function startOfdScheduleWorker(): void {
   if (started) return;
   started = true;
+  // In serverless-like envs, a long interval may be killed. Kick an immediate run once.
+  runDueOffsetJobs().catch(() => void 0);
   timer = setInterval(() => {
     runDueOffsetJobs().catch(() => void 0);
   }, 60 * 1000);
