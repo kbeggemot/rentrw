@@ -349,25 +349,27 @@ export default function SalesClient({ initial }: { initial: Sale[] }) {
         ) : (
           paged.map((s) => (
             <div key={String(s.taskId)} className="border border-gray-200 dark:border-gray-800 rounded-lg bg-white dark:bg-gray-950 p-3">
-              <div className="grid grid-cols-[9rem_1fr] gap-y-2 text-sm">
+              <div className="grid grid-cols-[7.5rem_1fr_7.5rem_1fr] gap-y-2 text-sm">
                 <div className="text-gray-500">№</div>
                 <div className="font-medium">{s.taskId}</div>
-                <div className="text-gray-500 whitespace-nowrap">Сумма, {'\u00A0'}₽</div>
-                <div>{new Intl.NumberFormat('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(s.amountGrossRub)}</div>
-                <div className="text-gray-500">Тип</div>
-                <div>{s.isAgent ? 'Агентская' : 'Прямая'}</div>
-                <div className="text-gray-500 whitespace-nowrap">Комиссия, {'\u00A0'}₽</div>
-                <div>{s.isAgent ? new Intl.NumberFormat('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(s.retainedCommissionRub) : '-'}</div>
                 <div className="text-gray-500">Статус</div>
                 <div>{s.status ?? '-'}</div>
-                <div className="text-gray-500">Дата продажи</div>
+                <div className="text-gray-500 whitespace-nowrap">Сумма, {'\u00A0'}₽</div>
+                <div>{new Intl.NumberFormat('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(s.amountGrossRub)}</div>
+                <div className="text-gray-500 whitespace-nowrap">Комиссия, {'\u00A0'}₽</div>
+                <div>{s.isAgent ? new Intl.NumberFormat('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(s.retainedCommissionRub) : '-'}</div>
+                <div className="text-gray-500">Дата</div>
                 <div>{fmtDate(s.createdAtRw)}</div>
-                <div className="text-gray-500">Окончание услуги</div>
+                <div className="text-gray-500">Окончание</div>
                 <div>{s.serviceEndDate ? fmtDate(s.serviceEndDate) : '-'}</div>
+                <div className="text-gray-500">Тип</div>
+                <div className="col-span-3">{s.isAgent ? 'Агентская' : 'Прямая'}</div>
               </div>
-              <div className="mt-3 flex items-center gap-2">
-                <Button variant="secondary" onClick={() => setChecksOpenId((id) => (id === s.taskId ? null : s.taskId))}>Чеки</Button>
-                <div className="ml-auto">
+              <div className="mt-3 grid grid-cols-2 items-center">
+                <div>
+                  <Button variant="secondary" onClick={() => setChecksOpenId((id) => (id === s.taskId ? null : s.taskId))}>Чеки</Button>
+                </div>
+                <div className="justify-self-end">
                   <Button aria-label="Изменить" variant="secondary" size="icon" onClick={() => alert('Будет доступно позже')}>
                     <IconEdit />
                   </Button>
