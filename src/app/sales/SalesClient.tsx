@@ -112,9 +112,11 @@ export default function SalesClient({ initial }: { initial: Sale[] }) {
     }
   };
 
-  // Force refresh once on mount to avoid stale SSR list
+  // Авто‑обновление при заходе на страницу:
+  // не очищаем таблицу, просто подменяем данные, когда придут новые
   useEffect(() => {
-    load(false).catch(() => {});
+    load(true).catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // удалено: глобальное "обновить всё" по просьбе
