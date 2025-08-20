@@ -1,12 +1,8 @@
-import { cookies, headers } from 'next/headers';
+import { cookies } from 'next/headers';
 import SettingsClient, { type SettingsPrefetch } from './SettingsClient';
 
 export default async function SettingsPage() {
   const cookieStore = await cookies();
-  const h = await headers();
-  const proto = h.get('x-forwarded-proto') || 'http';
-  const host = h.get('x-forwarded-host') || h.get('host') || 'localhost:3000';
-  const baseUrl = `${proto}://${host}`;
   const userId = cookieStore.get('session_user')?.value || '';
   const cookieHeader = cookieStore
     .getAll()
@@ -14,12 +10,12 @@ export default async function SettingsPage() {
     .join('; ');
 
   const [tRes, eRes, aRes, sRes, kRes, pRes] = await Promise.all([
-    fetch(`${baseUrl}/api/settings/token`, { cache: 'no-store', headers: { cookie: cookieHeader } }),
-    fetch(`${baseUrl}/api/settings/email`, { cache: 'no-store', headers: { cookie: cookieHeader } }),
-    fetch(`${baseUrl}/api/settings/account`, { cache: 'no-store', headers: { cookie: cookieHeader } }),
-    fetch(`${baseUrl}/api/settings/agent`, { cache: 'no-store', headers: { cookie: cookieHeader } }),
-    fetch(`${baseUrl}/api/auth/webauthn/list`, { cache: 'no-store', headers: { cookie: cookieHeader } }),
-    fetch(`${baseUrl}/api/settings/payout`, { cache: 'no-store', headers: { cookie: cookieHeader } }),
+    fetch(`/api/settings/token`, { cache: 'no-store', headers: { cookie: cookieHeader } }),
+    fetch(`/api/settings/email`, { cache: 'no-store', headers: { cookie: cookieHeader } }),
+    fetch(`/api/settings/account`, { cache: 'no-store', headers: { cookie: cookieHeader } }),
+    fetch(`/api/settings/agent`, { cache: 'no-store', headers: { cookie: cookieHeader } }),
+    fetch(`/api/auth/webauthn/list`, { cache: 'no-store', headers: { cookie: cookieHeader } }),
+    fetch(`/api/settings/payout`, { cache: 'no-store', headers: { cookie: cookieHeader } }),
   ]);
 
   const [t, e, a, s, k, p] = await Promise.all([
