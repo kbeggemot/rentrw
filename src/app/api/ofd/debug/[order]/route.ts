@@ -1,9 +1,9 @@
-import { NextResponse } from 'next/server';
+import { NextResponse, NextRequest } from 'next/server';
 import { fermaGetAuthTokenCached, fermaGetReceiptStatus, buildReceiptViewUrl } from '@/server/ofdFerma';
 import { getInvoiceIdString } from '@/server/orderStore';
 import { listSales } from '@/server/taskStore';
 
-function getUserId(req: Request): string | null {
+function getUserId(req: NextRequest): string | null {
   const cookie = req.headers.get('cookie') || '';
   const m = /(?:^|;\s*)session_user=([^;]+)/.exec(cookie);
   if (m) return decodeURIComponent(m[1]);
@@ -11,11 +11,11 @@ function getUserId(req: Request): string | null {
   return hdr && hdr.trim().length > 0 ? hdr.trim() : null;
 }
 
-export async function GET(req: Request, ctx: { params: { order: string } }) {
+export async function GET(req: NextRequest, { params }: { params: { order: string } }) {
   try {
     const userId = getUserId(req);
     if (!userId) return NextResponse.json({ error: 'NO_USER' }, { status: 401 });
-    const orderId = Number(ctx.params.order);
+    const orderId = Number(params.order);
     if (!Number.isFinite(orderId)) return NextResponse.json({ error: 'BAD_ORDER' }, { status: 400 });
 
     const sales = await listSales(userId);
