@@ -126,12 +126,12 @@ export default function PartnersClient({ initial }: { initial: Partner[] }) {
         ) : (
           paged.map((p) => (
             <div key={p.phone} className="border border-gray-200 dark:border-gray-800 rounded-lg bg-white dark:bg-gray-950 p-3">
-              <div className="grid grid-cols-[9rem_1fr] gap-y-2 text-sm">
-                <div className="text-gray-500">Телефон</div>
+              <div className="grid grid-cols-[7.25rem_1fr] gap-x-2 gap-y-1 text-[13px] leading-tight">
+                <div className="text-xs text-gray-500">Телефон</div>
                 <div className="font-medium">{p.phone}</div>
-                <div className="text-gray-500">ФИО</div>
+                <div className="text-xs text-gray-500">ФИО</div>
                 <div>{p.fio ?? '-'}</div>
-                <div className="text-gray-500">Статус</div>
+                <div className="text-xs text-gray-500">Статус</div>
                 <div>{p.status ?? '-'}</div>
               </div>
               <div className="mt-3"><Button asChild variant="secondary"><Link href={`/dashboard/accept?agent=1&phone=${encodeURIComponent(p.phone)}`}>Создать оплату</Link></Button></div>
