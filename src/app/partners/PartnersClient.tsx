@@ -68,8 +68,13 @@ export default function PartnersClient({ initial }: { initial: Partner[] }) {
 
   // iOS Safari: авто‑подтяжка партнёров при входе на страницу
   useEffect(() => {
-    reload().catch(() => {});
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    let raf: number | null = null;
+    if (typeof window !== 'undefined') {
+      raf = window.requestAnimationFrame(() => { reload().catch(() => {}); });
+    } else {
+      void reload();
+    }
+    return () => { if (raf) window.cancelAnimationFrame(raf); };
   }, []);
 
   useEffect(() => { setPage(1); }, [query]);

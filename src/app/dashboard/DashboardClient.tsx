@@ -37,13 +37,20 @@ export default function DashboardClient({ hasTokenInitial }: { hasTokenInitial: 
 
   // Additional client-side confirmation to avoid stale SSR (no-store)
   useEffect(() => {
-    (async () => {
+    let raf: number | null = null;
+    const run = async () => {
       try {
         const r = await fetch('/api/settings/token', { cache: 'no-store', credentials: 'include' });
         const d = await r.json();
         setHasToken((prev) => (prev === !!d?.token ? prev : !!d?.token));
       } catch {}
-    })();
+    };
+    if (typeof window !== 'undefined') {
+      raf = window.requestAnimationFrame(() => { run().catch(() => {}); });
+    } else {
+      void run();
+    }
+    return () => { if (raf) window.cancelAnimationFrame(raf); };
   }, []);
 
   const fetchBalance = async (): Promise<number | null> => {
