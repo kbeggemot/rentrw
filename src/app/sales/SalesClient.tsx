@@ -86,17 +86,17 @@ export default function SalesClient({ initial }: { initial: Sale[] }) {
     setLoading(true);
     try {
       if (refresh) {
-        void fetch('/api/sales?refresh=1', { cache: 'no-store' })
-          .then(() => fetch('/api/sales', { cache: 'no-store' }))
+        void fetch('/api/sales?refresh=1', { cache: 'no-store', credentials: 'include' })
+          .then(() => fetch('/api/sales', { cache: 'no-store', credentials: 'include' }))
           .then((r) => r.json())
           .then((d) => setSales(Array.isArray(d?.sales) ? d.sales : []))
           .catch(() => void 0)
           .finally(() => setLoading(false));
-        const resOld = await fetch('/api/sales', { cache: 'no-store' });
+        const resOld = await fetch('/api/sales', { cache: 'no-store', credentials: 'include' });
         const oldData = await resOld.json();
         setSales(Array.isArray(oldData?.sales) ? oldData.sales : []);
       } else {
-        const res = await fetch('/api/sales', { cache: 'no-store' });
+        const res = await fetch('/api/sales', { cache: 'no-store', credentials: 'include' });
         const data = await res.json();
         setSales(Array.isArray(data?.sales) ? data.sales : []);
       }
