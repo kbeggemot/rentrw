@@ -278,9 +278,14 @@ export default function DashboardClient({ hasTokenInitial }: { hasTokenInitial: 
 
           {/* Permanent links block */}
           <div className="mt-4">
-            <button type="button" className="inline-flex items-center rounded-lg bg-black text-white px-4 h-9 text-sm" onClick={() => setLinkOpen((v) => !v)}>
+            <Button
+              variant="secondary"
+              className="text-base w-full"
+              fullWidth
+              onClick={() => setLinkOpen((v) => !v)}
+            >
               Создать постоянную ссылку на оплату
-            </button>
+            </Button>
             {linkOpen ? (
               <div className="mt-3 border rounded-lg p-3">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
