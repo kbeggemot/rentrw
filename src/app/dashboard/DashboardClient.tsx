@@ -32,6 +32,20 @@ export default function DashboardClient({ hasTokenInitial }: { hasTokenInitial: 
     setTimeout(() => setToast(null), 3000);
   };
 
+  // Permalinks state
+  const [links, setLinks] = useState<Array<{ code: string; title: string; createdAt?: string }>>([]);
+  const [linkOpen, setLinkOpen] = useState(false);
+  const [linkTitle, setLinkTitle] = useState('');
+  const [linkDesc, setLinkDesc] = useState('');
+  const [linkSumMode, setLinkSumMode] = useState<'custom' | 'fixed'>('custom');
+  const [linkAmount, setLinkAmount] = useState('');
+  const [linkVat, setLinkVat] = useState<'none' | '0' | '10' | '20'>('none');
+  const [linkAgent, setLinkAgent] = useState(false);
+  const [linkCommType, setLinkCommType] = useState<'percent' | 'fixed'>('percent');
+  const [linkCommVal, setLinkCommVal] = useState('');
+  const [linkPartner, setLinkPartner] = useState('');
+  const [linkMethod, setLinkMethod] = useState<'any' | 'qr' | 'card'>('any');
+
   // Sync with server-provided flag if it changes across navigations
   useEffect(() => { setHasToken(hasTokenInitial); }, [hasTokenInitial]);
 
@@ -116,6 +130,17 @@ export default function DashboardClient({ hasTokenInitial }: { hasTokenInitial: 
             } catch {}
           }
         } catch {}
+      } catch {}
+    })();
+  }, []);
+
+  // Load permanent links on mount
+  useEffect(() => {
+    (async () => {
+      try {
+        const r = await fetch('/api/links', { cache: 'no-store' });
+        const d = await r.json();
+        if (Array.isArray(d?.items)) setLinks(d.items.map((x: any) => ({ code: x.code, title: x.title, createdAt: x.createdAt })));
       } catch {}
     })();
   }, []);
@@ -249,6 +274,103 @@ export default function DashboardClient({ hasTokenInitial }: { hasTokenInitial: 
                 Принять оплату
               </Button>
             </Link>
+          </div>
+
+          {/* Permanent links block */}
+          <div className="mt-4">
+            <button type="button" className="inline-flex items-center rounded-lg bg-black text-white px-4 h-9 text-sm" onClick={() => setLinkOpen((v) => !v)}>
+              Создать постоянную ссылку на оплату
+            </button>
+            {linkOpen ? (
+              <div className="mt-3 border rounded-lg p-3">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                  <div>
+                    <label className="block text-sm text-gray-700 mb-1">Название платежной ссылки</label>
+                    <input className="w-full rounded-lg border px-2 h-9 text-sm" value={linkTitle} onChange={(e) => setLinkTitle(e.target.value)} />
+                  </div>
+                  <div>
+                    <label className="block text-sm text-gray-700 mb-1">НДС</label>
+                    <select className="w-40 rounded-lg border px-2 h-9 text-sm" value={linkVat} onChange={(e) => setLinkVat(e.target.value as any)}>
+                      <option value="none">Без НДС</option>
+                      <option value="0">0%</option>
+                      <option value="10">10%</option>
+                      <option value="20">20%</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm text-gray-700 mb-1">Сумма</label>
+                    <div className="flex items-center gap-2">
+                      <select className="rounded-lg border px-2 h-9 text-sm" value={linkSumMode} onChange={(e) => setLinkSumMode(e.target.value as any)}>
+                        <option value="custom">Укажет покупатель</option>
+                        <option value="fixed">Фиксированная</option>
+                      </select>
+                      {linkSumMode === 'fixed' ? (
+                        <input className="w-40 rounded-lg border px-2 h-9 text-sm" value={linkAmount} onChange={(e) => setLinkAmount(e.target.value)} placeholder="0.00" />
+                      ) : null}
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-sm text-gray-700 mb-1">Тип оплаты</label>
+                    <select className="w-40 rounded-lg border px-2 h-9 text-sm" value={linkMethod} onChange={(e) => setLinkMethod(e.target.value as any)}>
+                      <option value="any">Любой</option>
+                      <option value="qr">СБП</option>
+                      <option value="card">Карта</option>
+                    </select>
+                  </div>
+                  <div className="md:col-span-2">
+                    <label className="block text-sm text-gray-700 mb-1">Описание услуги</label>
+                    <textarea className="w-full rounded-lg border px-2 py-2 text-sm" rows={2} value={linkDesc} onChange={(e) => setLinkDesc(e.target.value)} />
+                  </div>
+                  <div className="md:col-span-2">
+                    <label className="inline-flex items-center gap-2 text-sm">
+                      <input type="checkbox" checked={linkAgent} onChange={(e) => setLinkAgent(e.target.checked)} />
+                      <span>Агентская продажа</span>
+                    </label>
+                    {linkAgent ? (
+                      <div className="mt-2 flex flex-wrap items-end gap-3">
+                        <select className="rounded-lg border px-2 h-9 text-sm" value={linkCommType} onChange={(e) => setLinkCommType(e.target.value as any)}>
+                          <option value="percent">%</option>
+                          <option value="fixed">₽</option>
+                        </select>
+                        <input className="w-32 rounded-lg border px-2 h-9 text-sm" placeholder="Комиссия" value={linkCommVal} onChange={(e) => setLinkCommVal(e.target.value)} />
+                        <input className="w-56 rounded-lg border px-2 h-9 text-sm" placeholder="Телефон партнёра" value={linkPartner} onChange={(e) => setLinkPartner(e.target.value)} />
+                      </div>
+                    ) : null}
+                  </div>
+                </div>
+                <div className="mt-3">
+                  <Button
+                    onClick={async () => {
+                      try {
+                        const payload: any = { title: linkTitle.trim(), description: linkDesc.trim(), sumMode: linkSumMode, amountRub: linkSumMode === 'fixed' ? Number(linkAmount.replace(',', '.')) : undefined, vatRate: linkVat, isAgent: linkAgent, commissionType: linkAgent ? linkCommType : undefined, commissionValue: linkAgent ? Number(linkCommVal.replace(',', '.')) : undefined, partnerPhone: linkAgent ? linkPartner.trim() : undefined, method: linkMethod };
+                        const r = await fetch('/api/links', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+                        const d = await r.json();
+                        if (!r.ok) throw new Error(d?.error || 'ERROR');
+                        showToast('Ссылка создана', 'success');
+                        setLinks((prev) => [{ code: d?.item?.code, title: d?.item?.title, createdAt: d?.item?.createdAt }, ...prev]);
+                        setLinkTitle(''); setLinkDesc(''); setLinkAmount(''); setLinkAgent(false); setLinkCommVal(''); setLinkPartner(''); setLinkSumMode('custom'); setLinkVat('none'); setLinkMethod('any');
+                      } catch (e) { showToast('Не удалось создать ссылку', 'error'); }
+                    }}
+                  >Сохранить</Button>
+                </div>
+              </div>
+            ) : null}
+            {links.length > 0 ? (
+              <div className="mt-3">
+                <div className="text-sm text-gray-600 mb-2">Мои постоянные ссылки</div>
+                <div className="space-y-2">
+                  {links.map((l) => (
+                    <div key={l.code} className="flex items-center justify-between border rounded px-3 py-2">
+                      <div className="text-sm"><a className="text-blue-600 hover:underline" href={`/link/${encodeURIComponent(l.code)}`} target="_blank" rel="noreferrer">{l.title || l.code}</a></div>
+                      <div className="flex items-center gap-2">
+                        <Button variant="secondary" size="icon" onClick={async () => { try { await navigator.clipboard.writeText(new URL(`/link/${encodeURIComponent(l.code)}`, window.location.origin).toString()); showToast('Ссылка скопирована', 'success'); } catch {} }}>⧉</Button>
+                        <Button variant="secondary" size="icon" onClick={async () => { if (!confirm('Удалить ссылку?')) return; try { await fetch(`/api/links/${encodeURIComponent(l.code)}`, { method: 'DELETE' }); setLinks((prev) => prev.filter((x) => x.code !== l.code)); } catch {} }}>🗑</Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : null}
           </div>
 
           <div className="mt-6">
