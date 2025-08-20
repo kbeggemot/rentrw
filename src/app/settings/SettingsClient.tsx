@@ -95,6 +95,48 @@ export default function SettingsClient({ initial, userId }: { initial: SettingsP
 
   // Hard-refresh critical settings on mount to avoid any stale SSR
   // Не делаем авто‑refresh на монтировании — данные уже есть с SSR
+  useEffect(() => {
+    const need = (
+      currentMasked == null ||
+      emailMasked == null ||
+      accountPhone == null ||
+      (agentDesc ?? '').length === 0 && initial.defaultCommission == null ||
+      bik.length === 0 ||
+      account.length === 0 ||
+      orgName.length === 0
+    );
+    if (!need) return;
+    (async () => {
+      try {
+        const [tRes, eRes, aRes, sRes, pRes] = await Promise.all([
+          fetch('/api/settings/token', { cache: 'no-store', credentials: 'include' }),
+          fetch('/api/settings/email', { cache: 'no-store', credentials: 'include' }),
+          fetch('/api/settings/account', { cache: 'no-store', credentials: 'include' }),
+          fetch('/api/settings/agent', { cache: 'no-store', credentials: 'include' }),
+          fetch('/api/settings/payout', { cache: 'no-store', credentials: 'include' }),
+        ]);
+        // token
+        try { const d = await tRes.json(); if (typeof d?.token === 'string' || d?.token === null) setCurrentMasked(d.token ?? null); } catch {}
+        // email
+        try { const d = await eRes.json(); setEmailMasked(d?.email ?? null); setEmailVerified(!!d?.verified); } catch {}
+        // account
+        try { const d = await aRes.json(); setAccountPhone(d?.phone ?? null); } catch {}
+        // agent
+        try {
+          const d = await sRes.json();
+          if (typeof d?.agentDescription === 'string') setAgentDesc(d.agentDescription);
+          const dc = d?.defaultCommission as { type?: 'percent' | 'fixed'; value?: number } | undefined;
+          if (dc && (dc.type === 'percent' || dc.type === 'fixed') && typeof dc.value === 'number') {
+            setAgentType(dc.type);
+            setAgentValue(String(dc.value));
+          }
+        } catch {}
+        // payout
+        try { const d = await pRes.json(); if (typeof d?.bik === 'string') setBik(d.bik); if (typeof d?.account === 'string') setAccount(d.account); if (typeof d?.orgName === 'string') setOrgName(d.orgName); } catch {}
+      } catch {}
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // iOS Safari: verify WebAuthn status and force refresh keys if present
   useEffect(() => {
