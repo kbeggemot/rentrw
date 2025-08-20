@@ -80,7 +80,7 @@ export default function SettingsClient({ initial, userId }: { initial: SettingsP
     (async () => {
       try {
         setKeysLoading(true);
-        const res = await fetch('/api/auth/webauthn/list', { cache: 'no-store' });
+        const res = await fetch('/api/auth/webauthn/list', { cache: 'no-store', credentials: 'include' });
         const data = await res.json();
         if (!res.ok) throw new Error(data?.error || 'Ошибка загрузки ключей');
         setKeys(Array.isArray(data?.items) ? data.items : []);
@@ -98,17 +98,44 @@ export default function SettingsClient({ initial, userId }: { initial: SettingsP
     (async () => {
       try {
         const [tR, aR, pR, eR] = await Promise.all([
-          fetch('/api/settings/token', { cache: 'no-store' }),
-          fetch('/api/settings/account', { cache: 'no-store' }),
-          fetch('/api/settings/payout', { cache: 'no-store' }),
-          fetch('/api/settings/email', { cache: 'no-store' }),
+          fetch('/api/settings/token', { cache: 'no-store', credentials: 'include' }),
+          fetch('/api/settings/account', { cache: 'no-store', credentials: 'include' }),
+          fetch('/api/settings/payout', { cache: 'no-store', credentials: 'include' }),
+          fetch('/api/settings/email', { cache: 'no-store', credentials: 'include' }),
         ]);
         try { const td = await tR.json(); if (typeof td?.token === 'string') setCurrentMasked(td.token); } catch {}
         try { const ad = await aR.json(); setAccountPhone(ad?.phone ?? null); } catch {}
         try { const pd = await pR.json(); if (typeof pd?.orgName === 'string') setOrgName(pd.orgName || ''); if (typeof pd?.bik === 'string') setBik(pd.bik || ''); if (typeof pd?.account === 'string') setAccount(pd.account || ''); } catch {}
         try { const ed = await eR.json(); setEmailMasked(ed?.email ?? null); setEmailVerified(!!ed?.verified); } catch {}
+        // Refresh agent settings explicitly (Safari sometimes serves stale SSR)
+        try {
+          const sR = await fetch('/api/settings/agent', { cache: 'no-store', credentials: 'include' });
+          const sd = await sR.json();
+          if (typeof sd?.agentDescription === 'string') setAgentDesc(sd.agentDescription);
+          if (sd?.defaultCommission?.type) setAgentType(sd.defaultCommission.type);
+          if (typeof sd?.defaultCommission?.value === 'number') setAgentValue(String(sd.defaultCommission.value));
+        } catch {}
       } catch {}
     })();
+  }, []);
+
+  // iOS Safari: verify WebAuthn status and force refresh keys if present
+  useEffect(() => {
+    (async () => {
+      try {
+        const sr = await fetch('/api/auth/webauthn/status', { cache: 'no-store', credentials: 'include' });
+        const st = await sr.json();
+        if (st?.hasAny) {
+          try { localStorage.setItem('hasPasskey', '1'); } catch {}
+          if (!Array.isArray(keys) || keys.length === 0) {
+            const lr = await fetch('/api/auth/webauthn/list', { cache: 'no-store', credentials: 'include' });
+            const ld = await lr.json();
+            setKeys(Array.isArray(ld?.items) ? ld.items : []);
+          }
+        }
+      } catch {}
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const submit = async (e: React.FormEvent) => {
