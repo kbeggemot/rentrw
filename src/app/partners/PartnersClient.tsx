@@ -37,9 +37,10 @@ export default function PartnersClient({ initial }: { initial: Partner[] }) {
     try {
       const res = await fetch('/api/partners', { cache: 'no-store', credentials: 'include' });
       const data = await res.json();
-      setPartners(Array.isArray(data?.partners) ? data.partners : []);
+      const list = Array.isArray(data?.partners) ? data.partners : [];
+      setPartners((prev) => (JSON.stringify(prev) === JSON.stringify(list) ? prev : list));
     } catch {
-      setPartners([]);
+      // keep previous list on error to avoid flicker
     } finally {
       setLoading(false);
     }

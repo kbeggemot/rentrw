@@ -39,9 +39,9 @@ export default function DashboardClient({ hasTokenInitial }: { hasTokenInitial: 
   useEffect(() => {
     (async () => {
       try {
-        const r = await fetch('/api/settings/token', { cache: 'no-store' });
+        const r = await fetch('/api/settings/token', { cache: 'no-store', credentials: 'include' });
         const d = await r.json();
-        setHasToken(!!d?.token);
+        setHasToken((prev) => (prev === !!d?.token ? prev : !!d?.token));
       } catch {}
     })();
   }, []);

@@ -103,17 +103,21 @@ export default function SettingsClient({ initial, userId }: { initial: SettingsP
           fetch('/api/settings/payout', { cache: 'no-store', credentials: 'include' }),
           fetch('/api/settings/email', { cache: 'no-store', credentials: 'include' }),
         ]);
-        try { const td = await tR.json(); if (typeof td?.token === 'string') setCurrentMasked(td.token); } catch {}
-        try { const ad = await aR.json(); setAccountPhone(ad?.phone ?? null); } catch {}
-        try { const pd = await pR.json(); if (typeof pd?.orgName === 'string') setOrgName(pd.orgName || ''); if (typeof pd?.bik === 'string') setBik(pd.bik || ''); if (typeof pd?.account === 'string') setAccount(pd.account || ''); } catch {}
-        try { const ed = await eR.json(); setEmailMasked(ed?.email ?? null); setEmailVerified(!!ed?.verified); } catch {}
-        // Refresh agent settings explicitly (Safari sometimes serves stale SSR)
+        try { const td = await tR.json(); if (typeof td?.token === 'string') setCurrentMasked((prev) => (prev === td.token ? prev : td.token)); } catch {}
+        try { const ad = await aR.json(); setAccountPhone((prev) => (prev === (ad?.phone ?? null) ? prev : (ad?.phone ?? null))); } catch {}
+        try { const pd = await pR.json();
+          setOrgName((prev) => (prev === (pd?.orgName || '') ? prev : (pd?.orgName || '')));
+          setBik((prev) => (prev === (pd?.bik || '') ? prev : (pd?.bik || '')));
+          setAccount((prev) => (prev === (pd?.account || '') ? prev : (pd?.account || '')));
+        } catch {}
+        try { const ed = await eR.json(); setEmailMasked((prev) => (prev === (ed?.email ?? null) ? prev : (ed?.email ?? null))); setEmailVerified((prev) => (prev === !!ed?.verified ? prev : !!ed?.verified)); } catch {}
+        // Refresh agent settings explicitly without wiping UI
         try {
           const sR = await fetch('/api/settings/agent', { cache: 'no-store', credentials: 'include' });
           const sd = await sR.json();
-          if (typeof sd?.agentDescription === 'string') setAgentDesc(sd.agentDescription);
+          if (typeof sd?.agentDescription === 'string') setAgentDesc((prev) => (prev === sd.agentDescription ? prev : sd.agentDescription));
           if (sd?.defaultCommission?.type) setAgentType(sd.defaultCommission.type);
-          if (typeof sd?.defaultCommission?.value === 'number') setAgentValue(String(sd.defaultCommission.value));
+          if (typeof sd?.defaultCommission?.value === 'number') setAgentValue((prev) => (prev === String(sd.defaultCommission.value) ? prev : String(sd.defaultCommission.value)));
         } catch {}
       } catch {}
     })();
