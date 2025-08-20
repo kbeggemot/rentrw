@@ -13,12 +13,19 @@ export default function PartnersClient({ initial }: { initial: Partner[] }) {
   const [phone, setPhone] = useState('');
   const [message, setMessage] = useState<string | null>(null);
   const [query, setQuery] = useState('');
+  const [page, setPage] = useState(1);
+  const pageSize = 15;
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return partners;
     return partners.filter((p) => p.phone.toLowerCase().includes(q) || (p.fio ? p.fio.toLowerCase().includes(q) : false));
   }, [partners, query]);
+
+  const paged = useMemo(() => {
+    const start = (page - 1) * pageSize;
+    return filtered.slice(start, start + pageSize);
+  }, [filtered, page]);
 
   const reload = async () => {
     setLoading(true);
@@ -59,6 +66,8 @@ export default function PartnersClient({ initial }: { initial: Partner[] }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  useEffect(() => { setPage(1); }, [query]);
+
   return (
     <div className="max-w-4xl mx-auto">
       <h1 className="hidden md:block text-2xl font-bold mb-4">Партнёры</h1>
@@ -96,7 +105,7 @@ export default function PartnersClient({ initial }: { initial: Partner[] }) {
               <tr>
                 <td colSpan={4} className="px-3 py-6 text-center text-gray-500">Нет партнёров</td>
               </tr>
-            ) : filtered.map((p) => (
+            ) : paged.map((p) => (
               <tr key={p.phone} className="border-t border-gray-100 dark:border-gray-800">
                 <td className="px-3 py-2">{p.phone}</td>
                 <td className="px-3 py-2">{p.fio ?? '-'}</td>
@@ -109,6 +118,16 @@ export default function PartnersClient({ initial }: { initial: Partner[] }) {
           </tbody>
         </table>
       </div>
+      {filtered.length > pageSize ? (
+        <div className="mt-3 flex items-center justify-between text-sm">
+          <div className="text-gray-600 dark:text-gray-400">Строк: {Math.min(filtered.length, page * pageSize)} из {filtered.length}</div>
+          <div className="flex gap-2">
+            <Button variant="ghost" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1}>Назад</Button>
+            <div className="px-2 py-1">{page}</div>
+            <Button variant="ghost" onClick={() => setPage((p) => (p * pageSize < filtered.length ? p + 1 : p))} disabled={page * pageSize >= filtered.length}>Вперёд</Button>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
