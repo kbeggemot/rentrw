@@ -89,19 +89,24 @@ export default function SalesClient({ initial }: { initial: Sale[] }) {
         void fetch('/api/sales?refresh=1', { cache: 'no-store', credentials: 'include' })
           .then(() => fetch('/api/sales', { cache: 'no-store', credentials: 'include' }))
           .then((r) => r.json())
-          .then((d) => setSales(Array.isArray(d?.sales) ? d.sales : []))
+          .then((d) => {
+            const list = Array.isArray(d?.sales) ? d.sales : [];
+            setSales((prev) => (JSON.stringify(prev) === JSON.stringify(list) ? prev : list));
+          })
           .catch(() => void 0)
           .finally(() => setLoading(false));
         const resOld = await fetch('/api/sales', { cache: 'no-store', credentials: 'include' });
         const oldData = await resOld.json();
-        setSales(Array.isArray(oldData?.sales) ? oldData.sales : []);
+        const listOld = Array.isArray(oldData?.sales) ? oldData.sales : [];
+        setSales((prev) => (JSON.stringify(prev) === JSON.stringify(listOld) ? prev : listOld));
       } else {
         const res = await fetch('/api/sales', { cache: 'no-store', credentials: 'include' });
         const data = await res.json();
-        setSales(Array.isArray(data?.sales) ? data.sales : []);
+        const list = Array.isArray(data?.sales) ? data.sales : [];
+        setSales((prev) => (JSON.stringify(prev) === JSON.stringify(list) ? prev : list));
       }
     } catch {
-      setSales([]);
+      // keep previous data to avoid flicker
     } finally {
       if (!refresh) setLoading(false);
     }
@@ -390,8 +395,8 @@ export default function SalesClient({ initial }: { initial: Sale[] }) {
           <thead className="bg-gray-50 dark:bg-gray-900">
             <tr>
               <th className="text-left px-3 py-2">№</th>
-              <th className="text-left px-3 py-2 whitespace-nowrap">Сумма, {'\u00A0'}₽</th>
               <th className="text-left px-3 py-2">Тип</th>
+              <th className="text-left px-3 py-2 whitespace-nowrap">Сумма, {'\u00A0'}₽</th>
               <th className="text-left px-3 py-2 whitespace-nowrap">Комиссия, {'\u00A0'}₽</th>
               <th className="text-left px-3 py-2">Статус</th>
               <th className="text-left px-1 py-2 w-10">Чек предоплаты</th>
@@ -411,8 +416,8 @@ export default function SalesClient({ initial }: { initial: Sale[] }) {
             ) : paged.map((s) => (
               <tr key={String(s.taskId)} className="border-t border-gray-100 dark:border-gray-800">
                 <td className="px-3 py-2">{s.taskId}</td>
-                <td className="px-3 py-2">{new Intl.NumberFormat('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(s.amountGrossRub)}</td>
                 <td className="px-3 py-2">{s.isAgent ? 'Агентская' : 'Прямая'}</td>
+                <td className="px-3 py-2">{new Intl.NumberFormat('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(s.amountGrossRub)}</td>
                 <td className="px-3 py-2">{s.isAgent ? new Intl.NumberFormat('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(s.retainedCommissionRub) : '-'}</td>
                 <td className="px-3 py-2">{s.status ?? '-'}</td>
                 <td className="px-1 py-2 text-center">{s.ofdUrl ? <Button aria-label="Просмотреть чек предоплаты" variant="secondary" size="icon" onClick={() => window.open(s.ofdUrl!, '_blank')}><IconChevronRight /></Button> : '-'}</td>
@@ -430,9 +435,9 @@ export default function SalesClient({ initial }: { initial: Sale[] }) {
       {filtered.length > pageSize ? (
         <div className="mt-3 flex items-center justify-between text-sm">
           <div className="text-gray-600 dark:text-gray-400">Строк: {Math.min(filtered.length, page * pageSize)} из {filtered.length}</div>
-          <div className="flex gap-2">
+          <div className="flex items-center gap-2">
             <Button variant="ghost" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1}>Назад</Button>
-            <div className="px-2 py-1">{page}</div>
+            <div className="h-9 min-w-8 inline-flex items-center justify-center">{page}</div>
             <Button variant="ghost" onClick={() => setPage((p) => (p * pageSize < filtered.length ? p + 1 : p))} disabled={page * pageSize >= filtered.length}>Вперёд</Button>
           </div>
         </div>
