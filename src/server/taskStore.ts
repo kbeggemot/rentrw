@@ -1,7 +1,8 @@
 import { readText, writeText } from './storage';
 import path from 'path';
 
-const DATA_DIR = path.join(process.cwd(), '.data');
+// IMPORTANT: keep relative paths here so that S3 storage keys are correct
+const DATA_DIR = '.data';
 const TASKS_FILE = path.join(DATA_DIR, 'tasks.json');
 
 export type StoredTask = {

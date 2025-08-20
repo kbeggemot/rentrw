@@ -20,7 +20,8 @@ type OffsetJob = {
 
 type Store = { jobs: OffsetJob[] };
 
-const DATA_DIR = path.join(process.cwd(), '.data');
+// Use relative path so that storage.ts can route it to S3 when enabled
+const DATA_DIR = '.data';
 const FILE = path.join(DATA_DIR, 'ofd_jobs.json');
 
 async function readStore(): Promise<Store> {
