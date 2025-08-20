@@ -51,4 +51,34 @@ export async function listWithdrawals(userId: string): Promise<WithdrawalRecord[
   return arr.sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
 }
 
+// Upsert helper for backfills (e.g., when reading from RW tasks list)
+export async function upsertWithdrawal(userId: string, payload: Partial<WithdrawalRecord> & { taskId: string | number }): Promise<void> {
+  const store = await readStore();
+  const idx = store.items.findIndex((x) => x.userId === userId && x.taskId == payload.taskId);
+  const now = new Date().toISOString();
+  if (idx === -1) {
+    const rec: WithdrawalRecord = {
+      userId,
+      taskId: payload.taskId,
+      amountRub: typeof payload.amountRub === 'number' ? payload.amountRub : 0,
+      status: payload.status ?? null,
+      createdAt: payload.createdAt || now,
+      updatedAt: now,
+      paidAt: payload.paidAt,
+    };
+    store.items.push(rec);
+  } else {
+    const cur = store.items[idx];
+    store.items[idx] = {
+      ...cur,
+      amountRub: typeof payload.amountRub === 'number' ? payload.amountRub : (cur.amountRub ?? 0),
+      status: typeof payload.status !== 'undefined' ? payload.status : cur.status,
+      createdAt: payload.createdAt || cur.createdAt,
+      paidAt: typeof payload.paidAt !== 'undefined' ? payload.paidAt : cur.paidAt,
+      updatedAt: now,
+    };
+  }
+  await writeStore(store);
+}
+
 
