@@ -1,5 +1,3 @@
-import { NextResponse } from 'next/server';
-
 export const runtime = 'nodejs';
 
 async function tryFetch(url: string) {
@@ -41,11 +39,11 @@ export async function GET() {
         return chosen.text.trim();
       } catch { return chosen.text.trim(); }
     })();
-
-    return NextResponse.json({ ip, provider: chosen?.url || null, probes: results }, { status: 200 });
+    const body = JSON.stringify({ ip, provider: chosen?.url || null, probes: results });
+    return new Response(body, { status: 200, headers: { 'content-type': 'application/json; charset=utf-8' } });
   } catch (error) {
     const msg = error instanceof Error ? error.message : 'Server error';
-    return NextResponse.json({ error: msg }, { status: 500 });
+    return new Response(JSON.stringify({ error: msg }), { status: 500, headers: { 'content-type': 'application/json; charset=utf-8' } });
   }
 }
 

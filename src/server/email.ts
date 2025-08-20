@@ -1,4 +1,5 @@
 import { writeText } from './storage';
+import dns from 'dns';
 
 type SendEmailParams = {
   to: string;
@@ -38,6 +39,11 @@ export async function sendEmail(params: SendEmailParams): Promise<void> {
   // Lazy import nodemailer only when SMTP configured
   const mod: any = await import('nodemailer' as any);
   const nodemailer: any = mod?.default ?? mod;
+  try {
+    if (String(process.env.SMTP_FORCE_IPV4 || '') === '1') {
+      dns.setDefaultResultOrder('ipv4first');
+    }
+  } catch {}
   const port = Number(process.env.SMTP_PORT || 587);
   const secure = String(process.env.SMTP_SECURE || '').toLowerCase() === 'true' || port === 465;
   const user = process.env.SMTP_USER || undefined;
