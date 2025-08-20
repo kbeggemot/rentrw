@@ -1,15 +1,21 @@
 import { cookies, headers } from 'next/headers';
 import SettingsClient, { type SettingsPrefetch } from './SettingsClient';
-import { getUserPayoutRequisites } from '@/server/userStore';
-import { listOfdReceipts } from '@/server/ofdStore';
 
 export default async function SettingsPage() {
   try {
     const cookieStore = await cookies();
+    const h = await headers();
     const userId = cookieStore.get('session_user')?.value || '';
-    const cookieHeader = cookieStore.getAll().map((c) => `${c.name}=${encodeURIComponent(c.value)}`).join('; ');
-    const proto = 'http';
-    const host = 'localhost:3000';
+    const cookieHeader = cookieStore
+      .getAll()
+      .map((c) => `${c.name}=${encodeURIComponent(c.value)}`)
+      .join('; ');
+
+    const hostFromEnv = process.env.BASE_HOST || '';
+    const hostFromHdr = h.get('x-forwarded-host') || h.get('host') || '';
+    const host = hostFromEnv || hostFromHdr || 'localhost:3000';
+    const protoHdr = h.get('x-forwarded-proto') || '';
+    const proto = host.startsWith('localhost') || host.startsWith('127.') ? 'http' : (protoHdr || 'https');
     const baseUrl = `${proto}://${host}`;
     const [tRes, eRes, aRes, sRes, kRes, pRes] = await Promise.all([
       fetch(`${baseUrl}/api/settings/token`, { cache: 'no-store', headers: { cookie: cookieHeader } }),

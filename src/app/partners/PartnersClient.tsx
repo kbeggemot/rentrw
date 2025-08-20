@@ -12,6 +12,7 @@ export default function PartnersClient({ initial }: { initial: Partner[] }) {
   const [loading, setLoading] = useState(false);
   const [phone, setPhone] = useState('');
   const [toast, setToast] = useState<{ msg: string; kind: 'success' | 'error' | 'info' } | null>(null);
+  const [sseOn, setSseOn] = useState(false);
   const showToast = (msg: string, kind: 'success' | 'error' | 'info' = 'info') => {
     setToast({ msg, kind });
     setTimeout(() => setToast(null), 2500);
@@ -66,8 +67,26 @@ export default function PartnersClient({ initial }: { initial: Partner[] }) {
     }
   };
 
-  // iOS Safari: авто‑подтяжка партнёров при входе на страницу
-  // Не делаем авто‑refresh на монтировании, чтобы избежать мерцаний.
+  // Подписка на серверные события (прод) и мягкое обновление партнёров
+  useEffect(() => {
+    if (sseOn) return;
+    const isProd = typeof window !== 'undefined' && window.location.hostname !== 'localhost';
+    if (!isProd) return; // локаль без авто‑обновления
+    let es: EventSource | null = null;
+    try {
+      es = new EventSource('/api/events');
+      es.onmessage = (e) => {
+        try {
+          const msg = JSON.parse(e.data || '{}');
+          if (msg && (msg.topic === 'partners:update')) {
+            void reload();
+          }
+        } catch {}
+      };
+      setSseOn(true);
+    } catch {}
+    return () => { try { es?.close(); } catch {} };
+  }, [sseOn]);
 
   useEffect(() => { setPage(1); }, [query]);
 

@@ -1,4 +1,5 @@
 import { readText, writeText } from './storage';
+import { getHub } from './eventBus';
 
 export type PartnerRecord = {
   phone: string;
@@ -40,6 +41,7 @@ export async function upsertPartner(userId: string, partner: PartnerRecord): Pro
   if (idx !== -1) arr[idx] = partner; else arr.push(partner);
   store.users[userId] = arr;
   await writeStore(store);
+  try { getHub().publish(userId, 'partners:update'); } catch {}
 }
 
 export async function softDeletePartner(userId: string, phone: string): Promise<void> {
@@ -50,6 +52,7 @@ export async function softDeletePartner(userId: string, phone: string): Promise<
     arr[idx] = { ...arr[idx], hidden: true, updatedAt: new Date().toISOString() };
     store.users[userId] = arr;
     await writeStore(store);
+    try { getHub().publish(userId, 'partners:update'); } catch {}
   }
 }
 
@@ -61,6 +64,7 @@ export async function unhidePartner(userId: string, phone: string): Promise<void
     arr[idx] = { ...arr[idx], hidden: false, updatedAt: new Date().toISOString() };
     store.users[userId] = arr;
     await writeStore(store);
+    try { getHub().publish(userId, 'partners:update'); } catch {}
   }
 }
 

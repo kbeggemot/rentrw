@@ -1,4 +1,5 @@
 import { readText, writeText } from './storage';
+import { getHub } from './eventBus';
 import path from 'path';
 
 // IMPORTANT: keep relative paths here so that S3 storage keys are correct
@@ -102,6 +103,7 @@ export async function recordSaleOnCreate(params: {
     updatedAt: now,
   });
   await writeTasks(store);
+  try { getHub().publish(userId, 'sales:update'); } catch {}
 }
 
 export async function updateSaleFromStatus(userId: string, taskId: number | string, update: Partial<Pick<SaleRecord, 'status' | 'ofdUrl' | 'additionalCommissionOfdUrl' | 'npdReceiptUri'>>): Promise<void> {
@@ -123,6 +125,7 @@ export async function updateSaleFromStatus(userId: string, taskId: number | stri
     next.updatedAt = new Date().toISOString();
     store.sales[idx] = next;
     await writeTasks(store);
+    try { getHub().publish(userId, 'sales:update'); } catch {}
   }
 }
 
@@ -138,6 +141,7 @@ export async function updateSaleOfdUrls(userId: string, taskId: number | string,
     next.updatedAt = new Date().toISOString();
     store.sales[idx] = next;
     await writeTasks(store);
+    try { getHub().publish(userId, 'sales:update'); } catch {}
   }
 }
 
@@ -155,6 +159,7 @@ export async function updateSaleOfdUrlsByOrderId(userId: string, orderId: number
     next.updatedAt = new Date().toISOString();
     store.sales[idx] = next;
     await writeTasks(store);
+    try { getHub().publish(userId, 'sales:update'); } catch {}
   }
 }
 
@@ -169,6 +174,7 @@ export async function setSaleCreatedAtRw(userId: string, taskId: number | string
     next.updatedAt = new Date().toISOString();
     store.sales[idx] = next;
     await writeTasks(store);
+    try { getHub().publish(userId, 'sales:update'); } catch {}
   }
 }
 
@@ -251,6 +257,7 @@ export async function ensureSaleFromTask(params: {
   // Also record in tasks list for convenience
   store.tasks.push({ id: taskId, orderId: resolvedOrderId!, createdAt: now });
   await writeTasks(store);
+  try { getHub().publish(userId, 'sales:update'); } catch {}
 }
 
 export async function updateSaleRwOrderId(userId: string, taskId: number | string, rwOrderId: number | null): Promise<void> {
@@ -264,6 +271,7 @@ export async function updateSaleRwOrderId(userId: string, taskId: number | strin
     next.updatedAt = new Date().toISOString();
     store.sales[idx] = next;
     await writeTasks(store);
+    try { getHub().publish(userId, 'sales:update'); } catch {}
   }
 }
 

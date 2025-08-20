@@ -25,6 +25,7 @@ export default function SalesClient({ initial }: { initial: Sale[] }) {
   const [loading, setLoading] = useState(false);
   const [page, setPage] = useState(1);
   const pageSize = 15;
+  const [sseOn, setSseOn] = useState(false);
 
   function IconChevronRight() {
     return (
@@ -112,11 +113,39 @@ export default function SalesClient({ initial }: { initial: Sale[] }) {
     }
   };
 
-  // Авто‑обновление при заходе на страницу:
-  // не очищаем таблицу, просто подменяем данные, когда придут новые
-  // Не делаем авто‑refresh на монтировании, чтобы избежать визуального мерцания.
+  // Подписка на серверные события (прод) и мягкое обновление
+  useEffect(() => {
+    if (sseOn) return;
+    const isProd = typeof window !== 'undefined' && window.location.hostname !== 'localhost';
+    if (!isProd) return; // на локали не мешаем
+    let es: EventSource | null = null;
+    try {
+      es = new EventSource('/api/events');
+      es.onmessage = (e) => {
+        try {
+          const msg = JSON.parse(e.data || '{}');
+          if (msg && (msg.topic === 'sales:update')) {
+            // мягко перезапрашиваем без очистки
+            void load(false);
+          }
+        } catch {}
+      };
+      setSseOn(true);
+    } catch {}
+    return () => {
+      try { es?.close(); } catch {}
+    };
+  }, [sseOn]);
 
-  // удалено: глобальное "обновить всё" по просьбе
+  // Мягкий refresh при заходе в раздел продаж на проде
+  useEffect(() => {
+    const isProd = typeof window !== 'undefined' && window.location.hostname !== 'localhost';
+    if (!isProd) return;
+    // подождем кадр, чтобы не блокировать пеинт
+    const t = setTimeout(() => { void load(true); }, 0);
+    return () => clearTimeout(t);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const filtered = useMemo(() => {
     const q = query.trim();
