@@ -62,11 +62,21 @@ export async function POST(req: Request) {
     await writeText(`.data/email_code_${userId}.txt`, JSON.stringify({ email: targetEmail, code, ts: Date.now() }));
     const base = process.env.NEXT_PUBLIC_BASE_URL || '';
     const ui = base ? `${base}/settings` : '/settings';
-    await sendEmail({
-      to: targetEmail!,
-      subject: 'Подтверждение email в RentRW',
-      text: `Ваш код подтверждения: ${code}\n\nЕсли вы его не запрашивали, просто проигнорируйте это письмо.`,
-    });
+    try {
+      await sendEmail({
+        to: targetEmail!,
+        subject: 'Подтверждение email в RentRW',
+        text: `Ваш код подтверждения: ${code}\n\nЕсли вы его не запрашивали, просто проигнорируйте это письмо.`,
+      });
+    } catch (e) {
+      return NextResponse.json({ error: 'EMAIL_SEND_FAILED', debug: {
+        host: process.env.SMTP_HOST ? 'set' : 'missing',
+        port: process.env.SMTP_PORT ? 'set' : 'missing',
+        secure: process.env.SMTP_SECURE ?? 'unset',
+        user: process.env.SMTP_USER ? 'set' : 'missing',
+        from: process.env.SMTP_FROM ? 'set' : 'missing',
+      } }, { status: 502 });
+    }
     return NextResponse.json({ email: maskEmail(targetEmail!), verification: 'sent', debug: {
       host: process.env.SMTP_HOST ? 'set' : 'missing',
       port: process.env.SMTP_PORT ? 'set' : 'missing',

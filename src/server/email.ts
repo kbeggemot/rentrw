@@ -50,19 +50,52 @@ export async function sendEmail(params: SendEmailParams): Promise<void> {
     auth: user && pass ? { user, pass } : undefined,
     logger: String(process.env.SMTP_DEBUG || '').trim() === '1',
     debug: String(process.env.SMTP_DEBUG || '').trim() === '1',
+    connectionTimeout: Number(process.env.SMTP_CONN_TIMEOUT || 10000),
+    greetingTimeout: Number(process.env.SMTP_GREET_TIMEOUT || 10000),
+    socketTimeout: Number(process.env.SMTP_SOCKET_TIMEOUT || 20000),
   } as any);
 
+  // Optional: verify connection/auth to fail fast with clear error
+  try {
+    if (String(process.env.SMTP_VERIFY || '1') === '1') {
+      await transporter.verify();
+    }
+  } catch (e) {
+    // Write debug file and rethrow
+    try {
+      await writeText('.data/last_smtp_verify_error.json', JSON.stringify({ ts: new Date().toISOString(), error: String(e) }, null, 2));
+    } catch {}
+    throw e;
+  }
+
   const html = params.html ?? (params.text ? `<pre>${params.text}</pre>` : undefined);
-  await transporter.sendMail({
-    from: `${fromName} <${from}>`,
-    sender: from,
-    replyTo: from,
-    to: params.to,
-    subject: params.subject,
-    text: params.text,
-    html,
-    envelope: { from, to: params.to },
-  });
+  try {
+    await transporter.sendMail({
+      from: `${fromName} <${from}>`,
+      sender: from,
+      replyTo: from,
+      to: params.to,
+      subject: params.subject,
+      text: params.text,
+      html,
+      envelope: { from, to: params.to },
+    });
+  } catch (e) {
+    // Persist last error and also fallback to outbox to avoid losing the code in dev
+    try {
+      await writeText('.data/last_smtp_send_error.json', JSON.stringify({ ts: new Date().toISOString(), to: params.to, subject: params.subject, error: String(e) }, null, 2));
+      const fname = `.data/outbox/email-${Date.now()}-FAILED.txt`;
+      const content = [
+        `From: ${from}`,
+        `To: ${params.to}`,
+        `Subject: ${params.subject}`,
+        '',
+        params.text || params.html || '',
+      ].join('\n');
+      await writeText(fname, content);
+    } catch {}
+    throw e;
+  }
 }
 
 

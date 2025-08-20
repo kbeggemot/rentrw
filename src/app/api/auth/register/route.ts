@@ -20,8 +20,13 @@ export async function POST(req: Request) {
     const code = String(Math.floor(100000 + Math.random() * 900000));
     await upsertPending({ phone, email, password, code, expiresAt: Date.now() + 15 * 60 * 1000 });
     const origin = process.env.NEXT_PUBLIC_BASE_URL || new URL(req.url).origin;
-    await sendEmail({ to: email, subject: 'Подтверждение регистрации RentRW', text: `Код подтверждения: ${code}`, html: `<p>Код подтверждения: <b>${code}</b></p><p>Если вы не запрашивали регистрацию, проигнорируйте это письмо.</p>` });
-    return NextResponse.json({ ok: true, step: 'confirm', phone, email });
+    try {
+      await sendEmail({ to: email, subject: 'Подтверждение регистрации RentRW', text: `Код подтверждения: ${code}`, html: `<p>Код подтверждения: <b>${code}</b></p><p>Если вы не запрашивали регистрацию, проигнорируйте это письмо.</p>` });
+      return NextResponse.json({ ok: true, step: 'confirm', phone, email });
+    } catch (e) {
+      // Вернём диагностическую подсказку для админа (без раскрытия чувствительных данных)
+      return NextResponse.json({ error: 'EMAIL_SEND_FAILED' }, { status: 502 });
+    }
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Server error';
     return NextResponse.json({ error: message }, { status: 500 });
