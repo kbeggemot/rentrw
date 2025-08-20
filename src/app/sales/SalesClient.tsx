@@ -115,18 +115,12 @@ export default function SalesClient({ initial }: { initial: Sale[] }) {
   // Авто‑обновление при заходе на страницу:
   // не очищаем таблицу, просто подменяем данные, когда придут новые
   useEffect(() => {
-    let raf = 0 as unknown as number;
+    // Запускаем мягкое фоновое обновление через 1.8с после гидратации
+    let timer: number | null = null;
     if (typeof window !== 'undefined') {
-      raf = window.requestAnimationFrame(() => {
-        load(true).catch(() => {});
-      }) as unknown as number;
-    } else {
-      // SSR safety
-      void load(true);
+      timer = window.setTimeout(() => { load(true).catch(() => {}); }, 1800);
     }
-    return () => {
-      if (typeof window !== 'undefined' && raf) window.cancelAnimationFrame(raf as unknown as number);
-    };
+    return () => { if (timer) window.clearTimeout(timer); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

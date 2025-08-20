@@ -95,7 +95,8 @@ export default function SettingsClient({ initial, userId }: { initial: SettingsP
 
   // Hard-refresh critical settings on mount to avoid any stale SSR
   useEffect(() => {
-    let raf: number | null = null;
+    // Мягкий фоновый refresh через 1.8с после гидратации
+    let timer: number | null = null;
     const run = async () => {
       try {
         const [tR, aR, pR, eR] = await Promise.all([
@@ -122,11 +123,9 @@ export default function SettingsClient({ initial, userId }: { initial: SettingsP
       } catch {}
     };
     if (typeof window !== 'undefined') {
-      raf = window.requestAnimationFrame(() => { run().catch(() => {}); });
-    } else {
-      void run();
+      timer = window.setTimeout(() => { run().catch(() => {}); }, 1800);
     }
-    return () => { if (raf) window.cancelAnimationFrame(raf); };
+    return () => { if (timer) window.clearTimeout(timer); };
   }, []);
 
   // iOS Safari: verify WebAuthn status and force refresh keys if present
