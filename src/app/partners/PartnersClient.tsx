@@ -67,14 +67,7 @@ export default function PartnersClient({ initial }: { initial: Partner[] }) {
   };
 
   // iOS Safari: авто‑подтяжка партнёров при входе на страницу
-  useEffect(() => {
-    // Мягкое фоновое обновление через 1.8с
-    let timer: number | null = null;
-    if (typeof window !== 'undefined') {
-      timer = window.setTimeout(() => { reload().catch(() => {}); }, 1800);
-    }
-    return () => { if (timer) window.clearTimeout(timer); };
-  }, []);
+  // Не делаем авто‑refresh на монтировании, чтобы избежать мерцаний.
 
   useEffect(() => { setPage(1); }, [query]);
 

@@ -94,39 +94,7 @@ export default function SettingsClient({ initial, userId }: { initial: SettingsP
   }, [initial.keys.length]);
 
   // Hard-refresh critical settings on mount to avoid any stale SSR
-  useEffect(() => {
-    // Мягкий фоновый refresh через 1.8с после гидратации
-    let timer: number | null = null;
-    const run = async () => {
-      try {
-        const [tR, aR, pR, eR] = await Promise.all([
-          fetch('/api/settings/token', { cache: 'no-store', credentials: 'include' }),
-          fetch('/api/settings/account', { cache: 'no-store', credentials: 'include' }),
-          fetch('/api/settings/payout', { cache: 'no-store', credentials: 'include' }),
-          fetch('/api/settings/email', { cache: 'no-store', credentials: 'include' }),
-        ]);
-        try { const td = await tR.json(); if (typeof td?.token === 'string') setCurrentMasked((prev) => (prev === td.token ? prev : td.token)); } catch {}
-        try { const ad = await aR.json(); setAccountPhone((prev) => (prev === (ad?.phone ?? null) ? prev : (ad?.phone ?? null))); } catch {}
-        try { const pd = await pR.json();
-          setOrgName((prev) => (prev === (pd?.orgName || '') ? prev : (pd?.orgName || '')));
-          setBik((prev) => (prev === (pd?.bik || '') ? prev : (pd?.bik || '')));
-          setAccount((prev) => (prev === (pd?.account || '') ? prev : (pd?.account || '')));
-        } catch {}
-        try { const ed = await eR.json(); setEmailMasked((prev) => (prev === (ed?.email ?? null) ? prev : (ed?.email ?? null))); setEmailVerified((prev) => (prev === !!ed?.verified ? prev : !!ed?.verified)); } catch {}
-        try {
-          const sR = await fetch('/api/settings/agent', { cache: 'no-store', credentials: 'include' });
-          const sd = await sR.json();
-          if (typeof sd?.agentDescription === 'string') setAgentDesc((prev) => (prev === sd.agentDescription ? prev : sd.agentDescription));
-          if (sd?.defaultCommission?.type) setAgentType(sd.defaultCommission.type);
-          if (typeof sd?.defaultCommission?.value === 'number') setAgentValue((prev) => (prev === String(sd.defaultCommission.value) ? prev : String(sd.defaultCommission.value)));
-        } catch {}
-      } catch {}
-    };
-    if (typeof window !== 'undefined') {
-      timer = window.setTimeout(() => { run().catch(() => {}); }, 1800);
-    }
-    return () => { if (timer) window.clearTimeout(timer); };
-  }, []);
+  // Не делаем авто‑refresh на монтировании — данные уже есть с SSR
 
   // iOS Safari: verify WebAuthn status and force refresh keys if present
   useEffect(() => {

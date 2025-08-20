@@ -36,21 +36,7 @@ export default function DashboardClient({ hasTokenInitial }: { hasTokenInitial: 
   useEffect(() => { setHasToken(hasTokenInitial); }, [hasTokenInitial]);
 
   // Additional client-side confirmation to avoid stale SSR (no-store)
-  useEffect(() => {
-    // Мягкий фоновый refresh токена через 1.8с
-    let timer: number | null = null;
-    const run = async () => {
-      try {
-        const r = await fetch('/api/settings/token', { cache: 'no-store', credentials: 'include' });
-        const d = await r.json();
-        setHasToken((prev) => (prev === !!d?.token ? prev : !!d?.token));
-      } catch {}
-    };
-    if (typeof window !== 'undefined') {
-      timer = window.setTimeout(() => { run().catch(() => {}); }, 1800);
-    }
-    return () => { if (timer) window.clearTimeout(timer); };
-  }, []);
+  // Не делаем авто‑refresh токена на монтировании.
 
   const fetchBalance = async (): Promise<number | null> => {
     setLoading(true);

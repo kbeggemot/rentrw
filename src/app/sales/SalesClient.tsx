@@ -114,15 +114,7 @@ export default function SalesClient({ initial }: { initial: Sale[] }) {
 
   // Авто‑обновление при заходе на страницу:
   // не очищаем таблицу, просто подменяем данные, когда придут новые
-  useEffect(() => {
-    // Запускаем мягкое фоновое обновление через 1.8с после гидратации
-    let timer: number | null = null;
-    if (typeof window !== 'undefined') {
-      timer = window.setTimeout(() => { load(true).catch(() => {}); }, 1800);
-    }
-    return () => { if (timer) window.clearTimeout(timer); };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  // Не делаем авто‑refresh на монтировании, чтобы избежать визуального мерцания.
 
   // удалено: глобальное "обновить всё" по просьбе
 
