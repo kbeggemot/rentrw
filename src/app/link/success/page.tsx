@@ -8,6 +8,7 @@ type LinkInfo = { code: string; userId: string; title?: string; orgName?: string
 export default function PublicSuccessUnifiedPage() {
   const [info, setInfo] = useState<LinkInfo | null>(null);
   const [taskId, setTaskId] = useState<string | number | null>(null);
+  const [orderId, setOrderId] = useState<number | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [receipts, setReceipts] = useState<{ prepay?: string | null; full?: string | null; commission?: string | null; npd?: string | null }>({});
   const [msg, setMsg] = useState<string | null>(null);
@@ -55,6 +56,7 @@ export default function PublicSuccessUnifiedPage() {
               if (r.ok && d?.taskId) {
                 setTaskId(d.taskId);
                 setInfo({ code: '', userId: String(d.userId || ''), title: undefined, orgName: d?.orgName || null });
+                setOrderId(Number(d.orderId || 0) || null);
                 setWaiting(false);
               } else {
                 setWaiting(false);
@@ -95,6 +97,37 @@ export default function PublicSuccessUnifiedPage() {
         const rwCom = t?.additional_commission_ofd_url || t?.task?.additional_commission_ofd_url || t?.additional_commission_url || t?.task?.additional_commission_url || null;
         const rwNpd = t?.receipt_uri || t?.task?.receipt_uri || null;
         setReceipts({ prepay: rwPre ?? null, full: rwFull ?? null, commission: rwCom ?? null, npd: rwNpd ?? null });
+
+        // Try local sale store as authoritative source for URLs
+        try {
+          if (userId) {
+            if (orderId != null) {
+              const sres = await fetch(`/api/sales/by-order/${orderId}`, { cache: 'no-store', headers: { 'x-user-id': userId } as any });
+              if (sres.ok) {
+                const sj = await sres.json();
+                const sl = sj?.sale;
+                setReceipts((prev) => ({
+                  prepay: (sl?.ofdUrl ?? prev.prepay) || null,
+                  full: (sl?.ofdFullUrl ?? prev.full) || null,
+                  commission: (sl?.additionalCommissionOfdUrl ?? prev.commission) || null,
+                  npd: (sl?.npdReceiptUri ?? prev.npd) || null,
+                }));
+              }
+            } else {
+              const sres = await fetch(`/api/sales/by-task/${encodeURIComponent(String(uid))}`, { cache: 'no-store', headers: { 'x-user-id': userId } as any });
+              if (sres.ok) {
+                const sj = await sres.json();
+                const sl = sj?.sale;
+                setReceipts((prev) => ({
+                  prepay: (sl?.ofdUrl ?? prev.prepay) || null,
+                  full: (sl?.ofdFullUrl ?? prev.full) || null,
+                  commission: (sl?.additionalCommissionOfdUrl ?? prev.commission) || null,
+                  npd: (sl?.npdReceiptUri ?? prev.npd) || null,
+                }));
+              }
+            }
+          }
+        } catch {}
       } catch {}
       pollRef.current = window.setTimeout(tick, 2000) as unknown as number;
     };
@@ -144,9 +177,6 @@ export default function PublicSuccessUnifiedPage() {
               </div>
             )}
           </div>
-        ) : null}
-        {info ? (
-          <Link className="inline-flex items-center justify-center rounded-lg border px-4 h-9 text-sm" href={`/link/${encodeURIComponent(info.code)}`}>Открыть страницу ссылки</Link>
         ) : null}
       </div>
     </div>
