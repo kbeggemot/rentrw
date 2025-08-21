@@ -31,6 +31,7 @@ export default function PublicPayPage(props: any) {
   const [payUrl, setPayUrl] = useState<string | null>(null);
   const [awaitingPay, setAwaitingPay] = useState(false);
   const [receipts, setReceipts] = useState<{ prepay?: string | null; full?: string | null; commission?: string | null; npd?: string | null }>({});
+  const [detailsOpen, setDetailsOpen] = useState(false);
 
   const pollRef = useRef<number | null>(null);
   const payUrlPollRef = useRef<number | null>(null);
@@ -115,6 +116,7 @@ export default function PublicPayPage(props: any) {
       setMsg(null);
       setPayUrl(null);
       setTaskId(null);
+      setDetailsOpen(true);
       const amountNum = data.sumMode === 'fixed' ? (data.amountRub || 0) : Number(amount.replace(',', '.'));
       const body: any = {
         amountRub: amountNum,
@@ -183,35 +185,49 @@ export default function PublicPayPage(props: any) {
             <input className="w-40 rounded-lg border px-2 h-9 text-sm" value={data.method === 'card' ? 'Карта' : 'СБП'} readOnly />
           )}
         </div>
-        {!taskId ? (
-          <button disabled={!canPay || loading} onClick={goPay} className="inline-flex items-center justify-center rounded-lg bg-black text-white px-4 h-9 text-sm disabled:opacity-60">
-            {loading ? 'Формируем платежную ссылку…' : 'Перейти к оплате'}
+        <button disabled={!canPay || loading} onClick={goPay} className="inline-flex items-center justify-center rounded-lg bg-black text-white px-4 h-9 text-sm disabled:opacity-60">
+          {loading ? 'Формируем платежную ссылку…' : 'Перейти к оплате'}
+        </button>
+
+        {/* Collapsible details */}
+        <div className="mt-4">
+          <button type="button" className="w-full text-left px-3 py-2 rounded-md hover:bg-gray-50 border border-gray-200 flex items-center justify-between" onClick={() => setDetailsOpen((v) => !v)}>
+            <span className="text-base font-semibold">Ссылка и чеки</span>
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`${detailsOpen ? 'rotate-180' : ''}`}>"<path d="M6 9l6 6 6-6"/></svg>
           </button>
-        ) : (
-          <div className="space-y-2">
-            {!payUrl ? (
-              <div className="text-sm text-gray-600">Формируем платежную ссылку…</div>
-            ) : (
-              <button disabled={awaitingPay} onClick={() => { setAwaitingPay(true); try { window.open(payUrl!, '_blank'); } catch {} }} className="inline-flex items-center justify-center rounded-lg bg-black text-white px-4 h-9 text-sm disabled:opacity-60">
-                Оплатить
-              </button>
-            )}
-            {awaitingPay ? (<div className="text-sm text-gray-600">Ждём подтверждения оплаты…</div>) : null}
-            {(receipts.prepay || receipts.full || receipts.commission || receipts.npd) ? (
-              <div className="mt-2 rounded-md border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900 p-2 text-sm">
-                <div className="grid grid-cols-[9rem_1fr] gap-y-2">
-                  {receipts.prepay ? (<><div className="text-gray-500">Предоплата</div><a className="text-blue-600 hover:underline" href={receipts.prepay} target="_blank" rel="noreferrer">Открыть</a></>) : null}
-                  {receipts.full ? (<><div className="text-gray-500">Полный расчёт</div><a className="text-blue-600 hover:underline" href={receipts.full} target="_blank" rel="noreferrer">Открыть</a></>) : null}
-                  {receipts.commission ? (<><div className="text-gray-500">Комиссия</div><a className="text-blue-600 hover:underline" href={receipts.commission} target="_blank" rel="noreferrer">Открыть</a></>) : null}
-                  {receipts.npd ? (<><div className="text-gray-500">НПД</div><a className="text-blue-600 hover:underline" href={receipts.npd} target="_blank" rel="noreferrer">Открыть</a></>) : null}
-                  {(!receipts.prepay && !receipts.full && !receipts.commission && !receipts.npd) ? (
-                    <div className="col-span-2 text-gray-500">Чеки недоступны</div>
+          {detailsOpen ? (
+            <div className="mt-2">
+              {!taskId ? (
+                <div className="text-sm text-gray-600">Нажмите «Перейти к оплате», чтобы сформировать ссылку…</div>
+              ) : (
+                <div className="space-y-2">
+                  {!payUrl ? (
+                    <div className="text-sm text-gray-600">Формируем платежную ссылку…</div>
+                  ) : (
+                    <button disabled={awaitingPay} onClick={() => { setAwaitingPay(true); try { window.open(payUrl!, '_blank'); } catch {} }} className="inline-flex items-center justify-center rounded-lg bg-black text-white px-4 h-9 text-sm disabled:opacity-60">
+                      Оплатить
+                    </button>
+                  )}
+                  {awaitingPay ? (<div className="text-sm text-gray-600">Ждём подтверждения оплаты…</div>) : null}
+                  {(receipts.prepay || receipts.full || receipts.commission || receipts.npd) ? (
+                    <div className="mt-2 rounded-md border border-gray-200 bg-gray-50 p-2 text-sm">
+                      <div className="grid grid-cols-[9rem_1fr] gap-y-2">
+                        {receipts.prepay ? (<><div className="text-gray-500">Предоплата</div><a className="text-blue-600 hover:underline" href={receipts.prepay} target="_blank" rel="noreferrer">Открыть</a></>) : null}
+                        {receipts.full ? (<><div className="text-gray-500">Полный расчёт</div><a className="text-blue-600 hover:underline" href={receipts.full} target="_blank" rel="noreferrer">Открыть</a></>) : null}
+                        {receipts.commission ? (<><div className="text-gray-500">Комиссия</div><a className="text-blue-600 hover:underline" href={receipts.commission} target="_blank" rel="noreferrer">Открыть</a></>) : null}
+                        {receipts.npd ? (<><div className="text-gray-500">НПД</div><a className="text-blue-600 hover:underline" href={receipts.npd} target="_blank" rel="noreferrer">Открыть</a></>) : null}
+                        {(!receipts.prepay && !receipts.full && !receipts.commission && !receipts.npd) ? (
+                          <div className="col-span-2 text-gray-500">Чеки недоступны</div>
+                        ) : null}
+                      </div>
+                    </div>
                   ) : null}
                 </div>
-              </div>
-            ) : null}
-          </div>
-        )}
+              )}
+            </div>
+          ) : null}
+        </div>
+
         {msg ? <div className="mt-3 text-sm text-gray-600">{msg}</div> : null}
       </div>
     </div>
