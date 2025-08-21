@@ -160,6 +160,68 @@ export default function PublicPayPage(props: any) {
       setPayUrl(null);
       setTaskId(null);
       setDetailsOpen(true);
+      
+      // Validate partner in RW for agent sales before creating task
+      if (data.isAgent && data.partnerPhone) {
+        try {
+          const base = process.env.NEXT_PUBLIC_ROCKETWORK_API_BASE_URL || 'https://app.rocketwork.ru/api/';
+          const digits = String(data.partnerPhone).replace(/\D/g, '');
+          const url = new URL(`executors/${encodeURIComponent(digits)}`, base.endsWith('/') ? base : base + '/').toString();
+          const res = await fetch(url, { cache: 'no-store' });
+          const txt = await res.text();
+          let executorData: any = null; 
+          try { executorData = txt ? JSON.parse(txt) : null; } catch { executorData = txt; }
+          
+          if (res.status === 404 || (typeof executorData === 'object' && executorData && ((executorData.error && /not\s*found/i.test(String(executorData.error))) || executorData.executor == null || (executorData.executor && executorData.executor.inn == null)))) {
+            setMsg('Партнёр не завершил регистрацию в Рокет Ворк');
+            setLoading(false);
+            setStarted(false);
+            setDetailsOpen(false);
+            return;
+          }
+          
+          if (!res.ok) {
+            setMsg('Ошибка проверки партнёра');
+            setLoading(false);
+            setStarted(false);
+            setDetailsOpen(false);
+            return;
+          }
+          
+          const status: string | undefined = (executorData?.executor?.selfemployed_status as string | undefined) ?? (executorData?.selfemployed_status as string | undefined);
+          if (!status) {
+            setMsg('Партнёр не завершил регистрацию в Рокет Ворк');
+            setLoading(false);
+            setStarted(false);
+            setDetailsOpen(false);
+            return;
+          }
+          
+          if (status !== 'validated') {
+            setMsg('Партнёр не может принять оплату: нет статуса самозанятого');
+            setLoading(false);
+            setStarted(false);
+            setDetailsOpen(false);
+            return;
+          }
+          
+          const paymentInfo = (executorData?.executor?.payment_info ?? executorData?.payment_info ?? null);
+          if (!paymentInfo) {
+            setMsg('Партнёр не указал платёжные реквизиты в Рокет Ворк');
+            setLoading(false);
+            setStarted(false);
+            setDetailsOpen(false);
+            return;
+          }
+        } catch (e) {
+          setMsg('Ошибка проверки партнёра');
+          setLoading(false);
+          setStarted(false);
+          setDetailsOpen(false);
+          return;
+        }
+      }
+      
       const amountNum = data.sumMode === 'fixed' ? (data.amountRub || 0) : Number(amount.replace(',', '.'));
       const body: any = {
         amountRub: amountNum,
