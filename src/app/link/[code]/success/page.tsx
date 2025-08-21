@@ -35,7 +35,7 @@ export default function PublicSuccessPage(props: any) {
       </div>
 
       <div className="flex flex-col gap-3">
-        <Link href={`/link/${encodeURIComponent(code)}?paid=1`} className="inline-flex items-center justify-center rounded-lg bg-black text-white px-4 h-9 text-sm">
+        <Link href={`/link/${encodeURIComponent(code)}?paid=1&sid=${typeof window !== 'undefined' ? (sessionStorage.getItem(`paySid:${code}`) || '') : ''}`} className="inline-flex items-center justify-center rounded-lg bg-black text-white px-4 h-9 text-sm">
           Показать чеки и детали платежа
         </Link>
         <Link href="/" className="inline-flex items-center justify-center rounded-lg border px-4 h-9 text-sm">

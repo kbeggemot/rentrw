@@ -72,6 +72,33 @@ export default function PublicPayPage(props: any) {
     return () => { cancelled = true; };
   }, [code]);
 
+  // If returned from bank (?paid=1), try to restore last taskId from localStorage and resume polling
+  useEffect(() => {
+    try {
+      const search = typeof window !== 'undefined' ? window.location.search : '';
+      const params = new URLSearchParams(search);
+      if (params.get('paid') === '1' && !taskId) {
+        const raw = localStorage.getItem(`lastPay:${code}`);
+        const sidExpected = params.get('sid');
+        if (raw) {
+          const obj = JSON.parse(raw);
+          const ttlOk = obj?.ts && (Date.now() - Number(obj.ts) < 1800000);
+          const sidOk = !sidExpected || (obj?.sid && obj.sid === sidExpected);
+          if (ttlOk && sidOk && obj && obj.taskId) {
+            setTaskId(obj.taskId);
+            setAwaitingPay(true);
+            startPoll(obj.taskId);
+            startPayUrlPoll(obj.taskId);
+            try { localStorage.removeItem(`lastPay:${code}`); } catch {}
+          }
+        }
+        try { const url = new URL(window.location.href); url.searchParams.delete('paid'); url.searchParams.delete('sid'); window.history.replaceState({}, '', url.toString()); } catch {}
+      }
+    } catch {}
+    // run only once after initial mount
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [code]);
+
   // helpers
   const mskToday = () => new Date().toLocaleDateString('ru-RU', { timeZone: 'Europe/Moscow' }).split('.').reverse().join('-');
   const isValidEmail = (s: string) => /.+@.+\..+/.test(s.trim());
@@ -253,6 +280,17 @@ export default function PublicPayPage(props: any) {
       if (!res.ok) throw new Error(d?.error || 'CREATE_FAILED');
       const tId = d?.task_id;
       setTaskId(tId || null);
+      try {
+        if (tId && typeof window !== 'undefined') {
+          const sidKey = `paySid:${code}`;
+          let sid: string | null = sessionStorage.getItem(sidKey);
+          if (!sid) {
+            sid = (typeof crypto !== 'undefined' && (crypto as any).randomUUID) ? (crypto as any).randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+            sessionStorage.setItem(sidKey, String(sid));
+          }
+          localStorage.setItem(`lastPay:${code}`, JSON.stringify({ taskId: tId, ts: Date.now(), sid: String(sid) }));
+        }
+      } catch {}
       const url = d?.data?.acquiring_order?.url || d?.data?.acquiring_order?.payment_url || null;
       if (url) setPayUrl(url); else startPayUrlPoll(tId);
       setAwaitingPay(false);
