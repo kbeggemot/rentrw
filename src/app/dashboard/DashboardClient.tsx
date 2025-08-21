@@ -370,6 +370,7 @@ export default function DashboardClient({ hasTokenInitial }: { hasTokenInitial: 
                         }
                         // Агентская продажа — обязательные поля и границы
                         if (linkAgent) {
+                          if (linkPartner.trim().length === 0) { showToast('Укажите телефон партнёра', 'error'); return; }
                           if (linkCommVal.trim().length === 0) { showToast('Укажите комиссию агента', 'error'); return; }
                           const comm = Number(linkCommVal.replace(',', '.'));
                           if (!Number.isFinite(comm)) { showToast('Укажите корректную комиссию', 'error'); return; }
@@ -378,7 +379,17 @@ export default function DashboardClient({ hasTokenInitial }: { hasTokenInitial: 
                           } else {
                             if (comm <= 0) { showToast('Укажите фиксированную комиссию в рублях (> 0)', 'error'); return; }
                           }
-                          if (linkPartner.trim().length === 0) { showToast('Укажите телефон партнёра', 'error'); return; }
+                          // Проверка партнёра через RW
+                          try {
+                            const phoneDigits = linkPartner.replace(/\D/g, '');
+                            const r1 = await fetch('/api/rocketwork/tasks', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'InviteExecutor', phone: phoneDigits }) });
+                            await r1.text();
+                          } catch {}
+                          try {
+                            const digits = linkPartner.replace(/\D/g, '');
+                            const s = await fetch(`/api/rocketwork/task-debug?phone=${encodeURIComponent(digits)}`, { cache: 'no-store' });
+                            await s.text();
+                          } catch {}
                         }
                         const payload: any = { title: linkTitle.trim(), description: linkDesc.trim(), sumMode: linkSumMode, amountRub: amountNum, vatRate: linkVat, isAgent: linkAgent, commissionType: linkAgent ? linkCommType : undefined, commissionValue: linkAgent ? Number(linkCommVal.replace(',', '.')) : undefined, partnerPhone: linkAgent ? linkPartner.trim() : undefined, method: linkMethod };
                         const r = await fetch('/api/links', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
