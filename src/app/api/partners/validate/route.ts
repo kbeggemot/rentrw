@@ -51,7 +51,7 @@ export async function POST(req: Request) {
     ].filter(Boolean).join(' ').trim() : null;
     
     // Check registration first (404 or no executor data)
-    if (res.status === 404 || !executorData || !executorData.executor || !executorData.executor.inn) {
+    if (res.status === 404 || !executorData || !executorData.executor) {
       return NextResponse.json({ 
         error: 'PARTNER_NOT_REGISTERED',
         partnerData: { phone: digits, fio: null, status: null, inn: null, updatedAt: new Date().toISOString() }
