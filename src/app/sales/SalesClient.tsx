@@ -17,6 +17,7 @@ type Sale = {
   npdReceiptUri?: string | null;
   serviceEndDate?: string | null;
   createdAtRw?: string | null;
+  hidden?: boolean;
   createdAt: string;
 };
 
@@ -52,6 +53,7 @@ export default function SalesClient({ initial }: { initial: Sale[] }) {
   const [fullReceipt, setFullReceipt] = useState<'all' | 'yes' | 'no'>('all');
   const [commissionReceipt, setCommissionReceipt] = useState<'all' | 'yes' | 'no'>('all');
   const [npdReceipt, setNpdReceipt] = useState<'all' | 'yes' | 'no'>('all');
+  const [showHidden, setShowHidden] = useState<'all' | 'yes' | 'no'>('no');
   // Дата продажи (RW created_at если есть)
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
@@ -75,6 +77,7 @@ export default function SalesClient({ initial }: { initial: Sale[] }) {
     { key: 'endTo', label: 'Окончание услуги по' },
     { key: 'amountMin', label: 'Сумма от' },
     { key: 'amountMax', label: 'Сумма до' },
+    { key: 'showHidden', label: 'Показывать скрытые' },
   ];
   const addFilter = (key: string) => {
     setVisibleFilters((prev) => (prev.includes(key) ? prev : [...prev, key]));
@@ -157,6 +160,11 @@ export default function SalesClient({ initial }: { initial: Sale[] }) {
     const max = amountMax ? Number(amountMax.replace(',', '.')) : null;
     return sales.filter((s) => {
       if (q && !String(s.orderId).includes(q) && !String(s.taskId).includes(q)) return false;
+      if (showHidden !== 'all') {
+        const isHidden = Boolean(s.hidden);
+        if (showHidden === 'no' && isHidden) return false;
+        if (showHidden === 'yes' && !isHidden) return false;
+      }
       if (status !== 'all') {
         const st = String(s.status || '').toLowerCase();
         if (st !== status) return false;
@@ -200,14 +208,14 @@ export default function SalesClient({ initial }: { initial: Sale[] }) {
       if (max != null && !(s.amountGrossRub <= max)) return false;
       return true;
     });
-  }, [sales, query, status, agent, purchaseReceipt, fullReceipt, commissionReceipt, npdReceipt, dateFrom, dateTo, endFrom, endTo, amountMin, amountMax]);
+  }, [sales, query, status, agent, showHidden, purchaseReceipt, fullReceipt, commissionReceipt, npdReceipt, dateFrom, dateTo, endFrom, endTo, amountMin, amountMax]);
 
   const paged = useMemo(() => {
     const start = (page - 1) * pageSize;
     return filtered.slice(start, start + pageSize);
   }, [filtered, page]);
 
-  useEffect(() => { setPage(1); }, [query, status, agent, purchaseReceipt, fullReceipt, commissionReceipt, npdReceipt, dateFrom, dateTo, endFrom, endTo, amountMin, amountMax]);
+  useEffect(() => { setPage(1); }, [query, status, agent, showHidden, purchaseReceipt, fullReceipt, commissionReceipt, npdReceipt, dateFrom, dateTo, endFrom, endTo, amountMin, amountMax]);
 
   const fmtDate = (d?: string | null) => (d ? new Date(d).toLocaleDateString('ru-RU', { timeZone: 'Europe/Moscow' }) : '-');
   const [checksOpenId, setChecksOpenId] = useState<string | number | null>(null);
@@ -237,6 +245,19 @@ export default function SalesClient({ initial }: { initial: Sale[] }) {
         </div>
         {visibleFilters.length > 0 ? (
           <div className="flex flex-wrap gap-3 items-end text-sm">
+            {visibleFilters.includes('showHidden') ? (
+              <div>
+                <div className="text-sm mb-1 text-gray-600 dark:text-gray-400">Показывать скрытые</div>
+                <div className="flex items-center gap-2">
+                  <select className="border rounded-lg px-2 h-9 text-sm bg-white dark:bg-gray-950 w-44" value={showHidden} onChange={(e) => setShowHidden(e.target.value as any)}>
+                    <option value="all">Все</option>
+                    <option value="no">Нет</option>
+                    <option value="yes">Да</option>
+                  </select>
+                  <Button aria-label="Убрать фильтр" variant="ghost" size="icon" onClick={() => removeFilter('showHidden')}>×</Button>
+                </div>
+              </div>
+            ) : null}
             {visibleFilters.includes('status') ? (
               <div>
                 <div className="text-sm mb-1 text-gray-600 dark:text-gray-400">Статус</div>
@@ -396,9 +417,25 @@ export default function SalesClient({ initial }: { initial: Sale[] }) {
                   <Button variant="secondary" onClick={() => setChecksOpenId((id) => (id === s.taskId ? null : s.taskId))}>Чеки</Button>
                 </div>
                 <div className="justify-self-end">
-                  <Button aria-label="Изменить" variant="secondary" size="icon" onClick={() => alert('Будет доступно позже')}>
-                    <IconEdit />
-                  </Button>
+                  <div className="relative">
+                    <Button aria-label="Действия" variant="secondary" size="icon" onClick={(e) => {
+                      const m = (e.currentTarget.nextSibling as HTMLElement | null);
+                      if (m) m.classList.toggle('hidden');
+                    }}>
+                      <IconEdit />
+                    </Button>
+                    <div className="absolute right-0 mt-2 w-36 bg-white dark:bg-gray-950 border border-gray-200 dark:border-gray-800 rounded shadow-sm hidden z-10">
+                      {!s.hidden ? (
+                        <button className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 dark:hover:bg-gray-900" onClick={async () => { try { await fetch('/api/sales', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ taskId: s.taskId, hidden: true }) }); await load(false); } catch {} }}>
+                          Скрыть
+                        </button>
+                      ) : (
+                        <button className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 dark:hover:bg-gray-900" onClick={async () => { try { await fetch('/api/sales', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ taskId: s.taskId, hidden: false }) }); await load(false); } catch {} }}>
+                          Отобразить
+                        </button>
+                      )}
+                    </div>
+                  </div>
                 </div>
               </div>
               {checksOpenId === s.taskId ? (
@@ -456,7 +493,22 @@ export default function SalesClient({ initial }: { initial: Sale[] }) {
                 <td className="px-1 py-2 text-center">{s.npdReceiptUri ? <Button aria-label="Просмотреть чек НПД" variant="secondary" size="icon" onClick={() => window.open(s.npdReceiptUri!, '_blank')}><IconChevronRight /></Button> : '-'}</td>
                 <td className="px-3 py-2">{s.createdAtRw ? new Date(s.createdAtRw).toLocaleDateString('ru-RU', { timeZone: 'Europe/Moscow' }) : '-'}</td>
                 <td className="px-3 py-2">{s.serviceEndDate ? new Date(s.serviceEndDate).toLocaleDateString('ru-RU', { timeZone: 'Europe/Moscow' }) : '-'}</td>
-                <td className="px-1 py-2 text-center"><Button aria-label="Изменить" variant="secondary" size="icon" onClick={() => alert('Будет доступно позже')}><IconEdit /></Button></td>
+                <td className="px-1 py-2 text-center">
+                  <div className="relative inline-block">
+                    <Button aria-label="Действия" variant="secondary" size="icon" onClick={(e) => { const m = (e.currentTarget.nextSibling as HTMLElement | null); if (m) m.classList.toggle('hidden'); }}><IconEdit /></Button>
+                    <div className="absolute right-0 mt-2 w-40 bg-white dark:bg-gray-950 border border-gray-200 dark:border-gray-800 rounded shadow-sm hidden z-10">
+                      {!s.hidden ? (
+                        <button className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 dark:hover:bg-gray-900" onClick={async () => { try { await fetch('/api/sales', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ taskId: s.taskId, hidden: true }) }); await load(false); } catch {} }}>
+                          Скрыть
+                        </button>
+                      ) : (
+                        <button className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 dark:hover:bg-gray-900" onClick={async () => { try { await fetch('/api/sales', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ taskId: s.taskId, hidden: false }) }); await load(false); } catch {} }}>
+                          Отобразить
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </td>
               </tr>
             ))}
           </tbody>

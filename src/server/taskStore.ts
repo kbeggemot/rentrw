@@ -32,6 +32,7 @@ export type SaleRecord = {
   serviceEndDate?: string | null; // YYYY-MM-DD
   vatRate?: string | null; // e.g. none|0|10|20
   createdAtRw?: string | null; // created_at from RW task (ISO)
+  hidden?: boolean; // soft-hide from UI
   createdAt: string;
   updatedAt: string;
 };
@@ -99,6 +100,7 @@ export async function recordSaleOnCreate(params: {
     serviceEndDate: serviceEndDate ?? null,
     vatRate: vatRate ?? null,
     createdAtRw: null,
+    hidden: false,
     createdAt: now,
     updatedAt: now,
   });
@@ -251,6 +253,7 @@ export async function ensureSaleFromTask(params: {
     serviceEndDate: null,
     vatRate: null,
     createdAtRw: (task?.created_at as string | undefined) ?? null,
+    hidden: false,
     createdAt: task?.created_at || now,
     updatedAt: now,
   });
@@ -268,6 +271,21 @@ export async function updateSaleRwOrderId(userId: string, taskId: number | strin
     const current = store.sales[idx];
     const next = { ...current } as SaleRecord;
     next.rwOrderId = rwOrderId;
+    next.updatedAt = new Date().toISOString();
+    store.sales[idx] = next;
+    await writeTasks(store);
+    try { getHub().publish(userId, 'sales:update'); } catch {}
+  }
+}
+
+export async function setSaleHidden(userId: string, taskId: number | string, hidden: boolean): Promise<void> {
+  const store = await readTasks();
+  if (!store.sales) store.sales = [];
+  const idx = store.sales.findIndex((s) => s.userId === userId && s.taskId == taskId);
+  if (idx !== -1) {
+    const current = store.sales[idx];
+    const next = { ...current } as SaleRecord;
+    next.hidden = Boolean(hidden);
     next.updatedAt = new Date().toISOString();
     store.sales[idx] = next;
     await writeTasks(store);

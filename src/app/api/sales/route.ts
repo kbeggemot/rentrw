@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { listSales, updateSaleFromStatus, updateSaleOfdUrlsByOrderId, setSaleCreatedAtRw } from '@/server/taskStore';
+import { listSales, updateSaleFromStatus, updateSaleOfdUrlsByOrderId, setSaleCreatedAtRw, setSaleHidden } from '@/server/taskStore';
 import type { RocketworkTask } from '@/types/rocketwork';
 import { getDecryptedApiToken } from '@/server/secureStore';
 import { fermaGetAuthTokenCached, fermaGetReceiptStatus, buildReceiptViewUrl } from '@/server/ofdFerma';
@@ -180,6 +180,22 @@ export async function GET(req: Request) {
     return NextResponse.json({ sales });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Server error';
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
+}
+
+export async function PATCH(req: Request) {
+  try {
+    const userId = getUserId(req);
+    if (!userId) return NextResponse.json({ error: 'NO_USER' }, { status: 401 });
+    const body = await req.json().catch(() => ({} as any));
+    const taskId = body?.taskId;
+    const hidden = body?.hidden;
+    if (typeof taskId === 'undefined') return NextResponse.json({ error: 'NO_TASK' }, { status: 400 });
+    await setSaleHidden(userId, taskId, Boolean(hidden));
+    return NextResponse.json({ ok: true });
+  } catch (e) {
+    const message = e instanceof Error ? e.message : 'Server error';
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
