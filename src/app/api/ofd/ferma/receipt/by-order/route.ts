@@ -39,7 +39,9 @@ export async function GET(req: Request) {
           // 1) Try extended GET first (returns CustomerReceipt)
           const ext = await fermaGetReceiptExtended({ receiptId: String(rid), dateFromIncl: startUtc, dateToIncl: endUtc, fn: (sale as any)?.fn, zn: (sale as any)?.zn }, { baseUrl, authToken: token });
           if (ext.rawStatus >= 200 && ext.rawStatus < 300 && ext.rawText && ext.rawText.indexOf('CustomerReceipt') !== -1) {
-            return NextResponse.json(ext, { status: ext.rawStatus });
+            // Also fetch minimal status to return direct link alongside extended body
+            const mini = await fermaGetReceiptStatus(String(rid), { baseUrl, authToken: token });
+            return NextResponse.json({ extended: ext, status: mini }, { status: ext.rawStatus });
           }
           // 2) Fallback to detailed POST
           let byRid = await fermaGetReceiptStatusDetailed(String(rid), { startUtc, endUtc, startLocal: startUtc, endLocal: endUtc }, { baseUrl, authToken: token });
