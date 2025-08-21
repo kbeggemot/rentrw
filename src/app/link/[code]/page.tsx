@@ -174,6 +174,20 @@ export default function PublicPayPage(props: any) {
           if (!res.ok) {
             const errorData = await res.json();
             const code = errorData?.error;
+            
+            // Always update partner with current data from RW, even on error
+            if (errorData?.partnerData) {
+              try {
+                await fetch('/api/partners', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json', 'x-user-id': data.userId },
+                  body: JSON.stringify(errorData.partnerData)
+                });
+              } catch (e) {
+                // Silent fail - partner update is not critical for payment flow
+              }
+            }
+            
             if (code === 'PARTNER_NOT_REGISTERED') setMsg('Партнёр не завершил регистрацию в Рокет Ворк');
             else if (code === 'PARTNER_NOT_VALIDATED') setMsg('Партнёр не может принять оплату: нет статуса самозанятого');
             else if (code === 'PARTNER_NO_PAYMENT_INFO') setMsg('Партнёр не указал платёжные реквизиты в Рокет Ворк');

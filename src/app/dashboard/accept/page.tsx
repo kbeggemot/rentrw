@@ -417,6 +417,20 @@ function AcceptPaymentContent() {
         if (!res.ok) {
           const errorData = await res.json();
           const code = errorData?.error;
+          
+          // Always update partner with current data from RW, even on error
+          if (errorData?.partnerData) {
+            try {
+              await fetch('/api/partners', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(errorData.partnerData)
+              });
+            } catch (e) {
+              // Silent fail - partner update is not critical for payment flow
+            }
+          }
+          
           if (code === 'PARTNER_NOT_REGISTERED') showToast('Партнёр не завершил регистрацию в Рокет Ворк', 'error');
           else if (code === 'PARTNER_NOT_VALIDATED') showToast('Партнёр не может принять оплату: нет статуса самозанятого', 'error');
           else if (code === 'PARTNER_NO_PAYMENT_INFO') showToast('Партнёр не указал платёжные реквизиты в Рокет Ворк', 'error');

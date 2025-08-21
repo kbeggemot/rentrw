@@ -41,26 +41,62 @@ export async function POST(req: Request) {
     let executorData: any = null; 
     try { executorData = txt ? JSON.parse(txt) : null; } catch { executorData = txt; }
     
-    if (res.status === 404 || (typeof executorData === 'object' && executorData && ((executorData.error && /not\s*found/i.test(String(executorData.error))) || executorData.executor == null || (executorData.executor && executorData.executor.inn == null)))) {
-      return NextResponse.json({ error: 'PARTNER_NOT_REGISTERED' }, { status: 400 });
+    // Always extract available data for partner update
+    const status: string | undefined = (executorData?.executor?.selfemployed_status as string | undefined) ?? (executorData?.selfemployed_status as string | undefined);
+    const inn = executorData?.executor?.inn || executorData?.inn;
+    const fio = executorData?.executor ? [
+      executorData.executor.last_name,
+      executorData.executor.first_name, 
+      executorData.executor.second_name
+    ].filter(Boolean).join(' ').trim() : null;
+    
+    // Check registration first
+    const isNotFound = res.status === 404;
+    const hasExecutorError = executorData && typeof executorData === 'object' && 
+      (executorData.error || !executorData.executor || !executorData.executor.inn);
+    
+    if (isNotFound || hasExecutorError) {
+      return NextResponse.json({ 
+        error: 'PARTNER_NOT_REGISTERED',
+        partnerData: { phone: digits, fio, status, inn, updatedAt: new Date().toISOString() }
+      }, { status: 400 });
     }
     
     if (!res.ok) {
-      return NextResponse.json({ error: (executorData?.error as string) || 'RW_ERROR' }, { status: 400 });
+      return NextResponse.json({ 
+        error: (executorData?.error as string) || 'RW_ERROR',
+        partnerData: { phone: digits, fio, status, inn, updatedAt: new Date().toISOString() }
+      }, { status: 400 });
     }
     
-    const status: string | undefined = (executorData?.executor?.selfemployed_status as string | undefined) ?? (executorData?.selfemployed_status as string | undefined);
-    if (!status) return NextResponse.json({ error: 'PARTNER_NOT_REGISTERED' }, { status: 400 });
-    if (status !== 'validated') return NextResponse.json({ error: 'PARTNER_NOT_VALIDATED' }, { status: 400 });
+    if (!status) {
+      return NextResponse.json({ 
+        error: 'PARTNER_NOT_REGISTERED',
+        partnerData: { phone: digits, fio, status, inn, updatedAt: new Date().toISOString() }
+      }, { status: 400 });
+    }
+    
+    if (status !== 'validated') {
+      return NextResponse.json({ 
+        error: 'PARTNER_NOT_VALIDATED',
+        partnerData: { phone: digits, fio, status, inn, updatedAt: new Date().toISOString() }
+      }, { status: 400 });
+    }
     
     const paymentInfo = (executorData?.executor?.payment_info ?? executorData?.payment_info ?? null);
-    if (!paymentInfo) return NextResponse.json({ error: 'PARTNER_NO_PAYMENT_INFO' }, { status: 400 });
+    if (!paymentInfo) {
+      return NextResponse.json({ 
+        error: 'PARTNER_NO_PAYMENT_INFO',
+        partnerData: { phone: digits, fio, status, inn, updatedAt: new Date().toISOString() }
+      }, { status: 400 });
+    }
     
     return NextResponse.json({ 
       ok: true, 
       executor: executorData?.executor || executorData,
       status,
-      inn: executorData?.executor?.inn || executorData?.inn
+      inn,
+      partnerData: { phone: digits, fio, status, inn, updatedAt: new Date().toISOString() }
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'Server error';
