@@ -384,7 +384,7 @@ export default function DashboardClient({ hasTokenInitial }: { hasTokenInitial: 
                     <div className="divide-y divide-gray-100 dark:divide-gray-800">
                       {links.map((l) => (
                         <div key={l.code} className="flex items-center justify-between px-3 py-2">
-                          <div className="text-sm"><a className="text-black font-semibold hover:underline" href={`/link/${encodeURIComponent(l.code)}`} target="_blank" rel="noreferrer">{l.title || l.code}</a></div>
+                          <div className="text-sm"><a className="text-black font-medium hover:underline" href={`/link/${encodeURIComponent(l.code)}`} target="_blank" rel="noreferrer">{l.title || l.code}</a></div>
                           <div className="flex items-center gap-2">
                             <Button variant="secondary" size="icon" aria-label="Скопировать ссылку" onClick={async () => { try { await navigator.clipboard.writeText(new URL(`/link/${encodeURIComponent(l.code)}`, window.location.origin).toString()); showToast('Ссылка скопирована', 'success'); } catch {} }}>
                               <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
