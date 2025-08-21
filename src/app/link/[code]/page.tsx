@@ -84,28 +84,46 @@ export default function PublicPayPage(props: any) {
     if (pollRef.current) return;
     const tick = async () => {
       try {
-        const r = await fetch(`/api/rocketwork/tasks/${encodeURIComponent(String(uid))}`, { cache: 'no-store', headers: data?.userId ? { 'x-user-id': data.userId } as any : undefined });
+        const r = await fetch(`/api/rocketwork/tasks/${encodeURIComponent(String(uid))}?t=${Date.now()}`, { cache: 'no-store', headers: data?.userId ? { 'x-user-id': data.userId } as any : undefined });
         const t = await r.json();
-        const sale = t?.sale || null;
-        if (sale) {
-          const st = String(sale.status || '').toLowerCase();
-          const pre = sale.ofdUrl || null;
-          const full = sale.ofdFullUrl || null;
-          const com = sale.additionalCommissionOfdUrl || null;
-          const npd = sale.npdReceiptUri || null;
-          setReceipts({ prepay: pre, full, commission: com, npd });
-          if (st === 'paid' || st === 'transfered' || st === 'transferred') {
-            if (pre || full || com || npd) {
-              if (pollRef.current) { window.clearTimeout(pollRef.current); pollRef.current = null; }
-              setAwaitingPay(false);
-              return;
-            }
+        const aoStatus = String((t?.acquiring_order?.status || t?.task?.acquiring_order?.status || '')).toLowerCase();
+        // Try to read receipts directly from RW if available (rare when with_ofd_receipt=false)
+        const rwPre = t?.ofd_url || t?.acquiring_order?.ofd_url || null;
+        const rwFull = t?.ofd_full_url || t?.acquiring_order?.ofd_full_url || null;
+        const rwCom = t?.additional_commission_ofd_url || t?.task?.additional_commission_ofd_url || t?.additional_commission_url || t?.task?.additional_commission_url || null;
+        const rwNpd = t?.receipt_uri || t?.task?.receipt_uri || null;
+        // Prefer local sale store where callbacks and Ferma polling land
+        let salePre: string | null | undefined;
+        let saleFull: string | null | undefined;
+        let saleCom: string | null | undefined;
+        let saleNpd: string | null | undefined;
+        try {
+          const sres = await fetch(`/api/sales/by-task/${encodeURIComponent(String(uid))}`, { cache: 'no-store', headers: data?.userId ? { 'x-user-id': data.userId } as any : undefined });
+          if (sres.ok) {
+            const sj = await sres.json();
+            const sl = sj?.sale;
+            salePre = sl?.ofdUrl ?? null;
+            saleFull = sl?.ofdFullUrl ?? null;
+            saleCom = sl?.additionalCommissionOfdUrl ?? null;
+            saleNpd = sl?.npdReceiptUri ?? null;
+          }
+        } catch {}
+        const pre = (salePre ?? rwPre ?? null) as string | null;
+        const full = (saleFull ?? rwFull ?? null) as string | null;
+        const com = (saleCom ?? rwCom ?? null) as string | null;
+        const npd = (saleNpd ?? rwNpd ?? null) as string | null;
+        setReceipts({ prepay: pre, full, commission: com, npd });
+        if (['paid', 'transfered', 'transferred'].includes(aoStatus)) {
+          if (pre || full || com || npd) {
+            if (pollRef.current) { window.clearTimeout(pollRef.current); pollRef.current = null; }
+            setAwaitingPay(false);
+            return;
           }
         }
       } catch {}
       pollRef.current = window.setTimeout(tick, 2000) as unknown as number;
     };
-    pollRef.current = window.setTimeout(tick, 1500) as unknown as number;
+    pollRef.current = window.setTimeout(tick, 1000) as unknown as number;
   };
 
   const startPayUrlPoll = (uid: string | number) => {

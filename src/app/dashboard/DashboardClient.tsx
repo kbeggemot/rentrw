@@ -296,15 +296,15 @@ export default function DashboardClient({ hasTokenInitial }: { hasTokenInitial: 
               Создать постоянную ссылку на оплату
             </Button>
             {linkOpen ? (
-              <div className="mt-3 border rounded-lg p-3">
+              <div className="mt-3 border border-gray-200 dark:border-gray-800 rounded-lg p-3">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
                   <div>
                     <label className="block text-sm text-gray-700 mb-1">Название платежной ссылки</label>
-                    <input className="w-full rounded-lg border px-2 h-9 text-sm" value={linkTitle} onChange={(e) => setLinkTitle(e.target.value)} />
+                    <input className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-950 px-2 h-9 text-sm" value={linkTitle} onChange={(e) => setLinkTitle(e.target.value)} />
                   </div>
                   <div>
                     <label className="block text-sm text-gray-700 mb-1">НДС</label>
-                    <select className="w-40 rounded-lg border px-2 h-9 text-sm" value={linkVat} onChange={(e) => setLinkVat(e.target.value as any)}>
+                    <select className="w-40 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-950 px-2 h-9 text-sm" value={linkVat} onChange={(e) => setLinkVat(e.target.value as any)}>
                       <option value="none">Без НДС</option>
                       <option value="0">0%</option>
                       <option value="10">10%</option>
@@ -313,19 +313,19 @@ export default function DashboardClient({ hasTokenInitial }: { hasTokenInitial: 
                   </div>
                   <div>
                     <label className="block text-sm text-gray-700 mb-1">Сумма</label>
-                    <div className="flex items-center gap-2">
-                      <select className="rounded-lg border px-2 h-9 text-sm" value={linkSumMode} onChange={(e) => setLinkSumMode(e.target.value as any)}>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <select className="rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-950 px-2 h-9 text-sm shrink-0" value={linkSumMode} onChange={(e) => setLinkSumMode(e.target.value as any)}>
                         <option value="custom">Укажет покупатель</option>
                         <option value="fixed">Фиксированная</option>
                       </select>
                       {linkSumMode === 'fixed' ? (
-                        <input className="w-40 rounded-lg border px-2 h-9 text-sm" value={linkAmount} onChange={(e) => setLinkAmount(e.target.value)} placeholder="0.00" />
+                        <input className="w-32 sm:w-40 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-950 px-2 h-9 text-sm shrink-0" value={linkAmount} onChange={(e) => setLinkAmount(e.target.value)} placeholder="0.00" />
                       ) : null}
                     </div>
                   </div>
                   <div>
                     <label className="block text-sm text-gray-700 mb-1">Тип оплаты</label>
-                    <select className="w-40 rounded-lg border px-2 h-9 text-sm" value={linkMethod} onChange={(e) => setLinkMethod(e.target.value as any)}>
+                    <select className="w-40 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-950 px-2 h-9 text-sm" value={linkMethod} onChange={(e) => setLinkMethod(e.target.value as any)}>
                       <option value="any">Любой</option>
                       <option value="qr">СБП</option>
                       <option value="card">Карта</option>
@@ -333,7 +333,7 @@ export default function DashboardClient({ hasTokenInitial }: { hasTokenInitial: 
                   </div>
                   <div className="md:col-span-2">
                     <label className="block text-sm text-gray-700 mb-1">Описание услуги</label>
-                    <textarea className="w-full rounded-lg border px-2 py-2 text-sm" rows={2} value={linkDesc} onChange={(e) => setLinkDesc(e.target.value)} />
+                    <textarea className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-950 px-2 py-2 text-sm" rows={2} value={linkDesc} onChange={(e) => setLinkDesc(e.target.value)} />
                   </div>
                   <div className="md:col-span-2">
                     <label className="inline-flex items-center gap-2 text-sm">
@@ -342,12 +342,12 @@ export default function DashboardClient({ hasTokenInitial }: { hasTokenInitial: 
                     </label>
                     {linkAgent ? (
                       <div className="mt-2 flex flex-wrap items-end gap-3">
-                        <select className="rounded-lg border px-2 h-9 text-sm" value={linkCommType} onChange={(e) => setLinkCommType(e.target.value as any)}>
+                        <select className="rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-950 px-2 h-9 text-sm" value={linkCommType} onChange={(e) => setLinkCommType(e.target.value as any)}>
                           <option value="percent">%</option>
                           <option value="fixed">₽</option>
                         </select>
-                        <input className="w-32 rounded-lg border px-2 h-9 text-sm" placeholder="Комиссия" value={linkCommVal} onChange={(e) => setLinkCommVal(e.target.value)} />
-                        <input className="w-56 rounded-lg border px-2 h-9 text-sm" placeholder="Телефон партнёра" value={linkPartner} onChange={(e) => setLinkPartner(e.target.value)} />
+                        <input className="w-32 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-950 px-2 h-9 text-sm" placeholder="Комиссия" value={linkCommVal} onChange={(e) => setLinkCommVal(e.target.value)} />
+                        <input className="w-56 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-950 px-2 h-9 text-sm" placeholder="Телефон партнёра" value={linkPartner} onChange={(e) => setLinkPartner(e.target.value)} />
                       </div>
                     ) : null}
                   </div>
