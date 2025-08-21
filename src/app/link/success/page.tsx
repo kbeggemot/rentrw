@@ -14,6 +14,7 @@ export default function PublicSuccessUnifiedPage() {
   const [msg, setMsg] = useState<string | null>(null);
   const [waiting, setWaiting] = useState(false);
   const [summary, setSummary] = useState<{ amountRub?: number; description?: string | null } | null>(null);
+  const [payMethod, setPayMethod] = useState<string | null>(null);
   const pollRef = useRef<number | null>(null);
   const [dots, setDots] = useState(".");
 
@@ -134,6 +135,8 @@ export default function PublicSuccessUnifiedPage() {
         // 2) RW — как резервный источник статусов
         const r = await fetch(`/api/rocketwork/tasks/${encodeURIComponent(String(uid))}?t=${Date.now()}`, { cache: 'no-store', headers: userId ? { 'x-user-id': userId } as any : undefined });
         const t = await r.json();
+        const typ = (t?.acquiring_order?.type || t?.task?.acquiring_order?.type || '').toString().toUpperCase();
+        if (typ) setPayMethod(typ === 'QR' ? 'СБП' : typ === 'CARD' ? 'Карта' : typ);
         const rwPre = t?.ofd_url || t?.acquiring_order?.ofd_url || null;
         const rwFull = t?.ofd_full_url || t?.acquiring_order?.ofd_full_url || null;
         const rwCom = t?.additional_commission_ofd_url || t?.task?.additional_commission_ofd_url || t?.additional_commission_url || t?.task?.additional_commission_url || null;
@@ -161,9 +164,6 @@ export default function PublicSuccessUnifiedPage() {
     <div className="max-w-xl mx-auto p-4">
       <h1 className="text-xl font-semibold mb-1">Платёж успешно выполнен</h1>
       <div className="text-sm text-gray-600 mb-2">Спасибо! Мы сформируем чек(и) автоматически и отправим на почту.</div>
-      {summary ? (
-        <div className="text-sm text-gray-800 mb-3">{summary.description ? `${summary.description} — ` : ''}{typeof summary.amountRub === 'number' ? new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB' }).format(summary.amountRub) : ''}</div>
-      ) : null}
 
       {waiting ? (
         <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm mb-4">Ищем информацию о платеже{dots}</div>
@@ -181,20 +181,28 @@ export default function PublicSuccessUnifiedPage() {
         >Показать чеки и детали платежа</button>
         {detailsOpen ? (
           <div className="mt-1 rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm">
-            {!receipts.prepay && !receipts.full && !receipts.commission && !receipts.npd ? (
-              <div className="text-gray-600">Подтягиваем данные{dots}</div>
-            ) : (
-              <div className="grid grid-cols-[9rem_1fr] gap-y-2">
-                {(receipts.full || receipts.prepay) ? (<>
-                  <div className="text-gray-500">Чек на покупку</div>
+            <div className="grid grid-cols-[9rem_1fr] gap-y-2 mb-2">
+              <div className="text-gray-500">За что платим</div>
+              <div>{summary?.description || info?.title || '—'}</div>
+              <div className="text-gray-500">Сумма, ₽</div>
+              <div>{typeof summary?.amountRub === 'number' ? new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB' }).format(summary!.amountRub!) : '—'}</div>
+              <div className="text-gray-500">Способ оплаты</div>
+              <div>{payMethod || '—'}</div>
+              <div className="text-gray-500">Чек</div>
+              <div>
+                {(receipts.full || receipts.prepay) ? (
                   <a className="text-black font-semibold hover:underline" href={(receipts.full || receipts.prepay)!} target="_blank" rel="noreferrer">Открыть</a>
-                </>) : null}
-                {receipts.commission ? (<>
-                  <div className="text-gray-500">Чек на комиссию</div>
-                  <a className="text-black font-semibold hover:underline" href={receipts.commission!} target="_blank" rel="noreferrer">Открыть</a>
-                </>) : null}
+                ) : (
+                  <span className="text-gray-600">Подтягиваем данные{dots}</span>
+                )}
               </div>
-            )}
+            </div>
+            {receipts.commission ? (
+              <div className="grid grid-cols-[9rem_1fr] gap-y-2">
+                <div className="text-gray-500">Чек на комиссию</div>
+                <a className="text-black font-semibold hover:underline" href={receipts.commission!} target="_blank" rel="noreferrer">Открыть</a>
+              </div>
+            ) : null}
           </div>
         ) : null}
       </div>
