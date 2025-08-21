@@ -77,7 +77,7 @@ export default function SalesClient({ initial }: { initial: Sale[] }) {
     { key: 'endTo', label: 'Окончание услуги по' },
     { key: 'amountMin', label: 'Сумма от' },
     { key: 'amountMax', label: 'Сумма до' },
-    { key: 'showHidden', label: 'Показывать скрытые' },
+    { key: 'showHidden', label: 'Видимость' },
   ];
   const addFilter = (key: string) => {
     setVisibleFilters((prev) => (prev.includes(key) ? prev : [...prev, key]));
@@ -247,12 +247,12 @@ export default function SalesClient({ initial }: { initial: Sale[] }) {
           <div className="flex flex-wrap gap-3 items-end text-sm">
             {visibleFilters.includes('showHidden') ? (
               <div>
-                <div className="text-sm mb-1 text-gray-600 dark:text-gray-400">Показывать скрытые</div>
+                <div className="text-sm mb-1 text-gray-600 dark:text-gray-400">Видимость</div>
                 <div className="flex items-center gap-2">
                   <select className="border rounded-lg px-2 h-9 text-sm bg-white dark:bg-gray-950 w-44" value={showHidden} onChange={(e) => setShowHidden(e.target.value as any)}>
                     <option value="all">Все</option>
-                    <option value="no">Нет</option>
-                    <option value="yes">Да</option>
+                    <option value="yes">Только скрытые</option>
+                    <option value="no">Только видимые</option>
                   </select>
                   <Button aria-label="Убрать фильтр" variant="ghost" size="icon" onClick={() => removeFilter('showHidden')}>×</Button>
                 </div>
@@ -497,7 +497,7 @@ export default function SalesClient({ initial }: { initial: Sale[] }) {
                   <div className="relative inline-block">
                     <Button aria-label="Действия" variant="secondary" size="icon" onClick={(e) => { const m = (e.currentTarget.nextElementSibling as HTMLElement | null); if (m) m.classList.toggle('hidden'); }}><IconEdit /></Button>
                     <div className="absolute right-0 mt-2 w-40 bg-white dark:bg-gray-950 border border-gray-200 dark:border-gray-800 rounded shadow-sm hidden z-10">
-                      {(showHidden === 'yes' || s.hidden) ? (
+                      {s.hidden ? (
                         <button className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 dark:hover:bg-gray-900" onClick={async () => { try { await fetch('/api/sales', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ taskId: s.taskId, hidden: false }) }); await load(false); } catch {} }}>
                           Отобразить
                         </button>
