@@ -89,6 +89,17 @@ export default function SalesClient({ initial }: { initial: Sale[] }) {
   const load = async (refresh = false) => {
     setLoading(true);
     try {
+      const syncMissing = async (arr: Sale[]) => {
+        try {
+          const need = arr.filter((s) => !s.ofdUrl && !s.ofdFullUrl);
+          await Promise.allSettled(need.map((s) => fetch(`/api/ofd/sync?order=${encodeURIComponent(String(s.orderId))}`, { cache: 'no-store', credentials: 'include' })));
+          // soft refresh after sync attempts
+          const r2 = await fetch('/api/sales', { cache: 'no-store', credentials: 'include' });
+          const d2 = await r2.json();
+          const list2 = Array.isArray(d2?.sales) ? d2.sales : [];
+          setSales((prev) => (JSON.stringify(prev) === JSON.stringify(list2) ? prev : list2));
+        } catch {}
+      };
       if (refresh) {
         void fetch('/api/sales?refresh=1', { cache: 'no-store', credentials: 'include' })
           .then(() => fetch('/api/sales', { cache: 'no-store', credentials: 'include' }))
@@ -96,6 +107,7 @@ export default function SalesClient({ initial }: { initial: Sale[] }) {
           .then((d) => {
             const list = Array.isArray(d?.sales) ? d.sales : [];
             setSales((prev) => (JSON.stringify(prev) === JSON.stringify(list) ? prev : list));
+            void syncMissing(list);
           })
           .catch(() => void 0)
           .finally(() => setLoading(false));
@@ -103,11 +115,14 @@ export default function SalesClient({ initial }: { initial: Sale[] }) {
         const oldData = await resOld.json();
         const listOld = Array.isArray(oldData?.sales) ? oldData.sales : [];
         setSales((prev) => (JSON.stringify(prev) === JSON.stringify(listOld) ? prev : listOld));
+        // fire-and-forget sync for the interim list as well
+        void syncMissing(listOld);
       } else {
         const res = await fetch('/api/sales', { cache: 'no-store', credentials: 'include' });
         const data = await res.json();
         const list = Array.isArray(data?.sales) ? data.sales : [];
         setSales((prev) => (JSON.stringify(prev) === JSON.stringify(list) ? prev : list));
+        void syncMissing(list);
       }
     } catch {
       // keep previous data to avoid flicker
