@@ -299,11 +299,11 @@ export default function DashboardClient({ hasTokenInitial }: { hasTokenInitial: 
               <div className="mt-3 border border-gray-200 dark:border-gray-800 rounded-lg p-3">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
                   <div>
-                    <label className="block text-sm text-gray-700 mb-1">Название платежной ссылки</label>
+                    <label className="block text-sm text-gray-700 dark:text-gray-300 mb-1">Название платежной ссылки</label>
                     <input className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-950 px-2 h-9 text-sm" value={linkTitle} onChange={(e) => setLinkTitle(e.target.value)} />
                   </div>
                   <div>
-                    <label className="block text-sm text-gray-700 mb-1">НДС</label>
+                    <label className="block text-sm text-gray-700 dark:text-gray-300 mb-1">НДС</label>
                     <select className="w-44 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-950 px-2 h-9 text-sm" value={linkVat} onChange={(e) => setLinkVat(e.target.value as any)}>
                       <option value="none">Без НДС</option>
                       <option value="0">0%</option>
@@ -312,7 +312,7 @@ export default function DashboardClient({ hasTokenInitial }: { hasTokenInitial: 
                     </select>
                   </div>
                   <div>
-                    <label className="block text-sm text-gray-700 mb-1">Сумма</label>
+                    <label className="block text-sm text-gray-700 dark:text-gray-300 mb-1">Сумма</label>
                     <div className="flex flex-wrap items-center gap-2">
                       <select className="w-44 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-950 px-2 h-9 text-sm shrink-0" value={linkSumMode} onChange={(e) => setLinkSumMode(e.target.value as any)}>
                         <option value="custom">Укажет покупатель</option>
@@ -324,7 +324,7 @@ export default function DashboardClient({ hasTokenInitial }: { hasTokenInitial: 
                     </div>
                   </div>
                   <div>
-                    <label className="block text-sm text-gray-700 mb-1">Тип оплаты</label>
+                    <label className="block text-sm text-gray-700 dark:text-gray-300 mb-1">Тип оплаты</label>
                     <select className="w-44 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-950 px-2 h-9 text-sm" value={linkMethod} onChange={(e) => setLinkMethod(e.target.value as any)}>
                       <option value="any">Любой</option>
                       <option value="qr">СБП</option>
@@ -332,7 +332,7 @@ export default function DashboardClient({ hasTokenInitial }: { hasTokenInitial: 
                     </select>
                   </div>
                   <div className="md:col-span-2">
-                    <label className="block text-sm text-gray-700 mb-1">Описание услуги</label>
+                    <label className="block text-sm text-gray-700 dark:text-gray-300 mb-1">Описание услуги</label>
                     <textarea className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-950 px-2 py-2 text-sm" rows={2} value={linkDesc} onChange={(e) => setLinkDesc(e.target.value)} />
                   </div>
                   <div className="md:col-span-2">
@@ -433,12 +433,12 @@ export default function DashboardClient({ hasTokenInitial }: { hasTokenInitial: 
               {linksOpen ? (
                 <div className="mt-2 overflow-x-auto bg-white dark:bg-gray-950 border border-gray-200 dark:border-gray-800 rounded">
                   {links.length === 0 ? (
-                    <div className="px-3 py-3 text-sm text-gray-500">Ссылок нет</div>
+                    <div className="px-3 py-3 text-sm text-gray-500 dark:text-gray-400">Ссылок нет</div>
                   ) : (
                     <div className="divide-y divide-gray-100 dark:divide-gray-800">
                       {links.map((l) => (
                         <div key={l.code} className="flex items-center justify-between px-3 py-2">
-                          <div className="text-sm"><a className="text-black font-semibold hover:underline" href={`/link/${encodeURIComponent(l.code)}`} target="_blank" rel="noreferrer">{l.title || l.code}</a></div>
+                          <div className="text-sm"><a className="text-black dark:text-white font-semibold hover:underline" href={`/link/${encodeURIComponent(l.code)}`} target="_blank" rel="noreferrer">{l.title || l.code}</a></div>
                           <div className="flex items-center gap-2">
                             <Button variant="secondary" size="icon" aria-label="Скопировать ссылку" onClick={async () => { try { await navigator.clipboard.writeText(new URL(`/link/${encodeURIComponent(l.code)}`, window.location.origin).toString()); showToast('Ссылка скопирована', 'success'); } catch {} }}>
                               <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
