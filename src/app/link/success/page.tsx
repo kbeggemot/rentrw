@@ -11,6 +11,7 @@ export default function PublicSuccessUnifiedPage() {
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [receipts, setReceipts] = useState<{ prepay?: string | null; full?: string | null; commission?: string | null; npd?: string | null }>({});
   const [msg, setMsg] = useState<string | null>(null);
+  const [waiting, setWaiting] = useState(false);
   const pollRef = useRef<number | null>(null);
   const [dots, setDots] = useState(".");
 
@@ -44,7 +45,29 @@ export default function PublicSuccessUnifiedPage() {
       candidates.sort((a, b) => b.ts - a.ts);
       const chosen = candidates[0];
       if (!chosen || !chosen.taskId) {
-        setMsg("Данные об оплате не найдены или устарели");
+        // Если на клиенте ничего нет — пробуем резолвить sid на сервере и показать лоадер
+        if (sid) {
+          setWaiting(true);
+          (async () => {
+            try {
+              const r = await fetch(`/api/pay-resume?sid=${encodeURIComponent(sid)}`, { cache: 'no-store' });
+              const d = await r.json();
+              if (r.ok && d?.taskId) {
+                setTaskId(d.taskId);
+                setInfo({ code: '', userId: String(d.userId || ''), title: undefined, orgName: d?.orgName || null });
+                setWaiting(false);
+              } else {
+                setWaiting(false);
+                setMsg('Данные об оплате не найдены или устарели');
+              }
+            } catch {
+              setWaiting(false);
+              setMsg('Данные об оплате не найдены или устарели');
+            }
+          })();
+        } else {
+          setMsg("Данные об оплате не найдены или устарели");
+        }
         return;
       }
       setTaskId(chosen.taskId);
@@ -87,20 +110,14 @@ export default function PublicSuccessUnifiedPage() {
 
   return (
     <div className="max-w-xl mx-auto p-4">
-      <h1 className="text-xl font-semibold mb-1">Оплата успешно завершена</h1>
-      <div className="text-sm text-gray-600 mb-4">
-        {info ? (
-          <>Спасибо! Платёж по ссылке {info.title ? `«${info.title}»` : `№ ${info.code}`} в пользу {info.orgName || 'организации'} выполнен.</>
-        ) : (
-          <>Спасибо! Платёж выполнен.</>
-        )}
-      </div>
+      <h1 className="text-xl font-semibold mb-1">Платёж успешно выполнен</h1>
+      <div className="text-sm text-gray-600 mb-4">Спасибо! Мы сформируем чек(и) автоматически и отправим на почту.</div>
 
-      <div className="rounded-lg border border-green-200 bg-green-50 p-3 text-sm mb-4">
-        Мы сформируем чек(и) автоматически.
-      </div>
+      {waiting ? (
+        <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm mb-4">Ищем информацию о платеже{dots}</div>
+      ) : null}
 
-      {msg ? (
+      {msg && !waiting ? (
         <div className="rounded-lg border border-yellow-200 bg-yellow-50 p-3 text-sm mb-3">{msg}</div>
       ) : null}
 
