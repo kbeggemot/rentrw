@@ -404,10 +404,10 @@ export default function SalesClient({ initial }: { initial: Sale[] }) {
               {checksOpenId === s.taskId ? (
                 <div className="mt-2 rounded-md border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900 p-2 text-sm">
                   <div className="grid grid-cols-[9rem_1fr] gap-y-2">
-                    {s.ofdUrl ? (<><div className="text-gray-500">Предоплата</div><a className="text-black font-medium hover:underline" href={s.ofdUrl} target="_blank" rel="noreferrer">Открыть</a></>) : null}
-                    {s.ofdFullUrl ? (<><div className="text-gray-500">Полный расчёт</div><a className="text-black font-medium hover:underline" href={s.ofdFullUrl} target="_blank" rel="noreferrer">Открыть</a></>) : null}
-                    {s.additionalCommissionOfdUrl ? (<><div className="text-gray-500">Комиссия</div><a className="text-black font-medium hover:underline" href={s.additionalCommissionOfdUrl} target="_blank" rel="noreferrer">Открыть</a></>) : null}
-                    {s.npdReceiptUri ? (<><div className="text-gray-500">НПД</div><a className="text-black font-medium hover:underline" href={s.npdReceiptUri} target="_blank" rel="noreferrer">Открыть</a></>) : null}
+                    {s.ofdUrl ? (<><div className="text-gray-500">Предоплата</div><a className="text-black font-semibold hover:underline" href={s.ofdUrl} target="_blank" rel="noreferrer">Открыть</a></>) : null}
+                    {s.ofdFullUrl ? (<><div className="text-gray-500">Полный расчёт</div><a className="text-black font-semibold hover:underline" href={s.ofdFullUrl} target="_blank" rel="noreferrer">Открыть</a></>) : null}
+                    {s.additionalCommissionOfdUrl ? (<><div className="text-gray-500">Комиссия</div><a className="text-black font-semibold hover:underline" href={s.additionalCommissionOfdUrl} target="_blank" rel="noreferrer">Открыть</a></>) : null}
+                    {s.npdReceiptUri ? (<><div className="text-gray-500">НПД</div><a className="text-black font-semibold hover:underline" href={s.npdReceiptUri} target="_blank" rel="noreferrer">Открыть</a></>) : null}
                     {!s.ofdUrl && !s.ofdFullUrl && !s.additionalCommissionOfdUrl && !s.npdReceiptUri ? (
                       <div className="col-span-2 text-gray-500">Чеки недоступны</div>
                     ) : null}

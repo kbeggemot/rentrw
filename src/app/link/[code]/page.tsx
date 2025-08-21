@@ -250,7 +250,7 @@ export default function PublicPayPage(props: any) {
                   !(receipts.prepay || receipts.full || receipts.commission || receipts.npd) ? (
                     <div className="grid grid-cols-[9rem_1fr] gap-y-2">
                       <div className="text-gray-500">Платежная ссылка</div>
-                      <a className={`${awaitingPay ? 'text-gray-500' : 'text-black font-medium'} hover:underline`} href={payUrl} target="_blank" rel="noreferrer" onClick={() => setAwaitingPay(true)}>Оплатить</a>
+                      <a className={`${awaitingPay ? 'text-gray-500' : 'text-black font-semibold'} hover:underline`} href={payUrl} target="_blank" rel="noreferrer" onClick={() => setAwaitingPay(true)}>Оплатить</a>
                     </div>
                   ) : null
                 )}
@@ -265,14 +265,14 @@ export default function PublicPayPage(props: any) {
                       {(receipts.full || receipts.prepay) ? (
                         <>
                           <div className="text-gray-500">Чек на покупку</div>
-                          <a className="text-black font-medium hover:underline" href={(receipts.full || receipts.prepay)!} target="_blank" rel="noreferrer">Открыть</a>
+                          <a className="text-black font-semibold hover:underline" href={(receipts.full || receipts.prepay)!} target="_blank" rel="noreferrer">Открыть</a>
                         </>
                       ) : null}
                       {/* Комиссия: показываем только если есть */}
                       {receipts.commission ? (
                         <>
                           <div className="text-gray-500">Чек на комиссию</div>
-                          <a className="text-black font-medium hover:underline" href={receipts.commission!} target="_blank" rel="noreferrer">Открыть</a>
+                          <a className="text-black font-semibold hover:underline" href={receipts.commission!} target="_blank" rel="noreferrer">Открыть</a>
                         </>
                       ) : null}
                     </div>
