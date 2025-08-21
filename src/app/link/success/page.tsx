@@ -191,7 +191,7 @@ export default function PublicSuccessUnifiedPage() {
         <div className="rounded-lg border border-yellow-200 bg-yellow-50 p-3 text-sm mb-3">{msg}</div>
       ) : null}
 
-      <div className="space-y-3">
+      <div className="mt-4 space-y-3">
         <button
           className={`inline-flex items-center justify-center rounded-lg ${canShowDetails ? 'bg-black text-white' : 'bg-gray-200 text-gray-600'} px-4 h-9 text-sm`}
           onClick={() => setDetailsOpen((v) => !v)}
@@ -208,7 +208,7 @@ export default function PublicSuccessUnifiedPage() {
               <div>{payMethod || '—'}</div>
               <div className="text-gray-500">Дата оплаты</div>
               <div>{summary?.createdAt ? new Date(summary.createdAt).toLocaleString('ru-RU', { timeZone: 'Europe/Moscow' }) : '—'}</div>
-              <div className="text-gray-500">Чек</div>
+              <div className="text-gray-500">Чек на покупку</div>
               <div>
                 {(receipts.full || receipts.prepay) ? (
                   <a className="text-black font-semibold hover:underline" href={(receipts.full || receipts.prepay)!} target="_blank" rel="noreferrer">Открыть</a>
