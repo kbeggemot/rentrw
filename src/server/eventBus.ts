@@ -41,6 +41,9 @@ function publish(userId: string, topic: string) {
   }
 }
 
+// Ensure background workers start once per process by importing boot side-effect
+try { require('./boot'); } catch {}
+
 const hub: Hub = { subscribe, publish };
 
 g.__rentrw_hub = hub;

@@ -64,6 +64,14 @@ export async function runDueOffsetJobs(): Promise<void> {
     const due = Date.parse(job.dueAt);
     if (!Number.isFinite(due) || due > now) { remain.push(job); continue; }
     try {
+      // Append debug log for observability
+      try {
+        const line = JSON.stringify({ ts: new Date().toISOString(), action: 'run-job', job }, null, 2) + '\n';
+        const { promises: fs } = await import('fs');
+        const path = await import('path');
+        await fs.mkdir(path.join(process.cwd(), '.data'), { recursive: true });
+        await fs.appendFile(path.join(process.cwd(), '.data', 'ofd_job_runs.log'), line, 'utf8');
+      } catch {}
       const baseUrl = process.env.FERMA_BASE_URL || 'https://ferma.ofd.ru/';
       const token = await fermaGetAuthTokenCached(process.env.FERMA_LOGIN || '', process.env.FERMA_PASSWORD || '', { baseUrl });
       const host = process.env.BASE_HOST || process.env.VERCEL_URL || process.env.RENDER_EXTERNAL_URL || 'localhost:3000';
