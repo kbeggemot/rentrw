@@ -29,12 +29,12 @@ export async function createResumeToken(userId: string, orderId: number): Promis
   return token;
 }
 
-export async function resolveResumeToken(token: string, ttlMs = 24 * 60 * 60 * 1000): Promise<ResumeEntry | null> {
+export async function resolveResumeToken(token: string, ttlMs = 0): Promise<ResumeEntry | null> {
   const store = await readStore();
   const entry = store[token];
   if (!entry) return null;
   const ts = Date.parse(entry.createdAt);
-  if (!Number.isFinite(ts) || (Date.now() - ts) > ttlMs) return null;
+  if (ttlMs > 0 && (!Number.isFinite(ts) || (Date.now() - ts) > ttlMs)) return null;
   return entry;
 }
 
