@@ -67,6 +67,7 @@ function AcceptPaymentContent() {
   const attemptIdRef = useRef<number>(0);
   const activeTaskIdRef = useRef<string | number | null>(null);
   const ofdStartedForTaskIdRef = useRef<string | number | null>(null);
+  const methodRef = useRef<PaymentMethod>('qr');
   const updateDebug = () => {
     try {
       if (typeof window !== 'undefined') {
@@ -160,6 +161,9 @@ function AcceptPaymentContent() {
     updateDebug();
   }, [paymentUrl]);
 
+  // Keep method in ref to use inside async handlers
+  useEffect(() => { methodRef.current = method; }, [method]);
+
   // Run animated dots while QR is visible and payment not yet confirmed
   useEffect(() => {
     const paid = aoStatus && ['paid', 'transfered', 'transferred'].includes(String(aoStatus).toLowerCase());
@@ -223,15 +227,15 @@ function AcceptPaymentContent() {
         }
         if (stRes.ok && found) {
           if (attemptIdRef.current !== attemptId || activeTaskIdRef.current !== taskId) return;
-          if (!paymentUrlRef.current) {
-          setPaymentUrl(found);
-          try {
-            const dataUrl = await QRCode.toDataURL(found, { margin: 1, scale: 6 });
-            setQrDataUrl(dataUrl);
-          } catch {}
-          setMessage(null);
-          loadingRef.current = false;
-          setLoading(false);
+          if (paymentUrlRef.current !== found) {
+            setPaymentUrl(found);
+            try {
+              const dataUrl = await QRCode.toDataURL(found, { margin: 1, scale: 6 });
+              setQrDataUrl(dataUrl);
+            } catch {}
+            setMessage(null);
+            loadingRef.current = false;
+            setLoading(false);
           }
         }
       } catch {}
@@ -531,11 +535,13 @@ function AcceptPaymentContent() {
           const d0 = t0 ? JSON.parse(t0) : {};
           const url0 = (d0?.acquiring_order?.url as string | undefined) ?? (d0?.task?.acquiring_order?.url as string | undefined);
           if (url0) {
-            setPaymentUrl(url0);
-            try { const dataUrl = await QRCode.toDataURL(url0, { margin: 1, scale: 6 }); setQrDataUrl(dataUrl); } catch {}
-            setMessage(null);
-        setLoading(false);
-      }
+            if (paymentUrlRef.current !== url0) {
+              setPaymentUrl(url0);
+              try { const dataUrl = await QRCode.toDataURL(url0, { margin: 1, scale: 6 }); setQrDataUrl(dataUrl); } catch {}
+              setMessage(null);
+              setLoading(false);
+            }
+          }
         } catch {}
         startPolling(taskId, myAttempt);
         startStatusWatcher(taskId, myAttempt, isAgentSale);
@@ -776,13 +782,15 @@ function AcceptPaymentContent() {
                   const st = txt ? JSON.parse(txt) : {};
                   const found = (st?.acquiring_order?.url as string | undefined) ?? (st?.task?.acquiring_order?.url as string | undefined);
                   if (found) {
-                    setPaymentUrl(found);
-                    try {
-                      const dataUrl = await QRCode.toDataURL(found, { margin: 1, scale: 6 });
-                      setQrDataUrl(dataUrl);
-                    } catch {}
-                    setMessage(null);
-                    setLoading(false);
+                    if (paymentUrlRef.current !== found) {
+                      setPaymentUrl(found);
+                      try {
+                        const dataUrl = await QRCode.toDataURL(found, { margin: 1, scale: 6 });
+                        setQrDataUrl(dataUrl);
+                      } catch {}
+                      setMessage(null);
+                      setLoading(false);
+                    }
                   }
                 } catch {}
               }}
