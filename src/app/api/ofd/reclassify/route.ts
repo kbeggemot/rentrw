@@ -35,37 +35,59 @@ export async function POST(req: Request) {
     let fixed = 0;
     for (const s of sales) {
       const patch: any = {};
-      // Prefer explicit receipt ids if present
+      let decided: 'prepay' | 'full' | null = null;
+      let decidedUrl: string | null = null;
+
+      // 1) Try explicit ids first
       if ((s as any).ofdPrepayId) {
         try {
           const st = await getFermaStatusByKey((s as any).ofdPrepayId!);
-          if (/IncomePrepayment/i.test(st.type) && st.url) patch.ofdUrl = st.url;
+          if (st.url) {
+            decided = /IncomePrepayment/i.test(st.type) ? 'prepay' : 'full';
+            decidedUrl = st.url;
+          }
         } catch {}
       }
-      if ((s as any).ofdFullId) {
+      if (!decided && (s as any).ofdFullId) {
         try {
           const st = await getFermaStatusByKey((s as any).ofdFullId!);
-          if ((/(^|[^A-Za-z])Income($|[^A-Za-z])/i.test(st.type)) && st.url) patch.ofdFullUrl = st.url;
+          if (st.url) {
+            decided = /IncomePrepayment/i.test(st.type) ? 'prepay' : 'full';
+            decidedUrl = st.url;
+          }
         } catch {}
       }
-      // If still missing or misfiled, try by InvoiceId
-      if (!patch.ofdUrl || !patch.ofdFullUrl) {
+
+      // 2) Fallback: InvoiceId classification
+      if (!decided) {
         try {
           const { getInvoiceIdString } = await import('@/server/orderStore');
           const invoiceId = await getInvoiceIdString(s.orderId);
           const st2 = await getFermaStatusByKey(invoiceId);
-          if (/IncomePrepayment/i.test(st2.type) && st2.url) patch.ofdUrl = st2.url;
-          else if ((/(^|[^A-Za-z])Income($|[^A-Za-z])/i.test(st2.type)) && st2.url) patch.ofdFullUrl = st2.url;
+          if (st2.url) {
+            decided = /IncomePrepayment/i.test(st2.type) ? 'prepay' : 'full';
+            decidedUrl = st2.url;
+          }
         } catch {}
       }
-      // Clean up duplicates/misclassification: if we set one side, clear the other
-      if (patch.ofdUrl && (!patch.ofdFullUrl || /IncomePrepayment/i.test(String(patch.type || '')))) {
-        patch.ofdFullUrl = null;
+
+      // 3) Apply decision and force-clear opposite column to remove duplicates
+      if (decided && decidedUrl) {
+        if (decided === 'prepay') {
+          patch.ofdUrl = decidedUrl;
+          patch.ofdFullUrl = null; // ensure duplicate removal
+        } else {
+          patch.ofdFullUrl = decidedUrl;
+          patch.ofdUrl = null; // ensure duplicate removal
+        }
+      } else {
+        // If we couldn't determine URL/type but both columns have the same link, keep only full by default
+        if (s.ofdUrl && s.ofdFullUrl && s.ofdUrl === s.ofdFullUrl) {
+          patch.ofdUrl = null;
+        }
       }
-      if (patch.ofdFullUrl && (!patch.ofdUrl || /(^(?!IncomePrepayment).*)/i.test(String(patch.type || '')))) {
-        patch.ofdUrl = patch.ofdUrl ?? null;
-      }
-      if (Object.keys(patch).some((k) => k === 'ofdUrl' || k === 'ofdFullUrl')) {
+
+      if (Object.keys(patch).length > 0) {
         await updateSaleOfdUrlsByOrderId(userId, s.orderId, patch);
         fixed += 1;
       }
