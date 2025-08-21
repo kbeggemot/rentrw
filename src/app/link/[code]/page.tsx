@@ -1,6 +1,6 @@
-'use client';
+"use client";
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 type LinkData = {
   code: string;
@@ -26,6 +26,14 @@ export default function PublicPayPage(props: any) {
   const [msg, setMsg] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
+  // Flow state
+  const [taskId, setTaskId] = useState<string | number | null>(null);
+  const [payUrl, setPayUrl] = useState<string | null>(null);
+  const [awaitingPay, setAwaitingPay] = useState(false);
+  const [receipts, setReceipts] = useState<{ prepay?: string | null; full?: string | null; commission?: string | null; npd?: string | null }>({});
+
+  const pollRef = useRef<number | null>(null);
+
   useEffect(() => {
     (async () => {
       try {
@@ -39,17 +47,12 @@ export default function PublicPayPage(props: any) {
     })();
   }, [code]);
 
+  // helpers
+  const mskToday = () => new Date().toLocaleDateString('ru-RU', { timeZone: 'Europe/Moscow' }).split('.').reverse().join('-');
+
   const canPay = useMemo(() => {
     if (!data) return false;
-    if (data.sumMode === 'fixed') {
-      const n = Number((data.amountRub ?? 0));
-      if (!Number.isFinite(n) || n <= 0) return false;
-      const minOk = data.isAgent
-        ? (n - (data.commissionType === 'percent' ? n * (Number(data.commissionValue || 0) / 100) : Number(data.commissionValue || 0))) >= 10
-        : n >= 10;
-      return minOk;
-    }
-    const n = Number(amount.replace(',', '.'));
+    const n = Number((data.sumMode === 'fixed' ? (data.amountRub ?? 0) : Number(amount.replace(',', '.'))));
     if (!Number.isFinite(n) || n <= 0) return false;
     const minOk = data.isAgent
       ? (n - (data.commissionType === 'percent' ? n * (Number(data.commissionValue || 0) / 100) : Number(data.commissionValue || 0))) >= 10
@@ -57,12 +60,45 @@ export default function PublicPayPage(props: any) {
     return minOk;
   }, [data, amount]);
 
+  const startPoll = (uid: string | number) => {
+    if (pollRef.current) return;
+    const tick = async () => {
+      try {
+        const r = await fetch(`/api/rocketwork/tasks/${encodeURIComponent(String(uid))}`, { cache: 'no-store', headers: data?.userId ? { 'x-user-id': data.userId } as any : undefined });
+        const t = await r.json();
+        const sale = t?.sale || null;
+        if (sale) {
+          const st = String(sale.status || '').toLowerCase();
+          const pre = sale.ofdUrl || null;
+          const full = sale.ofdFullUrl || null;
+          const com = sale.additionalCommissionOfdUrl || null;
+          const npd = sale.npdReceiptUri || null;
+          setReceipts({ prepay: pre, full, commission: com, npd });
+          if (st === 'paid' || st === 'transfered' || st === 'transferred') {
+            // keep polling a bit for receipts to arrive
+            if (pre || full || com || npd) {
+              if (pollRef.current) { window.clearTimeout(pollRef.current); pollRef.current = null; }
+              setAwaitingPay(false);
+              return;
+            }
+          }
+        }
+      } catch {}
+      pollRef.current = window.setTimeout(tick, 2000) as unknown as number;
+    };
+    pollRef.current = window.setTimeout(tick, 1500) as unknown as number;
+  };
+
   const goPay = async () => {
     if (!data) return;
     try {
       setLoading(true);
+      setMsg(null);
+      setPayUrl(null);
+      setTaskId(null);
+      const amountNum = data.sumMode === 'fixed' ? (data.amountRub || 0) : Number(amount.replace(',', '.'));
       const body: any = {
-        amountRub: data.sumMode === 'fixed' ? (data.amountRub || 0) : Number(amount.replace(',', '.')),
+        amountRub: amountNum,
         description: data.description,
         method: method === 'card' ? 'card' : 'qr',
         clientEmail: undefined,
@@ -71,16 +107,20 @@ export default function PublicPayPage(props: any) {
         commissionType: data.isAgent ? (data.commissionType || undefined) : undefined,
         commissionValue: data.isAgent ? (typeof data.commissionValue === 'number' ? data.commissionValue : undefined) : undefined,
         vatRate: (data.vatRate || 'none'),
+        serviceEndDate: mskToday(),
       };
       const res = await fetch('/api/rocketwork/tasks', { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-user-id': data.userId }, body: JSON.stringify(body) });
       const txt = await res.text();
       const d = txt ? JSON.parse(txt) : {};
       if (!res.ok) throw new Error(d?.error || 'CREATE_FAILED');
-      const payUrl = d?.data?.acquiring_order?.url || d?.data?.acquiring_order?.payment_url || null;
-      if (payUrl) window.open(payUrl, '_blank');
-      setMsg('Перейдите в открытую вкладку банка, чтобы завершить оплату.');
+      const tId = d?.task_id;
+      setTaskId(tId || null);
+      const url = d?.data?.acquiring_order?.url || d?.data?.acquiring_order?.payment_url || null;
+      if (url) setPayUrl(url);
+      setAwaitingPay(false);
+      startPoll(tId);
     } catch (e) {
-      setMsg('Не удалось сформировать ссылку на оплату');
+      setMsg('Не удалось сформировать платежную ссылку');
     } finally { setLoading(false); }
   };
 
@@ -105,7 +145,7 @@ export default function PublicPayPage(props: any) {
         <div className="mb-3">
           <label className="block text-sm text-gray-600 mb-1">Сумма, ₽</label>
           {data.sumMode === 'fixed' ? (
-            <input className="w-40 rounded-lg border px-2 h-9 text-sm" value={amount} readOnly />
+            <input className="w-40 rounded-lg border px-2 h-9 text-sm" value={String(data.amountRub ?? '')} readOnly />
           ) : (
             <input className="w-40 rounded-lg border px-2 h-9 text-sm" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0.00" />
           )}
@@ -124,9 +164,35 @@ export default function PublicPayPage(props: any) {
             <input className="w-40 rounded-lg border px-2 h-9 text-sm" value={data.method === 'card' ? 'Карта' : 'СБП'} readOnly />
           )}
         </div>
-        <button disabled={!canPay || loading} onClick={goPay} className="inline-flex items-center justify-center rounded-lg bg-black text-white px-4 h-9 text-sm disabled:opacity-60">
-          {loading ? 'Создаю ссылку…' : 'Перейти к оплате'}
-        </button>
+        {!taskId ? (
+          <button disabled={!canPay || loading} onClick={goPay} className="inline-flex items-center justify-center rounded-lg bg-black text-white px-4 h-9 text-sm disabled:opacity-60">
+            {loading ? 'Формируем платежную ссылку…' : 'Перейти к оплате'}
+          </button>
+        ) : (
+          <div className="space-y-2">
+            {!payUrl ? (
+              <div className="text-sm text-gray-600">Формируем платежную ссылку…</div>
+            ) : (
+              <button disabled={awaitingPay} onClick={() => { setAwaitingPay(true); try { window.open(payUrl!, '_blank'); } catch {} }} className="inline-flex items-center justify-center rounded-lg bg-black text-white px-4 h-9 text-sm disabled:opacity-60">
+                Оплатить
+              </button>
+            )}
+            {awaitingPay ? (<div className="text-sm text-gray-600">Ждём подтверждения оплаты…</div>) : null}
+            {(receipts.prepay || receipts.full || receipts.commission || receipts.npd) ? (
+              <div className="mt-2 rounded-md border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900 p-2 text-sm">
+                <div className="grid grid-cols-[9rem_1fr] gap-y-2">
+                  {receipts.prepay ? (<><div className="text-gray-500">Предоплата</div><a className="text-blue-600 hover:underline" href={receipts.prepay} target="_blank" rel="noreferrer">Открыть</a></>) : null}
+                  {receipts.full ? (<><div className="text-gray-500">Полный расчёт</div><a className="text-blue-600 hover:underline" href={receipts.full} target="_blank" rel="noreferrer">Открыть</a></>) : null}
+                  {receipts.commission ? (<><div className="text-gray-500">Комиссия</div><a className="text-blue-600 hover:underline" href={receipts.commission} target="_blank" rel="noreferrer">Открыть</a></>) : null}
+                  {receipts.npd ? (<><div className="text-gray-500">НПД</div><a className="text-blue-600 hover:underline" href={receipts.npd} target="_blank" rel="noreferrer">Открыть</a></>) : null}
+                  {(!receipts.prepay && !receipts.full && !receipts.commission && !receipts.npd) ? (
+                    <div className="col-span-2 text-gray-500">Чеки недоступны</div>
+                  ) : null}
+                </div>
+              </div>
+            ) : null}
+          </div>
+        )}
         {msg ? <div className="mt-3 text-sm text-gray-600">{msg}</div> : null}
       </div>
     </div>
