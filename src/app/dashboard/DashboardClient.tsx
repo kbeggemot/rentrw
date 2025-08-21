@@ -466,7 +466,7 @@ export default function DashboardClient({ hasTokenInitial }: { hasTokenInitial: 
           <div className="mt-6">
             <h2 className="text-lg font-semibold mb-2">Мой счёт</h2>
             <div className="flex flex-wrap items-center gap-3 mb-3">
-              <Button className="text-base" variant="secondary" onClick={fetchBalance} disabled={loading}>
+              <Button className="text-base w-40" variant="secondary" onClick={fetchBalance} disabled={loading}>
                 {loading ? 'Загружаю…' : 'Показать баланс'}
               </Button>
           {balance !== null ? (
