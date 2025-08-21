@@ -68,12 +68,13 @@ export async function GET(req: Request) {
             const addOfd = (normalized?.additional_commission_ofd_url as string | undefined)
               ?? null;
             const npdReceipt = (normalized?.receipt_uri as string | undefined) ?? null;
-            // Determine whether this ofdUrl is full settlement or prepay by serviceEndDate
-            const mskToday = new Date().toLocaleDateString('ru-RU', { timeZone: 'Europe/Moscow' }).split('.').reverse().join('-');
+            // Classify RW ofd_url using creation date vs service end date
             const patch: any = { status: normalized?.acquiring_order?.status, additionalCommissionOfdUrl: addOfd, npdReceiptUri: npdReceipt };
             if (ofdUrl) {
+              const createdAt = (normalized as any)?.created_at || s.createdAtRw || s.createdAt;
+              const createdDate = createdAt ? String(createdAt).slice(0, 10) : null;
               const endStr = (s.serviceEndDate || '') as string;
-              if (endStr && endStr === mskToday) patch.ofdFullUrl = ofdUrl; else patch.ofdUrl = ofdUrl;
+              if (createdDate && endStr && createdDate === endStr) patch.ofdFullUrl = ofdUrl; else patch.ofdUrl = ofdUrl;
             }
             await updateSaleFromStatus(userId, s.taskId, patch);
             try {
