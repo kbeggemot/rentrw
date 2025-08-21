@@ -32,10 +32,11 @@ export async function POST(req: Request) {
     const fd: string | number | undefined = body?.Data?.Fd || body?.Fd;
     const fp: string | number | undefined = body?.Data?.Fp || body?.Fp;
     const invoiceIdRaw: string | number | undefined = body?.Data?.InvoiceId || body?.InvoiceId || body?.Request?.InvoiceId;
-    // Try to detect PaymentItems[].PaymentType (1=prepay, 2=offset)
+    // Try to detect PaymentItems[].PaymentType (2=offset). Value 1 is NOT prepayment marker.
     const pt = (body?.Data?.CustomerReceipt?.PaymentItems?.[0]?.PaymentType
       ?? body?.CustomerReceipt?.PaymentItems?.[0]?.PaymentType
       ?? body?.PaymentItems?.[0]?.PaymentType) as number | undefined;
+    const docTypeRaw = (body?.Data?.Request?.Type || body?.Request?.Type || '').toString();
     // Build viewer link if parts are known
     let receiptUrl: string | undefined;
     if (fn && fd != null && fp != null) { receiptUrl = buildReceiptViewUrl(fn, fd, fp); }
@@ -78,20 +79,30 @@ export async function POST(req: Request) {
     }
     if (Number.isFinite(orderId)) {
       const patch: any = {};
+      // Decide classification: offset (pt=2 or docTypeOffset), else by docType or serviceEndDate
+      const isOffset = pt === 2 || /IncomePrepaymentOffset/i.test(docTypeRaw);
+      let classify: 'prepay' | 'full';
+      if (/IncomePrepayment/i.test(docTypeRaw)) classify = 'prepay';
+      else if (isOffset || /(^|[^A-Za-z])Income($|[^A-Za-z])/i.test(docTypeRaw)) classify = 'full';
+      else {
+        // Fallback to serviceEndDate vs today (MSK)
+        let isToday = false;
+        try {
+          const { listSales } = await import('@/server/taskStore');
+          const sales = await listSales(String(userId));
+          const sale = sales.find((s: any) => Number(s.orderId) === Number(orderId));
+          if (sale?.serviceEndDate) {
+            const mskToday = new Date().toLocaleDateString('ru-RU', { timeZone: 'Europe/Moscow' }).split('.').reverse().join('-');
+            isToday = sale.serviceEndDate === mskToday;
+          }
+        } catch {}
+        classify = isToday ? 'full' : 'prepay';
+      }
       if (receiptUrl) {
-        if (pt === 1) patch.ofdUrl = receiptUrl;
-        else if (pt === 2) patch.ofdFullUrl = receiptUrl;
-        else {
-          // fallback: если тип неизвестен, считаем как "полный расчёт"
-          patch.ofdFullUrl = receiptUrl;
-        }
+        if (classify === 'prepay') patch.ofdUrl = receiptUrl; else patch.ofdFullUrl = receiptUrl;
       }
       if (receiptId) {
-        if (pt === 1) patch.ofdPrepayId = receiptId;
-        else if (pt === 2) patch.ofdFullId = receiptId;
-        else {
-          patch.ofdFullId = receiptId;
-        }
+        if (classify === 'prepay') patch.ofdPrepayId = receiptId; else patch.ofdFullId = receiptId;
       }
       if (Object.keys(patch).length > 0) {
         try { await updateSaleOfdUrlsByOrderId(userId, Number(orderId), patch); } catch {}
