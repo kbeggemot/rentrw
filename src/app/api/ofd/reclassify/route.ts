@@ -58,7 +58,14 @@ export async function POST(req: Request) {
           else if ((/(^|[^A-Za-z])Income($|[^A-Za-z])/i.test(st2.type)) && st2.url) patch.ofdFullUrl = st2.url;
         } catch {}
       }
-      if (Object.keys(patch).length > 0) {
+      // Clean up duplicates/misclassification: if we set one side, clear the other
+      if (patch.ofdUrl && (!patch.ofdFullUrl || /IncomePrepayment/i.test(String(patch.type || '')))) {
+        patch.ofdFullUrl = null;
+      }
+      if (patch.ofdFullUrl && (!patch.ofdUrl || /(^(?!IncomePrepayment).*)/i.test(String(patch.type || '')))) {
+        patch.ofdUrl = patch.ofdUrl ?? null;
+      }
+      if (Object.keys(patch).some((k) => k === 'ofdUrl' || k === 'ofdFullUrl')) {
         await updateSaleOfdUrlsByOrderId(userId, s.orderId, patch);
         fixed += 1;
       }
