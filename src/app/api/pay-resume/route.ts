@@ -10,10 +10,26 @@ export async function GET(req: Request) {
   try {
     const url = new URL(req.url);
     const sid = url.searchParams.get('sid') || '';
-    if (!sid) return NextResponse.json({ error: 'NO_SID' }, { status: 400 });
-    const entry = await resolveResumeToken(sid);
-    if (!entry) return NextResponse.json({ error: 'NOT_FOUND' }, { status: 404 });
-    const { userId, orderId } = entry;
+    const orderParam = url.searchParams.get('order');
+    let userId: string | null = null;
+    let orderId: number | null = null;
+    if (sid) {
+      const entry = await resolveResumeToken(sid);
+      if (!entry) return NextResponse.json({ error: 'NOT_FOUND' }, { status: 404 });
+      userId = entry.userId;
+      orderId = entry.orderId;
+    } else if (orderParam) {
+      orderId = Number(orderParam);
+      if (!Number.isFinite(orderId)) return NextResponse.json({ error: 'BAD_ORDER' }, { status: 400 });
+      // try to resolve userId from header or cookie
+      const cookie = req.headers.get('cookie') || '';
+      const m = /(?:^|;\s*)session_user=([^;]+)/.exec(cookie);
+      userId = (m ? decodeURIComponent(m[1]) : undefined) || req.headers.get('x-user-id');
+      if (!userId) return NextResponse.json({ error: 'NO_USER' }, { status: 401 });
+    } else {
+      return NextResponse.json({ error: 'NO_QUERY' }, { status: 400 });
+    }
+    if (!userId || orderId == null) return NextResponse.json({ error: 'NO_DATA' }, { status: 400 });
     const sales = await listSales(userId);
     const sale = sales.find((s) => s.orderId === orderId) || null;
     let orgName: string | null = null;

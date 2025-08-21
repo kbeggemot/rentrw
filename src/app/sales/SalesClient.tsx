@@ -452,7 +452,7 @@ export default function SalesClient({ initial }: { initial: Sale[] }) {
                           Скрыть
                         </button>
                       )}
-                      <a className="block px-3 py-2 text-sm hover:bg-gray-50 dark:hover:bg-gray-900" href={`/link/success?sid=${encodeURIComponent(String(s.orderId))}`} target="_blank" rel="noreferrer" onClick={() => setMenuOpenId(null)}>Открыть success</a>
+                      <a className="block px-3 py-2 text-sm hover:bg-gray-50 dark:hover:bg-gray-900" href={`/link/success?order=${encodeURIComponent(String(s.orderId))}`} target="_blank" rel="noreferrer" onClick={() => setMenuOpenId(null)}>Открыть success</a>
                     </div>
                   </div>
                 </div>
@@ -525,7 +525,7 @@ export default function SalesClient({ initial }: { initial: Sale[] }) {
                           Скрыть
                         </button>
                       )}
-                      <a className="block px-3 py-2 text-sm hover:bg-gray-50 dark:hover:bg-gray-900" href={`/link/success?sid=${encodeURIComponent(String(s.orderId))}`} target="_blank" rel="noreferrer" onClick={() => setMenuOpenId(null)}>Открыть success</a>
+                      <a className="block px-3 py-2 text-sm hover:bg-gray-50 dark:hover:bg-gray-900" href={`/link/success?order=${encodeURIComponent(String(s.orderId))}`} target="_blank" rel="noreferrer" onClick={() => setMenuOpenId(null)}>Открыть success</a>
                     </div>
                   </div>
                 </td>
