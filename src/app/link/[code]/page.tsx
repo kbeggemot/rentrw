@@ -251,9 +251,11 @@ export default function PublicPayPage(props: any) {
                     </div>
                   ) : null
                 )}
-                {awaitingPay && !(receipts.prepay || receipts.full || receipts.commission || receipts.npd) ? (<div className="text-gray-600">Ждём подтверждения оплаты…</div>) : null}
+                {awaitingPay && !(receipts.prepay || receipts.full || receipts.commission || receipts.npd) ? (
+                  <div className="text-gray-600">{`Ждём подтверждения оплаты${dots}`}</div>
+                ) : null}
                 {(receipts.prepay || receipts.full || receipts.commission) ? (
-                  <div className="mt-1 rounded-md border border-gray-200 bg-white p-2">
+                  <div className="mt-1 p-2">
                     <div className="text-green-700 font-medium mb-2">Успешно оплачено</div>
                     <div className="grid grid-cols-[9rem_1fr] gap-y-2">
                       {/* Покупка: показываем либо предоплату, либо полный расчёт */}

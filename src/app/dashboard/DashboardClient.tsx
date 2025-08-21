@@ -314,7 +314,7 @@ export default function DashboardClient({ hasTokenInitial }: { hasTokenInitial: 
                   <div>
                     <label className="block text-sm text-gray-700 mb-1">Сумма</label>
                     <div className="flex flex-wrap items-center gap-2">
-                      <select className="w-32 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-950 px-2 h-9 text-sm shrink-0" value={linkSumMode} onChange={(e) => setLinkSumMode(e.target.value as any)}>
+                      <select className="w-44 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-950 px-2 h-9 text-sm shrink-0" value={linkSumMode} onChange={(e) => setLinkSumMode(e.target.value as any)}>
                         <option value="custom">Укажет покупатель</option>
                         <option value="fixed">Точная</option>
                       </select>
@@ -384,7 +384,7 @@ export default function DashboardClient({ hasTokenInitial }: { hasTokenInitial: 
                     <div className="divide-y divide-gray-100 dark:divide-gray-800">
                       {links.map((l) => (
                         <div key={l.code} className="flex items-center justify-between px-3 py-2">
-                          <div className="text-sm"><a className="text-blue-600 hover:underline" href={`/link/${encodeURIComponent(l.code)}`} target="_blank" rel="noreferrer">{l.title || l.code}</a></div>
+                          <div className="text-sm"><a className="text-black font-semibold hover:underline" href={`/link/${encodeURIComponent(l.code)}`} target="_blank" rel="noreferrer">{l.title || l.code}</a></div>
                           <div className="flex items-center gap-2">
                             <Button variant="secondary" size="icon" aria-label="Скопировать ссылку" onClick={async () => { try { await navigator.clipboard.writeText(new URL(`/link/${encodeURIComponent(l.code)}`, window.location.origin).toString()); showToast('Ссылка скопирована', 'success'); } catch {} }}>
                               <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
@@ -415,7 +415,7 @@ export default function DashboardClient({ hasTokenInitial }: { hasTokenInitial: 
               <Button className="text-base" variant="secondary" onClick={fetchBalance} disabled={loading}>
                 {loading ? 'Загружаю…' : 'Показать баланс'}
               </Button>
-              {balance !== null ? (
+          {balance !== null ? (
                 <div className="text-sm text-gray-800 dark:text-gray-200">Баланс: {balance}</div>
               ) : null}
             </div>
@@ -523,7 +523,7 @@ export default function DashboardClient({ hasTokenInitial }: { hasTokenInitial: 
                     </div>
                   </div>
                 </>
-              ) : null}
+          ) : null}
             </div>
           </div>
         </div>
