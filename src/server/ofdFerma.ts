@@ -181,6 +181,29 @@ export async function fermaGetReceiptStatusDetailed(
   return { status: (data && (data.status || data.state)) || (data && data.Status) || undefined, rawStatus: res.status, rawText: text };
 }
 
+// GET extended receipt info (returns full CustomerReceipt) with query params
+export async function fermaGetReceiptExtended(
+  params: { receiptId: string; dateFromIncl: string; dateToIncl: string; zn?: string; fn?: string },
+  opts?: Partial<FermaAuth & { extendedPath?: string }>
+): Promise<{ rawStatus: number; rawText: string }> {
+  const envAuth = getAuth();
+  const auth = { ...envAuth, ...opts } as FermaAuth & { extendedPath?: string };
+  if (!auth.baseUrl) throw new Error('FERMA_BASE_URL not configured');
+  const path = opts?.extendedPath || process.env.FERMA_EXTENDED_PATH || '/api/kkt/cloud/stats/receipts/extended';
+  const base = auth.baseUrl.endsWith('/') ? auth.baseUrl : auth.baseUrl + '/';
+  const u = new URL(path.startsWith('/') ? path.slice(1) : path, base);
+  if (auth.authToken) u.searchParams.set('AuthToken', auth.authToken);
+  u.searchParams.set('dateFromIncl', params.dateFromIncl);
+  u.searchParams.set('dateToIncl', params.dateToIncl);
+  u.searchParams.set('receiptId', params.receiptId);
+  if (params.zn) u.searchParams.set('zn', params.zn);
+  if (params.fn) u.searchParams.set('fn', params.fn);
+  const headers = authHeaders(auth);
+  const res = await fetch(u.toString(), { method: 'GET', headers, cache: 'no-store' });
+  const text = await res.text();
+  return { rawStatus: res.status, rawText: text };
+}
+
 export async function fermaCreateAuthToken(login?: string, password?: string, opts?: { baseUrl?: string }): Promise<{ authToken?: string; expires?: string; rawStatus: number; rawText: string }> {
   const env = getAuth();
   const baseUrl = opts?.baseUrl || env.baseUrl || 'https://ferma.ofd.ru/';
