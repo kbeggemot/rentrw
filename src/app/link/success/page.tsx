@@ -59,6 +59,14 @@ export default function PublicSuccessUnifiedPage() {
                 setInfo({ code: '', userId: String(d.userId || ''), title: undefined, orgName: d?.orgName || null });
                 setOrderId(Number(d.orderId || 0) || null);
                 if (d?.sale) setSummary({ amountRub: d.sale.amountRub, description: d.sale.description });
+                if (d?.sale) {
+                  setReceipts({
+                    prepay: d.sale.ofdUrl || null,
+                    full: d.sale.ofdFullUrl || null,
+                    commission: d.sale.commissionUrl || null,
+                    npd: d.sale.npdReceiptUri || null,
+                  });
+                }
                 setWaiting(false);
               } else {
                 setWaiting(false);
@@ -92,15 +100,7 @@ export default function PublicSuccessUnifiedPage() {
     if (pollRef.current) return;
     const tick = async () => {
       try {
-        const r = await fetch(`/api/rocketwork/tasks/${encodeURIComponent(String(uid))}?t=${Date.now()}`, { cache: 'no-store', headers: userId ? { 'x-user-id': userId } as any : undefined });
-        const t = await r.json();
-        const rwPre = t?.ofd_url || t?.acquiring_order?.ofd_url || null;
-        const rwFull = t?.ofd_full_url || t?.acquiring_order?.ofd_full_url || null;
-        const rwCom = t?.additional_commission_ofd_url || t?.task?.additional_commission_ofd_url || t?.additional_commission_url || t?.task?.additional_commission_url || null;
-        const rwNpd = t?.receipt_uri || t?.task?.receipt_uri || null;
-        setReceipts({ prepay: rwPre ?? null, full: rwFull ?? null, commission: rwCom ?? null, npd: rwNpd ?? null });
-
-        // Try local sale store as authoritative source for URLs
+        // 1) Локальный стор — приоритетно и быстрее
         try {
           if (userId) {
             if (orderId != null) {
@@ -130,16 +130,30 @@ export default function PublicSuccessUnifiedPage() {
             }
           }
         } catch {}
+
+        // 2) RW — как резервный источник статусов
+        const r = await fetch(`/api/rocketwork/tasks/${encodeURIComponent(String(uid))}?t=${Date.now()}`, { cache: 'no-store', headers: userId ? { 'x-user-id': userId } as any : undefined });
+        const t = await r.json();
+        const rwPre = t?.ofd_url || t?.acquiring_order?.ofd_url || null;
+        const rwFull = t?.ofd_full_url || t?.acquiring_order?.ofd_full_url || null;
+        const rwCom = t?.additional_commission_ofd_url || t?.task?.additional_commission_ofd_url || t?.additional_commission_url || t?.task?.additional_commission_url || null;
+        const rwNpd = t?.receipt_uri || t?.task?.receipt_uri || null;
+        setReceipts({ prepay: rwPre ?? null, full: rwFull ?? null, commission: rwCom ?? null, npd: rwNpd ?? null });
       } catch {}
-      pollRef.current = window.setTimeout(tick, 2000) as unknown as number;
+      pollRef.current = window.setTimeout(tick, 1200) as unknown as number;
     };
-    pollRef.current = window.setTimeout(tick, 1000) as unknown as number;
+    // Первый тик — сразу, без задержки
+    void tick();
   };
 
   const canShowDetails = useMemo(() => Boolean(taskId && info?.userId), [taskId, info?.userId]);
 
   useEffect(() => {
-    if (detailsOpen && taskId && info?.userId) startPoll(taskId, info.userId);
+    if (detailsOpen && taskId && info?.userId) {
+      // Дополнительно триггерим серверный sync по orderId, чтобы ускорить появление ссылки
+      (async () => { try { if (orderId != null) await fetch(`/api/ofd/sync?order=${orderId}`, { cache: 'no-store' }); } catch {} })();
+      startPoll(taskId, info.userId);
+    }
     return () => { if (pollRef.current) { window.clearTimeout(pollRef.current); pollRef.current = null; } };
   }, [detailsOpen, taskId, info?.userId]);
 
