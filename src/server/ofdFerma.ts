@@ -130,11 +130,23 @@ export async function fermaGetReceiptStatus(id: string, opts?: Partial<FermaAuth
     let data: any = null; try { data = text ? JSON.parse(text) : null; } catch { data = text; }
     return { status: (data && (data.status || data.state)) || undefined, rawStatus: res.status, rawText: text };
   }
-  // POST status by ReceiptId first, then fallback to InvoiceId if not found
+  // POST status by ReceiptId first, with minimal and expanded bodies; then fallback to InvoiceId if not found
   const statusBody = (payload: any) => JSON.stringify({ Request: payload });
+  // 1) minimal by ReceiptId
   let res = await fetch(url, { method: 'POST', headers, body: statusBody({ ReceiptId: id }), cache: 'no-store' });
   text = await res.text();
   if (res.status === 404 || /not\s*found/i.test(text) || /не\s*найден/i.test(text)) {
+    // 2) try extended body with dates derived from current period (±30 days)
+    const now = new Date();
+    const start = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    const end = new Date(now.getTime() + 1 * 24 * 60 * 60 * 1000);
+    const fmt = (d: Date) => d.toISOString().slice(0, 19);
+    const ext = { ReceiptId: id, StartDateUtc: fmt(start), EndDateUtc: fmt(end), StartDateLocal: fmt(start), EndDateLocal: fmt(end) };
+    res = await fetch(url, { method: 'POST', headers, body: statusBody(ext), cache: 'no-store' });
+    text = await res.text();
+  }
+  if (res.status === 404 || /not\s*found/i.test(text) || /не\s*найден/i.test(text)) {
+    // 3) fallback by InvoiceId
     res = await fetch(url, { method: 'POST', headers, body: statusBody({ InvoiceId: id }), cache: 'no-store' });
     text = await res.text();
   }
