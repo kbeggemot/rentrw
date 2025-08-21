@@ -34,18 +34,18 @@ async function writeStore(store: Store): Promise<void> {
   await writeText(FILE, JSON.stringify(store, null, 2));
 }
 
-function genCode(): string {
-  const alphabet = 'abcdefghijklmnopqrstuvwxyz0123456789';
+function genCode(len = 4): string {
+  const alphabet = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
   let out = '';
-  for (let i = 0; i < 8; i++) out += alphabet[Math.floor(Math.random() * alphabet.length)];
+  for (let i = 0; i < len; i++) out += alphabet[Math.floor(Math.random() * alphabet.length)];
   return out;
 }
 
 export async function createPaymentLink(userId: string, data: Omit<PaymentLink, 'code' | 'userId' | 'createdAt'>): Promise<PaymentLink> {
   const store = await readStore();
-  let code = genCode();
+  let code = genCode(4);
   const exists = new Set(store.items.map((i) => i.code));
-  while (exists.has(code)) code = genCode();
+  while (exists.has(code)) code = genCode(4);
   const now = new Date().toISOString();
   const item: PaymentLink = {
     code,

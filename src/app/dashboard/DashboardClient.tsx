@@ -356,13 +356,28 @@ export default function DashboardClient({ hasTokenInitial }: { hasTokenInitial: 
                   <Button
                     onClick={async () => {
                       try {
-                        const payload: any = { title: linkTitle.trim(), description: linkDesc.trim(), sumMode: linkSumMode, amountRub: linkSumMode === 'fixed' ? Number(linkAmount.replace(',', '.')) : undefined, vatRate: linkVat, isAgent: linkAgent, commissionType: linkAgent ? linkCommType : undefined, commissionValue: linkAgent ? Number(linkCommVal.replace(',', '.')) : undefined, partnerPhone: linkAgent ? linkPartner.trim() : undefined, method: linkMethod };
+                        const amountNum = linkSumMode === 'fixed' ? Number(linkAmount.replace(',', '.')) : undefined;
+                        if (linkSumMode === 'fixed') {
+                          if (!Number.isFinite(amountNum as number) || (amountNum as number) <= 0) { showToast('Укажите корректную сумму', 'error'); return; }
+                          if (linkAgent && linkCommType && linkCommVal.trim().length > 0) {
+                            const comm = Number(linkCommVal.replace(',', '.'));
+                            if (Number.isFinite(comm)) {
+                              const retained = linkCommType === 'percent' ? ((amountNum as number) * (comm / 100)) : comm;
+                              const net = (amountNum as number) - retained;
+                              if (net < 10) { showToast('Сумма за вычетом комиссии должна быть ≥ 10 ₽', 'error'); return; }
+                            }
+                          } else if (!linkAgent && (amountNum as number) < 10) { showToast('Сумма должна быть ≥ 10 ₽', 'error'); return; }
+                        }
+                        const payload: any = { title: linkTitle.trim(), description: linkDesc.trim(), sumMode: linkSumMode, amountRub: amountNum, vatRate: linkVat, isAgent: linkAgent, commissionType: linkAgent ? linkCommType : undefined, commissionValue: linkAgent ? Number(linkCommVal.replace(',', '.')) : undefined, partnerPhone: linkAgent ? linkPartner.trim() : undefined, method: linkMethod };
                         const r = await fetch('/api/links', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
                         const d = await r.json();
                         if (!r.ok) throw new Error(d?.error || 'ERROR');
                         showToast('Ссылка создана', 'success');
                         setLinks((prev) => [{ code: d?.item?.code, title: d?.item?.title, createdAt: d?.item?.createdAt }, ...prev]);
                         setLinkTitle(''); setLinkDesc(''); setLinkAmount(''); setLinkAgent(false); setLinkCommVal(''); setLinkPartner(''); setLinkSumMode('custom'); setLinkVat('none'); setLinkMethod('any');
+                        // Auto open spoiler and copy
+                        setLinksOpen(true);
+                        try { await navigator.clipboard.writeText(new URL(`/link/${encodeURIComponent(d?.item?.code)}`, window.location.origin).toString()); showToast('Ссылка скопирована', 'success'); } catch {}
                       } catch (e) { showToast('Не удалось создать ссылку', 'error'); }
                     }}
                   >Сохранить</Button>
