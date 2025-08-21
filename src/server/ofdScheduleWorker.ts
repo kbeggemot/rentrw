@@ -3,6 +3,8 @@ import path from 'path';
 import { fermaGetAuthTokenCached, fermaCreateReceipt } from './ofdFerma';
 import { buildFermaReceiptPayload, PAYMENT_METHOD_FULL_PAYMENT, VatRate } from '@/app/api/ofd/ferma/build-payload';
 import { getUserOrgInn, getUserPayoutRequisites } from './userStore';
+import { getDecryptedApiToken } from './secureStore';
+import { listSales } from './taskStore';
 
 type OffsetJob = {
   id: string; // `${userId}:${orderId}`
@@ -80,6 +82,31 @@ export async function runDueOffsetJobs(): Promise<void> {
       let payload: any;
       if (job.party === 'partner') {
         if (!job.partnerInn) throw new Error('NO_PARTNER_INN');
+        // Ensure we have partner full name; if missing — fetch from RW task
+        let partnerName = (job.partnerName || '').trim();
+        if (partnerName.length === 0) {
+          try {
+            const token = await getDecryptedApiToken(job.userId);
+            if (token) {
+              const sales = await listSales(job.userId);
+              const sale = sales.find((s) => s.orderId === job.orderId);
+              const taskId = sale?.taskId;
+              if (taskId != null) {
+                const base = process.env.ROCKETWORK_API_BASE_URL || 'https://app.rocketwork.ru/api/';
+                const tUrl = new URL(`tasks/${encodeURIComponent(String(taskId))}`, base.endsWith('/') ? base : base + '/').toString();
+                const r = await fetch(tUrl, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }, cache: 'no-store' });
+                const txt = await r.text();
+                let d: any = null; try { d = txt ? JSON.parse(txt) : null; } catch { d = txt; }
+                const task = (d && typeof d === 'object' && 'task' in d) ? (d.task as any) : d;
+                const last = String(task?.executor?.last_name || '').trim();
+                const first = String(task?.executor?.first_name || '').trim();
+                const second = String(task?.executor?.second_name || '').trim();
+                const fio = [last, first, second].filter(Boolean).join(' ').trim();
+                if (fio.length > 0) partnerName = fio;
+              }
+            }
+          } catch {}
+        }
         const { getInvoiceIdString } = await import('./orderStore');
         const invoiceIdFull = await getInvoiceIdString(job.orderId);
         payload = buildFermaReceiptPayload({
@@ -95,7 +122,7 @@ export async function runDueOffsetJobs(): Promise<void> {
           invoiceId: invoiceIdFull,
           callbackUrl,
           withAdvanceOffset: true,
-          paymentAgentInfo: { AgentType: 'AGENT', SupplierInn: job.partnerInn, SupplierName: job.partnerName || 'Исполнитель' },
+          paymentAgentInfo: { AgentType: 'AGENT', SupplierInn: job.partnerInn, SupplierName: partnerName || 'Исполнитель' },
         });
       } else {
         const orgInn = await getUserOrgInn(job.userId);

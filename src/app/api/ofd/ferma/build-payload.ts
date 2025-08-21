@@ -90,6 +90,9 @@ export function buildFermaReceiptPayload(params: {
     (customerReceipt as any).PaymentAgentInfo = normalizedPai;
   }
   // PaymentItems: предоплата -> 1, зачёт предоплаты -> 2
+  // Логика:
+  // - when withAdvanceOffset => 2 (зачёт предоплаты)
+  // - when withPrepaymentItem => 1 (полный расчёт без отложенного зачёта, но с пометкой предоплаты)
   const paymentItemType = params.withAdvanceOffset ? 2 : (params.withPrepaymentItem ? 1 : undefined);
   const paymentItems = (typeof paymentItemType === 'number') ? [{ PaymentType: paymentItemType, Sum: sum }] : undefined;
   if (paymentItems) {
