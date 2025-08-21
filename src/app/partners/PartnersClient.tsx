@@ -7,6 +7,12 @@ import { Input } from '@/components/ui/Input';
 
 type Partner = { phone: string; fio: string | null; status: string | null; updatedAt: string };
 
+// Format phone for display with +
+function formatPhoneForDisplay(phone: string): string {
+  const digits = phone.replace(/\D/g, '');
+  return digits ? `+${digits}` : phone;
+}
+
 export default function PartnersClient({ initial }: { initial: Partner[] }) {
   const [partners, setPartners] = useState<Partner[]>(initial);
   const [loading, setLoading] = useState(false);
@@ -114,6 +120,21 @@ export default function PartnersClient({ initial }: { initial: Partner[] }) {
           }}
           disabled={loading}
         >Обновить</Button>
+        <Button
+          variant="ghost"
+          onClick={async () => {
+            setLoading(true);
+            try {
+              await fetch('/api/partners/merge-duplicates', { method: 'POST' });
+              await reload();
+              showToast('Дубликаты объединены', 'success');
+            } catch (e) {
+              showToast('Ошибка объединения', 'error');
+            }
+            setLoading(false);
+          }}
+          disabled={loading}
+        >Объединить дубликаты</Button>
       </div>
       {toast ? (
         <div className={`fixed bottom-4 right-4 z-50 rounded-lg px-3 py-2 text-sm shadow-md ${toast.kind === 'success' ? 'bg-green-600 text-white' : toast.kind === 'error' ? 'bg-red-600 text-white' : 'bg-gray-800 text-white'}`}>{toast.msg}</div>
@@ -128,7 +149,7 @@ export default function PartnersClient({ initial }: { initial: Partner[] }) {
             <div key={p.phone} className="border border-gray-200 dark:border-gray-800 rounded-lg bg-white dark:bg-gray-950 p-3">
               <div className="grid grid-cols-[7.25rem_1fr] gap-x-2 gap-y-1 text-[13px] leading-tight">
                 <div className="text-xs text-gray-500">Телефон</div>
-                <div className="font-medium">{p.phone}</div>
+                <div className="font-medium">{formatPhoneForDisplay(p.phone)}</div>
                 <div className="text-xs text-gray-500">ФИО</div>
                 <div>{p.fio ?? '-'}</div>
                 <div className="text-xs text-gray-500">Статус</div>
@@ -158,7 +179,7 @@ export default function PartnersClient({ initial }: { initial: Partner[] }) {
               </tr>
             ) : paged.map((p) => (
               <tr key={p.phone} className="border-t border-gray-100 dark:border-gray-800">
-                <td className="px-3 py-2">{p.phone}</td>
+                <td className="px-3 py-2">{formatPhoneForDisplay(p.phone)}</td>
                 <td className="px-3 py-2">{p.fio ?? '-'}</td>
                 <td className="px-3 py-2">{p.status ?? '-'}</td>
                 <td className="px-3 py-2">

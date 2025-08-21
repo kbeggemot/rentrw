@@ -50,18 +50,15 @@ export async function POST(req: Request) {
       executorData.executor.second_name
     ].filter(Boolean).join(' ').trim() : null;
     
-    // Check registration first
-    const isNotFound = res.status === 404;
-    const hasExecutorError = executorData && typeof executorData === 'object' && 
-      (executorData.error || !executorData.executor || !executorData.executor.inn);
-    
-    if (isNotFound || hasExecutorError) {
+    // Check registration first (404 or no executor data)
+    if (res.status === 404 || !executorData || !executorData.executor || !executorData.executor.inn) {
       return NextResponse.json({ 
         error: 'PARTNER_NOT_REGISTERED',
-        partnerData: { phone: digits, fio, status, inn, updatedAt: new Date().toISOString() }
+        partnerData: { phone: digits, fio: null, status: null, inn: null, updatedAt: new Date().toISOString() }
       }, { status: 400 });
     }
     
+    // Check if RW returned an error
     if (!res.ok) {
       return NextResponse.json({ 
         error: (executorData?.error as string) || 'RW_ERROR',
@@ -69,10 +66,11 @@ export async function POST(req: Request) {
       }, { status: 400 });
     }
     
+    // Now check status (we know executor exists)
     if (!status) {
       return NextResponse.json({ 
         error: 'PARTNER_NOT_REGISTERED',
-        partnerData: { phone: digits, fio, status, inn, updatedAt: new Date().toISOString() }
+        partnerData: { phone: digits, fio, status: null, inn, updatedAt: new Date().toISOString() }
       }, { status: 400 });
     }
     
