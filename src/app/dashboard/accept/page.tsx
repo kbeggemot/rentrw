@@ -90,6 +90,20 @@ function AcceptPaymentContent() {
     setToast({ msg, kind });
     setTimeout(() => setToast(null), 2500);
   };
+  // Executor pre-check UI
+  const [checkingExecutor, setCheckingExecutor] = useState(false);
+  const [btnDots, setBtnDots] = useState('.');
+  useEffect(() => {
+    let t: number | null = null;
+    if (checkingExecutor) {
+      t = window.setInterval(() => {
+        setBtnDots((prev) => (prev.length >= 3 ? '.' : prev + '.'));
+      }, 400) as unknown as number;
+    } else {
+      setBtnDots('.');
+    }
+    return () => { if (t) window.clearInterval(t); };
+  }, [checkingExecutor]);
 
   const validateMinNet = () => {
     const MIN_AMOUNT = 10;
@@ -362,41 +376,18 @@ function AcceptPaymentContent() {
     setMessageKind('info');
     const numAmount = Number(amount.replace(',', '.'));
     const numComm = Number(commission.replace(',', '.'));
-    if (!Number.isFinite(numAmount) || numAmount <= 0) {
-      setMessage('Введите корректную сумму');
-      setMessageKind('error');
-      return;
-    }
+    if (!Number.isFinite(numAmount) || numAmount <= 0) { showToast('Введите корректную сумму', 'error'); return; }
     // Business rule: минимальная сумма оплаты – не менее 10 ₽ (для агентских – после вычета комиссии)
     const MIN_AMOUNT = 10;
     if (isAgentSale) {
-      if (!agentDesc || agentDesc.trim().length === 0) {
-        setMessage('Заполните описание ваших услуг, как Агента, в настройках');
-        setMessageKind('error');
-        return;
-      }
-      if (commission.trim().length === 0) {
-        setMessage('Укажите комиссию агента');
-        return;
-      }
+      if (!agentDesc || agentDesc.trim().length === 0) { showToast('Заполните описание ваших услуг, как Агента, в настройках', 'error'); return; }
+      if (commission.trim().length === 0) { showToast('Укажите комиссию агента', 'error'); return; }
       if (commissionType === 'percent') {
-        if (!Number.isFinite(numComm) || numComm < 0 || numComm > 100) {
-          setMessage('Комиссия должна быть в диапазоне 0–100%');
-          setMessageKind('error');
-          return;
-        }
+        if (!Number.isFinite(numComm) || numComm < 0 || numComm > 100) { showToast('Комиссия должна быть в диапазоне 0–100%', 'error'); return; }
       } else {
-        if (!Number.isFinite(numComm) || numComm <= 0) {
-          setMessage('Укажите фиксированную комиссию в рублях (> 0)');
-          setMessageKind('error');
-          return;
-        }
+        if (!Number.isFinite(numComm) || numComm <= 0) { showToast('Укажите фиксированную комиссию в рублях (> 0)', 'error'); return; }
       }
-      if (agentPhone.trim().length === 0) {
-        setMessage('Укажите телефон партнёра');
-        setMessageKind('error');
-        return;
-      }
+      if (agentPhone.trim().length === 0) { showToast('Укажите телефон партнёра', 'error'); return; }
       // Validate net amount after commission
       const retained = commissionType === 'percent' ? (numAmount * (numComm / 100)) : numComm;
       const net = numAmount - retained;
@@ -408,6 +399,17 @@ function AcceptPaymentContent() {
       if (!(numAmount >= MIN_AMOUNT)) {
         showToast('Сумма должна быть не менее 10 рублей', 'error');
         return;
+      }
+    }
+    // Агентская продажа: предварительная проверка исполнителя с дизейблом кнопки
+    if (isAgentSale) {
+      try {
+        setCheckingExecutor(true);
+        const digits = agentPhone.replace(/\D/g, '');
+        try { await fetch('/api/rocketwork/tasks', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'InviteExecutor', phone: digits }) }); } catch {}
+        try { await fetch(`/api/rocketwork/task-debug?phone=${encodeURIComponent(digits)}`, { cache: 'no-store' }); } catch {}
+      } finally {
+        setCheckingExecutor(false);
       }
     }
     // Отправка на серверный маршрут создания сделки
@@ -478,16 +480,10 @@ function AcceptPaymentContent() {
         } catch {}
         startPolling(taskId, myAttempt);
         startStatusWatcher(taskId, myAttempt, isAgentSale);
-      } else {
-        setLoading(false);
-        setMessage('Не удалось получить идентификатор задачи');
-        setMessageKind('error');
-        setCollapsed(false);
-      }
+      } else { setLoading(false); showToast('Не удалось получить идентификатор задачи', 'error'); setCollapsed(false); }
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Ошибка';
-      setMessage(msg);
-      setMessageKind('error');
+      showToast(msg, 'error');
       setLoading(false);
       setCollapsed(false);
     }
@@ -646,7 +642,7 @@ function AcceptPaymentContent() {
         ) : null}
           </>
         ) : null}
-        <Button type="submit" disabled={loading}>{loading ? 'Создаю…' : (lastTaskId ? 'Повторить' : 'Продолжить')}</Button>
+        <Button type="submit" disabled={loading || checkingExecutor}>{checkingExecutor ? `Проверяю${btnDots}` : (loading ? 'Создаю…' : (lastTaskId ? 'Повторить' : 'Продолжить'))}</Button>
         {paymentUrl ? (
           <div className="mt-4 space-y-3">
             <div className="flex gap-2 items-end">
