@@ -16,6 +16,7 @@ export type SaleRecord = {
   taskId: number | string;
   orderId: number;
   userId: string;
+  clientEmail?: string | null;
   description?: string | null;
   amountGrossRub: number;
   isAgent: boolean;
@@ -63,6 +64,7 @@ export async function recordSaleOnCreate(params: {
   userId: string;
   taskId: number | string;
   orderId: number;
+  clientEmail?: string | null;
   description?: string;
   amountGrossRub: number;
   isAgent: boolean;
@@ -71,7 +73,7 @@ export async function recordSaleOnCreate(params: {
   serviceEndDate?: string;
   vatRate?: string;
 }): Promise<void> {
-  const { userId, taskId, orderId, description, amountGrossRub, isAgent, commissionType, commissionValue, serviceEndDate, vatRate } = params;
+  const { userId, taskId, orderId, clientEmail, description, amountGrossRub, isAgent, commissionType, commissionValue, serviceEndDate, vatRate } = params;
   let retained = 0;
   if (isAgent && commissionValue !== undefined) {
     if (commissionType === 'percent') retained = (amountGrossRub * commissionValue) / 100;
@@ -84,6 +86,7 @@ export async function recordSaleOnCreate(params: {
     taskId,
     orderId,
     userId,
+    clientEmail: (clientEmail ?? null),
     description: description ?? null,
     amountGrossRub,
     isAgent,
@@ -239,10 +242,12 @@ export async function ensureSaleFromTask(params: {
   const now = new Date().toISOString();
   const status = (task?.acquiring_order as any)?.status ?? null;
   const ofd = (task?.acquiring_order as any)?.ofd_url ?? null;
+  const clientEmail = (task?.acquiring_order as any)?.client_email ?? null;
   store.sales.push({
     taskId,
     orderId: resolvedOrderId!,
     userId,
+    clientEmail: (typeof clientEmail === 'string' ? clientEmail : null) as any,
     amountGrossRub: amountRub || 0,
     isAgent,
     retainedCommissionRub: 0,

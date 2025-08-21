@@ -8,9 +8,8 @@ import { getUserAgentSettings } from '@/server/userStore';
 import type { RocketworkTask } from '@/types/rocketwork';
 import { getUserPayoutRequisites, getUserOrgInn } from '@/server/userStore';
 import { createResumeToken } from '@/server/payResumeStore';
-import { fermaGetAuthTokenCached, fermaCreateReceipt } from '@/server/ofdFerma';
+// Removed immediate OFD creation on task creation; receipts are created on paid/transfered via postbacks
 import { buildFermaReceiptPayload, PAYMENT_METHOD_PREPAY_FULL, PAYMENT_METHOD_FULL_PAYMENT } from '@/app/api/ofd/ferma/build-payload';
-import { enqueueOffsetJob, startOfdScheduleWorker } from '@/server/ofdScheduleWorker';
 import { updateSaleOfdUrlsByOrderId } from '@/server/taskStore';
 import { headers as nextHeaders } from 'next/headers';
 import { listWithdrawals } from '@/server/withdrawalStore';
@@ -366,6 +365,7 @@ export async function POST(req: Request) {
         userId,
         taskId,
         orderId,
+        clientEmail,
         description,
         amountGrossRub: amountRub,
         isAgent: !!body.agentSale,
@@ -375,58 +375,7 @@ export async function POST(req: Request) {
         vatRate: vatRate || undefined,
       });
 
-      if (needDeferredFull) {
-        try {
-          // start worker (idempotent)
-          startOfdScheduleWorker();
-          // Build and send prepayment receipt now
-          const baseUrl = process.env.FERMA_BASE_URL || 'https://ferma.ofd.ru/';
-          const tokenOfd = await fermaGetAuthTokenCached(process.env.FERMA_LOGIN || '', process.env.FERMA_PASSWORD || '', { baseUrl });
-          const hdrs = await nextHeaders();
-          const proto = hdrs.get('x-forwarded-proto') || 'http';
-          const host = hdrs.get('x-forwarded-host') || hdrs.get('host') || 'localhost:3000';
-          const secret = process.env.OFD_CALLBACK_SECRET || '';
-          const callbackUrl = `${proto}://${host}/api/ofd/ferma/callback${secret ? `?secret=${encodeURIComponent(secret)}&` : '?'}uid=${encodeURIComponent(userId)}`;
-          const invoiceId = String(orderId);
-          const usedVat = (vatRate || 'none') as any;
-          if (body.agentSale) {
-            // partner prepayment
-            const partnerPhone = String(body.agentPhone || '').trim();
-            const phoneDigits = partnerPhone.replace(/\D/g, '');
-            let partnerInn: string | undefined;
-            let partnerNameOut: string | undefined;
-            try {
-              const exUrl = new URL(`executors/${encodeURIComponent(phoneDigits)}`, base.endsWith('/') ? base : base + '/').toString();
-              const exRes = await fetch(exUrl, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }, cache: 'no-store' });
-              const exTxt = await exRes.text();
-              let ex: any = null; try { ex = exTxt ? JSON.parse(exTxt) : null; } catch { ex = exTxt; }
-              partnerInn = (ex?.executor?.inn as string | undefined) ?? (ex?.inn as string | undefined);
-              partnerNameOut = (ex?.executor && [ex?.executor?.last_name, ex?.executor?.first_name, ex?.executor?.second_name].filter(Boolean).join(' ').trim()) || undefined;
-            } catch {}
-            if (!partnerInn) throw new Error('NO_PARTNER_INN');
-            // Use net amount (minus commission) and pass SupplierName
-            const pp = buildFermaReceiptPayload({ party: 'partner', partyInn: partnerInn, description, amountRub: Math.round(netUnitPriceCents) / 100, vatRate: usedVat, methodCode: PAYMENT_METHOD_PREPAY_FULL, orderId, docType: 'IncomePrepayment', buyerEmail: clientEmail, invoiceId, callbackUrl, withPrepaymentItem: true, paymentAgentInfo: { AgentType: 'AGENT', SupplierInn: partnerInn, SupplierName: partnerNameOut || 'Исполнитель' } });
-            {
-              const created = await fermaCreateReceipt(pp, { baseUrl, authToken: tokenOfd });
-              await updateSaleOfdUrlsByOrderId(userId, orderId, { ofdUrl: null, ofdPrepayId: created.id || null });
-            }
-            // enqueue offset at 12:00 MSK of endDate
-            const dueDate = new Date(`${endDate}T09:00:00Z`); // 12:00 MSK ~= 09:00 UTC
-            await enqueueOffsetJob({ userId, orderId, dueAt: dueDate.toISOString(), party: 'partner', partnerInn, description, amountRub: Math.round(netUnitPriceCents) / 100, vatRate: usedVat, buyerEmail: clientEmail || undefined });
-          } else {
-            const orgInn = await getUserOrgInn(userId);
-            const orgData = await getUserPayoutRequisites(userId);
-            if (!orgInn) throw new Error('NO_ORG_INN');
-            const pp = buildFermaReceiptPayload({ party: 'org', partyInn: orgInn, description, amountRub: Math.round(netUnitPriceCents) / 100, vatRate: usedVat, methodCode: PAYMENT_METHOD_PREPAY_FULL, orderId, docType: 'IncomePrepayment', buyerEmail: clientEmail, invoiceId, callbackUrl, withPrepaymentItem: true, paymentAgentInfo: { AgentType: 'AGENT', SupplierInn: orgInn, SupplierName: orgData.orgName || 'Организация' } });
-            {
-              const created = await fermaCreateReceipt(pp, { baseUrl, authToken: tokenOfd });
-              await updateSaleOfdUrlsByOrderId(userId, orderId, { ofdUrl: null, ofdPrepayId: created.id || null });
-            }
-            const dueDate = new Date(`${endDate}T09:00:00Z`); // 12:00 MSK
-            await enqueueOffsetJob({ userId, orderId, dueAt: dueDate.toISOString(), party: 'org', description, amountRub: Math.round(netUnitPriceCents) / 100, vatRate: usedVat, buyerEmail: clientEmail || undefined });
-          }
-        } catch {}
-      }
+      // Removed: prepayment receipt creation and offset scheduling at creation time
     }
 
     return NextResponse.json({ ok: true, order_id: orderId, task_id: taskId, data }, { status: 201 });
