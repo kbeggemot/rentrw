@@ -17,7 +17,20 @@ export async function GET(req: Request) {
     const sale = sales.find((s) => s.orderId === orderId) || null;
     let orgName: string | null = null;
     try { const reqs = await getUserPayoutRequisites(userId); orgName = reqs?.orgName || null; } catch {}
-    return NextResponse.json({ userId, orderId, taskId: sale?.taskId ?? null, orgName });
+    const payload: Record<string, unknown> = { userId, orderId, taskId: sale?.taskId ?? null, orgName };
+    if (sale) {
+      payload.sale = {
+        description: sale.description ?? null,
+        amountRub: sale.amountGrossRub,
+        createdAt: sale.createdAtRw || sale.createdAt,
+        status: sale.status ?? null,
+        ofdUrl: sale.ofdUrl ?? null,
+        ofdFullUrl: sale.ofdFullUrl ?? null,
+        commissionUrl: sale.additionalCommissionOfdUrl ?? null,
+        npdReceiptUri: sale.npdReceiptUri ?? null,
+      };
+    }
+    return NextResponse.json(payload);
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'Server error';
     return NextResponse.json({ error: msg }, { status: 500 });

@@ -13,6 +13,7 @@ export default function PublicSuccessUnifiedPage() {
   const [receipts, setReceipts] = useState<{ prepay?: string | null; full?: string | null; commission?: string | null; npd?: string | null }>({});
   const [msg, setMsg] = useState<string | null>(null);
   const [waiting, setWaiting] = useState(false);
+  const [summary, setSummary] = useState<{ amountRub?: number; description?: string | null } | null>(null);
   const pollRef = useRef<number | null>(null);
   const [dots, setDots] = useState(".");
 
@@ -57,6 +58,7 @@ export default function PublicSuccessUnifiedPage() {
                 setTaskId(d.taskId);
                 setInfo({ code: '', userId: String(d.userId || ''), title: undefined, orgName: d?.orgName || null });
                 setOrderId(Number(d.orderId || 0) || null);
+                if (d?.sale) setSummary({ amountRub: d.sale.amountRub, description: d.sale.description });
                 setWaiting(false);
               } else {
                 setWaiting(false);
@@ -144,7 +146,10 @@ export default function PublicSuccessUnifiedPage() {
   return (
     <div className="max-w-xl mx-auto p-4">
       <h1 className="text-xl font-semibold mb-1">Платёж успешно выполнен</h1>
-      <div className="text-sm text-gray-600 mb-4">Спасибо! Мы сформируем чек(и) автоматически и отправим на почту.</div>
+      <div className="text-sm text-gray-600 mb-2">Спасибо! Мы сформируем чек(и) автоматически и отправим на почту.</div>
+      {summary ? (
+        <div className="text-sm text-gray-800 mb-3">{summary.description ? `${summary.description} — ` : ''}{typeof summary.amountRub === 'number' ? new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB' }).format(summary.amountRub) : ''}</div>
+      ) : null}
 
       {waiting ? (
         <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm mb-4">Ищем информацию о платеже{dots}</div>
