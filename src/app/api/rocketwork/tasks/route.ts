@@ -7,6 +7,7 @@ import { saveTaskId, recordSaleOnCreate } from '@/server/taskStore';
 import { getUserAgentSettings } from '@/server/userStore';
 import type { RocketworkTask } from '@/types/rocketwork';
 import { getUserPayoutRequisites, getUserOrgInn } from '@/server/userStore';
+import { createResumeToken } from '@/server/payResumeStore';
 import { fermaGetAuthTokenCached, fermaCreateReceipt } from '@/server/ofdFerma';
 import { buildFermaReceiptPayload, PAYMENT_METHOD_PREPAY_FULL, PAYMENT_METHOD_FULL_PAYMENT } from '@/app/api/ofd/ferma/build-payload';
 import { enqueueOffsetJob, startOfdScheduleWorker } from '@/server/ofdScheduleWorker';
@@ -246,6 +247,17 @@ export async function POST(req: Request) {
         order: String(orderId),
       },
     };
+
+    // Inject redirect_url to acquiring_order for bank success redirect
+    try {
+      const hdrs = await nextHeaders();
+      const proto = hdrs.get('x-forwarded-proto') || 'http';
+      const host = hdrs.get('x-forwarded-host') || hdrs.get('host') || 'localhost:3000';
+      // Create one-time resume token bound to userId+orderId to help payer browser resume polling
+      const tokenForResume = await createResumeToken(userId, orderId);
+      const successUrl = `${proto}://${host}/link/success?sid=${encodeURIComponent(tokenForResume)}`;
+      (payload.acquiring_order as any).redirect_url = successUrl;
+    } catch {}
 
     // Map VAT selection from UI into RW acquiring_order.vat for downstream OFD
     const vatRate: string | undefined = typeof (body as any)?.vatRate === 'string' ? (body as any).vatRate : undefined;

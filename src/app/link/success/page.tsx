@@ -35,6 +35,7 @@ export default function PublicSuccessUnifiedPage() {
           const obj = JSON.parse(raw);
           const ts = Number(obj?.ts || 0);
           if (!Number.isFinite(ts) || now - ts > 30 * 60 * 1000) continue; // ttl 30m
+          // Accept either browser sid (from sessionStorage) or server resume token (from redirect)
           if (sid && obj?.sid && obj.sid !== sid) continue;
           const code = k.replace(/^lastPay:/, "");
           candidates.push({ key: k, code, taskId: obj?.taskId, ts, sid: obj?.sid });
