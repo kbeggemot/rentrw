@@ -23,6 +23,7 @@ export default function PublicPayPage(props: any) {
   const [data, setData] = useState<LinkData | null>(null);
   const [amount, setAmount] = useState('');
   const [method, setMethod] = useState<'qr' | 'card'>('qr');
+  const [email, setEmail] = useState('');
   const [msg, setMsg] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -51,6 +52,7 @@ export default function PublicPayPage(props: any) {
 
   // helpers
   const mskToday = () => new Date().toLocaleDateString('ru-RU', { timeZone: 'Europe/Moscow' }).split('.').reverse().join('-');
+  const isValidEmail = (s: string) => /.+@.+\..+/.test(s.trim());
 
   const canPay = useMemo(() => {
     if (!data) return false;
@@ -59,8 +61,8 @@ export default function PublicPayPage(props: any) {
     const minOk = data.isAgent
       ? (n - (data.commissionType === 'percent' ? n * (Number(data.commissionValue || 0) / 100) : Number(data.commissionValue || 0))) >= 10
       : n >= 10;
-    return minOk;
-  }, [data, amount]);
+    return minOk && isValidEmail(email);
+  }, [data, amount, email]);
 
   const startPoll = (uid: string | number) => {
     if (pollRef.current) return;
@@ -122,7 +124,7 @@ export default function PublicPayPage(props: any) {
         amountRub: amountNum,
         description: data.description,
         method: method === 'card' ? 'card' : 'qr',
-        clientEmail: undefined,
+        clientEmail: email.trim(),
         agentSale: !!data.isAgent,
         agentPhone: data.partnerPhone || undefined,
         commissionType: data.isAgent ? (data.commissionType || undefined) : undefined,
@@ -174,6 +176,11 @@ export default function PublicPayPage(props: any) {
             <div className="text-xs text-gray-500 mt-1">Минимальная сумма {data.isAgent ? 'за вычетом комиссии' : ''} — 10 ₽</div>
           ) : null}
         </div>
+        <div className="mb-3">
+          <label className="block text-sm text-gray-600 mb-1">Email покупателя</label>
+          <input className="w-full sm:w-80 rounded-lg border px-2 h-9 text-sm" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="name@example.com" />
+          <div className="text-xs text-gray-500 mt-1">Отправим чек на этот email</div>
+        </div>
         <div className="mb-4">
           <label className="block text-sm text-gray-600 mb-1">Способ оплаты</label>
           {data.method === 'any' ? (
@@ -189,44 +196,39 @@ export default function PublicPayPage(props: any) {
           {loading ? 'Формируем платежную ссылку…' : 'Перейти к оплате'}
         </button>
 
-        {/* Collapsible details */}
-        <div className="mt-4">
-          <button type="button" className="w-full text-left px-3 py-2 rounded-md hover:bg-gray-50 border border-gray-200 flex items-center justify-between" onClick={() => setDetailsOpen((v) => !v)}>
-            <span className="text-base font-semibold">Ссылка и чеки</span>
-            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`${detailsOpen ? 'rotate-180' : ''}`}>"<path d="M6 9l6 6 6-6"/></svg>
-          </button>
-          {detailsOpen ? (
-            <div className="mt-2">
-              {!taskId ? (
-                <div className="text-sm text-gray-600">Нажмите «Перейти к оплате», чтобы сформировать ссылку…</div>
-              ) : (
-                <div className="space-y-2">
-                  {!payUrl ? (
-                    <div className="text-sm text-gray-600">Формируем платежную ссылку…</div>
-                  ) : (
-                    <button disabled={awaitingPay} onClick={() => { setAwaitingPay(true); try { window.open(payUrl!, '_blank'); } catch {} }} className="inline-flex items-center justify-center rounded-lg bg-black text-white px-4 h-9 text-sm disabled:opacity-60">
-                      Оплатить
-                    </button>
-                  )}
-                  {awaitingPay ? (<div className="text-sm text-gray-600">Ждём подтверждения оплаты…</div>) : null}
-                  {(receipts.prepay || receipts.full || receipts.commission || receipts.npd) ? (
-                    <div className="mt-2 rounded-md border border-gray-200 bg-gray-50 p-2 text-sm">
-                      <div className="grid grid-cols-[9rem_1fr] gap-y-2">
-                        {receipts.prepay ? (<><div className="text-gray-500">Предоплата</div><a className="text-blue-600 hover:underline" href={receipts.prepay} target="_blank" rel="noreferrer">Открыть</a></>) : null}
-                        {receipts.full ? (<><div className="text-gray-500">Полный расчёт</div><a className="text-blue-600 hover:underline" href={receipts.full} target="_blank" rel="noreferrer">Открыть</a></>) : null}
-                        {receipts.commission ? (<><div className="text-gray-500">Комиссия</div><a className="text-blue-600 hover:underline" href={receipts.commission} target="_blank" rel="noreferrer">Открыть</a></>) : null}
-                        {receipts.npd ? (<><div className="text-gray-500">НПД</div><a className="text-blue-600 hover:underline" href={receipts.npd} target="_blank" rel="noreferrer">Открыть</a></>) : null}
-                        {(!receipts.prepay && !receipts.full && !receipts.commission && !receipts.npd) ? (
-                          <div className="col-span-2 text-gray-500">Чеки недоступны</div>
-                        ) : null}
-                      </div>
+        {/* Inline expandable panel (Sales-like) */}
+        {detailsOpen ? (
+          <div className="mt-4 rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm">
+            {!taskId ? (
+              <div className="text-gray-600">Нажмите «Перейти к оплате», чтобы сформировать ссылку…</div>
+            ) : (
+              <div className="space-y-2">
+                {!payUrl ? (
+                  <div className="text-gray-600">Формируем платежную ссылку…</div>
+                ) : (
+                  <div className="grid grid-cols-[9rem_1fr] gap-y-2">
+                    <div className="text-gray-500">Ссылка</div>
+                    <a className="text-blue-600 hover:underline" href={payUrl} target="_blank" rel="noreferrer" onClick={() => setAwaitingPay(true)}>Открыть</a>
+                  </div>
+                )}
+                {awaitingPay ? (<div className="text-gray-600">Ждём подтверждения оплаты…</div>) : null}
+                {(receipts.prepay || receipts.full || receipts.commission || receipts.npd) ? (
+                  <div className="mt-1 rounded-md border border-gray-200 bg-white p-2">
+                    <div className="grid grid-cols-[9rem_1fr] gap-y-2">
+                      {receipts.prepay ? (<><div className="text-gray-500">Предоплата</div><a className="text-blue-600 hover:underline" href={receipts.prepay} target="_blank" rel="noreferrer">Открыть</a></>) : null}
+                      {receipts.full ? (<><div className="text-gray-500">Полный расчёт</div><a className="text-blue-600 hover:underline" href={receipts.full} target="_blank" rel="noreferrer">Открыть</a></>) : null}
+                      {receipts.commission ? (<><div className="text-gray-500">Комиссия</div><a className="text-blue-600 hover:underline" href={receipts.commission} target="_blank" rel="noreferrer">Открыть</a></>) : null}
+                      {receipts.npd ? (<><div className="text-gray-500">НПД</div><a className="text-blue-600 hover:underline" href={receipts.npd} target="_blank" rel="noreferrer">Открыть</a></>) : null}
+                      {(!receipts.prepay && !receipts.full && !receipts.commission && !receipts.npd) ? (
+                        <div className="col-span-2 text-gray-500">Чеки недоступны</div>
+                      ) : null}
                     </div>
-                  ) : null}
-                </div>
-              )}
-            </div>
-          ) : null}
-        </div>
+                  </div>
+                ) : null}
+              </div>
+            )}
+          </div>
+        ) : null}
 
         {msg ? <div className="mt-3 text-sm text-gray-600">{msg}</div> : null}
       </div>
