@@ -26,6 +26,7 @@ export default function PublicPayPage(props: any) {
   const [email, setEmail] = useState('');
   const [msg, setMsg] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [started, setStarted] = useState(false);
 
   // Flow state
   const [taskId, setTaskId] = useState<string | number | null>(null);
@@ -36,6 +37,21 @@ export default function PublicPayPage(props: any) {
 
   const pollRef = useRef<number | null>(null);
   const payUrlPollRef = useRef<number | null>(null);
+
+  // Animated dots for "формируем ссылку"
+  const [dots, setDots] = useState('.');
+  useEffect(() => {
+    let timer: number | null = null;
+    const active = loading || (detailsOpen && taskId && !payUrl);
+    if (active) {
+      timer = window.setInterval(() => {
+        setDots((prev) => (prev.length >= 3 ? '.' : prev + '.'));
+      }, 400) as unknown as number;
+    } else {
+      setDots('.');
+    }
+    return () => { if (timer) window.clearInterval(timer); };
+  }, [loading, detailsOpen, taskId, payUrl]);
 
   useEffect(() => {
     (async () => {
@@ -114,6 +130,7 @@ export default function PublicPayPage(props: any) {
   const goPay = async () => {
     if (!data) return;
     try {
+      setStarted(true);
       setLoading(true);
       setMsg(null);
       setPayUrl(null);
@@ -156,10 +173,13 @@ export default function PublicPayPage(props: any) {
     );
   }
 
+  const canStart = canPay && !started && !loading;
+  const actionBtnClasses = `inline-flex items-center justify-center rounded-lg ${canStart ? 'bg-black text-white' : 'bg-gray-200 text-gray-600'} px-4 h-9 text-sm`;
+
   return (
     <div className="max-w-xl mx-auto p-4">
       <h1 className="text-xl font-semibold mb-1">Оплата в пользу {data.orgName || 'Организация'}</h1>
-      <div className="text-sm text-gray-600 mb-4">Название: {data.title}</div>
+      <div className="text-sm text-gray-600 mb-4">{data.title}</div>
       <div className="bg-white dark:bg-gray-950 border border-gray-200 dark:border-gray-800 rounded-lg p-4">
         <div className="mb-3">
           <div className="text-sm text-gray-600">За что платим</div>
@@ -177,9 +197,9 @@ export default function PublicPayPage(props: any) {
           ) : null}
         </div>
         <div className="mb-3">
-          <label className="block text-sm text-gray-600 mb-1">Email покупателя</label>
+          <label className="block text-sm text-gray-600 mb-1">Ваш email</label>
           <input className="w-full sm:w-80 rounded-lg border px-2 h-9 text-sm" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="name@example.com" />
-          <div className="text-xs text-gray-500 mt-1">Отправим чек на этот email</div>
+          <div className="text-xs text-gray-500 mt-1">Отправим чек на эту почту</div>
         </div>
         <div className="mb-4">
           <label className="block text-sm text-gray-600 mb-1">Способ оплаты</label>
@@ -192,8 +212,8 @@ export default function PublicPayPage(props: any) {
             <input className="w-40 rounded-lg border px-2 h-9 text-sm" value={data.method === 'card' ? 'Карта' : 'СБП'} readOnly />
           )}
         </div>
-        <button disabled={!canPay || loading} onClick={goPay} className="inline-flex items-center justify-center rounded-lg bg-black text-white px-4 h-9 text-sm disabled:opacity-60">
-          {loading ? 'Формируем платежную ссылку…' : 'Перейти к оплате'}
+        <button disabled={!canStart} onClick={goPay} className={actionBtnClasses}>
+          {loading ? `Формируем платежную ссылку${dots}` : 'Перейти к оплате'}
         </button>
 
         {/* Inline expandable panel (Sales-like) */}
@@ -204,7 +224,7 @@ export default function PublicPayPage(props: any) {
             ) : (
               <div className="space-y-2">
                 {!payUrl ? (
-                  <div className="text-gray-600">Формируем платежную ссылку…</div>
+                  <div className="text-gray-600">{`Формируем платежную ссылку${dots}`}</div>
                 ) : (
                   <div className="grid grid-cols-[9rem_1fr] gap-y-2">
                     <div className="text-gray-500">Ссылка</div>

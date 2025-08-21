@@ -35,6 +35,7 @@ export default function DashboardClient({ hasTokenInitial }: { hasTokenInitial: 
   // Permalinks state
   const [links, setLinks] = useState<Array<{ code: string; title: string; createdAt?: string }>>([]);
   const [linkOpen, setLinkOpen] = useState(false);
+  const [linksOpen, setLinksOpen] = useState(false);
   const [linkTitle, setLinkTitle] = useState('');
   const [linkDesc, setLinkDesc] = useState('');
   const [linkSumMode, setLinkSumMode] = useState<'custom' | 'fixed'>('custom');
@@ -100,6 +101,14 @@ export default function DashboardClient({ hasTokenInitial }: { hasTokenInitial: 
     } catch {
       setHistory([]);
     }
+  };
+
+  const refreshLinks = async () => {
+    try {
+      const r = await fetch('/api/links', { cache: 'no-store' });
+      const d = await r.json();
+      if (Array.isArray(d?.items)) setLinks(d.items.map((x: any) => ({ code: x.code, title: x.title, createdAt: x.createdAt })));
+    } catch {}
   };
 
   // On mount: load history and restore pending task (for spinner) if any
@@ -360,22 +369,33 @@ export default function DashboardClient({ hasTokenInitial }: { hasTokenInitial: 
                 </div>
               </div>
             ) : null}
-            {links.length > 0 ? (
-              <div className="mt-3">
-                <div className="text-sm text-gray-600 mb-2">Мои постоянные ссылки</div>
-                <div className="space-y-2">
-                  {links.map((l) => (
-                    <div key={l.code} className="flex items-center justify-between border rounded px-3 py-2">
-                      <div className="text-sm"><a className="text-blue-600 hover:underline" href={`/link/${encodeURIComponent(l.code)}`} target="_blank" rel="noreferrer">{l.title || l.code}</a></div>
-                      <div className="flex items-center gap-2">
-                        <Button variant="secondary" size="icon" onClick={async () => { try { await navigator.clipboard.writeText(new URL(`/link/${encodeURIComponent(l.code)}`, window.location.origin).toString()); showToast('Ссылка скопирована', 'success'); } catch {} }}>⧉</Button>
-                        <Button variant="secondary" size="icon" onClick={async () => { if (!confirm('Удалить ссылку?')) return; try { await fetch(`/api/links/${encodeURIComponent(l.code)}`, { method: 'DELETE' }); setLinks((prev) => prev.filter((x) => x.code !== l.code)); } catch {} }}>🗑</Button>
-                      </div>
+
+            {/* Spoiler for the links list */}
+            <div className="mt-3">
+              <button type="button" className="w-full text-left px-3 py-2 rounded-md hover:bg-gray-50 dark:hover:bg-gray-900 border border-gray-200 dark:border-gray-800 flex items-center justify-between" onClick={async () => { const next = !linksOpen; setLinksOpen(next); if (next && links.length === 0) { await refreshLinks(); } }}>
+                <span className="text-base font-semibold">Мои постоянные ссылки</span>
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`${linksOpen ? 'rotate-180' : ''}`}><path d="M6 9l6 6 6-6"/></svg>
+              </button>
+              {linksOpen ? (
+                <div className="mt-2">
+                  {links.length === 0 ? (
+                    <div className="px-3 py-3 text-sm text-gray-500 border rounded-md bg-white dark:bg-gray-950">Ссылок нет</div>
+                  ) : (
+                    <div className="space-y-2">
+                      {links.map((l) => (
+                        <div key={l.code} className="flex items-center justify-between border rounded px-3 py-2">
+                          <div className="text-sm"><a className="text-blue-600 hover:underline" href={`/link/${encodeURIComponent(l.code)}`} target="_blank" rel="noreferrer">{l.title || l.code}</a></div>
+                          <div className="flex items-center gap-2">
+                            <Button variant="secondary" size="icon" onClick={async () => { try { await navigator.clipboard.writeText(new URL(`/link/${encodeURIComponent(l.code)}`, window.location.origin).toString()); showToast('Ссылка скопирована', 'success'); } catch {} }}>⧉</Button>
+                            <Button variant="secondary" size="icon" onClick={async () => { if (!confirm('Удалить ссылку?')) return; try { await fetch(`/api/links/${encodeURIComponent(l.code)}`, { method: 'DELETE' }); setLinks((prev) => prev.filter((x) => x.code !== l.code)); } catch {} }}>🗑</Button>
+                          </div>
+                        </div>
+                      ))}
                     </div>
-                  ))}
+                  )}
                 </div>
-              </div>
-            ) : null}
+              ) : null}
+            </div>
           </div>
 
           <div className="mt-6">
