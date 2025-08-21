@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createPaymentLink, listPaymentLinks } from '@/server/paymentLinkStore';
+import { getDecryptedApiToken } from '@/server/secureStore';
 
 export const runtime = 'nodejs';
 
@@ -38,8 +39,44 @@ export async function POST(req: Request) {
     const commissionValue = isAgent && typeof body?.commissionValue === 'number' ? Number(body?.commissionValue) : null;
     const partnerPhone = isAgent ? (String(body?.partnerPhone || '').trim() || null) : null;
     const method = (body?.method === 'qr' || body?.method === 'card') ? body?.method : 'any';
-    if (!title || !description) return NextResponse.json({ error: 'INVALID' }, { status: 400 });
+    if (!title) return NextResponse.json({ error: 'TITLE_REQUIRED' }, { status: 400 });
+    if (!description) return NextResponse.json({ error: 'DESCRIPTION_REQUIRED' }, { status: 400 });
     if (sumMode === 'fixed' && (!Number.isFinite(amountRub) || Number(amountRub) <= 0)) return NextResponse.json({ error: 'INVALID_AMOUNT' }, { status: 400 });
+    // Validate agent fields and partner in RW when isAgent
+    if (isAgent) {
+      if (!commissionType) return NextResponse.json({ error: 'COMMISSION_TYPE_REQUIRED' }, { status: 400 });
+      if (commissionValue == null || !Number.isFinite(commissionValue)) return NextResponse.json({ error: 'COMMISSION_VALUE_REQUIRED' }, { status: 400 });
+      if (commissionType === 'percent' && (commissionValue < 0 || commissionValue > 100)) return NextResponse.json({ error: 'COMMISSION_PERCENT_RANGE' }, { status: 400 });
+      if (commissionType === 'fixed' && commissionValue <= 0) return NextResponse.json({ error: 'COMMISSION_FIXED_POSITIVE' }, { status: 400 });
+      if (!partnerPhone) return NextResponse.json({ error: 'PARTNER_PHONE_REQUIRED' }, { status: 400 });
+      // Check partner via RW similar to main flow
+      try {
+        const token = await getDecryptedApiToken(userId);
+        if (!token) return NextResponse.json({ error: 'NO_TOKEN' }, { status: 400 });
+        const base = process.env.ROCKETWORK_API_BASE_URL || 'https://app.rocketwork.ru/api/';
+        const digits = String(partnerPhone).replace(/\D/g, '');
+        // invite best-effort
+        try { await fetch(new URL('executors/invite', base.endsWith('/') ? base : base + '/').toString(), { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify({ phone: digits, with_framework_agreement: false }), cache: 'no-store' }); } catch {}
+        const url = new URL(`executors/${encodeURIComponent(digits)}`, base.endsWith('/') ? base : base + '/').toString();
+        const res = await fetch(url, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }, cache: 'no-store' });
+        const txt = await res.text();
+        let data: any = null; try { data = txt ? JSON.parse(txt) : null; } catch { data = txt; }
+        if (res.status === 404 || (typeof data === 'object' && data && ((data.error && /not\s*found/i.test(String(data.error))) || data.executor == null || (data.executor && data.executor.inn == null)))) {
+          return NextResponse.json({ error: 'PARTNER_NOT_REGISTERED' }, { status: 400 });
+        }
+        if (!res.ok) {
+          return NextResponse.json({ error: (data?.error as string) || 'RW_ERROR' }, { status: 400 });
+        }
+        const status: string | undefined = (data?.executor?.selfemployed_status as string | undefined) ?? (data?.selfemployed_status as string | undefined);
+        if (!status) return NextResponse.json({ error: 'PARTNER_NOT_REGISTERED' }, { status: 400 });
+        if (status !== 'validated') return NextResponse.json({ error: 'PARTNER_NOT_VALIDATED' }, { status: 400 });
+        const paymentInfo = (data?.executor?.payment_info ?? data?.payment_info ?? null);
+        if (!paymentInfo) return NextResponse.json({ error: 'PARTNER_NO_PAYMENT_INFO' }, { status: 400 });
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : 'CHECK_ERROR';
+        return NextResponse.json({ error: msg }, { status: 400 });
+      }
+    }
     const item = await createPaymentLink(userId, { title, description, sumMode, amountRub: amountRub ?? undefined, vatRate, isAgent, commissionType: commissionType as any, commissionValue: commissionValue ?? undefined, partnerPhone, method });
     const hostHdr = req.headers.get('x-forwarded-host') || req.headers.get('host') || 'localhost:3000';
     const protoHdr = req.headers.get('x-forwarded-proto') || (hostHdr.startsWith('localhost') ? 'http' : 'https');

@@ -394,7 +394,23 @@ export default function DashboardClient({ hasTokenInitial }: { hasTokenInitial: 
                         const payload: any = { title: linkTitle.trim(), description: linkDesc.trim(), sumMode: linkSumMode, amountRub: amountNum, vatRate: linkVat, isAgent: linkAgent, commissionType: linkAgent ? linkCommType : undefined, commissionValue: linkAgent ? Number(linkCommVal.replace(',', '.')) : undefined, partnerPhone: linkAgent ? linkPartner.trim() : undefined, method: linkMethod };
                         const r = await fetch('/api/links', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
                         const d = await r.json();
-                        if (!r.ok) throw new Error(d?.error || 'ERROR');
+                        if (!r.ok) {
+                          const code = d?.error;
+                          if (code === 'TITLE_REQUIRED') showToast('Укажите название ссылки', 'error');
+                          else if (code === 'DESCRIPTION_REQUIRED') showToast('Укажите описание услуги', 'error');
+                          else if (code === 'INVALID_AMOUNT') showToast('Укажите корректную сумму', 'error');
+                          else if (code === 'COMMISSION_TYPE_REQUIRED') showToast('Выберите тип комиссии', 'error');
+                          else if (code === 'COMMISSION_VALUE_REQUIRED') showToast('Укажите комиссию агента', 'error');
+                          else if (code === 'COMMISSION_PERCENT_RANGE') showToast('Комиссия должна быть в диапазоне 0–100%', 'error');
+                          else if (code === 'COMMISSION_FIXED_POSITIVE') showToast('Укажите фиксированную комиссию в рублях (> 0)', 'error');
+                          else if (code === 'PARTNER_PHONE_REQUIRED') showToast('Укажите телефон партнёра', 'error');
+                          else if (code === 'PARTNER_NOT_REGISTERED') showToast('Партнёр не завершил регистрацию в Рокет Ворк', 'error');
+                          else if (code === 'PARTNER_NOT_VALIDATED') showToast('Партнёр не может принять оплату: нет статуса самозанятого', 'error');
+                          else if (code === 'PARTNER_NO_PAYMENT_INFO') showToast('Партнёр не указал платёжные реквизиты в Рокет Ворк', 'error');
+                          else if (code === 'NO_TOKEN') showToast('Не задан токен API. Укажите токен в настройках', 'error', 'Открыть настройки', '/settings');
+                          else showToast('Не удалось создать ссылку', 'error');
+                          return;
+                        }
                         showToast('Ссылка создана', 'success');
                         setLinks((prev) => [{ code: d?.item?.code, title: d?.item?.title, createdAt: d?.item?.createdAt }, ...prev]);
                         setLinkTitle(''); setLinkDesc(''); setLinkAmount(''); setLinkAgent(false); setLinkCommVal(''); setLinkPartner(''); setLinkSumMode('custom'); setLinkVat('none'); setLinkMethod('any');
