@@ -484,7 +484,7 @@ export default function SalesClient({ initial }: { initial: Sale[] }) {
       </div>
 
       {/* Desktop table */}
-      <div className="hidden md:block overflow-x-auto bg-white dark:bg-gray-950 border border-gray-200 dark:border-gray-800 rounded-lg">
+      <div className="hidden md:block overflow-x-auto overflow-y-visible relative bg-white dark:bg-gray-950 border border-gray-200 dark:border-gray-800 rounded-lg">
         <table className="min-w-full text-sm">
           <thead className="bg-gray-50 dark:bg-gray-900">
             <tr>
