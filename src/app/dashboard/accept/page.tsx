@@ -83,6 +83,8 @@ function AcceptPaymentContent() {
   const [purchaseReceiptUrl, setPurchaseReceiptUrl] = useState<string | null>(null);
   const [commissionReceiptUrl, setCommissionReceiptUrl] = useState<string | null>(null);
   const [taskIsAgent, setTaskIsAgent] = useState<boolean | null>(null);
+  // Animated dots for waiting under QR
+  const [dots, setDots] = useState('.');
   const [toast, setToast] = useState<{ msg: string; kind: 'success' | 'error' | 'info' } | null>(null);
   const showToast = (msg: string, kind: 'success' | 'error' | 'info' = 'info') => {
     setToast({ msg, kind });
@@ -143,6 +145,21 @@ function AcceptPaymentContent() {
     paymentUrlRef.current = paymentUrl;
     updateDebug();
   }, [paymentUrl]);
+
+  // Run animated dots while QR is visible and payment not yet confirmed
+  useEffect(() => {
+    const paid = aoStatus && ['paid', 'transfered', 'transferred'].includes(String(aoStatus).toLowerCase());
+    const waiting = Boolean(qrDataUrl) && !paid;
+    let t: number | null = null;
+    if (waiting) {
+      t = window.setInterval(() => {
+        setDots((prev) => (prev.length >= 3 ? '.' : prev + '.'));
+      }, 400) as unknown as number;
+    } else {
+      setDots('.');
+    }
+    return () => { if (t) window.clearInterval(t); };
+  }, [qrDataUrl, aoStatus]);
 
   // Глобальная страховка: как только статус финальный или появился любой чек — скрываем QR/ссылку
   useEffect(() => {
@@ -665,6 +682,7 @@ function AcceptPaymentContent() {
             <div className="text-sm text-gray-600 dark:text-gray-400 mb-1">QR для оплаты</div>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             {qrElement}
+            <div className="mt-2 text-sm text-gray-600 dark:text-gray-400">{`Ждём подтверждения оплаты${dots}`}</div>
           </div>
         ) : null}
         {aoStatus && (aoStatus.toLowerCase() === 'paid' || aoStatus.toLowerCase() === 'transfered' || aoStatus.toLowerCase() === 'transferred') ? (
