@@ -253,7 +253,7 @@ export default function SalesClient({ initial }: { initial: Sale[] }) {
               ))}
             </select>
           </div>
-          <Button variant="ghost" onClick={() => { setVisibleFilters([]); setQuery(''); setStatus('all'); setAgent('all'); setPurchaseReceipt('all'); setFullReceipt('all'); setCommissionReceipt('all'); setNpdReceipt('all'); setDateFrom(''); setDateTo(''); setEndFrom(''); setEndTo(''); setAmountMin(''); setAmountMax(''); }}>
+          <Button variant="ghost" onClick={() => { setVisibleFilters([]); setQuery(''); setStatus('all'); setAgent('all'); setPurchaseReceipt('all'); setFullReceipt('all'); setCommissionReceipt('all'); setNpdReceipt('all'); setShowHidden('no'); setDateFrom(''); setDateTo(''); setEndFrom(''); setEndTo(''); setAmountMin(''); setAmountMax(''); }}>
             Сбросить
           </Button>
           <Button variant="secondary" onClick={() => load(true)} disabled={loading}>{loading ? 'Обновляю…' : 'Обновить'}</Button>
