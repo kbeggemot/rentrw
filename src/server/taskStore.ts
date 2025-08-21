@@ -116,6 +116,10 @@ export async function updateSaleFromStatus(userId: string, taskId: number | stri
     const current = store.sales[idx];
     const next = { ...current } as SaleRecord;
     if (typeof update.status !== 'undefined' && update.status !== null) next.status = update.status;
+    // Auto-hide expired tasks
+    if (next.status && String(next.status).toLowerCase() === 'expired') {
+      next.hidden = true;
+    }
     if (typeof update.ofdUrl !== 'undefined' && update.ofdUrl) {
       // if service end date is today (Europe/Moscow), treat RW ofd_url as full settlement
       const mskToday = new Date().toLocaleDateString('ru-RU', { timeZone: 'Europe/Moscow' }).split('.').reverse().join('-');
@@ -254,7 +258,7 @@ export async function ensureSaleFromTask(params: {
     serviceEndDate: null,
     vatRate: null,
     createdAtRw: (task?.created_at as string | undefined) ?? null,
-    hidden: false,
+    hidden: String(status || '').toLowerCase() === 'expired',
     createdAt: task?.created_at || now,
     updatedAt: now,
   });

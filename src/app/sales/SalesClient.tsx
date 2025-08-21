@@ -237,8 +237,8 @@ export default function SalesClient({ initial }: { initial: Sale[] }) {
   const [menuOpenId, setMenuOpenId] = useState<string | number | null>(null);
   useEffect(() => {
     const close = () => setMenuOpenId(null);
-    document.addEventListener('click', close);
-    return () => document.removeEventListener('click', close);
+    document.addEventListener('pointerdown', close);
+    return () => document.removeEventListener('pointerdown', close);
   }, []);
 
   return (
@@ -438,8 +438,8 @@ export default function SalesClient({ initial }: { initial: Sale[] }) {
                   <Button variant="secondary" onClick={() => setChecksOpenId((id) => (id === s.taskId ? null : s.taskId))}>Чеки</Button>
                 </div>
                 <div className="justify-self-end">
-                  <div className="relative" onClick={(e) => e.stopPropagation()}>
-                    <Button aria-label="Действия" variant="secondary" size="icon" onClick={(e) => { e.stopPropagation(); setMenuOpenId((id) => (id === s.taskId ? null : s.taskId)); }}>
+                  <div className="relative" onPointerDown={(e) => e.stopPropagation()}>
+                    <Button aria-label="Действия" variant="secondary" size="icon" onPointerDown={(e) => { e.stopPropagation(); setMenuOpenId((id) => (id === s.taskId ? null : s.taskId)); }}>
                       <IconEdit />
                     </Button>
                     <div className={`absolute right-0 mt-2 w-36 bg-white dark:bg-gray-950 border border-gray-200 dark:border-gray-800 rounded shadow-sm z-50 ${menuOpenId === s.taskId ? '' : 'hidden'}`}>
@@ -513,8 +513,8 @@ export default function SalesClient({ initial }: { initial: Sale[] }) {
                 <td className="px-3 py-2">{s.createdAtRw ? new Date(s.createdAtRw).toLocaleDateString('ru-RU', { timeZone: 'Europe/Moscow' }) : '-'}</td>
                 <td className="px-3 py-2">{s.serviceEndDate ? new Date(s.serviceEndDate).toLocaleDateString('ru-RU', { timeZone: 'Europe/Moscow' }) : '-'}</td>
                 <td className="px-1 py-2 text-center">
-                  <div className="relative inline-block" onClick={(e) => e.stopPropagation()}>
-                    <Button aria-label="Действия" variant="secondary" size="icon" onClick={(e) => { e.stopPropagation(); setMenuOpenId((id) => (id === s.taskId ? null : s.taskId)); }}><IconEdit /></Button>
+                  <div className="relative inline-block" onPointerDown={(e) => e.stopPropagation()}>
+                    <Button aria-label="Действия" variant="secondary" size="icon" onPointerDown={(e) => { e.stopPropagation(); setMenuOpenId((id) => (id === s.taskId ? null : s.taskId)); }}><IconEdit /></Button>
                     <div className={`absolute right-0 mt-2 w-40 bg-white dark:bg-gray-950 border border-gray-200 dark:border-gray-800 rounded shadow-sm z-50 ${menuOpenId === s.taskId ? '' : 'hidden'}`}>
                       {s.hidden ? (
                         <button className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 dark:hover:bg-gray-900" onClick={async () => { try { await fetch('/api/sales', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ taskId: s.taskId, hidden: false }) }); await load(false); } catch {} finally { setMenuOpenId(null); } }}>
