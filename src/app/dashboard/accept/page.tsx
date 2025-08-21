@@ -68,6 +68,7 @@ function AcceptPaymentContent() {
   const activeTaskIdRef = useRef<string | number | null>(null);
   const ofdStartedForTaskIdRef = useRef<string | number | null>(null);
   const methodRef = useRef<PaymentMethod>('qr');
+  const lastQrUrlRef = useRef<string | null>(null);
   const updateDebug = () => {
     try {
       if (typeof window !== 'undefined') {
@@ -132,6 +133,7 @@ function AcceptPaymentContent() {
       if (pollTimerRef.current) clearTimeout(pollTimerRef.current);
       if (statusTimerRef.current) clearTimeout(statusTimerRef.current);
       if (ofdTimerRef.current) clearTimeout(ofdTimerRef.current);
+      lastQrUrlRef.current = null;
     };
   }, []);
 
@@ -185,6 +187,7 @@ function AcceptPaymentContent() {
     if (final || purchaseReceiptUrl || commissionReceiptUrl) {
       setPaymentUrl(null);
       setQrDataUrl(null);
+      lastQrUrlRef.current = null;
       setMessage(null);
       setMessageKind('info');
     }
@@ -229,9 +232,13 @@ function AcceptPaymentContent() {
           if (attemptIdRef.current !== attemptId || activeTaskIdRef.current !== taskId) return;
           if (paymentUrlRef.current !== found) {
             setPaymentUrl(found);
+            paymentUrlRef.current = found;
             try {
-              const dataUrl = await QRCode.toDataURL(found, { margin: 1, scale: 6 });
-              setQrDataUrl(dataUrl);
+              if (lastQrUrlRef.current !== found) {
+                const dataUrl = await QRCode.toDataURL(found, { margin: 1, scale: 6 });
+                setQrDataUrl(dataUrl);
+                lastQrUrlRef.current = found;
+              }
             } catch {}
             setMessage(null);
             loadingRef.current = false;
@@ -537,7 +544,14 @@ function AcceptPaymentContent() {
           if (url0) {
             if (paymentUrlRef.current !== url0) {
               setPaymentUrl(url0);
-              try { const dataUrl = await QRCode.toDataURL(url0, { margin: 1, scale: 6 }); setQrDataUrl(dataUrl); } catch {}
+              paymentUrlRef.current = url0;
+              try {
+                if (lastQrUrlRef.current !== url0) {
+                  const dataUrl = await QRCode.toDataURL(url0, { margin: 1, scale: 6 });
+                  setQrDataUrl(dataUrl);
+                  lastQrUrlRef.current = url0;
+                }
+              } catch {}
               setMessage(null);
               setLoading(false);
             }
@@ -784,9 +798,13 @@ function AcceptPaymentContent() {
                   if (found) {
                     if (paymentUrlRef.current !== found) {
                       setPaymentUrl(found);
+                      paymentUrlRef.current = found;
                       try {
-                        const dataUrl = await QRCode.toDataURL(found, { margin: 1, scale: 6 });
-                        setQrDataUrl(dataUrl);
+                        if (lastQrUrlRef.current !== found) {
+                          const dataUrl = await QRCode.toDataURL(found, { margin: 1, scale: 6 });
+                          setQrDataUrl(dataUrl);
+                          lastQrUrlRef.current = found;
+                        }
                       } catch {}
                       setMessage(null);
                       setLoading(false);
