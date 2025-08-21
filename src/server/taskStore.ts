@@ -123,12 +123,7 @@ export async function updateSaleFromStatus(userId: string, taskId: number | stri
     if (next.status && String(next.status).toLowerCase() === 'expired') {
       next.hidden = true;
     }
-    if (typeof update.ofdUrl !== 'undefined' && update.ofdUrl) {
-      // if service end date is today (Europe/Moscow), treat RW ofd_url as full settlement
-      const mskToday = new Date().toLocaleDateString('ru-RU', { timeZone: 'Europe/Moscow' }).split('.').reverse().join('-');
-      if (current.serviceEndDate && current.serviceEndDate === mskToday) next.ofdFullUrl = update.ofdUrl;
-      else next.ofdUrl = update.ofdUrl;
-    }
+    if (typeof update.ofdUrl !== 'undefined' && update.ofdUrl) next.ofdUrl = update.ofdUrl;
     if (typeof update.ofdFullUrl !== 'undefined' && update.ofdFullUrl) next.ofdFullUrl = update.ofdFullUrl;
     if (typeof update.additionalCommissionOfdUrl !== 'undefined' && update.additionalCommissionOfdUrl) next.additionalCommissionOfdUrl = update.additionalCommissionOfdUrl;
     if (typeof update.npdReceiptUri !== 'undefined' && update.npdReceiptUri) next.npdReceiptUri = update.npdReceiptUri;
