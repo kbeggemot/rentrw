@@ -68,7 +68,14 @@ export async function GET(req: Request) {
             const addOfd = (normalized?.additional_commission_ofd_url as string | undefined)
               ?? null;
             const npdReceipt = (normalized?.receipt_uri as string | undefined) ?? null;
-            await updateSaleFromStatus(userId, s.taskId, { status: normalized?.acquiring_order?.status, ofdUrl, additionalCommissionOfdUrl: addOfd, npdReceiptUri: npdReceipt });
+            // Determine whether this ofdUrl is full settlement or prepay by serviceEndDate
+            const mskToday = new Date().toLocaleDateString('ru-RU', { timeZone: 'Europe/Moscow' }).split('.').reverse().join('-');
+            const patch: any = { status: normalized?.acquiring_order?.status, additionalCommissionOfdUrl: addOfd, npdReceiptUri: npdReceipt };
+            if (ofdUrl) {
+              const endStr = (s.serviceEndDate || '') as string;
+              if (endStr && endStr === mskToday) patch.ofdFullUrl = ofdUrl; else patch.ofdUrl = ofdUrl;
+            }
+            await updateSaleFromStatus(userId, s.taskId, patch);
             try {
               const createdAtRw: string | undefined = (normalized as any)?.created_at || undefined;
               if (createdAtRw) await setSaleCreatedAtRw(userId, s.taskId, createdAtRw);

@@ -108,7 +108,7 @@ export async function recordSaleOnCreate(params: {
   try { getHub().publish(userId, 'sales:update'); } catch {}
 }
 
-export async function updateSaleFromStatus(userId: string, taskId: number | string, update: Partial<Pick<SaleRecord, 'status' | 'ofdUrl' | 'additionalCommissionOfdUrl' | 'npdReceiptUri'>>): Promise<void> {
+export async function updateSaleFromStatus(userId: string, taskId: number | string, update: Partial<Pick<SaleRecord, 'status' | 'ofdUrl' | 'ofdFullUrl' | 'additionalCommissionOfdUrl' | 'npdReceiptUri'>>): Promise<void> {
   const store = await readTasks();
   if (!store.sales) store.sales = [];
   const idx = store.sales.findIndex((s) => s.taskId == taskId && s.userId === userId);
@@ -122,6 +122,7 @@ export async function updateSaleFromStatus(userId: string, taskId: number | stri
       if (current.serviceEndDate && current.serviceEndDate === mskToday) next.ofdFullUrl = update.ofdUrl;
       else next.ofdUrl = update.ofdUrl;
     }
+    if (typeof update.ofdFullUrl !== 'undefined' && update.ofdFullUrl) next.ofdFullUrl = update.ofdFullUrl;
     if (typeof update.additionalCommissionOfdUrl !== 'undefined' && update.additionalCommissionOfdUrl) next.additionalCommissionOfdUrl = update.additionalCommissionOfdUrl;
     if (typeof update.npdReceiptUri !== 'undefined' && update.npdReceiptUri) next.npdReceiptUri = update.npdReceiptUri;
     next.updatedAt = new Date().toISOString();
