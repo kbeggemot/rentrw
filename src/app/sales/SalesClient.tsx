@@ -432,25 +432,11 @@ export default function SalesClient({ initial }: { initial: Sale[] }) {
                   <Button variant="secondary" onClick={() => setChecksOpenId((id) => (id === s.taskId ? null : s.taskId))}>Чеки</Button>
                 </div>
                 <div className="justify-self-end">
-                  <div className="relative">
-                    <Button aria-label="Действия" variant="secondary" size="icon" onClick={(e) => {
-                      const m = (e.currentTarget.nextElementSibling as HTMLElement | null);
-                      if (m) m.classList.toggle('hidden');
-                    }}>
-                      <IconEdit />
-                    </Button>
-                    <div className="absolute right-0 mt-2 w-36 bg-white dark:bg-gray-950 border border-gray-200 dark:border-gray-800 rounded shadow-sm hidden z-10">
-                      {(showHidden === 'yes' || s.hidden) ? (
-                        <button className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 dark:hover:bg-gray-900" onClick={async () => { try { await fetch('/api/sales', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ taskId: s.taskId, hidden: false }) }); await load(false); } catch {} }}>
-                          Отобразить
-                        </button>
-                      ) : (
-                        <button className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 dark:hover:bg-gray-900" onClick={async () => { try { await fetch('/api/sales', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ taskId: s.taskId, hidden: true }) }); await load(false); } catch {} }}>
-                          Скрыть
-                        </button>
-                      )}
-                    </div>
-                  </div>
+                  {s.hidden ? (
+                    <Button variant="secondary" onClick={async () => { try { await fetch('/api/sales', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ taskId: s.taskId, hidden: false }) }); await load(false); } catch {} }}>Отобразить</Button>
+                  ) : (
+                    <Button variant="secondary" onClick={async () => { try { await fetch('/api/sales', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ taskId: s.taskId, hidden: true }) }); await load(false); } catch {} }}>Скрыть</Button>
+                  )}
                 </div>
               </div>
               {checksOpenId === s.taskId ? (
@@ -509,20 +495,11 @@ export default function SalesClient({ initial }: { initial: Sale[] }) {
                 <td className="px-3 py-2">{s.createdAtRw ? new Date(s.createdAtRw).toLocaleDateString('ru-RU', { timeZone: 'Europe/Moscow' }) : '-'}</td>
                 <td className="px-3 py-2">{s.serviceEndDate ? new Date(s.serviceEndDate).toLocaleDateString('ru-RU', { timeZone: 'Europe/Moscow' }) : '-'}</td>
                 <td className="px-1 py-2 text-center">
-                  <div className="relative inline-block">
-                    <Button aria-label="Действия" variant="secondary" size="icon" onClick={(e) => { const m = (e.currentTarget.nextElementSibling as HTMLElement | null); if (m) m.classList.toggle('hidden'); }}><IconEdit /></Button>
-                    <div className="absolute right-0 mt-2 w-40 bg-white dark:bg-gray-950 border border-gray-200 dark:border-gray-800 rounded shadow-sm hidden z-10">
-                      {s.hidden ? (
-                        <button className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 dark:hover:bg-gray-900" onClick={async () => { try { await fetch('/api/sales', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ taskId: s.taskId, hidden: false }) }); await load(false); } catch {} }}>
-                          Отобразить
-                        </button>
-                      ) : (
-                        <button className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 dark:hover:bg-gray-900" onClick={async () => { try { await fetch('/api/sales', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ taskId: s.taskId, hidden: true }) }); await load(false); } catch {} }}>
-                          Скрыть
-                        </button>
-                      )}
-                    </div>
-                  </div>
+                  {s.hidden ? (
+                    <Button variant="secondary" onClick={async () => { try { await fetch('/api/sales', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ taskId: s.taskId, hidden: false }) }); await load(false); } catch {} }}>Отобразить</Button>
+                  ) : (
+                    <Button variant="secondary" onClick={async () => { try { await fetch('/api/sales', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ taskId: s.taskId, hidden: true }) }); await load(false); } catch {} }}>Скрыть</Button>
+                  )}
                 </td>
               </tr>
             ))}
