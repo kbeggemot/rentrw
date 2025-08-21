@@ -33,6 +33,7 @@ export default function PublicPayPage(props: any) {
   const [receipts, setReceipts] = useState<{ prepay?: string | null; full?: string | null; commission?: string | null; npd?: string | null }>({});
 
   const pollRef = useRef<number | null>(null);
+  const payUrlPollRef = useRef<number | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -75,7 +76,6 @@ export default function PublicPayPage(props: any) {
           const npd = sale.npdReceiptUri || null;
           setReceipts({ prepay: pre, full, commission: com, npd });
           if (st === 'paid' || st === 'transfered' || st === 'transferred') {
-            // keep polling a bit for receipts to arrive
             if (pre || full || com || npd) {
               if (pollRef.current) { window.clearTimeout(pollRef.current); pollRef.current = null; }
               setAwaitingPay(false);
@@ -87,6 +87,25 @@ export default function PublicPayPage(props: any) {
       pollRef.current = window.setTimeout(tick, 2000) as unknown as number;
     };
     pollRef.current = window.setTimeout(tick, 1500) as unknown as number;
+  };
+
+  const startPayUrlPoll = (uid: string | number) => {
+    if (payUrlPollRef.current) return;
+    const tick = async () => {
+      try {
+        const r = await fetch(`/api/rocketwork/task-status/${encodeURIComponent(String(uid))}`, { cache: 'no-store', headers: data?.userId ? { 'x-user-id': data.userId } as any : undefined });
+        const t = await r.json();
+        const ao = (t && (t.acquiring_order || (t.task && t.task.acquiring_order))) || null;
+        const url = ao?.url || ao?.payment_url || null;
+        if (url) {
+          setPayUrl(url);
+          if (payUrlPollRef.current) { window.clearTimeout(payUrlPollRef.current); payUrlPollRef.current = null; }
+          return;
+        }
+      } catch {}
+      payUrlPollRef.current = window.setTimeout(tick, 1500) as unknown as number;
+    };
+    payUrlPollRef.current = window.setTimeout(tick, 1000) as unknown as number;
   };
 
   const goPay = async () => {
@@ -116,7 +135,7 @@ export default function PublicPayPage(props: any) {
       const tId = d?.task_id;
       setTaskId(tId || null);
       const url = d?.data?.acquiring_order?.url || d?.data?.acquiring_order?.payment_url || null;
-      if (url) setPayUrl(url);
+      if (url) setPayUrl(url); else startPayUrlPoll(tId);
       setAwaitingPay(false);
       startPoll(tId);
     } catch (e) {
