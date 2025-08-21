@@ -41,17 +41,18 @@ export async function POST(req: Request) {
     let executorData: any = null; 
     try { executorData = txt ? JSON.parse(txt) : null; } catch { executorData = txt; }
     
-    // Always extract available data for partner update
-    const status: string | undefined = (executorData?.executor?.selfemployed_status as string | undefined) ?? (executorData?.selfemployed_status as string | undefined);
-    const inn = executorData?.executor?.inn || executorData?.inn;
-    const fio = executorData?.executor ? [
-      executorData.executor.last_name,
-      executorData.executor.first_name, 
-      executorData.executor.second_name
-    ].filter(Boolean).join(' ').trim() : null;
-    
-    // Check registration first (404 or no executor data)
-    if (res.status === 404 || !executorData || !executorData.executor) {
+    // Extract fields defensively from various possible RW shapes
+    const raw: any = executorData && typeof executorData === 'object' ? executorData : {};
+    const ex = (raw.executor && typeof raw.executor === 'object') ? raw.executor : raw;
+    const status: string | undefined = (ex?.selfemployed_status as string | undefined)
+      ?? (raw?.selfemployed_status as string | undefined)
+      ?? (ex?.status as string | undefined)
+      ?? (raw?.status as string | undefined);
+    const inn = ex?.inn ?? raw?.inn ?? null;
+    const fio = ex ? [ex.last_name, ex.first_name, ex.second_name].filter(Boolean).join(' ').trim() || null : null;
+
+    // Check registration first (HTTP 404 or completely empty payload)
+    if (res.status === 404 || executorData == null) {
       return NextResponse.json({ 
         error: 'PARTNER_NOT_REGISTERED',
         partnerData: { phone: digits, fio: null, status: null, inn: null, updatedAt: new Date().toISOString() }
@@ -66,22 +67,23 @@ export async function POST(req: Request) {
       }, { status: 400 });
     }
     
-    // Now check status (we know executor exists)
-    if (!status) {
-      return NextResponse.json({ 
-        error: 'PARTNER_NOT_REGISTERED',
-        partnerData: { phone: digits, fio, status: null, inn, updatedAt: new Date().toISOString() }
-      }, { status: 400 });
-    }
-    
-    if (status !== 'validated') {
+    // Now check status (if present)
+    if (status && status !== 'validated') {
       return NextResponse.json({ 
         error: 'PARTNER_NOT_VALIDATED',
         partnerData: { phone: digits, fio, status, inn, updatedAt: new Date().toISOString() }
       }, { status: 400 });
     }
     
-    const paymentInfo = (executorData?.executor?.payment_info ?? executorData?.payment_info ?? null);
+    // If status is missing but we do have some executor fields, treat as not registered
+    if (!status) {
+      return NextResponse.json({ 
+        error: 'PARTNER_NOT_REGISTERED',
+        partnerData: { phone: digits, fio, status: null, inn, updatedAt: new Date().toISOString() }
+      }, { status: 400 });
+    }
+
+    const paymentInfo = (ex?.payment_info ?? raw?.payment_info ?? null);
     if (!paymentInfo) {
       return NextResponse.json({ 
         error: 'PARTNER_NO_PAYMENT_INFO',
