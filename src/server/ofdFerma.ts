@@ -154,6 +154,33 @@ export async function fermaGetReceiptStatus(id: string, opts?: Partial<FermaAuth
   return { status: (data && (data.status || data.state)) || (data && data.Status) || undefined, rawStatus: res.status, rawText: text };
 }
 
+export async function fermaGetReceiptStatusDetailed(
+  id: string,
+  range: { startUtc: string; endUtc: string; startLocal?: string; endLocal?: string },
+  opts?: Partial<FermaAuth & { statusPath?: string }>
+): Promise<{ status?: string; rawStatus: number; rawText: string }> {
+  const envAuth = getAuth();
+  const auth = { ...envAuth, ...opts } as FermaAuth & { statusPath?: string };
+  if (!auth.baseUrl) throw new Error('FERMA_BASE_URL not configured');
+  const pathTpl = opts?.statusPath || process.env.FERMA_STATUS_PATH || '/api/kkt/cloud/status';
+  const isGetByPath = /\{id\}/.test(pathTpl);
+  const url = joinUrl(auth.baseUrl, isGetByPath ? pathTpl.replace('{id}', encodeURIComponent(id)) : pathTpl);
+  const headers = authHeaders(auth);
+  const fmt = (v: string | undefined) => (v && v.length > 0 ? v : undefined);
+  const payload: any = {
+    ReceiptId: id,
+    StartDateUtc: range.startUtc,
+    EndDateUtc: range.endUtc,
+  };
+  if (fmt(range.startLocal)) payload.StartDateLocal = fmt(range.startLocal);
+  if (fmt(range.endLocal)) payload.EndDateLocal = fmt(range.endLocal);
+  const body = JSON.stringify({ Request: payload });
+  const res = await fetch(url, { method: 'POST', headers, body, cache: 'no-store' });
+  const text = await res.text();
+  let data: any = null; try { data = text ? JSON.parse(text) : null; } catch { data = text; }
+  return { status: (data && (data.status || data.state)) || (data && data.Status) || undefined, rawStatus: res.status, rawText: text };
+}
+
 export async function fermaCreateAuthToken(login?: string, password?: string, opts?: { baseUrl?: string }): Promise<{ authToken?: string; expires?: string; rawStatus: number; rawText: string }> {
   const env = getAuth();
   const baseUrl = opts?.baseUrl || env.baseUrl || 'https://ferma.ofd.ru/';

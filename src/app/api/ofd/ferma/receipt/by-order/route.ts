@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getInvoiceIdString } from '@/server/orderStore';
-import { fermaGetAuthTokenCached, fermaGetReceiptStatus } from '@/server/ofdFerma';
+import { fermaGetAuthTokenCached, fermaGetReceiptStatus, fermaGetReceiptStatusDetailed } from '@/server/ofdFerma';
 import { listSales } from '@/server/taskStore';
 
 export const runtime = 'nodejs';
@@ -31,7 +31,16 @@ export async function GET(req: Request) {
         const sale = (await listSales(userId)).find((s) => Number(s.orderId) === Number(orderId));
         const rid = (sale as any)?.ofdFullId || (sale as any)?.ofdPrepayId || null;
         if (rid) {
-          const byRid = await fermaGetReceiptStatus(String(rid), { baseUrl, authToken: token });
+          // Try detailed first using created/end dates to maximize chance of full receipt
+          const createdAt = sale?.createdAtRw || sale?.createdAt;
+          const endDate = sale?.serviceEndDate || undefined;
+          const startUtc = (createdAt ? new Date(createdAt) : new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)).toISOString().slice(0, 19);
+          const endUtc = (endDate ? new Date(`${endDate}T23:59:59Z`) : new Date()).toISOString().slice(0, 19);
+          let byRid = await fermaGetReceiptStatusDetailed(String(rid), { startUtc, endUtc, startLocal: startUtc, endLocal: endUtc }, { baseUrl, authToken: token });
+          // Fallback to minimal if still not full
+          if (byRid.rawStatus === 404 || !byRid.rawText || byRid.rawText.indexOf('CustomerReceipt') === -1) {
+            byRid = await fermaGetReceiptStatus(String(rid), { baseUrl, authToken: token });
+          }
           return NextResponse.json(byRid, { status: byRid.rawStatus || 200 });
         }
       } catch {}
