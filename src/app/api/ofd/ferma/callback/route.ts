@@ -36,7 +36,18 @@ export async function POST(req: Request) {
     const pt = (body?.Data?.CustomerReceipt?.PaymentItems?.[0]?.PaymentType
       ?? body?.CustomerReceipt?.PaymentItems?.[0]?.PaymentType
       ?? body?.PaymentItems?.[0]?.PaymentType) as number | undefined;
-    const docTypeRaw = (body?.Data?.Request?.Type || body?.Request?.Type || '').toString();
+    let docTypeRaw = (body?.Data?.Request?.Type || body?.Request?.Type || '').toString();
+    if ((!docTypeRaw || docTypeRaw.length === 0) && (receiptId || invoiceIdRaw)) {
+      try {
+        const baseUrl = process.env.FERMA_BASE_URL || 'https://ferma.ofd.ru/';
+        const token = await fermaGetAuthTokenCached(process.env.FERMA_LOGIN || '', process.env.FERMA_PASSWORD || '', { baseUrl });
+        const key = receiptId || invoiceIdRaw;
+        const st = await fermaGetReceiptStatus(String(key), { baseUrl, authToken: token });
+        const obj = st.rawText ? JSON.parse(st.rawText) : {};
+        const t = (obj?.Data?.Request?.Type || obj?.Request?.Type || '').toString();
+        if (t) docTypeRaw = t;
+      } catch {}
+    }
     // Build viewer link if parts are known
     let receiptUrl: string | undefined;
     if (fn && fd != null && fp != null) { receiptUrl = buildReceiptViewUrl(fn, fd, fp); }
@@ -81,23 +92,9 @@ export async function POST(req: Request) {
       const patch: any = {};
       // Decide classification: offset (pt=2 or docTypeOffset), else by docType or serviceEndDate
       const isOffset = pt === 2 || /IncomePrepaymentOffset/i.test(docTypeRaw);
-      let classify: 'prepay' | 'full';
+      let classify: 'prepay' | 'full' = 'full';
       if (/IncomePrepayment/i.test(docTypeRaw)) classify = 'prepay';
       else if (isOffset || /(^|[^A-Za-z])Income($|[^A-Za-z])/i.test(docTypeRaw)) classify = 'full';
-      else {
-        // Fallback to serviceEndDate vs today (MSK)
-        let isToday = false;
-        try {
-          const { listSales } = await import('@/server/taskStore');
-          const sales = await listSales(String(userId));
-          const sale = sales.find((s: any) => Number(s.orderId) === Number(orderId));
-          if (sale?.serviceEndDate) {
-            const mskToday = new Date().toLocaleDateString('ru-RU', { timeZone: 'Europe/Moscow' }).split('.').reverse().join('-');
-            isToday = sale.serviceEndDate === mskToday;
-          }
-        } catch {}
-        classify = isToday ? 'full' : 'prepay';
-      }
       if (receiptUrl) {
         if (classify === 'prepay') patch.ofdUrl = receiptUrl; else patch.ofdFullUrl = receiptUrl;
       }
