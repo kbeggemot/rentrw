@@ -213,7 +213,7 @@ export default function PublicPayPage(props: any) {
           )}
         </div>
         <button disabled={!canStart} onClick={goPay} className={actionBtnClasses}>
-          {loading ? `Формируем платежную ссылку${dots}` : 'Перейти к оплате'}
+          Перейти к оплате
         </button>
 
         {/* Inline expandable panel (Sales-like) */}
@@ -227,8 +227,8 @@ export default function PublicPayPage(props: any) {
                   <div className="text-gray-600">{`Формируем платежную ссылку${dots}`}</div>
                 ) : (
                   <div className="grid grid-cols-[9rem_1fr] gap-y-2">
-                    <div className="text-gray-500">Ссылка</div>
-                    <a className="text-blue-600 hover:underline" href={payUrl} target="_blank" rel="noreferrer" onClick={() => setAwaitingPay(true)}>Открыть</a>
+                    <div className="text-gray-500">Платежная ссылка</div>
+                    <a className="text-blue-600 hover:underline" href={payUrl} target="_blank" rel="noreferrer" onClick={() => setAwaitingPay(true)}>Оплатить</a>
                   </div>
                 )}
                 {awaitingPay ? (<div className="text-gray-600">Ждём подтверждения оплаты…</div>) : null}
