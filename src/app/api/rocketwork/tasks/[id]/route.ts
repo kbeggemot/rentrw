@@ -137,8 +137,10 @@ export async function GET(_: Request) {
       if (aoFin === 'paid' || aoFin === 'transfered' || aoFin === 'transferred') {
         const sale = await findSaleByTaskId(userId, taskId);
         if (sale && sale.source !== 'external') {
-          const mskToday = new Date().toLocaleDateString('ru-RU', { timeZone: 'Europe/Moscow' }).split('.').reverse().join('-');
-          const isToday = (sale.serviceEndDate || null) === mskToday;
+          const createdAt = (normalized as any)?.created_at || sale.createdAtRw || sale.createdAt;
+          const createdDate = createdAt ? String(createdAt).slice(0, 10) : null;
+          const endDate = sale.serviceEndDate || null;
+          const isToday = Boolean(createdDate && endDate && createdDate === endDate);
           const amountRub = Number(sale.amountGrossRub || 0);
           const retainedRub = Number(sale.retainedCommissionRub || 0);
           const amountNetRub = sale.isAgent ? Math.max(0, amountRub - retainedRub) : amountRub;

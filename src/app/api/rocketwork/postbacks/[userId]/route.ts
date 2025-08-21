@@ -130,8 +130,10 @@ export async function POST(req: Request) {
         if (fin === 'paid' || fin === 'transfered' || fin === 'transferred') {
           const sale = await findSaleByTaskId(userId, taskId);
           if (sale && sale.source !== 'external') {
-            const mskToday = new Date().toLocaleDateString('ru-RU', { timeZone: 'Europe/Moscow' }).split('.').reverse().join('-');
-            const isToday = (sale.serviceEndDate || null) === mskToday;
+            const createdAt = sale.createdAtRw || sale.createdAt;
+            const createdDate = createdAt ? String(createdAt).slice(0, 10) : null;
+            const endDate = sale.serviceEndDate || null;
+            const isToday = Boolean(createdDate && endDate && createdDate === endDate);
             const amountRub = Number(sale.amountGrossRub || 0);
             const usedVat = (sale.vatRate || 'none') as any;
             const baseUrl = process.env.FERMA_BASE_URL || 'https://ferma.ofd.ru/';

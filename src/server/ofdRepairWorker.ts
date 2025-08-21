@@ -44,7 +44,10 @@ export async function repairUserSales(userId: string): Promise<void> {
     const status = String(s.status || '').toLowerCase();
     const final = status === 'paid' || status === 'transfered' || status === 'transferred';
     if (!final) continue;
-    const isToday = (s.serviceEndDate || null) === mskToday;
+    const created = s.createdAtRw || s.createdAt;
+    const createdDate = created ? String(created).slice(0, 10) : null;
+    const endDate = s.serviceEndDate || null;
+    const isToday = Boolean(createdDate && endDate && createdDate === endDate);
     // Full settlement today
     if (isToday) {
       if (!s.ofdFullId && !s.ofdFullUrl) {
