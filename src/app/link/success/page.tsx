@@ -181,7 +181,7 @@ export default function PublicSuccessUnifiedPage() {
   return (
     <div className="max-w-xl mx-auto p-4">
       <h1 className="text-xl font-semibold mb-1">Платёж успешно выполнен</h1>
-      <div className="text-sm text-gray-600 mb-2">Спасибо! Мы сформируем чек(и) автоматически и отправим на почту.</div>
+      <div className="text-sm text-gray-600 dark:text-gray-300 mb-2">Спасибо! Мы сформируем чек(и) автоматически и отправим на почту.</div>
 
       {waiting ? (
         <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm mb-4">Ищем информацию о платеже{dots}</div>
@@ -198,29 +198,29 @@ export default function PublicSuccessUnifiedPage() {
           disabled={!canShowDetails}
         >Показать чеки и детали платежа</button>
         {detailsOpen ? (
-          <div className="mt-1 rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm">
-            <div className="grid grid-cols-[9rem_1fr] gap-y-2 mb-2">
-              <div className="text-gray-500">За что платим</div>
+          <div className="mt-1 rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 p-3 text-sm">
+            <div className="grid grid-cols-[9rem_1fr] gap-y-2 mb-2 text-gray-800 dark:text-gray-200">
+              <div className="text-gray-500 dark:text-gray-400">За что платим</div>
               <div>{summary?.description || info?.title || '—'}</div>
-              <div className="text-gray-500">Сумма</div>
+              <div className="text-gray-500 dark:text-gray-400">Сумма</div>
               <div>{typeof summary?.amountRub === 'number' ? new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB' }).format(summary!.amountRub!) : '—'}</div>
-              <div className="text-gray-500">Способ оплаты</div>
+              <div className="text-gray-500 dark:text-gray-400">Способ оплаты</div>
               <div>{payMethod || '—'}</div>
-              <div className="text-gray-500">Дата оплаты</div>
+              <div className="text-gray-500 dark:text-gray-400">Дата оплаты</div>
               <div>{summary?.createdAt ? new Date(summary.createdAt).toLocaleString('ru-RU', { timeZone: 'Europe/Moscow' }) : '—'}</div>
-              <div className="text-gray-500">Чек на покупку</div>
+              <div className="text-gray-500 dark:text-gray-400">Чек на покупку</div>
               <div>
                 {(receipts.full || receipts.prepay) ? (
-                  <a className="text-black font-semibold hover:underline" href={(receipts.full || receipts.prepay)!} target="_blank" rel="noreferrer">Открыть</a>
+                  <a className="text-black dark:text-white font-semibold hover:underline" href={(receipts.full || receipts.prepay)!} target="_blank" rel="noreferrer">Открыть</a>
                 ) : (
-                  <span className="text-gray-600">Подтягиваем данные{dots}</span>
+                  <span className="text-gray-600 dark:text-gray-300">Подтягиваем данные{dots}</span>
                 )}
               </div>
             </div>
             {receipts.commission ? (
-              <div className="grid grid-cols-[9rem_1fr] gap-y-2">
-                <div className="text-gray-500">Чек на комиссию</div>
-                <a className="text-black font-semibold hover:underline" href={receipts.commission!} target="_blank" rel="noreferrer">Открыть</a>
+              <div className="grid grid-cols-[9rem_1fr] gap-y-2 text-gray-800 dark:text-gray-200">
+                <div className="text-gray-500 dark:text-gray-400">Чек на комиссию</div>
+                <a className="text-black dark:text-white font-semibold hover:underline" href={receipts.commission!} target="_blank" rel="noreferrer">Открыть</a>
               </div>
             ) : null}
           </div>
