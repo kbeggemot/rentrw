@@ -57,16 +57,19 @@ export default function PublicPayPage(props: any) {
   }, [loading, taskId, payUrl, awaitingPay, receipts.prepay, receipts.full, receipts.commission, receipts.npd]);
 
   useEffect(() => {
+    let cancelled = false;
     (async () => {
       try {
-        const res = await fetch(`/api/links/${encodeURIComponent(code)}`, { cache: 'no-store' });
+        const res = await fetch(`/api/links/${encodeURIComponent(code)}`, { cache: 'force-cache' });
         const d = await res.json();
         if (!res.ok) throw new Error(d?.error || 'NOT_FOUND');
+        if (cancelled) return;
         setData(d);
         if (d?.sumMode === 'fixed' && typeof d?.amountRub === 'number') setAmount(String(d.amountRub));
         if (d?.method === 'card') setMethod('card'); else setMethod('qr');
-      } catch (e) { setMsg('Ссылка не найдена'); }
+      } catch (e) { if (!cancelled) setMsg('Ссылка не найдена'); }
     })();
+    return () => { cancelled = true; };
   }, [code]);
 
   // helpers
@@ -199,8 +202,8 @@ export default function PublicPayPage(props: any) {
 
   return (
     <div className="max-w-xl mx-auto p-4">
-      <h1 className="text-xl font-semibold mb-1">Оплата в пользу {data.orgName || 'Организация'}</h1>
-      <div className="text-sm text-gray-600 mb-4">{data.title}</div>
+      <h1 className="text-xl font-semibold mb-1">{data.title}</h1>
+      <div className="text-sm text-gray-600 mb-4">Оплата в пользу {data.orgName || 'Организация'}</div>
       <div className="bg-white dark:bg-gray-950 border border-gray-200 dark:border-gray-800 rounded-lg p-4">
         <div className="mb-3">
           <div className="text-sm text-gray-600">За что платим</div>
