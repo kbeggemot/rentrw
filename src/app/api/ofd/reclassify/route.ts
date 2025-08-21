@@ -20,10 +20,11 @@ async function getFermaStatusByKey(key: string | number) {
   const type = (obj?.Data?.Request?.Type || obj?.Request?.Type || '').toString();
   const pm = (obj?.Data?.CustomerReceipt?.Items?.[0]?.PaymentMethod || obj?.CustomerReceipt?.Items?.[0]?.PaymentMethod) as number | undefined;
   const pt = (obj?.Data?.CustomerReceipt?.PaymentItems?.[0]?.PaymentType || obj?.CustomerReceipt?.PaymentItems?.[0]?.PaymentType) as number | undefined;
+  const rid = (obj?.Data?.ReceiptId || obj?.ReceiptId) as string | undefined;
   const direct: string | undefined = obj?.Data?.Device?.OfdReceiptUrl;
   const fn = obj?.Data?.Fn || obj?.Fn; const fd = obj?.Data?.Fd || obj?.Fd; const fp = obj?.Data?.Fp || obj?.Fp;
   const url = direct && direct.length > 0 ? direct : (fn && fd != null && fp != null ? buildReceiptViewUrl(fn, fd, fp) : undefined);
-  return { type, url, pm, pt } as const;
+  return { type, url, pm, pt, rid } as const;
 }
 
 export async function POST(req: Request) {
@@ -39,6 +40,7 @@ export async function POST(req: Request) {
       const patch: any = {};
       let decided: 'prepay' | 'full' | null = null;
       let decidedUrl: string | null = null;
+      let decidedRid: string | null = null;
 
       // 1) Try explicit ids first
       if ((s as any).ofdPrepayId) {
@@ -47,6 +49,7 @@ export async function POST(req: Request) {
           if (st.url) {
             decided = (st.pm === 1) ? 'prepay' : 'full';
             decidedUrl = st.url;
+            decidedRid = st.rid || null;
           }
         } catch {}
       }
@@ -56,6 +59,7 @@ export async function POST(req: Request) {
           if (st.url) {
             decided = (st.pm === 1) ? 'prepay' : 'full';
             decidedUrl = st.url;
+            decidedRid = st.rid || null;
           }
         } catch {}
       }
@@ -69,6 +73,7 @@ export async function POST(req: Request) {
           if (st2.url) {
             decided = (st2.pm === 1) ? 'prepay' : 'full';
             decidedUrl = st2.url;
+            decidedRid = st2.rid || null;
           }
         } catch {}
       }
@@ -77,10 +82,14 @@ export async function POST(req: Request) {
       if (decided && decidedUrl) {
         if (decided === 'prepay') {
           patch.ofdUrl = decidedUrl;
+          patch.ofdPrepayId = decidedRid || null;
           patch.ofdFullUrl = null; // ensure duplicate removal
+          patch.ofdFullId = null;
         } else {
           patch.ofdFullUrl = decidedUrl;
+          patch.ofdFullId = decidedRid || null;
           patch.ofdUrl = null; // ensure duplicate removal
+          patch.ofdPrepayId = null;
         }
       } else {
         // If we couldn't determine URL/type but both columns have the same link, keep only full by default
