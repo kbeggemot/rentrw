@@ -410,7 +410,7 @@ function AcceptPaymentContent() {
         // Validate partner via our API endpoint
         const res = await fetch('/api/partners/validate', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', credentials: 'include' },
           body: JSON.stringify({ phone: digits })
         });
         
