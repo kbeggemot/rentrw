@@ -314,18 +314,18 @@ export default function DashboardClient({ hasTokenInitial }: { hasTokenInitial: 
                   <div>
                     <label className="block text-sm text-gray-700 mb-1">Сумма</label>
                     <div className="flex flex-wrap items-center gap-2">
-                      <select className="rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-950 px-2 h-9 text-sm shrink-0" value={linkSumMode} onChange={(e) => setLinkSumMode(e.target.value as any)}>
+                      <select className="w-32 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-950 px-2 h-9 text-sm shrink-0" value={linkSumMode} onChange={(e) => setLinkSumMode(e.target.value as any)}>
                         <option value="custom">Укажет покупатель</option>
-                        <option value="fixed">Фиксированная</option>
+                        <option value="fixed">Точная</option>
                       </select>
                       {linkSumMode === 'fixed' ? (
-                        <input className="w-32 sm:w-40 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-950 px-2 h-9 text-sm shrink-0" value={linkAmount} onChange={(e) => setLinkAmount(e.target.value)} placeholder="0.00" />
+                        <input className="w-28 sm:w-32 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-950 px-2 h-9 text-sm shrink-0" value={linkAmount} onChange={(e) => setLinkAmount(e.target.value)} placeholder="0.00" />
                       ) : null}
                     </div>
                   </div>
                   <div>
                     <label className="block text-sm text-gray-700 mb-1">Тип оплаты</label>
-                    <select className="w-40 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-950 px-2 h-9 text-sm" value={linkMethod} onChange={(e) => setLinkMethod(e.target.value as any)}>
+                    <select className="w-32 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-950 px-2 h-9 text-sm" value={linkMethod} onChange={(e) => setLinkMethod(e.target.value as any)}>
                       <option value="any">Любой</option>
                       <option value="qr">СБП</option>
                       <option value="card">Карта</option>

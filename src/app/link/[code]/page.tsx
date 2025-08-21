@@ -244,21 +244,31 @@ export default function PublicPayPage(props: any) {
                 {!payUrl ? (
                   <div className="text-gray-600">{`Формируем платежную ссылку${dots}`}</div>
                 ) : (
-                  <div className="grid grid-cols-[9rem_1fr] gap-y-2">
-                    <div className="text-gray-500">Платежная ссылка</div>
-                    <a className="text-blue-600 hover:underline" href={payUrl} target="_blank" rel="noreferrer" onClick={() => setAwaitingPay(true)}>Оплатить</a>
-                  </div>
-                )}
-                {awaitingPay ? (<div className="text-gray-600">Ждём подтверждения оплаты…</div>) : null}
-                {(receipts.prepay || receipts.full || receipts.commission || receipts.npd) ? (
-                  <div className="mt-1 rounded-md border border-gray-200 bg-white p-2">
+                  !(receipts.prepay || receipts.full || receipts.commission || receipts.npd) ? (
                     <div className="grid grid-cols-[9rem_1fr] gap-y-2">
-                      {receipts.prepay ? (<><div className="text-gray-500">Предоплата</div><a className="text-blue-600 hover:underline" href={receipts.prepay} target="_blank" rel="noreferrer">Открыть</a></>) : null}
-                      {receipts.full ? (<><div className="text-gray-500">Полный расчёт</div><a className="text-blue-600 hover:underline" href={receipts.full} target="_blank" rel="noreferrer">Открыть</a></>) : null}
-                      {receipts.commission ? (<><div className="text-gray-500">Комиссия</div><a className="text-blue-600 hover:underline" href={receipts.commission} target="_blank" rel="noreferrer">Открыть</a></>) : null}
-                      {receipts.npd ? (<><div className="text-gray-500">НПД</div><a className="text-blue-600 hover:underline" href={receipts.npd} target="_blank" rel="noreferrer">Открыть</a></>) : null}
-                      {(!receipts.prepay && !receipts.full && !receipts.commission && !receipts.npd) ? (
-                        <div className="col-span-2 text-gray-500">Чеки недоступны</div>
+                      <div className="text-gray-500">Платежная ссылка</div>
+                      <a className={`${awaitingPay ? 'text-gray-500' : 'text-black font-semibold'} hover:underline`} href={payUrl} target="_blank" rel="noreferrer" onClick={() => setAwaitingPay(true)}>Оплатить</a>
+                    </div>
+                  ) : null
+                )}
+                {awaitingPay && !(receipts.prepay || receipts.full || receipts.commission || receipts.npd) ? (<div className="text-gray-600">Ждём подтверждения оплаты…</div>) : null}
+                {(receipts.prepay || receipts.full || receipts.commission) ? (
+                  <div className="mt-1 rounded-md border border-gray-200 bg-white p-2">
+                    <div className="text-green-700 font-medium mb-2">Успешно оплачено</div>
+                    <div className="grid grid-cols-[9rem_1fr] gap-y-2">
+                      {/* Покупка: показываем либо предоплату, либо полный расчёт */}
+                      {(receipts.full || receipts.prepay) ? (
+                        <>
+                          <div className="text-gray-500">Чек на покупку</div>
+                          <a className="text-black font-semibold hover:underline" href={(receipts.full || receipts.prepay)!} target="_blank" rel="noreferrer">Открыть</a>
+                        </>
+                      ) : null}
+                      {/* Комиссия: показываем только если есть */}
+                      {receipts.commission ? (
+                        <>
+                          <div className="text-gray-500">Чек на комиссию</div>
+                          <a className="text-black font-semibold hover:underline" href={receipts.commission!} target="_blank" rel="noreferrer">Открыть</a>
+                        </>
                       ) : null}
                     </div>
                   </div>
