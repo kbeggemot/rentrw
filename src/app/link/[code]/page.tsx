@@ -164,54 +164,52 @@ export default function PublicPayPage(props: any) {
       // Validate partner in RW for agent sales before creating task
       if (data.isAgent && data.partnerPhone) {
         try {
-          const base = process.env.NEXT_PUBLIC_ROCKETWORK_API_BASE_URL || 'https://app.rocketwork.ru/api/';
           const digits = String(data.partnerPhone).replace(/\D/g, '');
-          const url = new URL(`executors/${encodeURIComponent(digits)}`, base.endsWith('/') ? base : base + '/').toString();
-          const res = await fetch(url, { cache: 'no-store' });
-          const txt = await res.text();
-          let executorData: any = null; 
-          try { executorData = txt ? JSON.parse(txt) : null; } catch { executorData = txt; }
-          
-          if (res.status === 404 || (typeof executorData === 'object' && executorData && ((executorData.error && /not\s*found/i.test(String(executorData.error))) || executorData.executor == null || (executorData.executor && executorData.executor.inn == null)))) {
-            setMsg('Партнёр не завершил регистрацию в Рокет Ворк');
-            setLoading(false);
-            setStarted(false);
-            setDetailsOpen(false);
-            return;
-          }
+          const res = await fetch('/api/partners/validate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'x-user-id': data.userId },
+            body: JSON.stringify({ phone: digits })
+          });
           
           if (!res.ok) {
-            setMsg('Ошибка проверки партнёра');
+            const errorData = await res.json();
+            const code = errorData?.error;
+            if (code === 'PARTNER_NOT_REGISTERED') setMsg('Партнёр не завершил регистрацию в Рокет Ворк');
+            else if (code === 'PARTNER_NOT_VALIDATED') setMsg('Партнёр не может принять оплату: нет статуса самозанятого');
+            else if (code === 'PARTNER_NO_PAYMENT_INFO') setMsg('Партнёр не указал платёжные реквизиты в Рокет Ворк');
+            else setMsg('Ошибка проверки партнёра');
             setLoading(false);
             setStarted(false);
             setDetailsOpen(false);
             return;
           }
           
-          const status: string | undefined = (executorData?.executor?.selfemployed_status as string | undefined) ?? (executorData?.selfemployed_status as string | undefined);
-          if (!status) {
-            setMsg('Партнёр не завершил регистрацию в Рокет Ворк');
-            setLoading(false);
-            setStarted(false);
-            setDetailsOpen(false);
-            return;
-          }
+          const executorData = await res.json();
           
-          if (status !== 'validated') {
-            setMsg('Партнёр не может принять оплату: нет статуса самозанятого');
-            setLoading(false);
-            setStarted(false);
-            setDetailsOpen(false);
-            return;
-          }
-          
-          const paymentInfo = (executorData?.executor?.payment_info ?? executorData?.payment_info ?? null);
-          if (!paymentInfo) {
-            setMsg('Партнёр не указал платёжные реквизиты в Рокет Ворк');
-            setLoading(false);
-            setStarted(false);
-            setDetailsOpen(false);
-            return;
+          // Auto-add/update partner if validation successful
+          try {
+            const fio = executorData?.executor ? [
+              executorData.executor.last_name,
+              executorData.executor.first_name, 
+              executorData.executor.second_name
+            ].filter(Boolean).join(' ').trim() : null;
+            
+            const partner = {
+              phone: digits,
+              fio: fio || null,
+              status: executorData.status || null,
+              inn: executorData.inn || null,
+              updatedAt: new Date().toISOString(),
+              hidden: false
+            };
+            
+            await fetch('/api/partners', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'x-user-id': data.userId },
+              body: JSON.stringify(partner)
+            });
+          } catch (e) {
+            // Silent fail - partner update is not critical for payment flow
           }
         } catch (e) {
           setMsg('Ошибка проверки партнёра');

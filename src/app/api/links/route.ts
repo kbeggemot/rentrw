@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createPaymentLink, listPaymentLinks } from '@/server/paymentLinkStore';
 import { getDecryptedApiToken } from '@/server/secureStore';
+import { partnerExists, upsertPartnerFromValidation } from '@/server/partnerStore';
 
 export const runtime = 'nodejs';
 
@@ -72,6 +73,9 @@ export async function POST(req: Request) {
         if (status !== 'validated') return NextResponse.json({ error: 'PARTNER_NOT_VALIDATED' }, { status: 400 });
         const paymentInfo = (data?.executor?.payment_info ?? data?.payment_info ?? null);
         if (!paymentInfo) return NextResponse.json({ error: 'PARTNER_NO_PAYMENT_INFO' }, { status: 400 });
+        
+        // Auto-add/update partner if validation successful
+        await upsertPartnerFromValidation(userId, digits, data);
       } catch (e) {
         const msg = e instanceof Error ? e.message : 'CHECK_ERROR';
         return NextResponse.json({ error: msg }, { status: 400 });

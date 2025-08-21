@@ -406,8 +406,52 @@ function AcceptPaymentContent() {
       try {
         setCheckingExecutor(true);
         const digits = agentPhone.replace(/\D/g, '');
-        try { await fetch('/api/rocketwork/tasks', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'InviteExecutor', phone: digits }) }); } catch {}
-        try { await fetch(`/api/rocketwork/task-debug?phone=${encodeURIComponent(digits)}`, { cache: 'no-store' }); } catch {}
+        
+        // Validate partner via our API endpoint
+        const res = await fetch('/api/partners/validate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ phone: digits })
+        });
+        
+        if (!res.ok) {
+          const errorData = await res.json();
+          const code = errorData?.error;
+          if (code === 'PARTNER_NOT_REGISTERED') showToast('Партнёр не завершил регистрацию в Рокет Ворк', 'error');
+          else if (code === 'PARTNER_NOT_VALIDATED') showToast('Партнёр не может принять оплату: нет статуса самозанятого', 'error');
+          else if (code === 'PARTNER_NO_PAYMENT_INFO') showToast('Партнёр не указал платёжные реквизиты в Рокет Ворк', 'error');
+          else showToast('Ошибка проверки партнёра', 'error');
+          setCheckingExecutor(false);
+          return;
+        }
+        
+        const executorData = await res.json();
+        
+        // Auto-add/update partner if validation successful
+        try {
+          const fio = executorData?.executor ? [
+            executorData.executor.last_name,
+            executorData.executor.first_name, 
+            executorData.executor.second_name
+          ].filter(Boolean).join(' ').trim() : null;
+          
+          const partner = {
+            phone: digits,
+            fio: fio || null,
+            status: executorData.status || null,
+            inn: executorData.inn || null,
+            updatedAt: new Date().toISOString(),
+            hidden: false
+          };
+          
+          await fetch('/api/partners', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(partner)
+          });
+        } catch (e) {
+          // Silent fail - partner update is not critical for payment flow
+        }
       } finally {
         setCheckingExecutor(false);
       }

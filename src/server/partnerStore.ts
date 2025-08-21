@@ -68,4 +68,36 @@ export async function unhidePartner(userId: string, phone: string): Promise<void
   }
 }
 
+export async function partnerExists(userId: string, phone: string): Promise<boolean> {
+  const store = await readStore();
+  const arr = Array.isArray(store.users[userId]) ? store.users[userId] : [];
+  return arr.some((p) => p.phone === phone);
+}
+
+export async function upsertPartnerFromValidation(
+  userId: string, 
+  phone: string, 
+  executorData: any
+): Promise<void> {
+  const fio = executorData?.executor ? [
+    executorData.executor.last_name,
+    executorData.executor.first_name, 
+    executorData.executor.second_name
+  ].filter(Boolean).join(' ').trim() : null;
+  
+  const status = executorData?.executor?.selfemployed_status || executorData?.selfemployed_status;
+  const inn = executorData?.executor?.inn || executorData?.inn;
+  
+  const partner: PartnerRecord = {
+    phone,
+    fio: fio || null,
+    status: status || null,
+    inn: inn || null,
+    updatedAt: new Date().toISOString(),
+    hidden: false
+  };
+  
+  await upsertPartner(userId, partner);
+}
+
 
