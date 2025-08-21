@@ -34,8 +34,12 @@ export async function GET(req: Request) {
           // Try detailed first using created/end dates to maximize chance of full receipt
           const createdAt = sale?.createdAtRw || sale?.createdAt;
           const endDate = sale?.serviceEndDate || undefined;
-          const startUtc = (createdAt ? new Date(createdAt) : new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)).toISOString().slice(0, 19);
-          const endUtc = (endDate ? new Date(`${endDate}T23:59:59Z`) : new Date()).toISOString().slice(0, 19);
+          const startBase = createdAt ? new Date(createdAt) : new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+          const endBase = endDate ? new Date(`${endDate}T23:59:59Z`) : new Date();
+          const startExt = new Date(startBase.getTime() - 24 * 60 * 60 * 1000); // minus 1 day
+          const endExt = new Date(endBase.getTime() + 24 * 60 * 60 * 1000); // plus 1 day
+          const startUtc = startExt.toISOString().slice(0, 19);
+          const endUtc = endExt.toISOString().slice(0, 19);
           // 1) Try extended GET first (returns CustomerReceipt)
           const ext = await fermaGetReceiptExtended({ receiptId: String(rid), dateFromIncl: startUtc, dateToIncl: endUtc, fn: (sale as any)?.fn, zn: (sale as any)?.zn }, { baseUrl, authToken: token });
           if (ext.rawStatus >= 200 && ext.rawStatus < 300 && ext.rawText && ext.rawText.indexOf('CustomerReceipt') !== -1) {
