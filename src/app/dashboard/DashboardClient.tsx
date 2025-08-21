@@ -448,7 +448,7 @@ export default function DashboardClient({ hasTokenInitial }: { hasTokenInitial: 
           </div>
 
           <div className="mt-6">
-            <h2 className="text-lg font-semibold mb-2">Деньги</h2>
+            <h2 className="text-lg font-semibold mb-2">Мой счёт</h2>
             <div className="flex flex-wrap items-center gap-3 mb-3">
               <Button className="text-base" variant="secondary" onClick={fetchBalance} disabled={loading}>
                 {loading ? 'Загружаю…' : 'Показать баланс'}
@@ -457,14 +457,14 @@ export default function DashboardClient({ hasTokenInitial }: { hasTokenInitial: 
                 <div className="text-sm text-gray-800 dark:text-gray-200">Баланс: {balance}</div>
               ) : null}
             </div>
-            <div className="flex items-end gap-3 max-w-md">
-              <div className="flex-1">
+            <div className="flex items-end gap-3">
+              <div className="w-40">
                 <label className="block text-sm text-gray-700 dark:text-gray-300 mb-1">Сумма к выводу (₽)</label>
                 <input
                   type="number"
                   min="0"
                   step="0.01"
-                  className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 h-9 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-foreground"
+                  className="w-40 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 h-9 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-foreground"
                   placeholder="0.00"
                   value={withdrawAmount}
                   onChange={(e) => setWithdrawAmount(e.target.value)}
