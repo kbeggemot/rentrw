@@ -1,4 +1,4 @@
-import { listSales, updateSaleOfdUrlsByOrderId } from './taskStore';
+import { listSales, updateSaleOfdUrlsByOrderId, listAllSales } from './taskStore';
 import { fermaGetAuthTokenCached, fermaCreateReceipt, fermaGetReceiptStatus, buildReceiptViewUrl } from './ofdFerma';
 import { buildFermaReceiptPayload, PAYMENT_METHOD_FULL_PAYMENT, PAYMENT_METHOD_PREPAY_FULL } from '@/app/api/ofd/ferma/build-payload';
 import { getUserOrgInn, getUserPayoutRequisites } from './userStore';
@@ -24,12 +24,11 @@ export function startOfdRepairWorker(): void {
 
 async function runRepairTick(): Promise<void> {
   try {
-    const allUsers = new Set<string>();
-    // gather users from sales list (sales already partitioned by userId)
-    // listSales requires a userId; we don't have multi-tenant listing exported,
-    // so we rely on scanning recent userIds from environment/session not available.
-    // Fallback: try to repair per user ids inferred from LAST entries persisted in stores is not trivial.
-    // Simpler approach: try to repair for users derived from sales themselves by iterating per user candidate set.
+    const all = await listAllSales();
+    const userIds = Array.from(new Set(all.map((s) => s.userId)));
+    for (const uid of userIds) {
+      try { await repairUserSales(uid); } catch {}
+    }
   } catch {}
 }
 
