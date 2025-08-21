@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { getDecryptedApiToken } from '@/server/secureStore';
 
 export const runtime = 'nodejs';
 
@@ -21,22 +22,25 @@ export async function POST(req: Request) {
     
     const base = process.env.ROCKETWORK_API_BASE_URL || 'https://app.rocketwork.ru/api/';
     const digits = phone.replace(/\D/g, '');
+    const token = await getDecryptedApiToken(userId);
+    if (!token) return NextResponse.json({ error: 'NO_TOKEN' }, { status: 400 });
+    const commonHeaders: Record<string, string> = {
+      Authorization: `Bearer ${token}`,
+      Accept: 'application/json'
+    };
     
     // invite best-effort
     try { 
       await fetch(new URL('executors/invite', base.endsWith('/') ? base : base + '/').toString(), { 
         method: 'POST', 
-        headers: { 
-          'Content-Type': 'application/json', 
-          Accept: 'application/json' 
-        }, 
+        headers: { ...commonHeaders, 'Content-Type': 'application/json' }, 
         body: JSON.stringify({ phone: digits, with_framework_agreement: false }), 
         cache: 'no-store' 
       }); 
     } catch {}
     
     const url = new URL(`executors/${encodeURIComponent(digits)}`, base.endsWith('/') ? base : base + '/').toString();
-    const res = await fetch(url, { cache: 'no-store' });
+    const res = await fetch(url, { cache: 'no-store', headers: commonHeaders });
     const txt = await res.text();
     let executorData: any = null; 
     try { executorData = txt ? JSON.parse(txt) : null; } catch { executorData = txt; }
