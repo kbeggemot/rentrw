@@ -77,6 +77,19 @@ export async function GET(req: Request) {
               if (createdDate && endStr && createdDate === endStr) patch.ofdFullUrl = ofdUrl; else patch.ofdUrl = ofdUrl;
             }
             await updateSaleFromStatus(userId, s.taskId, patch);
+            // Force-exclusive placement: if we classified RW ofd_url, clear the opposite column
+            if (ofdUrl) {
+              try {
+                const createdAt = (normalized as any)?.created_at || s.createdAtRw || s.createdAt;
+                const createdDate = createdAt ? String(createdAt).slice(0, 10) : null;
+                const endStr = (s.serviceEndDate || '') as string;
+                if (createdDate && endStr && createdDate === endStr) {
+                  await updateSaleOfdUrlsByOrderId(userId, s.orderId, { ofdFullUrl: ofdUrl, ofdUrl: null });
+                } else {
+                  await updateSaleOfdUrlsByOrderId(userId, s.orderId, { ofdUrl: ofdUrl, ofdFullUrl: null });
+                }
+              } catch {}
+            }
             try {
               const createdAtRw: string | undefined = (normalized as any)?.created_at || undefined;
               if (createdAtRw) await setSaleCreatedAtRw(userId, s.taskId, createdAtRw);
