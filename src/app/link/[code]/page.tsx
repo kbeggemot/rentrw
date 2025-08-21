@@ -241,7 +241,11 @@ export default function PublicPayPage(props: any) {
         {detailsOpen ? (
           <div className="mt-4 rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm">
             {!taskId ? (
-              <div className="text-gray-600">Нажмите «Перейти к оплате», чтобы сформировать ссылку…</div>
+              started ? (
+                <div className="text-gray-600">{`Формируем платежную ссылку${dots}`}</div>
+              ) : (
+                <div className="text-gray-600">Нажмите «Перейти к оплате», чтобы сформировать ссылку…</div>
+              )
             ) : (
               <div className="space-y-2">
                 {!payUrl ? (

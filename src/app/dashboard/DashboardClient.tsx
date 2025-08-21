@@ -368,6 +368,18 @@ export default function DashboardClient({ hasTokenInitial }: { hasTokenInitial: 
                             }
                           } else if (!linkAgent && (amountNum as number) < 10) { showToast('Сумма должна быть ≥ 10 ₽', 'error'); return; }
                         }
+                        // Агентская продажа — обязательные поля и границы
+                        if (linkAgent) {
+                          if (linkCommVal.trim().length === 0) { showToast('Укажите комиссию агента', 'error'); return; }
+                          const comm = Number(linkCommVal.replace(',', '.'));
+                          if (!Number.isFinite(comm)) { showToast('Укажите корректную комиссию', 'error'); return; }
+                          if (linkCommType === 'percent') {
+                            if (comm < 0 || comm > 100) { showToast('Комиссия должна быть в диапазоне 0–100%', 'error'); return; }
+                          } else {
+                            if (comm <= 0) { showToast('Укажите фиксированную комиссию в рублях (> 0)', 'error'); return; }
+                          }
+                          if (linkPartner.trim().length === 0) { showToast('Укажите телефон партнёра', 'error'); return; }
+                        }
                         const payload: any = { title: linkTitle.trim(), description: linkDesc.trim(), sumMode: linkSumMode, amountRub: amountNum, vatRate: linkVat, isAgent: linkAgent, commissionType: linkAgent ? linkCommType : undefined, commissionValue: linkAgent ? Number(linkCommVal.replace(',', '.')) : undefined, partnerPhone: linkAgent ? linkPartner.trim() : undefined, method: linkMethod };
                         const r = await fetch('/api/links', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
                         const d = await r.json();
