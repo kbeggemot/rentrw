@@ -18,10 +18,12 @@ async function getFermaStatusByKey(key: string | number) {
   const st = await fermaGetReceiptStatus(String(key), { baseUrl, authToken: token });
   const obj = st.rawText ? JSON.parse(st.rawText) : {};
   const type = (obj?.Data?.Request?.Type || obj?.Request?.Type || '').toString();
+  const pm = (obj?.Data?.CustomerReceipt?.Items?.[0]?.PaymentMethod || obj?.CustomerReceipt?.Items?.[0]?.PaymentMethod) as number | undefined;
+  const pt = (obj?.Data?.CustomerReceipt?.PaymentItems?.[0]?.PaymentType || obj?.CustomerReceipt?.PaymentItems?.[0]?.PaymentType) as number | undefined;
   const direct: string | undefined = obj?.Data?.Device?.OfdReceiptUrl;
   const fn = obj?.Data?.Fn || obj?.Fn; const fd = obj?.Data?.Fd || obj?.Fd; const fp = obj?.Data?.Fp || obj?.Fp;
   const url = direct && direct.length > 0 ? direct : (fn && fd != null && fp != null ? buildReceiptViewUrl(fn, fd, fp) : undefined);
-  return { type, url } as const;
+  return { type, url, pm, pt } as const;
 }
 
 export async function POST(req: Request) {
@@ -43,7 +45,7 @@ export async function POST(req: Request) {
         try {
           const st = await getFermaStatusByKey((s as any).ofdPrepayId!);
           if (st.url) {
-            decided = /IncomePrepayment/i.test(st.type) ? 'prepay' : 'full';
+            decided = (st.pm === 1) ? 'prepay' : 'full';
             decidedUrl = st.url;
           }
         } catch {}
@@ -52,7 +54,7 @@ export async function POST(req: Request) {
         try {
           const st = await getFermaStatusByKey((s as any).ofdFullId!);
           if (st.url) {
-            decided = /IncomePrepayment/i.test(st.type) ? 'prepay' : 'full';
+            decided = (st.pm === 1) ? 'prepay' : 'full';
             decidedUrl = st.url;
           }
         } catch {}
@@ -65,7 +67,7 @@ export async function POST(req: Request) {
           const invoiceId = await getInvoiceIdString(s.orderId);
           const st2 = await getFermaStatusByKey(invoiceId);
           if (st2.url) {
-            decided = /IncomePrepayment/i.test(st2.type) ? 'prepay' : 'full';
+            decided = (st2.pm === 1) ? 'prepay' : 'full';
             decidedUrl = st2.url;
           }
         } catch {}

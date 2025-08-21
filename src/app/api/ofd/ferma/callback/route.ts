@@ -32,10 +32,13 @@ export async function POST(req: Request) {
     const fd: string | number | undefined = body?.Data?.Fd || body?.Fd;
     const fp: string | number | undefined = body?.Data?.Fp || body?.Fp;
     const invoiceIdRaw: string | number | undefined = body?.Data?.InvoiceId || body?.InvoiceId || body?.Request?.InvoiceId;
-    // Try to detect PaymentItems[].PaymentType (2=offset). Value 1 is NOT prepayment marker.
+    // Detect PaymentItems[].PaymentType (2=offset) and Items[0].PaymentMethod (1=prepay, 4=full)
     const pt = (body?.Data?.CustomerReceipt?.PaymentItems?.[0]?.PaymentType
       ?? body?.CustomerReceipt?.PaymentItems?.[0]?.PaymentType
       ?? body?.PaymentItems?.[0]?.PaymentType) as number | undefined;
+    const pm = (body?.Data?.CustomerReceipt?.Items?.[0]?.PaymentMethod
+      ?? body?.CustomerReceipt?.Items?.[0]?.PaymentMethod
+      ?? body?.Items?.[0]?.PaymentMethod) as number | undefined;
     let docTypeRaw = (body?.Data?.Request?.Type || body?.Request?.Type || '').toString();
     if ((!docTypeRaw || docTypeRaw.length === 0) && (receiptId || invoiceIdRaw)) {
       try {
@@ -91,10 +94,12 @@ export async function POST(req: Request) {
     if (Number.isFinite(orderId)) {
       const patch: any = {};
       // Decide classification: offset (pt=2 or docTypeOffset), else by docType or serviceEndDate
-      const isOffset = pt === 2; // offset is indicated by PaymentItems.PaymentType=2
+      const isOffset = pt === 2; // offset indicated by PaymentItems.PaymentType=2
       let classify: 'prepay' | 'full' = 'full';
-      if (/IncomePrepayment/i.test(docTypeRaw)) classify = 'prepay';
-      else if (isOffset || /(^|[^A-Za-z])Income($|[^A-Za-z])/i.test(docTypeRaw)) classify = 'full';
+      if (pm === 1) classify = 'prepay';
+      else if (pm === 4) classify = 'full';
+      else if (/IncomePrepayment/i.test(docTypeRaw)) classify = 'prepay';
+      else if (/(^|[^A-Za-z])Income($|[^A-Za-z])/i.test(docTypeRaw)) classify = 'full';
       if (receiptUrl) {
         if (classify === 'prepay') patch.ofdUrl = receiptUrl; else patch.ofdFullUrl = receiptUrl;
       }
