@@ -304,7 +304,7 @@ export default function DashboardClient({ hasTokenInitial }: { hasTokenInitial: 
                   </div>
                   <div>
                     <label className="block text-sm text-gray-700 mb-1">НДС</label>
-                    <select className="w-40 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-950 px-2 h-9 text-sm" value={linkVat} onChange={(e) => setLinkVat(e.target.value as any)}>
+                    <select className="w-44 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-950 px-2 h-9 text-sm" value={linkVat} onChange={(e) => setLinkVat(e.target.value as any)}>
                       <option value="none">Без НДС</option>
                       <option value="0">0%</option>
                       <option value="10">10%</option>
@@ -325,7 +325,7 @@ export default function DashboardClient({ hasTokenInitial }: { hasTokenInitial: 
                   </div>
                   <div>
                     <label className="block text-sm text-gray-700 mb-1">Тип оплаты</label>
-                    <select className="w-32 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-950 px-2 h-9 text-sm" value={linkMethod} onChange={(e) => setLinkMethod(e.target.value as any)}>
+                    <select className="w-44 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-950 px-2 h-9 text-sm" value={linkMethod} onChange={(e) => setLinkMethod(e.target.value as any)}>
                       <option value="any">Любой</option>
                       <option value="qr">СБП</option>
                       <option value="card">Карта</option>

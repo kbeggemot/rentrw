@@ -38,11 +38,14 @@ export default function PublicPayPage(props: any) {
   const pollRef = useRef<number | null>(null);
   const payUrlPollRef = useRef<number | null>(null);
 
-  // Animated dots for "формируем ссылку"
+  // Animated dots for pending states
   const [dots, setDots] = useState('.');
   useEffect(() => {
     let timer: number | null = null;
-    const active = loading || (detailsOpen && taskId && !payUrl);
+    const hasReceipts = Boolean(receipts.prepay || receipts.full || receipts.commission || receipts.npd);
+    const waitingForLink = Boolean(taskId) && !payUrl;
+    const waitingForConfirm = awaitingPay && !hasReceipts;
+    const active = loading || waitingForLink || waitingForConfirm;
     if (active) {
       timer = window.setInterval(() => {
         setDots((prev) => (prev.length >= 3 ? '.' : prev + '.'));
@@ -51,7 +54,7 @@ export default function PublicPayPage(props: any) {
       setDots('.');
     }
     return () => { if (timer) window.clearInterval(timer); };
-  }, [loading, detailsOpen, taskId, payUrl]);
+  }, [loading, taskId, payUrl, awaitingPay, receipts.prepay, receipts.full, receipts.commission, receipts.npd]);
 
   useEffect(() => {
     (async () => {
