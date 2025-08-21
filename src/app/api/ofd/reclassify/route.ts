@@ -45,7 +45,7 @@ export async function POST(req: Request) {
       if ((s as any).ofdFullId) {
         try {
           const st = await getFermaStatusByKey((s as any).ofdFullId!);
-          if ((/IncomePrepaymentOffset/i.test(st.type) || /(^|[^A-Za-z])Income($|[^A-Za-z])/i.test(st.type)) && st.url) patch.ofdFullUrl = st.url;
+          if ((/(^|[^A-Za-z])Income($|[^A-Za-z])/i.test(st.type)) && st.url) patch.ofdFullUrl = st.url;
         } catch {}
       }
       // If still missing or misfiled, try by InvoiceId
@@ -55,7 +55,7 @@ export async function POST(req: Request) {
           const invoiceId = await getInvoiceIdString(s.orderId);
           const st2 = await getFermaStatusByKey(invoiceId);
           if (/IncomePrepayment/i.test(st2.type) && st2.url) patch.ofdUrl = st2.url;
-          else if ((/IncomePrepaymentOffset/i.test(st2.type) || /(^|[^A-Za-z])Income($|[^A-Za-z])/i.test(st2.type)) && st2.url) patch.ofdFullUrl = st2.url;
+          else if ((/(^|[^A-Za-z])Income($|[^A-Za-z])/i.test(st2.type)) && st2.url) patch.ofdFullUrl = st2.url;
         } catch {}
       }
       if (Object.keys(patch).length > 0) {

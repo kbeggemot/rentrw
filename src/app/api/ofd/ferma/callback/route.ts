@@ -91,7 +91,7 @@ export async function POST(req: Request) {
     if (Number.isFinite(orderId)) {
       const patch: any = {};
       // Decide classification: offset (pt=2 or docTypeOffset), else by docType or serviceEndDate
-      const isOffset = pt === 2 || /IncomePrepaymentOffset/i.test(docTypeRaw);
+      const isOffset = pt === 2; // offset is indicated by PaymentItems.PaymentType=2
       let classify: 'prepay' | 'full' = 'full';
       if (/IncomePrepayment/i.test(docTypeRaw)) classify = 'prepay';
       else if (isOffset || /(^|[^A-Za-z])Income($|[^A-Za-z])/i.test(docTypeRaw)) classify = 'full';
