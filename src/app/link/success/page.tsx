@@ -13,7 +13,7 @@ export default function PublicSuccessUnifiedPage() {
   const [receipts, setReceipts] = useState<{ prepay?: string | null; full?: string | null; commission?: string | null; npd?: string | null }>({});
   const [msg, setMsg] = useState<string | null>(null);
   const [waiting, setWaiting] = useState(false);
-  const [summary, setSummary] = useState<{ amountRub?: number; description?: string | null } | null>(null);
+  const [summary, setSummary] = useState<{ amountRub?: number; description?: string | null; createdAt?: string | null } | null>(null);
   const [payMethod, setPayMethod] = useState<string | null>(null);
   const pollRef = useRef<number | null>(null);
   const [dots, setDots] = useState(".");
@@ -59,7 +59,7 @@ export default function PublicSuccessUnifiedPage() {
                 setTaskId(d.taskId);
                 setInfo({ code: '', userId: String(d.userId || ''), title: undefined, orgName: d?.orgName || null });
                 setOrderId(Number(d.orderId || 0) || null);
-                if (d?.sale) setSummary({ amountRub: d.sale.amountRub, description: d.sale.description });
+                if (d?.sale) setSummary({ amountRub: d.sale.amountRub, description: d.sale.description, createdAt: d.sale.createdAt ?? null });
                 if (d?.sale) {
                   setReceipts({
                     prepay: d.sale.ofdUrl || null,
@@ -141,7 +141,12 @@ export default function PublicSuccessUnifiedPage() {
         const rwFull = t?.ofd_full_url || t?.acquiring_order?.ofd_full_url || null;
         const rwCom = t?.additional_commission_ofd_url || t?.task?.additional_commission_ofd_url || t?.additional_commission_url || t?.task?.additional_commission_url || null;
         const rwNpd = t?.receipt_uri || t?.task?.receipt_uri || null;
-        setReceipts({ prepay: rwPre ?? null, full: rwFull ?? null, commission: rwCom ?? null, npd: rwNpd ?? null });
+        setReceipts((prev) => ({
+          prepay: prev.prepay ?? (rwPre ?? null),
+          full: prev.full ?? (rwFull ?? null),
+          commission: prev.commission ?? (rwCom ?? null),
+          npd: prev.npd ?? (rwNpd ?? null),
+        }));
       } catch {}
       pollRef.current = window.setTimeout(tick, 1200) as unknown as number;
     };
@@ -159,6 +164,19 @@ export default function PublicSuccessUnifiedPage() {
     }
     return () => { if (pollRef.current) { window.clearTimeout(pollRef.current); pollRef.current = null; } };
   }, [detailsOpen, taskId, info?.userId]);
+
+  // Fetch payment method once as soon as taskId известен, чтобы не ждать первого тика
+  useEffect(() => {
+    (async () => {
+      try {
+        if (!taskId || !info?.userId) return;
+        const r = await fetch(`/api/rocketwork/task-status/${encodeURIComponent(String(taskId))}`, { cache: 'no-store', headers: { 'x-user-id': info.userId } as any });
+        const t = await r.json();
+        const typ = (t?.acquiring_order?.type || t?.task?.acquiring_order?.type || '').toString().toUpperCase();
+        if (typ) setPayMethod(typ === 'QR' ? 'СБП' : typ === 'CARD' ? 'Карта' : typ);
+      } catch {}
+    })();
+  }, [taskId, info?.userId]);
 
   return (
     <div className="max-w-xl mx-auto p-4">
@@ -184,10 +202,12 @@ export default function PublicSuccessUnifiedPage() {
             <div className="grid grid-cols-[9rem_1fr] gap-y-2 mb-2">
               <div className="text-gray-500">За что платим</div>
               <div>{summary?.description || info?.title || '—'}</div>
-              <div className="text-gray-500">Сумма, ₽</div>
+              <div className="text-gray-500">Сумма</div>
               <div>{typeof summary?.amountRub === 'number' ? new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB' }).format(summary!.amountRub!) : '—'}</div>
               <div className="text-gray-500">Способ оплаты</div>
               <div>{payMethod || '—'}</div>
+              <div className="text-gray-500">Дата оплаты</div>
+              <div>{summary?.createdAt ? new Date(summary.createdAt).toLocaleString('ru-RU', { timeZone: 'Europe/Moscow' }) : '—'}</div>
               <div className="text-gray-500">Чек</div>
               <div>
                 {(receipts.full || receipts.prepay) ? (

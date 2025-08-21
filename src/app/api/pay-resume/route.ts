@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { resolveResumeToken } from '@/server/payResumeStore';
 import { listSales } from '@/server/taskStore';
 import { getUserPayoutRequisites } from '@/server/userStore';
+import { getDecryptedApiToken } from '@/server/secureStore';
 
 export const runtime = 'nodejs';
 
@@ -30,6 +31,25 @@ export async function GET(req: Request) {
         npdReceiptUri: sale.npdReceiptUri ?? null,
       };
     }
+    // Try to enrich with payment method and created_at from RW
+    try {
+      const taskId = (payload.taskId as any) ?? null;
+      if (taskId != null) {
+        const token = await getDecryptedApiToken(userId);
+        if (token) {
+          const base = process.env.ROCKETWORK_API_BASE_URL || 'https://app.rocketwork.ru/api/';
+          const url = new URL(`tasks/${encodeURIComponent(String(taskId))}`, base.endsWith('/') ? base : base + '/').toString();
+          const res = await fetch(url, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }, cache: 'no-store' });
+          const txt = await res.text();
+          let d: any = null; try { d = txt ? JSON.parse(txt) : null; } catch { d = txt; }
+          const taskObj = (d && typeof d === 'object' && 'task' in d) ? (d.task as any) : d;
+          const typ = (taskObj?.acquiring_order?.type || '').toString().toUpperCase();
+          if (typ === 'QR' || typ === 'CARD') payload.method = (typ === 'QR' ? 'qr' : 'card');
+          if (!payload.sale) payload.sale = {} as any;
+          if (!(payload.sale as any).createdAt && taskObj?.created_at) (payload.sale as any).createdAt = taskObj.created_at;
+        }
+      }
+    } catch {}
     return NextResponse.json(payload);
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'Server error';

@@ -224,14 +224,14 @@ function AcceptPaymentContent() {
         if (stRes.ok && found) {
           if (attemptIdRef.current !== attemptId || activeTaskIdRef.current !== taskId) return;
           if (!paymentUrlRef.current) {
-            setPaymentUrl(found);
-            try {
-              const dataUrl = await QRCode.toDataURL(found, { margin: 1, scale: 6 });
-              setQrDataUrl(dataUrl);
-            } catch {}
-            setMessage(null);
-            loadingRef.current = false;
-            setLoading(false);
+          setPaymentUrl(found);
+          try {
+            const dataUrl = await QRCode.toDataURL(found, { margin: 1, scale: 6 });
+            setQrDataUrl(dataUrl);
+          } catch {}
+          setMessage(null);
+          loadingRef.current = false;
+          setLoading(false);
           }
         }
       } catch {}
@@ -269,7 +269,7 @@ function AcceptPaymentContent() {
         const st = String(status || '').toLowerCase();
         if (st === 'paid' || st === 'transfered' || st === 'transferred') {
           if (attemptIdRef.current !== attemptId || activeTaskIdRef.current !== taskId) return;
-          setPaymentUrl(null);
+            setPaymentUrl(null);
           // после успеха — полностью убираем QR и заголовок
           setQrDataUrl(null);
           setMessage(null);
@@ -534,8 +534,8 @@ function AcceptPaymentContent() {
             setPaymentUrl(url0);
             try { const dataUrl = await QRCode.toDataURL(url0, { margin: 1, scale: 6 }); setQrDataUrl(dataUrl); } catch {}
             setMessage(null);
-            setLoading(false);
-          }
+        setLoading(false);
+      }
         } catch {}
         startPolling(taskId, myAttempt);
         startStatusWatcher(taskId, myAttempt, isAgentSale);
