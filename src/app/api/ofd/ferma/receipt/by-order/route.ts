@@ -57,15 +57,17 @@ export async function GET(req: Request) {
           }
           const startMsk = formatMsk(startExt);
           const endMsk = formatMsk(endExt);
+          const startParam = startMsk.replace(/\u00A0/g, ' ').trim();
+          const endParam = endMsk.replace(/\u00A0/g, ' ').trim();
           // 1) Try extended GET first (returns CustomerReceipt)
-          const ext = await fermaGetReceiptExtended({ receiptId: String(rid), dateFromIncl: startMsk, dateToIncl: endMsk, fn: (sale as any)?.fn, zn: (sale as any)?.zn }, { baseUrl, authToken: token });
+          const ext = await fermaGetReceiptExtended({ receiptId: String(rid), dateFromIncl: startParam, dateToIncl: endParam, fn: (sale as any)?.fn, zn: (sale as any)?.zn }, { baseUrl, authToken: token });
           if (ext.rawStatus >= 200 && ext.rawStatus < 300 && ext.rawText && ext.rawText.indexOf('CustomerReceipt') !== -1) {
             // Also fetch minimal status to return direct link alongside extended body
             const mini = await fermaGetReceiptStatus(String(rid), { baseUrl, authToken: token });
             return NextResponse.json({ extended: ext, status: mini }, { status: ext.rawStatus });
           }
           // 2) Fallback to detailed POST
-          let byRid = await fermaGetReceiptStatusDetailed(String(rid), { startUtc: startMsk.replace(' ', 'T'), endUtc: endMsk.replace(' ', 'T'), startLocal: startMsk.replace(' ', 'T'), endLocal: endMsk.replace(' ', 'T') }, { baseUrl, authToken: token });
+          let byRid = await fermaGetReceiptStatusDetailed(String(rid), { startUtc: startParam.replace(' ', 'T'), endUtc: endParam.replace(' ', 'T'), startLocal: startParam.replace(' ', 'T'), endLocal: endParam.replace(' ', 'T') }, { baseUrl, authToken: token });
           if (byRid.rawStatus >= 200 && byRid.rawStatus < 300 && byRid.rawText && byRid.rawText.indexOf('CustomerReceipt') !== -1) {
             return NextResponse.json(byRid, { status: byRid.rawStatus });
           }
