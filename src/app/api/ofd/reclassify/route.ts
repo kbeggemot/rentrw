@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { listSales, updateSaleOfdUrlsByOrderId } from '@/server/taskStore';
-import { fermaGetAuthTokenCached, fermaGetReceiptStatus, buildReceiptViewUrl } from '@/server/ofdFerma';
+import { fermaGetAuthTokenCached, fermaGetReceiptStatus, buildReceiptViewUrl, fermaGetReceiptExtended, fermaGetReceiptStatusDetailed } from '@/server/ofdFerma';
 
 export const runtime = 'nodejs';
 
@@ -12,19 +12,57 @@ function getUserId(req: Request): string | null {
   return hdr && hdr.trim().length > 0 ? hdr.trim() : null;
 }
 
-async function getFermaStatusByKey(key: string | number) {
+async function classifySaleWithOfd(sale: any): Promise<{ pm?: number; pt?: number; url?: string; rid?: string }> {
   const baseUrl = process.env.FERMA_BASE_URL || 'https://ferma.ofd.ru/';
   const token = await fermaGetAuthTokenCached(process.env.FERMA_LOGIN || '', process.env.FERMA_PASSWORD || '', { baseUrl });
-  const st = await fermaGetReceiptStatus(String(key), { baseUrl, authToken: token });
-  const obj = st.rawText ? JSON.parse(st.rawText) : {};
-  const type = (obj?.Data?.Request?.Type || obj?.Request?.Type || '').toString();
-  const pm = (obj?.Data?.CustomerReceipt?.Items?.[0]?.PaymentMethod || obj?.CustomerReceipt?.Items?.[0]?.PaymentMethod) as number | undefined;
-  const pt = (obj?.Data?.CustomerReceipt?.PaymentItems?.[0]?.PaymentType || obj?.CustomerReceipt?.PaymentItems?.[0]?.PaymentType) as number | undefined;
-  const rid = (obj?.Data?.ReceiptId || obj?.ReceiptId) as string | undefined;
-  const direct: string | undefined = obj?.Data?.Device?.OfdReceiptUrl;
-  const fn = obj?.Data?.Fn || obj?.Fn; const fd = obj?.Data?.Fd || obj?.Fd; const fp = obj?.Data?.Fp || obj?.Fp;
-  const url = direct && direct.length > 0 ? direct : (fn && fd != null && fp != null ? buildReceiptViewUrl(fn, fd, fp) : undefined);
-  return { type, url, pm, pt, rid } as const;
+
+  const createdAt = sale?.createdAtRw || sale?.createdAt;
+  const endDate = sale?.serviceEndDate || undefined;
+  const startBase = createdAt ? new Date(createdAt) : new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+  const endBase = endDate ? new Date(`${endDate}T23:59:59Z`) : new Date();
+  const startExt = new Date(startBase.getTime() - 24 * 60 * 60 * 1000);
+  const endExt = new Date(endBase.getTime() + 24 * 60 * 60 * 1000);
+  function formatMsk(d: Date): string {
+    const parts = new Intl.DateTimeFormat('ru-RU', { timeZone: 'Europe/Moscow', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }).formatToParts(d);
+    const map: Record<string, string> = {}; for (const p of parts) { if (p.type !== 'literal') map[p.type] = p.value; }
+    return `${map.year}-${map.month}-${map.day} ${map.hour}:${map.minute}:${map.second}`;
+  }
+  const dateFromIncl = formatMsk(startExt).replace(/\u00A0/g, ' ').trim();
+  const dateToIncl = formatMsk(endExt).replace(/\u00A0/g, ' ').trim();
+
+  async function byRid(rid: string): Promise<{ pm?: number; pt?: number; url?: string; rid?: string }> {
+    const [ext, det, min] = await Promise.all([
+      fermaGetReceiptExtended({ receiptId: String(rid), dateFromIncl, dateToIncl }, { baseUrl, authToken: token }).catch(() => ({ rawStatus: 0, rawText: '' })),
+      fermaGetReceiptStatusDetailed(String(rid), { startUtc: dateFromIncl.replace(' ', 'T'), endUtc: dateToIncl.replace(' ', 'T'), startLocal: dateFromIncl.replace(' ', 'T'), endLocal: dateToIncl.replace(' ', 'T') }, { baseUrl, authToken: token }).catch(() => ({ rawStatus: 0, rawText: '' } as any)),
+      fermaGetReceiptStatus(String(rid), { baseUrl, authToken: token }).catch(() => ({ rawStatus: 0, rawText: '' } as any)),
+    ]);
+    let pm: number | undefined; let pt: number | undefined; let url: string | undefined; let outRid: string | undefined;
+    try { const o = ext.rawText ? JSON.parse(ext.rawText) : {}; const item = o?.Data?.Receipts?.[0]?.Items?.[0]; if (item && typeof item.CalculationMethod === 'number') pm = item.CalculationMethod; } catch {}
+    try { const o = det.rawText ? JSON.parse(det.rawText) : {}; const cr = o?.Data?.[0]?.Receipt?.CustomerReceipt ?? o?.Data?.CustomerReceipt; const it = cr?.Items?.[0]; if (it && typeof it.PaymentMethod === 'number') pm = pm ?? it.PaymentMethod; const pi = Array.isArray(cr?.PaymentItems) ? cr.PaymentItems[0] : undefined; if (pi && typeof pi.PaymentType === 'number') pt = pi.PaymentType; } catch {}
+    try { const o = min.rawText ? JSON.parse(min.rawText) : {}; outRid = o?.Data?.ReceiptId || o?.ReceiptId || outRid; const direct: string | undefined = o?.Data?.Device?.OfdReceiptUrl; const fn = o?.Data?.Fn || o?.Fn; const fd = o?.Data?.Fd || o?.Fd; const fp = o?.Data?.Fp || o?.Fp; url = direct && direct.length > 0 ? direct : (fn && fd != null && fp != null ? buildReceiptViewUrl(fn, fd, fp) : url); } catch {}
+    return { pm, pt, url, rid: outRid || rid };
+  }
+
+  let rid: string | undefined = sale?.ofdFullId || sale?.ofdPrepayId || undefined;
+  if (rid) return byRid(rid);
+
+  // Fallback by InvoiceId: get minimal to resolve ReceiptId then repeat
+  try {
+    const { getInvoiceIdString } = await import('@/server/orderStore');
+    const invoiceId = await getInvoiceIdString(sale.orderId);
+    const min = await fermaGetReceiptStatus(String(invoiceId), { baseUrl, authToken: token });
+    const obj = min.rawText ? JSON.parse(min.rawText) : {};
+    const direct: string | undefined = obj?.Data?.Device?.OfdReceiptUrl; const fn = obj?.Data?.Fn || obj?.Fn; const fd = obj?.Data?.Fd || obj?.Fd; const fp = obj?.Data?.Fp || obj?.Fp;
+    const url = direct && direct.length > 0 ? direct : (fn && fd != null && fp != null ? buildReceiptViewUrl(fn, fd, fp) : undefined);
+    rid = (obj?.Data?.ReceiptId || obj?.ReceiptId) as string | undefined;
+    if (rid) {
+      const rest = await byRid(rid);
+      return { pm: rest.pm, pt: rest.pt, url: rest.url || url, rid: rest.rid || rid };
+    }
+    return { url };
+  } catch {
+    return {};
+  }
 }
 
 export async function POST(req: Request) {
@@ -38,45 +76,11 @@ export async function POST(req: Request) {
     let fixed = 0;
     for (const s of sales) {
       const patch: any = {};
+      const cls = await classifySaleWithOfd(s);
       let decided: 'prepay' | 'full' | null = null;
-      let decidedUrl: string | null = null;
-      let decidedRid: string | null = null;
-
-      // 1) Try explicit ids first
-      if ((s as any).ofdPrepayId) {
-        try {
-          const st = await getFermaStatusByKey((s as any).ofdPrepayId!);
-          if (st.url) {
-            decided = (st.pm === 1) ? 'prepay' : 'full';
-            decidedUrl = st.url;
-            decidedRid = st.rid || null;
-          }
-        } catch {}
-      }
-      if (!decided && (s as any).ofdFullId) {
-        try {
-          const st = await getFermaStatusByKey((s as any).ofdFullId!);
-          if (st.url) {
-            decided = (st.pm === 1) ? 'prepay' : 'full';
-            decidedUrl = st.url;
-            decidedRid = st.rid || null;
-          }
-        } catch {}
-      }
-
-      // 2) Fallback: InvoiceId classification
-      if (!decided) {
-        try {
-          const { getInvoiceIdString } = await import('@/server/orderStore');
-          const invoiceId = await getInvoiceIdString(s.orderId);
-          const st2 = await getFermaStatusByKey(invoiceId);
-          if (st2.url) {
-            decided = (st2.pm === 1) ? 'prepay' : 'full';
-            decidedUrl = st2.url;
-            decidedRid = st2.rid || null;
-          }
-        } catch {}
-      }
+      if (typeof cls.pm === 'number') decided = (cls.pm === 1 ? 'prepay' : 'full');
+      const decidedUrl = cls.url || null;
+      const decidedRid = cls.rid || null;
 
       // 3) Apply decision and force-clear opposite column to remove duplicates
       if (decided && decidedUrl) {
