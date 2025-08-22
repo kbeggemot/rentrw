@@ -286,7 +286,9 @@ export async function POST(req: Request) {
       if (!agentDesc) {
         return NextResponse.json({ error: 'Заполните описание ваших услуг, как Агента, в настройках' }, { status: 400 });
       }
-      (payload as Record<string, unknown>).additional_commission_ofd_description = agentDesc;
+      // Normalize description for OFD: collapse whitespace and restrict length to avoid rejection
+      const agentDescNormalized = agentDesc.replace(/[\r\n\t]+/g, ' ').replace(/\s{2,}/g, ' ').slice(0, 200);
+      (payload as Record<string, unknown>).additional_commission_ofd_description = agentDescNormalized;
       (payload as Record<string, unknown>).additional_commission_included = true;
       // Extra fields for agent sale
       if (verifiedPartnerPhone) {
