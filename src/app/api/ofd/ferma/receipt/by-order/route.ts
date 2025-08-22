@@ -38,17 +38,34 @@ export async function GET(req: Request) {
           const endBase = endDate ? new Date(`${endDate}T23:59:59Z`) : new Date();
           const startExt = new Date(startBase.getTime() - 24 * 60 * 60 * 1000); // minus 1 day
           const endExt = new Date(endBase.getTime() + 24 * 60 * 60 * 1000); // plus 1 day
-          const startUtc = startExt.toISOString().slice(0, 19);
-          const endUtc = endExt.toISOString().slice(0, 19);
+
+          function formatMsk(d: Date): string {
+            const parts = new Intl.DateTimeFormat('ru-RU', {
+              timeZone: 'Europe/Moscow',
+              year: 'numeric',
+              month: '2-digit',
+              day: '2-digit',
+              hour: '2-digit',
+              minute: '2-digit',
+              second: '2-digit',
+              hour12: false,
+            }).formatToParts(d);
+            const map: Record<string, string> = {};
+            for (const p of parts) { if (p.type !== 'literal') map[p.type] = p.value; }
+            // ru-RU returns day/month/year; rebuild YYYY-MM-DD HH:mm:ss
+            return `${map.year}-${map.month}-${map.day} ${map.hour}:${map.minute}:${map.second}`;
+          }
+          const startMsk = formatMsk(startExt);
+          const endMsk = formatMsk(endExt);
           // 1) Try extended GET first (returns CustomerReceipt)
-          const ext = await fermaGetReceiptExtended({ receiptId: String(rid), dateFromIncl: startUtc, dateToIncl: endUtc, fn: (sale as any)?.fn, zn: (sale as any)?.zn }, { baseUrl, authToken: token });
+          const ext = await fermaGetReceiptExtended({ receiptId: String(rid), dateFromIncl: startMsk, dateToIncl: endMsk, fn: (sale as any)?.fn, zn: (sale as any)?.zn }, { baseUrl, authToken: token });
           if (ext.rawStatus >= 200 && ext.rawStatus < 300 && ext.rawText && ext.rawText.indexOf('CustomerReceipt') !== -1) {
             // Also fetch minimal status to return direct link alongside extended body
             const mini = await fermaGetReceiptStatus(String(rid), { baseUrl, authToken: token });
             return NextResponse.json({ extended: ext, status: mini }, { status: ext.rawStatus });
           }
           // 2) Fallback to detailed POST
-          let byRid = await fermaGetReceiptStatusDetailed(String(rid), { startUtc, endUtc, startLocal: startUtc, endLocal: endUtc }, { baseUrl, authToken: token });
+          let byRid = await fermaGetReceiptStatusDetailed(String(rid), { startUtc: startMsk.replace(' ', 'T'), endUtc: endMsk.replace(' ', 'T'), startLocal: startMsk.replace(' ', 'T'), endLocal: endMsk.replace(' ', 'T') }, { baseUrl, authToken: token });
           if (byRid.rawStatus >= 200 && byRid.rawStatus < 300 && byRid.rawText && byRid.rawText.indexOf('CustomerReceipt') !== -1) {
             return NextResponse.json(byRid, { status: byRid.rawStatus });
           }
