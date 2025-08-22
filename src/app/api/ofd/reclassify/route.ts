@@ -60,10 +60,10 @@ async function classifySaleWithOfd(sale: any): Promise<Array<{ pm?: number; pt?:
     const obj = min.rawText ? JSON.parse(min.rawText) : {};
     const direct: string | undefined = obj?.Data?.Device?.OfdReceiptUrl; const fn = obj?.Data?.Fn || obj?.Fn; const fd = obj?.Data?.Fd || obj?.Fd; const fp = obj?.Data?.Fp || obj?.Fp;
     const url = direct && direct.length > 0 ? direct : (fn && fd != null && fp != null ? buildReceiptViewUrl(fn, fd, fp) : undefined);
-    rid = (obj?.Data?.ReceiptId || obj?.ReceiptId) as string | undefined;
-    if (rid) {
-      const rest = await byRid(rid);
-      return [{ pm: rest.pm, pt: rest.pt, url: rest.url || url, rid: rest.rid || rid }];
+    const foundRid = (obj?.Data?.ReceiptId || obj?.ReceiptId) as string | undefined;
+    if (foundRid) {
+      const rest = await byRid(foundRid);
+      return [{ pm: rest.pm, pt: rest.pt, url: rest.url || url, rid: rest.rid || foundRid }];
     }
     return url ? [{ url, rid: 'unknown' }] : [];
   } catch {
