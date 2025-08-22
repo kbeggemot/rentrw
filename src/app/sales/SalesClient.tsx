@@ -235,17 +235,30 @@ export default function SalesClient({ initial }: { initial: Sale[] }) {
   const fmtDate = (d?: string | null) => (d ? new Date(d).toLocaleDateString('ru-RU', { timeZone: 'Europe/Moscow' }) : '-');
   const [checksOpenId, setChecksOpenId] = useState<string | number | null>(null);
   const [menuOpenId, setMenuOpenId] = useState<string | number | null>(null);
-  async function openSalePage(orderId: number) {
+  const [pageCodes, setPageCodes] = useState<Record<number, string>>({});
+  async function ensurePageCode(orderId: number): Promise<string | null> {
+    if (pageCodes[orderId]) return pageCodes[orderId];
     try {
       const r = await fetch(`/api/sales/by-order/${encodeURIComponent(String(orderId))}`, { cache: 'no-store', credentials: 'include' });
       const d = await r.json();
       const code: string | undefined = d?.pageCode;
-      const url = code ? `/link/s/${encodeURIComponent(code)}` : `/link/s/${encodeURIComponent(String(orderId))}`;
-      window.open(url, '_blank');
-    } catch {
-      window.open(`/link/s/${encodeURIComponent(String(orderId))}`, '_blank');
-    }
+      if (code) {
+        setPageCodes((prev) => (prev[orderId] ? prev : { ...prev, [orderId]: code! }));
+        return code;
+      }
+    } catch {}
+    return null;
   }
+
+  useEffect(() => {
+    if (menuOpenId == null) return;
+    const sale = filtered.find((s) => s.taskId === menuOpenId);
+    if (!sale) return;
+    const fin = String(sale.status || '').toLowerCase();
+    const isFinal = fin === 'paid' || fin === 'transfered' || fin === 'transferred';
+    if (isFinal) void ensurePageCode(sale.orderId);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [menuOpenId]);
   useEffect(() => {
     const close = (e: Event) => {
       const target = e.target as HTMLElement | null;
@@ -462,9 +475,17 @@ export default function SalesClient({ initial }: { initial: Sale[] }) {
                       <IconEdit />
                     </Button>
                     <div className={`absolute right-0 mt-2 w-48 bg-white dark:bg-gray-950 border border-gray-200 dark:border-gray-800 rounded shadow-sm z-[100] ${menuOpenId === s.taskId ? '' : 'hidden'}`}>
-                      {(() => { const fin = String(s.status || '').toLowerCase(); const isFinal = fin === 'paid' || fin === 'transfered' || fin === 'transferred'; return isFinal ? (
-                        <button className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 dark:hover:bg-gray-900" onClick={() => { setMenuOpenId(null); openSalePage(s.orderId); }}>Страница продажи</button>
-                      ) : null; })()}
+                      {(() => {
+                        const fin = String(s.status || '').toLowerCase();
+                        const isFinal = fin === 'paid' || fin === 'transfered' || fin === 'transferred';
+                        if (!isFinal) return null;
+                        const code = pageCodes[s.orderId];
+                        return code ? (
+                          <a className="block px-3 py-2 text-sm font-medium text-left hover:bg-gray-50 dark:hover:bg-gray-900" href={`/link/s/${encodeURIComponent(code)}`} target="_blank" rel="noreferrer" onClick={() => setMenuOpenId(null)}>Страница продажи</a>
+                        ) : (
+                          <div className="px-3 py-2 text-sm text-gray-500">Готовим ссылку…</div>
+                        );
+                      })()}
                       {s.hidden ? (
                         <button className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 dark:hover:bg-gray-900" onClick={async () => { try { await fetch('/api/sales', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ taskId: s.taskId, hidden: false }) }); await load(false); } catch {} finally { setMenuOpenId(null); } }}>
                           Отобразить

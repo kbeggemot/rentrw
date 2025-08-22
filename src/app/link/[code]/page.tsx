@@ -414,7 +414,7 @@ export default function PublicPayPage(props: any) {
                   <div className="mt-1 p-2">
                     <div className="text-green-700 font-medium mb-2">Успешно оплачено</div>
                     <div className="grid grid-cols-[9rem_1fr] gap-y-2">
-                      {/* Покупка: всегда показываем строку, если ещё нет ссылки — «Подгружаем…» */}
+                      {/* Покупка: всегда показываем строку, пока нет ссылки — «Подгружаем…» */}
                       <>
                         <div className="text-gray-500">Чек на покупку</div>
                         {receipts.full || receipts.prepay ? (
@@ -430,7 +430,7 @@ export default function PublicPayPage(props: any) {
                           {receipts.commission ? (
                             <a className="text-black font-semibold hover:underline" href={receipts.commission!} target="_blank" rel="noreferrer">Открыть</a>
                           ) : (
-                            <div className="text-gray-600">Подтягиваем данные{dots}</div>
+                            <div className="text-gray-600">Подгружаем{dots}</div>
                           )}
                         </>
                       ) : null}
