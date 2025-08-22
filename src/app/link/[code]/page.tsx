@@ -423,14 +423,14 @@ export default function PublicPayPage(props: any) {
                           <div className="text-gray-600">Подгружаем{dots}</div>
                         )}
                       </>
-                      {/* Комиссия: показываем строку для агентских продаж */}
+                      {/* Комиссия: показываем строку для агентских продаж сразу, даже если ещё нет ссылки */}
                       {data?.isAgent ? (
                         <>
                           <div className="text-gray-500">Чек на комиссию</div>
                           {receipts.commission ? (
                             <a className="text-black font-semibold hover:underline" href={receipts.commission!} target="_blank" rel="noreferrer">Открыть</a>
                           ) : (
-                            <div className="text-gray-600">Подгружаем{dots}</div>
+                            <div className="text-gray-600">Подтягиваем данные{dots}</div>
                           )}
                         </>
                       ) : null}

@@ -235,6 +235,17 @@ export default function SalesClient({ initial }: { initial: Sale[] }) {
   const fmtDate = (d?: string | null) => (d ? new Date(d).toLocaleDateString('ru-RU', { timeZone: 'Europe/Moscow' }) : '-');
   const [checksOpenId, setChecksOpenId] = useState<string | number | null>(null);
   const [menuOpenId, setMenuOpenId] = useState<string | number | null>(null);
+  async function openSalePage(orderId: number) {
+    try {
+      const r = await fetch(`/api/sales/by-order/${encodeURIComponent(String(orderId))}`, { cache: 'no-store', credentials: 'include' });
+      const d = await r.json();
+      const code: string | undefined = d?.pageCode;
+      const url = code ? `/link/s/${encodeURIComponent(code)}` : `/link/s/${encodeURIComponent(String(orderId))}`;
+      window.open(url, '_blank');
+    } catch {
+      window.open(`/link/s/${encodeURIComponent(String(orderId))}`, '_blank');
+    }
+  }
   useEffect(() => {
     const close = (e: Event) => {
       const target = e.target as HTMLElement | null;
@@ -451,7 +462,9 @@ export default function SalesClient({ initial }: { initial: Sale[] }) {
                       <IconEdit />
                     </Button>
                     <div className={`absolute right-0 mt-2 w-48 bg-white dark:bg-gray-950 border border-gray-200 dark:border-gray-800 rounded shadow-sm z-[100] ${menuOpenId === s.taskId ? '' : 'hidden'}`}>
-                      <a className="block px-3 py-2 text-sm font-medium text-left hover:bg-gray-50 dark:hover:bg-gray-900" href={(() => { try { const sid = typeof window !== 'undefined' ? (sessionStorage.getItem(`paySid:${String(s.orderId)}`) || '') : ''; return `/link/success?sid=${encodeURIComponent(sid)}`; } catch { return `/link/success`; } })()} target="_blank" rel="noreferrer" onClick={() => setMenuOpenId(null)}>Страница продажи</a>
+                      {(() => { const fin = String(s.status || '').toLowerCase(); const isFinal = fin === 'paid' || fin === 'transfered' || fin === 'transferred'; return isFinal ? (
+                        <button className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 dark:hover:bg-gray-900" onClick={() => { setMenuOpenId(null); openSalePage(s.orderId); }}>Страница продажи</button>
+                      ) : null; })()}
                       {s.hidden ? (
                         <button className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 dark:hover:bg-gray-900" onClick={async () => { try { await fetch('/api/sales', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ taskId: s.taskId, hidden: false }) }); await load(false); } catch {} finally { setMenuOpenId(null); } }}>
                           Отобразить
