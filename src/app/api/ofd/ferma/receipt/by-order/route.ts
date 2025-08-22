@@ -72,7 +72,8 @@ export async function GET(req: Request) {
             return { receiptId: ridX, extended, detailed, status: statusObj };
           }
           const list = [ridFull, ridPrepay].filter((x): x is string => !!x);
-          const receipts = await Promise.all(list.map(triple));
+          const uniq = Array.from(new Set(list));
+          const receipts = await Promise.all(uniq.map(triple));
           if (receipts.length > 0) return NextResponse.json({ receipts }, { status: 200 });
           return NextResponse.json({ extended: null, detailed: null, status: null }, { status: 200 });
         }
