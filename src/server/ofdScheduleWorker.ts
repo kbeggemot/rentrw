@@ -5,7 +5,8 @@ import { buildFermaReceiptPayload, PAYMENT_METHOD_FULL_PAYMENT, VatRate } from '
 import { getUserOrgInn, getUserPayoutRequisites } from './userStore';
 import { getDecryptedApiToken } from './secureStore';
 import { listSales } from './taskStore';
-import { getInvoiceIdForOffset } from './orderStore';
+
+// Offset jobs are created only when invoiceIdOffset was assigned at creation
 
 type OffsetJob = {
   id: string; // `${userId}:${orderId}`
@@ -108,7 +109,10 @@ export async function runDueOffsetJobs(): Promise<void> {
             }
           } catch {}
         }
-        const invoiceIdFull = await getInvoiceIdForOffset(job.orderId);
+        const sales = await listSales(job.userId);
+        const sale = sales.find((s) => s.orderId === job.orderId);
+        const invoiceIdOffset = sale?.invoiceIdOffset || null;
+        if (!invoiceIdOffset) throw new Error('NO_INVOICE_ID_OFFSET');
         payload = buildFermaReceiptPayload({
           party: 'partner',
           partyInn: job.partnerInn,
@@ -119,7 +123,7 @@ export async function runDueOffsetJobs(): Promise<void> {
           orderId: job.orderId,
           docType: 'Income',
           buyerEmail: job.buyerEmail || null,
-          invoiceId: invoiceIdFull,
+          invoiceId: invoiceIdOffset,
           callbackUrl,
           withAdvanceOffset: true,
           paymentAgentInfo: { AgentType: 'AGENT', SupplierInn: job.partnerInn, SupplierName: partnerName || 'Исполнитель' },
@@ -128,7 +132,10 @@ export async function runDueOffsetJobs(): Promise<void> {
         const orgInn = await getUserOrgInn(job.userId);
         const orgData = await getUserPayoutRequisites(job.userId);
         if (!orgInn) throw new Error('NO_ORG_INN');
-        const invoiceIdFull = await getInvoiceIdForOffset(job.orderId);
+        const sales = await listSales(job.userId);
+        const sale = sales.find((s) => s.orderId === job.orderId);
+        const invoiceIdOffset = sale?.invoiceIdOffset || null;
+        if (!invoiceIdOffset) throw new Error('NO_INVOICE_ID_OFFSET');
         payload = buildFermaReceiptPayload({
           party: 'org',
           partyInn: orgInn,
@@ -139,7 +146,7 @@ export async function runDueOffsetJobs(): Promise<void> {
           orderId: job.orderId,
           docType: 'Income',
           buyerEmail: job.buyerEmail || null,
-          invoiceId: invoiceIdFull,
+          invoiceId: invoiceIdOffset,
           callbackUrl,
           withAdvanceOffset: true,
           paymentAgentInfo: { AgentType: 'AGENT', SupplierInn: orgInn, SupplierName: orgData.orgName || 'Организация' },

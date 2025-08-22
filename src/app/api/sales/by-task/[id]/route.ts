@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
 import { listSales } from '@/server/taskStore';
-import { getInvoiceIdString } from '@/server/orderStore';
 
 export const runtime = 'nodejs';
 
@@ -23,11 +22,7 @@ export async function GET(req: Request) {
 		const sales = await listSales(userId);
 		const sale = sales.find((s) => String(s.taskId) === String(taskId)) || null;
 		if (!sale) return NextResponse.json({ error: 'NOT_FOUND' }, { status: 404 });
-		const { getInvoiceIdForPrepay, getInvoiceIdForOffset, getInvoiceIdForFull } = await import('@/server/orderStore');
-		const invoiceIdPrepay = await getInvoiceIdForPrepay(Number(sale.orderId));
-		const invoiceIdOffset = await getInvoiceIdForOffset(Number(sale.orderId));
-		const invoiceIdFull = await getInvoiceIdForFull(Number(sale.orderId));
-		return NextResponse.json({ sale: { ...sale, invoiceIdPrepay, invoiceIdOffset, invoiceIdFull } }, { status: 200 });
+		return NextResponse.json({ sale }, { status: 200 });
 	} catch (error) {
 		const msg = error instanceof Error ? error.message : 'Server error';
 		return NextResponse.json({ error: msg }, { status: 500 });

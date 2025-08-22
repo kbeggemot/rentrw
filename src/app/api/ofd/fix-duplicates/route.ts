@@ -134,10 +134,9 @@ export async function POST(req: Request) {
         if (sale.invoiceIdPrepay) stored.push(String(sale.invoiceIdPrepay));
         if (sale.invoiceIdOffset) stored.push(String(sale.invoiceIdOffset));
         if (sale.invoiceIdFull) stored.push(String(sale.invoiceIdFull));
-        let invoiceIds: string[] = stored;
+        let invoiceIds: string[] = Array.from(new Set(stored));
         if (invoiceIds.length === 0) {
-          const { getInvoiceIdForPrepay, getInvoiceIdForOffset, getInvoiceIdForFull } = await import('@/server/orderStore');
-          invoiceIds = [await getInvoiceIdForPrepay(orderId), await getInvoiceIdForOffset(orderId), await getInvoiceIdForFull(orderId)];
+          return NextResponse.json({ ok: true, changed: false });
         }
         const receipts: string[] = [];
         for (const inv of invoiceIds) {

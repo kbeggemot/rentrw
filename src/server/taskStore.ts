@@ -86,11 +86,26 @@ export async function recordSaleOnCreate(params: {
   const now = new Date().toISOString();
   const store = await readTasks();
   if (!store.sales) store.sales = [];
-  // Pre-generate invoice ids A/B/C
-  const { getInvoiceIdForPrepay, getInvoiceIdForOffset, getInvoiceIdForFull } = await import('./orderStore');
-  const invoiceIdPrepay = await getInvoiceIdForPrepay(orderId);
-  const invoiceIdOffset = await getInvoiceIdForOffset(orderId);
-  const invoiceIdFull = await getInvoiceIdForFull(orderId);
+  // Assign InvoiceIds conditionally by Moscow date rules
+  let invoiceIdPrepay: string | null = null;
+  let invoiceIdOffset: string | null = null;
+  let invoiceIdFull: string | null = null;
+  try {
+    const mskToday = new Date().toLocaleDateString('ru-RU', { timeZone: 'Europe/Moscow' }).split('.').reverse().join('-');
+    const endDate = serviceEndDate && serviceEndDate.trim().length > 0 ? serviceEndDate.trim() : null;
+    if (endDate && endDate === mskToday) {
+      const { getInvoiceIdForFull } = await import('./orderStore');
+      invoiceIdFull = await getInvoiceIdForFull(orderId);
+    } else if (endDate && endDate !== mskToday) {
+      const { getInvoiceIdForPrepay, getInvoiceIdForOffset } = await import('./orderStore');
+      invoiceIdPrepay = await getInvoiceIdForPrepay(orderId);
+      invoiceIdOffset = await getInvoiceIdForOffset(orderId);
+    } else {
+      // If no end date provided, treat as same-day full settlement
+      const { getInvoiceIdForFull } = await import('./orderStore');
+      invoiceIdFull = await getInvoiceIdForFull(orderId);
+    }
+  } catch {}
   store.sales.push({
     taskId,
     orderId,

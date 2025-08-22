@@ -59,13 +59,8 @@ async function classifySaleWithOfd(sale: any): Promise<Array<{ pm?: number; pt?:
     if (sale?.invoiceIdOffset) storedIds.push(String(sale.invoiceIdOffset));
     if (sale?.invoiceIdFull) storedIds.push(String(sale.invoiceIdFull));
     const uniqStored = Array.from(new Set(storedIds));
-    const idsToTry: string[] = [];
-    if (uniqStored.length > 0) {
-      idsToTry.push(...uniqStored);
-    } else {
-      const { getInvoiceIdForPrepay, getInvoiceIdForOffset, getInvoiceIdForFull } = await import('@/server/orderStore');
-      idsToTry.push(await getInvoiceIdForPrepay(sale.orderId), await getInvoiceIdForOffset(sale.orderId), await getInvoiceIdForFull(sale.orderId));
-    }
+    const idsToTry: string[] = uniqStored;
+    if (idsToTry.length === 0) return [];
     for (const inv of idsToTry) {
       const min = await fermaGetReceiptStatus(String(inv), { baseUrl, authToken: token });
       const obj = min.rawText ? JSON.parse(min.rawText) : {};

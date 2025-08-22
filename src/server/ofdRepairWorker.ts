@@ -3,7 +3,6 @@ import { fermaGetAuthTokenCached, fermaCreateReceipt, fermaGetReceiptStatus, bui
 import { buildFermaReceiptPayload, PAYMENT_METHOD_FULL_PAYMENT, PAYMENT_METHOD_PREPAY_FULL } from '@/app/api/ofd/ferma/build-payload';
 import { getUserOrgInn, getUserPayoutRequisites } from './userStore';
 import { getDecryptedApiToken } from './secureStore';
-import { getInvoiceIdForFull, getInvoiceIdForPrepay } from './orderStore';
 
 let started = false;
 let timer: NodeJS.Timer | null = null;
@@ -11,8 +10,9 @@ let timer: NodeJS.Timer | null = null;
 /**
  * Periodically scans sales for missing OFD receipts and repairs them.
  * Cases:
- * - isToday and status final: create full settlement (Income) if missing
- * - not today and status final: create prepayment (IncomePrepayment) if missing
+ * - isToday and status final: create full settlement (Income) if missing and invoiceIdFull exists
+ * - not today and status final: create prepayment (IncomePrepayment) if missing and invoiceIdPrepay exists
+ * - DO NOT create offset here; it is handled by the scheduler at 12:00 MSK
  */
 export function startOfdRepairWorker(): void {
   if (started) return;
@@ -39,7 +39,6 @@ export async function repairUserSales(userId: string): Promise<void> {
   const baseUrl = process.env.FERMA_BASE_URL || 'https://ferma.ofd.ru/';
   const ofdToken = await fermaGetAuthTokenCached(process.env.FERMA_LOGIN || '', process.env.FERMA_PASSWORD || '', { baseUrl });
   const defaultEmail = process.env.OFD_DEFAULT_EMAIL || process.env.DEFAULT_RECEIPT_EMAIL || 'ofd@rockethumans.com';
-  const mskToday = new Date().toLocaleDateString('ru-RU', { timeZone: 'Europe/Moscow' }).split('.').reverse().join('-');
   for (const s of sales) {
     const status = String(s.status || '').toLowerCase();
     const final = status === 'paid' || status === 'transfered' || status === 'transferred';
@@ -50,26 +49,24 @@ export async function repairUserSales(userId: string): Promise<void> {
     const isToday = Boolean(createdDate && endDate && createdDate === endDate);
     // Full settlement today
     if (isToday) {
-      if (!s.ofdFullId && !s.ofdFullUrl) {
+      if (!s.ofdFullId && !s.ofdFullUrl && s.invoiceIdFull) {
         try {
           // Idempotency pre-check: see if OFD already has receipt by stored InvoiceId (C)
           const invoiceIdFull = s.invoiceIdFull;
-          if (invoiceIdFull) {
-            try {
-              const st = await fermaGetReceiptStatus(String(invoiceIdFull), { baseUrl, authToken: ofdToken });
-              const obj = st.rawText ? JSON.parse(st.rawText) : {};
-              const fn = obj?.Data?.Fn || obj?.Fn;
-              const fd = obj?.Data?.Fd || obj?.Fd;
-              const fp = obj?.Data?.Fp || obj?.Fp;
-              const rid = obj?.Data?.ReceiptId || obj?.ReceiptId;
-              if ((fn && fd != null && fp != null) || rid) {
-                const url = fn && fd != null && fp != null ? buildReceiptViewUrl(fn, fd, fp) : undefined;
-                try { (global as any).__OFD_SOURCE__ = 'repair_worker'; } catch {}
-                await updateSaleOfdUrlsByOrderId(userId, s.orderId, { ofdFullId: rid || null, ofdFullUrl: url || null });
-                continue; // already exists -> skip creation
-              }
-            } catch {}
-          }
+          try {
+            const st = await fermaGetReceiptStatus(String(invoiceIdFull), { baseUrl, authToken: ofdToken });
+            const obj = st.rawText ? JSON.parse(st.rawText) : {};
+            const fn = obj?.Data?.Fn || obj?.Fn;
+            const fd = obj?.Data?.Fd || obj?.Fd;
+            const fp = obj?.Data?.Fp || obj?.Fp;
+            const rid = obj?.Data?.ReceiptId || obj?.ReceiptId;
+            if ((fn && fd != null && fp != null) || rid) {
+              const url = fn && fd != null && fp != null ? buildReceiptViewUrl(fn, fd, fp) : undefined;
+              try { (global as any).__OFD_SOURCE__ = 'repair_worker'; } catch {}
+              await updateSaleOfdUrlsByOrderId(userId, s.orderId, { ofdFullId: rid || null, ofdFullUrl: url || null });
+              continue; // already exists -> skip creation
+            }
+          } catch {}
           // create new with stored InvoiceId C
           if (s.isAgent) {
             // need partner inn/name from RW
@@ -84,8 +81,7 @@ export async function repairUserSales(userId: string): Promise<void> {
             const partnerInn = (task?.executor?.inn as string | undefined) ?? undefined;
             if (!partnerInn) continue;
             const partnerName = (task?.executor && [task.executor.last_name, task.executor.first_name, task.executor.second_name].filter(Boolean).join(' ').trim()) || undefined;
-            // reuse invoiceIdFull from above variable
-            const payload = buildFermaReceiptPayload({ party: 'partner', partyInn: partnerInn, description: s.description || 'Оплата услуги', amountRub: s.isAgent ? Math.max(0, s.amountGrossRub - s.retainedCommissionRub) : s.amountGrossRub, vatRate: (s.vatRate as any) || 'none', methodCode: PAYMENT_METHOD_FULL_PAYMENT, orderId: s.orderId, docType: 'Income', buyerEmail: s.clientEmail || defaultEmail, invoiceId: (s.invoiceIdFull || (await (await import('./orderStore')).getInvoiceIdForFull(s.orderId))), callbackUrl: undefined, paymentAgentInfo: { AgentType: 'AGENT', SupplierInn: partnerInn, SupplierName: partnerName || 'Исполнитель' } });
+            const payload = buildFermaReceiptPayload({ party: 'partner', partyInn: partnerInn, description: s.description || 'Оплата услуги', amountRub: s.isAgent ? Math.max(0, s.amountGrossRub - s.retainedCommissionRub) : s.amountGrossRub, vatRate: (s.vatRate as any) || 'none', methodCode: PAYMENT_METHOD_FULL_PAYMENT, orderId: s.orderId, docType: 'Income', buyerEmail: s.clientEmail || defaultEmail, invoiceId: s.invoiceIdFull, callbackUrl: undefined, paymentAgentInfo: { AgentType: 'AGENT', SupplierInn: partnerInn, SupplierName: partnerName || 'Исполнитель' } });
             const created = await fermaCreateReceipt(payload, { baseUrl, authToken: ofdToken });
             try { (global as any).__OFD_SOURCE__ = 'repair_worker'; } catch {}
             await updateSaleOfdUrlsByOrderId(userId, s.orderId, { ofdFullId: created.id || null });
@@ -93,8 +89,7 @@ export async function repairUserSales(userId: string): Promise<void> {
             const orgInn = await getUserOrgInn(userId);
             const orgData = await getUserPayoutRequisites(userId);
             if (!orgInn) continue;
-            // reuse invoiceIdFull
-            const payload = buildFermaReceiptPayload({ party: 'org', partyInn: orgInn, description: s.description || 'Оплата услуги', amountRub: s.amountGrossRub, vatRate: (s.vatRate as any) || 'none', methodCode: PAYMENT_METHOD_FULL_PAYMENT, orderId: s.orderId, docType: 'Income', buyerEmail: s.clientEmail || defaultEmail, invoiceId: (s.invoiceIdFull || (await (await import('./orderStore')).getInvoiceIdForFull(s.orderId))), callbackUrl: undefined, paymentAgentInfo: { AgentType: 'AGENT', SupplierInn: orgInn, SupplierName: orgData.orgName || 'Организация' } });
+            const payload = buildFermaReceiptPayload({ party: 'org', partyInn: orgInn, description: s.description || 'Оплата услуги', amountRub: s.amountGrossRub, vatRate: (s.vatRate as any) || 'none', methodCode: PAYMENT_METHOD_FULL_PAYMENT, orderId: s.orderId, docType: 'Income', buyerEmail: s.clientEmail || defaultEmail, invoiceId: s.invoiceIdFull, callbackUrl: undefined, paymentAgentInfo: { AgentType: 'AGENT', SupplierInn: orgInn, SupplierName: orgData.orgName || 'Организация' } });
             const created = await fermaCreateReceipt(payload, { baseUrl, authToken: ofdToken });
             try { (global as any).__OFD_SOURCE__ = 'repair_worker'; } catch {}
             await updateSaleOfdUrlsByOrderId(userId, s.orderId, { ofdFullId: created.id || null });
@@ -104,24 +99,22 @@ export async function repairUserSales(userId: string): Promise<void> {
       continue;
     }
     // Prepayment receipt missing
-    if (!s.ofdPrepayId && !s.ofdUrl) {
+    if (!s.ofdPrepayId && !s.ofdUrl && s.invoiceIdPrepay) {
       try {
-        const invoiceIdFull = s.invoiceIdPrepay;
+        const invoiceIdPrepay = s.invoiceIdPrepay;
         // Idempotency pre-check: maybe prepay already exists by stored invoice A
         try {
-          if (invoiceIdFull) {
-            const st = await fermaGetReceiptStatus(String(invoiceIdFull), { baseUrl, authToken: ofdToken });
-            const obj = st.rawText ? JSON.parse(st.rawText) : {};
-            const fn = obj?.Data?.Fn || obj?.Fn;
-            const fd = obj?.Data?.Fd || obj?.Fd;
-            const fp = obj?.Data?.Fp || obj?.Fp;
-            const rid = obj?.Data?.ReceiptId || obj?.ReceiptId;
-            if ((fn && fd != null && fp != null) || rid) {
-              const url = fn && fd != null && fp != null ? buildReceiptViewUrl(fn, fd, fp) : undefined;
-              try { (global as any).__OFD_SOURCE__ = 'repair_worker'; } catch {}
-              await updateSaleOfdUrlsByOrderId(userId, s.orderId, { ofdPrepayId: rid || null, ofdUrl: url || null });
-              continue;
-            }
+          const st = await fermaGetReceiptStatus(String(invoiceIdPrepay), { baseUrl, authToken: ofdToken });
+          const obj = st.rawText ? JSON.parse(st.rawText) : {};
+          const fn = obj?.Data?.Fn || obj?.Fn;
+          const fd = obj?.Data?.Fd || obj?.Fd;
+          const fp = obj?.Data?.Fp || obj?.Fp;
+          const rid = obj?.Data?.ReceiptId || obj?.ReceiptId;
+          if ((fn && fd != null && fp != null) || rid) {
+            const url = fn && fd != null && fp != null ? buildReceiptViewUrl(fn, fd, fp) : undefined;
+            try { (global as any).__OFD_SOURCE__ = 'repair_worker'; } catch {}
+            await updateSaleOfdUrlsByOrderId(userId, s.orderId, { ofdPrepayId: rid || null, ofdUrl: url || null });
+            continue;
           }
         } catch {}
         // create with stored A
@@ -137,8 +130,7 @@ export async function repairUserSales(userId: string): Promise<void> {
           const partnerInn = (task?.executor?.inn as string | undefined) ?? undefined;
           if (!partnerInn) continue;
           const partnerName = (task?.executor && [task.executor.last_name, task.executor.first_name, task.executor.second_name].filter(Boolean).join(' ').trim()) || undefined;
-          // invoiceIdFull already computed
-          const payload = buildFermaReceiptPayload({ party: 'partner', partyInn: partnerInn, description: s.description || 'Оплата услуги', amountRub: Math.max(0, s.amountGrossRub - s.retainedCommissionRub), vatRate: (s.vatRate as any) || 'none', methodCode: PAYMENT_METHOD_PREPAY_FULL, orderId: s.orderId, docType: 'IncomePrepayment', buyerEmail: s.clientEmail || defaultEmail, invoiceId: (s.invoiceIdPrepay || (await (await import('./orderStore')).getInvoiceIdForPrepay(s.orderId))), callbackUrl: undefined, withPrepaymentItem: true, paymentAgentInfo: { AgentType: 'AGENT', SupplierInn: partnerInn, SupplierName: partnerName || 'Исполнитель' } });
+          const payload = buildFermaReceiptPayload({ party: 'partner', partyInn: partnerInn, description: s.description || 'Оплата услуги', amountRub: Math.max(0, s.amountGrossRub - s.retainedCommissionRub), vatRate: (s.vatRate as any) || 'none', methodCode: PAYMENT_METHOD_PREPAY_FULL, orderId: s.orderId, docType: 'IncomePrepayment', buyerEmail: s.clientEmail || defaultEmail, invoiceId: s.invoiceIdPrepay, callbackUrl: undefined, withPrepaymentItem: true, paymentAgentInfo: { AgentType: 'AGENT', SupplierInn: partnerInn, SupplierName: partnerName || 'Исполнитель' } });
           const created = await fermaCreateReceipt(payload, { baseUrl, authToken: ofdToken });
           try { (global as any).__OFD_SOURCE__ = 'repair_worker'; } catch {}
           await updateSaleOfdUrlsByOrderId(userId, s.orderId, { ofdPrepayId: created.id || null });
@@ -146,8 +138,7 @@ export async function repairUserSales(userId: string): Promise<void> {
           const orgInn = await getUserOrgInn(userId);
           const orgData = await getUserPayoutRequisites(userId);
           if (!orgInn) continue;
-          // invoiceIdFull already computed
-          const payload = buildFermaReceiptPayload({ party: 'org', partyInn: orgInn, description: s.description || 'Оплата услуги', amountRub: s.amountGrossRub, vatRate: (s.vatRate as any) || 'none', methodCode: PAYMENT_METHOD_PREPAY_FULL, orderId: s.orderId, docType: 'IncomePrepayment', buyerEmail: s.clientEmail || defaultEmail, invoiceId: (s.invoiceIdPrepay || (await (await import('./orderStore')).getInvoiceIdForPrepay(s.orderId))), callbackUrl: undefined, withPrepaymentItem: true, paymentAgentInfo: { AgentType: 'AGENT', SupplierInn: orgInn, SupplierName: orgData.orgName || 'Организация' } });
+          const payload = buildFermaReceiptPayload({ party: 'org', partyInn: orgInn, description: s.description || 'Оплата услуги', amountRub: s.amountGrossRub, vatRate: (s.vatRate as any) || 'none', methodCode: PAYMENT_METHOD_PREPAY_FULL, orderId: s.orderId, docType: 'IncomePrepayment', buyerEmail: s.clientEmail || defaultEmail, invoiceId: s.invoiceIdPrepay, callbackUrl: undefined, withPrepaymentItem: true, paymentAgentInfo: { AgentType: 'AGENT', SupplierInn: orgInn, SupplierName: orgData.orgName || 'Организация' } });
           const created = await fermaCreateReceipt(payload, { baseUrl, authToken: ofdToken });
           try { (global as any).__OFD_SOURCE__ = 'repair_worker'; } catch {}
           await updateSaleOfdUrlsByOrderId(userId, s.orderId, { ofdPrepayId: created.id || null });

@@ -169,7 +169,7 @@ export async function GET(req: Request) {
                 }
               }
               // Fallback: ONLY use stored InvoiceId variants when a receipt link is missing
-              if ((!s.ofdFullUrl || !s.ofdUrl) && (s as any).invoiceIdPrepay || (s as any).invoiceIdOffset || (s as any).invoiceIdFull) {
+              if ((!s.ofdFullUrl || !s.ofdUrl) && ((s as any).invoiceIdPrepay || (s as any).invoiceIdOffset || (s as any).invoiceIdFull)) {
                 try {
                   const baseUrl = process.env.FERMA_BASE_URL || 'https://ferma.ofd.ru/';
                   const tokenOfd = await fermaGetAuthTokenCached(process.env.FERMA_LOGIN || '', process.env.FERMA_PASSWORD || '', { baseUrl });
@@ -183,7 +183,6 @@ export async function GET(req: Request) {
                     const url = direct && direct.length > 0 ? direct : (fn && fd != null && fp != null ? buildReceiptViewUrl(fn, fd, fp) : undefined);
                     if (url) {
                       const patch2: any = {};
-                      // heuristic: if inv ends with -C → full, -A → prepay, -B → full (offset)
                       if (/\-C\-?\d+$/.test(inv) || /\-B\-?\d+$/.test(inv)) { patch2.ofdFullUrl = url; if (rid) patch2.ofdFullId = rid; }
                       else { patch2.ofdUrl = url; if (rid) patch2.ofdPrepayId = rid; }
                       await updateSaleOfdUrlsByOrderId(userId, s.orderId, patch2);
