@@ -109,7 +109,7 @@ export function AuthForm() {
         setPasswordError('Пароли не совпадают');
         return;
       }
-      const ok = /.+@.+\..+/.test(email.trim());
+      const ok = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/.test(email.trim());
       if (!ok) {
         setLoading(false);
         setPasswordError(null);

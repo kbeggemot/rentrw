@@ -615,6 +615,8 @@ function AcceptPaymentContent() {
         <Input
           label="Email покупателя (необязательно)"
           type="email"
+          inputMode="email"
+          pattern="^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$"
           placeholder="user@example.com"
           value={buyerEmail}
           onChange={(e) => setBuyerEmail(e.target.value)}

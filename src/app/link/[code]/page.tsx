@@ -135,7 +135,7 @@ export default function PublicPayPage(props: any) {
 
   // helpers
   const mskToday = () => new Date().toLocaleDateString('ru-RU', { timeZone: 'Europe/Moscow' }).split('.').reverse().join('-');
-  const isValidEmail = (s: string) => /.+@.+\..+/.test(s.trim());
+  const isValidEmail = (s: string) => /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/.test(s.trim());
 
   const canPay = useMemo(() => {
     if (!data) return false;
@@ -372,7 +372,7 @@ export default function PublicPayPage(props: any) {
         </div>
         <div className="mb-3">
           <label className="block text-sm text-gray-600 mb-1">Ваш email</label>
-          <input className="w-full sm:w-80 rounded-lg border px-2 h-9 text-sm" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="name@example.com" />
+          <input className="w-full sm:w-80 rounded-lg border px-2 h-9 text-sm" type="email" inputMode="email" pattern="^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="name@example.com" />
           <div className="text-xs text-gray-500 mt-1">Отправим чек на эту почту</div>
         </div>
         <div className="mb-4">

@@ -36,7 +36,7 @@ export async function POST(req: Request) {
     const userId = (mc ? decodeURIComponent(mc[1]) : undefined) || req.headers.get('x-user-id') || 'default';
     const body = await req.json().catch(() => null);
     const incoming: string | undefined = body?.email;
-    const emailRegex = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+    const emailRegex = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/;
     const isMasked = (v: string) => v.includes('*');
     let targetEmail: string | null = null;
     if (incoming) {

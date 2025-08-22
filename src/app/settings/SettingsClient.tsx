@@ -322,6 +322,8 @@ export default function SettingsClient({ initial, userId }: { initial: SettingsP
             <div className="flex items-center gap-3">
               <Input
                 type="email"
+                inputMode="email"
+                pattern="^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$"
                 placeholder="user@example.com"
                 value={emailValue}
                 onChange={(e) => setEmailValue(e.target.value)}
