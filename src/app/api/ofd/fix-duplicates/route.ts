@@ -43,6 +43,23 @@ export async function POST(req: Request) {
     const dateFromIncl = fmtMsk(startExt);
     const dateToIncl = fmtMsk(endExt);
 
+    function extractReceiptIdsFromStatus(rawText: string): string[] {
+      const ids: string[] = [];
+      try {
+        const obj = rawText ? JSON.parse(rawText) : {};
+        const rid1 = obj?.Data?.ReceiptId || obj?.ReceiptId;
+        if (rid1) ids.push(String(rid1));
+        const list = obj?.Data?.Receipts || obj?.Receipts;
+        if (Array.isArray(list)) {
+          for (const it of list) {
+            const rid = it?.ReceiptId || it?.Id || it?.id;
+            if (rid) ids.push(String(rid));
+          }
+        }
+      } catch {}
+      return Array.from(new Set(ids));
+    }
+
     async function classifyByRid(rid: string): Promise<{ pm?: number; pt?: number; url?: string; rid: string }> {
       const [ext, det, min] = await Promise.all([
         fermaGetReceiptExtended({ receiptId: String(rid), dateFromIncl, dateToIncl }, { baseUrl, authToken: token }).catch(() => ({ rawText: '' })),
@@ -57,19 +74,39 @@ export async function POST(req: Request) {
     }
 
     let changed = false;
+    const ensureCleanMismatch = async (cls: { pm?: number; url?: string; rid: string }) => {
+      if (!strict) return;
+      if (!cls.url || typeof cls.pm !== 'number') return;
+      // чистим только ту колонку, где контент не соответствует типу
+      if (cls.pm === 1) {
+        // это предоплата — удалим из полного, если там лежит тот же чек
+        if (sale.ofdFullUrl === cls.url || sale.ofdFullId === cls.rid) {
+          try { (global as any).__OFD_SOURCE__ = 'fix_duplicates'; } catch {}
+          await updateSaleOfdUrlsByOrderId(userId, orderId, { ofdFullUrl: sale.ofdFullUrl === cls.url ? null : sale.ofdFullUrl, ofdFullId: sale.ofdFullId === cls.rid ? null : sale.ofdFullId });
+          changed = true;
+        }
+      } else if (cls.pm === 4) {
+        // это полный — удалим из предоплаты, если там лежит тот же чек
+        if (sale.ofdUrl === cls.url || sale.ofdPrepayId === cls.rid) {
+          try { (global as any).__OFD_SOURCE__ = 'fix_duplicates'; } catch {}
+          await updateSaleOfdUrlsByOrderId(userId, orderId, { ofdUrl: sale.ofdUrl === cls.url ? null : sale.ofdUrl, ofdPrepayId: sale.ofdPrepayId === cls.rid ? null : sale.ofdPrepayId });
+          changed = true;
+        }
+      }
+    };
     // Обрабатываем id предоплаты
     if (sale.ofdPrepayId) {
       const cls = await classifyByRid(sale.ofdPrepayId);
       if (cls.pm === 1) {
         // должен быть в предоплате
-        if (cls.url && sale.ofdUrl !== cls.url) { try { (global as any).__OFD_SOURCE__ = 'fix_duplicates'; } catch {} await updateSaleOfdUrlsByOrderId(userId, orderId, { ofdUrl: cls.url, ofdPrepayId: sale.ofdPrepayId }); changed = true; }
-        // если лежит в полном — при strict затираем неверную колонку
-        if (strict && sale.ofdFullUrl === cls.url) { try { (global as any).__OFD_SOURCE__ = 'fix_duplicates'; } catch {} await updateSaleOfdUrlsByOrderId(userId, orderId, { ofdFullUrl: null, ofdFullId: sale.ofdFullId === sale.ofdPrepayId ? null : sale.ofdFullId }); changed = true; }
+        if (cls.url && sale.ofdUrl !== cls.url) { try { (global as any).__OFD_SOURCE__ = 'fix_duplicates'; } catch {} await updateSaleOfdUrlsByOrderId(userId, orderId, { ofdUrl: cls.url, ofdPrepayId: sale.ofdPrepayId || cls.rid }); changed = true; }
+        await ensureCleanMismatch({ pm: 1, url: cls.url, rid: cls.rid });
       } else if (cls.pm === 4) {
         // неверно записан как предоплата — перенесём в полный; при strict удаляем из предоплаты
         if (cls.url) {
           try { (global as any).__OFD_SOURCE__ = 'fix_duplicates'; } catch {}
-          await updateSaleOfdUrlsByOrderId(userId, orderId, { ofdFullUrl: cls.url, ofdFullId: sale.ofdFullId || sale.ofdPrepayId, ...(strict ? { ofdUrl: null, ofdPrepayId: sale.ofdPrepayId === sale.ofdFullId ? null : sale.ofdPrepayId } : {}) });
+          await updateSaleOfdUrlsByOrderId(userId, orderId, { ofdFullUrl: cls.url, ofdFullId: sale.ofdFullId || cls.rid });
+          await ensureCleanMismatch({ pm: 4, url: cls.url, rid: cls.rid });
           changed = true;
         }
       }
@@ -78,38 +115,41 @@ export async function POST(req: Request) {
     if (sale.ofdFullId) {
       const cls = await classifyByRid(sale.ofdFullId);
       if (cls.pm === 4) {
-        if (cls.url && sale.ofdFullUrl !== cls.url) { try { (global as any).__OFD_SOURCE__ = 'fix_duplicates'; } catch {} await updateSaleOfdUrlsByOrderId(userId, orderId, { ofdFullUrl: cls.url, ofdFullId: sale.ofdFullId }); changed = true; }
-        if (strict && sale.ofdUrl === cls.url) { try { (global as any).__OFD_SOURCE__ = 'fix_duplicates'; } catch {} await updateSaleOfdUrlsByOrderId(userId, orderId, { ofdUrl: null, ofdPrepayId: sale.ofdPrepayId === sale.ofdFullId ? null : sale.ofdPrepayId }); changed = true; }
+        if (cls.url && sale.ofdFullUrl !== cls.url) { try { (global as any).__OFD_SOURCE__ = 'fix_duplicates'; } catch {} await updateSaleOfdUrlsByOrderId(userId, orderId, { ofdFullUrl: cls.url, ofdFullId: sale.ofdFullId || cls.rid }); changed = true; }
+        await ensureCleanMismatch({ pm: 4, url: cls.url, rid: cls.rid });
       } else if (cls.pm === 1) {
         if (cls.url) {
           try { (global as any).__OFD_SOURCE__ = 'fix_duplicates'; } catch {}
-          await updateSaleOfdUrlsByOrderId(userId, orderId, { ofdUrl: cls.url, ofdPrepayId: sale.ofdPrepayId || sale.ofdFullId, ...(strict ? { ofdFullUrl: null, ofdFullId: sale.ofdFullId === sale.ofdPrepayId ? null : sale.ofdFullId } : {}) });
+          await updateSaleOfdUrlsByOrderId(userId, orderId, { ofdUrl: cls.url, ofdPrepayId: sale.ofdPrepayId || cls.rid });
+          await ensureCleanMismatch({ pm: 1, url: cls.url, rid: cls.rid });
           changed = true;
         }
       }
     }
 
-    // Если один из ReceiptId отсутствует — попробуем восстановить его по InvoiceId
-    if (!sale.ofdPrepayId || !sale.ofdFullId) {
+    // Если ReceiptId отсутствуют или дублируются — попробуем восстановить(найти все) по InvoiceId (получим массив)
+    if (!sale.ofdPrepayId || !sale.ofdFullId || sale.ofdPrepayId === sale.ofdFullId) {
       try {
         const { getInvoiceIdString } = await import('@/server/orderStore');
         const invoiceId = await getInvoiceIdString(orderId);
         const resp = await fermaGetReceiptStatus(String(invoiceId), { baseUrl, authToken: token });
-        const obj = resp.rawText ? JSON.parse(resp.rawText) : {};
-        const foundRid: string | undefined = obj?.Data?.ReceiptId || obj?.ReceiptId;
-        if (foundRid && foundRid !== sale.ofdPrepayId && foundRid !== sale.ofdFullId) {
-          const cls = await classifyByRid(foundRid);
+        const candidates = extractReceiptIdsFromStatus(resp.rawText || '')
+          .filter((rid) => rid && rid !== sale.ofdPrepayId && rid !== sale.ofdFullId);
+        for (const rid of candidates) {
+          const cls = await classifyByRid(rid);
           if (cls.pm === 1) {
-            const patch: any = { ofdPrepayId: foundRid };
+            const patch: any = { ofdPrepayId: rid };
             if (cls.url) patch.ofdUrl = cls.url;
             try { (global as any).__OFD_SOURCE__ = 'fix_duplicates'; } catch {}
             await updateSaleOfdUrlsByOrderId(userId, orderId, patch);
+            await ensureCleanMismatch({ pm: 1, url: cls.url, rid });
             changed = true;
           } else if (cls.pm === 4) {
-            const patch: any = { ofdFullId: foundRid };
+            const patch: any = { ofdFullId: rid };
             if (cls.url) patch.ofdFullUrl = cls.url;
             try { (global as any).__OFD_SOURCE__ = 'fix_duplicates'; } catch {}
             await updateSaleOfdUrlsByOrderId(userId, orderId, patch);
+            await ensureCleanMismatch({ pm: 4, url: cls.url, rid });
             changed = true;
           }
         }
