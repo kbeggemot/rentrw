@@ -168,28 +168,27 @@ export async function GET(req: Request) {
                   await updateSaleOfdUrlsByOrderId(userId, s.orderId, patch);
                 }
               }
-              // Fallback: try by InvoiceId when a receipt link is missing
-              if (!s.ofdFullUrl || !s.ofdUrl) {
+              // Fallback: ONLY use stored InvoiceId variants when a receipt link is missing
+              if ((!s.ofdFullUrl || !s.ofdUrl) && (s as any).invoiceIdPrepay || (s as any).invoiceIdOffset || (s as any).invoiceIdFull) {
                 try {
-                  const { getInvoiceIdString } = await import('@/server/orderStore');
-                  const invoiceIdFull = await getInvoiceIdString(s.orderId);
                   const baseUrl = process.env.FERMA_BASE_URL || 'https://ferma.ofd.ru/';
                   const tokenOfd = await fermaGetAuthTokenCached(process.env.FERMA_LOGIN || '', process.env.FERMA_PASSWORD || '', { baseUrl });
-                  const st = await fermaGetReceiptStatus(invoiceIdFull, { baseUrl, authToken: tokenOfd });
-                  const obj = st.rawText ? JSON.parse(st.rawText) : {};
-                  const direct = obj?.Data?.Device?.OfdReceiptUrl as string | undefined;
-                  const rid = obj?.Data?.ReceiptId as string | undefined;
-                  const fn = obj?.Data?.Fn || obj?.Fn; const fd = obj?.Data?.Fd || obj?.Fd; const fp = obj?.Data?.Fp || obj?.Fp;
-                  const url = direct && direct.length > 0 ? direct : (fn && fd != null && fp != null ? buildReceiptViewUrl(fn, fd, fp) : undefined);
-                  if (url) {
-                    const mskToday = new Date().toLocaleDateString('ru-RU', { timeZone: 'Europe/Moscow' }).split('.').reverse().join('-');
-                    const endStr = (s.serviceEndDate || '') as string;
-                    // если дата окончания услуги уже наступила (<= сегодня по МСК) — считаем это полным расчётом
-                    const isFull = endStr && endStr <= mskToday;
-                    const patch2: any = {};
-                    if (isFull) { patch2.ofdFullUrl = url; if (rid) patch2.ofdFullId = rid; }
-                    else { patch2.ofdUrl = url; if (rid) patch2.ofdPrepayId = rid; }
-                    await updateSaleOfdUrlsByOrderId(userId, s.orderId, patch2);
+                  const invoiceIds = [s.invoiceIdPrepay, s.invoiceIdOffset, s.invoiceIdFull].filter(Boolean) as string[];
+                  for (const inv of invoiceIds) {
+                    const st = await fermaGetReceiptStatus(inv, { baseUrl, authToken: tokenOfd });
+                    const obj = st.rawText ? JSON.parse(st.rawText) : {};
+                    const direct = obj?.Data?.Device?.OfdReceiptUrl as string | undefined;
+                    const rid = obj?.Data?.ReceiptId as string | undefined;
+                    const fn = obj?.Data?.Fn || obj?.Fn; const fd = obj?.Data?.Fd || obj?.Fd; const fp = obj?.Data?.Fp || obj?.Fp;
+                    const url = direct && direct.length > 0 ? direct : (fn && fd != null && fp != null ? buildReceiptViewUrl(fn, fd, fp) : undefined);
+                    if (url) {
+                      const patch2: any = {};
+                      // heuristic: if inv ends with -C → full, -A → prepay, -B → full (offset)
+                      if (/\-C\-?\d+$/.test(inv) || /\-B\-?\d+$/.test(inv)) { patch2.ofdFullUrl = url; if (rid) patch2.ofdFullId = rid; }
+                      else { patch2.ofdUrl = url; if (rid) patch2.ofdPrepayId = rid; }
+                      await updateSaleOfdUrlsByOrderId(userId, s.orderId, patch2);
+                      break;
+                    }
                   }
                 } catch {}
               }

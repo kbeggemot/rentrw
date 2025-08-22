@@ -29,8 +29,16 @@ export async function GET(req: Request) {
         if ((s as any).ofdFullId) {
           st = await fermaGetReceiptStatus((s as any).ofdFullId!, { baseUrl, authToken: tokenOfd });
         } else {
-          const invoiceId = await getInvoiceIdString(s.orderId);
-          st = await fermaGetReceiptStatus(invoiceId, { baseUrl, authToken: tokenOfd });
+          const { getInvoiceIdForPrepay, getInvoiceIdForOffset, getInvoiceIdForFull } = await import('@/server/orderStore');
+          const invoiceIds = [await getInvoiceIdForPrepay(s.orderId), await getInvoiceIdForOffset(s.orderId), await getInvoiceIdForFull(s.orderId)];
+          let found: any = null;
+          for (const inv of invoiceIds) {
+            const resp = await fermaGetReceiptStatus(inv, { baseUrl, authToken: tokenOfd });
+            const obj = resp.rawText ? JSON.parse(resp.rawText) : {};
+            const hasAny = Boolean(obj?.Data?.Device?.OfdReceiptUrl) || Boolean(obj?.Data?.Fn);
+            if (hasAny) { found = resp; break; }
+          }
+          st = found || await fermaGetReceiptStatus(await getInvoiceIdForFull(s.orderId), { baseUrl, authToken: tokenOfd });
         }
         const obj = st.rawText ? JSON.parse(st.rawText) : {};
         const direct = obj?.Data?.Device?.OfdReceiptUrl as string | undefined;

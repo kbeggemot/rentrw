@@ -54,18 +54,31 @@ async function classifySaleWithOfd(sale: any): Promise<Array<{ pm?: number; pt?:
 
   // Fallback by InvoiceId: get minimal to resolve ReceiptId then repeat
   try {
-    const { getInvoiceIdString } = await import('@/server/orderStore');
-    const invoiceId = await getInvoiceIdString(sale.orderId);
-    const min = await fermaGetReceiptStatus(String(invoiceId), { baseUrl, authToken: token });
-    const obj = min.rawText ? JSON.parse(min.rawText) : {};
-    const direct: string | undefined = obj?.Data?.Device?.OfdReceiptUrl; const fn = obj?.Data?.Fn || obj?.Fn; const fd = obj?.Data?.Fd || obj?.Fd; const fp = obj?.Data?.Fp || obj?.Fp;
-    const url = direct && direct.length > 0 ? direct : (fn && fd != null && fp != null ? buildReceiptViewUrl(fn, fd, fp) : undefined);
-    const foundRid = (obj?.Data?.ReceiptId || obj?.ReceiptId) as string | undefined;
-    if (foundRid) {
-      const rest = await byRid(foundRid);
-      return [{ pm: rest.pm, pt: rest.pt, url: rest.url || url, rid: rest.rid || foundRid }];
+    const storedIds: string[] = [];
+    if (sale?.invoiceIdPrepay) storedIds.push(String(sale.invoiceIdPrepay));
+    if (sale?.invoiceIdOffset) storedIds.push(String(sale.invoiceIdOffset));
+    if (sale?.invoiceIdFull) storedIds.push(String(sale.invoiceIdFull));
+    const uniqStored = Array.from(new Set(storedIds));
+    const idsToTry: string[] = [];
+    if (uniqStored.length > 0) {
+      idsToTry.push(...uniqStored);
+    } else {
+      const { getInvoiceIdForPrepay, getInvoiceIdForOffset, getInvoiceIdForFull } = await import('@/server/orderStore');
+      idsToTry.push(await getInvoiceIdForPrepay(sale.orderId), await getInvoiceIdForOffset(sale.orderId), await getInvoiceIdForFull(sale.orderId));
     }
-    return url ? [{ url, rid: 'unknown' }] : [];
+    for (const inv of idsToTry) {
+      const min = await fermaGetReceiptStatus(String(inv), { baseUrl, authToken: token });
+      const obj = min.rawText ? JSON.parse(min.rawText) : {};
+      const direct: string | undefined = obj?.Data?.Device?.OfdReceiptUrl; const fn = obj?.Data?.Fn || obj?.Fn; const fd = obj?.Data?.Fd || obj?.Fd; const fp = obj?.Data?.Fp || obj?.Fp;
+      const url = direct && direct.length > 0 ? direct : (fn && fd != null && fp != null ? buildReceiptViewUrl(fn, fd, fp) : undefined);
+      const rid = (obj?.Data?.ReceiptId || obj?.ReceiptId) as string | undefined;
+      if (rid) {
+        const rest = await byRid(rid);
+        return [{ pm: rest.pm, pt: rest.pt, url: rest.url || url, rid: rest.rid || rid }];
+      }
+      if (url) return [{ url, rid: 'unknown' }];
+    }
+    return [];
   } catch {
     return [];
   }

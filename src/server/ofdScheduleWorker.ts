@@ -5,6 +5,7 @@ import { buildFermaReceiptPayload, PAYMENT_METHOD_FULL_PAYMENT, VatRate } from '
 import { getUserOrgInn, getUserPayoutRequisites } from './userStore';
 import { getDecryptedApiToken } from './secureStore';
 import { listSales } from './taskStore';
+import { getInvoiceIdForOffset } from './orderStore';
 
 type OffsetJob = {
   id: string; // `${userId}:${orderId}`
@@ -107,8 +108,7 @@ export async function runDueOffsetJobs(): Promise<void> {
             }
           } catch {}
         }
-        const { getInvoiceIdString } = await import('./orderStore');
-        const invoiceIdFull = await getInvoiceIdString(job.orderId);
+        const invoiceIdFull = await getInvoiceIdForOffset(job.orderId);
         payload = buildFermaReceiptPayload({
           party: 'partner',
           partyInn: job.partnerInn,
@@ -128,8 +128,7 @@ export async function runDueOffsetJobs(): Promise<void> {
         const orgInn = await getUserOrgInn(job.userId);
         const orgData = await getUserPayoutRequisites(job.userId);
         if (!orgInn) throw new Error('NO_ORG_INN');
-        const { getInvoiceIdString } = await import('./orderStore');
-        const invoiceIdFull = await getInvoiceIdString(job.orderId);
+        const invoiceIdFull = await getInvoiceIdForOffset(job.orderId);
         payload = buildFermaReceiptPayload({
           party: 'org',
           partyInn: orgInn,

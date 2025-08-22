@@ -36,6 +36,10 @@ export type SaleRecord = {
   hidden?: boolean; // soft-hide from UI
   createdAt: string;
   updatedAt: string;
+  // New: stored invoice ids (A=prepay, B=offset, C=full)
+  invoiceIdPrepay?: string | null;
+  invoiceIdOffset?: string | null;
+  invoiceIdFull?: string | null;
 };
 
 type TaskStoreData = {
@@ -82,6 +86,11 @@ export async function recordSaleOnCreate(params: {
   const now = new Date().toISOString();
   const store = await readTasks();
   if (!store.sales) store.sales = [];
+  // Pre-generate invoice ids A/B/C
+  const { getInvoiceIdForPrepay, getInvoiceIdForOffset, getInvoiceIdForFull } = await import('./orderStore');
+  const invoiceIdPrepay = await getInvoiceIdForPrepay(orderId);
+  const invoiceIdOffset = await getInvoiceIdForOffset(orderId);
+  const invoiceIdFull = await getInvoiceIdForFull(orderId);
   store.sales.push({
     taskId,
     orderId,
@@ -106,6 +115,9 @@ export async function recordSaleOnCreate(params: {
     hidden: false,
     createdAt: now,
     updatedAt: now,
+    invoiceIdPrepay,
+    invoiceIdOffset,
+    invoiceIdFull,
   });
   await writeTasks(store);
   try { getHub().publish(userId, 'sales:update'); } catch {}

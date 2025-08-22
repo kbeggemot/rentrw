@@ -35,4 +35,24 @@ export async function getInvoiceIdString(orderId: number): Promise<string> {
   return `${prefix}-${orderId}`;
 }
 
+export type InvoiceKind = 'A' | 'B' | 'C';
+
+export async function getInvoiceIdStringForType(orderId: number, kind: InvoiceKind): Promise<string> {
+  const cur = await readOrder();
+  const prefix = cur.prefix || DEFAULT_PREFIX; // e.g. fhrff351d
+  return `${prefix}-${kind}-${orderId}`;
+}
+
+export async function getInvoiceIdForPrepay(orderId: number): Promise<string> {
+  return getInvoiceIdStringForType(orderId, 'A');
+}
+
+export async function getInvoiceIdForOffset(orderId: number): Promise<string> {
+  return getInvoiceIdStringForType(orderId, 'B');
+}
+
+export async function getInvoiceIdForFull(orderId: number): Promise<string> {
+  return getInvoiceIdStringForType(orderId, 'C');
+}
+
 

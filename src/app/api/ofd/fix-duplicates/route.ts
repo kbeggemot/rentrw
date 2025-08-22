@@ -130,10 +130,21 @@ export async function POST(req: Request) {
     // Если ReceiptId отсутствуют или дублируются — попробуем восстановить(найти все) по InvoiceId (получим массив)
     if (!sale.ofdPrepayId || !sale.ofdFullId || sale.ofdPrepayId === sale.ofdFullId) {
       try {
-        const { getInvoiceIdString } = await import('@/server/orderStore');
-        const invoiceId = await getInvoiceIdString(orderId);
-        const resp = await fermaGetReceiptStatus(String(invoiceId), { baseUrl, authToken: token });
-        const candidates = extractReceiptIdsFromStatus(resp.rawText || '')
+        const stored: string[] = [];
+        if (sale.invoiceIdPrepay) stored.push(String(sale.invoiceIdPrepay));
+        if (sale.invoiceIdOffset) stored.push(String(sale.invoiceIdOffset));
+        if (sale.invoiceIdFull) stored.push(String(sale.invoiceIdFull));
+        let invoiceIds: string[] = stored;
+        if (invoiceIds.length === 0) {
+          const { getInvoiceIdForPrepay, getInvoiceIdForOffset, getInvoiceIdForFull } = await import('@/server/orderStore');
+          invoiceIds = [await getInvoiceIdForPrepay(orderId), await getInvoiceIdForOffset(orderId), await getInvoiceIdForFull(orderId)];
+        }
+        const receipts: string[] = [];
+        for (const inv of invoiceIds) {
+          const resp = await fermaGetReceiptStatus(String(inv), { baseUrl, authToken: token });
+          receipts.push(...extractReceiptIdsFromStatus(resp.rawText || ''));
+        }
+        const candidates = Array.from(new Set(receipts))
           .filter((rid) => rid && rid !== sale.ofdPrepayId && rid !== sale.ofdFullId);
         for (const rid of candidates) {
           const cls = await classifyByRid(rid);
