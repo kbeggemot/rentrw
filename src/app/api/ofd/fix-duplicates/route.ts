@@ -18,6 +18,7 @@ export async function POST(req: Request) {
     if (!userId) return NextResponse.json({ error: 'NO_USER' }, { status: 401 });
     const url = new URL(req.url);
     const orderParam = url.searchParams.get('order');
+    const strict = /^(1|true|yes)$/i.test(url.searchParams.get('strict') || '');
     if (!orderParam) return NextResponse.json({ error: 'NO_ORDER' }, { status: 400 });
     const orderId = Number(orderParam);
     if (!Number.isFinite(orderId)) return NextResponse.json({ error: 'BAD_ORDER' }, { status: 400 });
@@ -62,10 +63,15 @@ export async function POST(req: Request) {
       if (cls.pm === 1) {
         // должен быть в предоплате
         if (cls.url && sale.ofdUrl !== cls.url) { try { (global as any).__OFD_SOURCE__ = 'fix_duplicates'; } catch {} await updateSaleOfdUrlsByOrderId(userId, orderId, { ofdUrl: cls.url }); changed = true; }
-        // если по ошибке лежит в полном — ничего не трогаем (может быть второй чек), удаление делаем только когда явно мискласс
+        // если лежит в полном — при strict затираем неверную колонку
+        if (strict && sale.ofdFullUrl === cls.url) { try { (global as any).__OFD_SOURCE__ = 'fix_duplicates'; } catch {} await updateSaleOfdUrlsByOrderId(userId, orderId, { ofdFullUrl: null }); changed = true; }
       } else if (cls.pm === 4) {
-        // неверно записан как предоплата — перенесём в полный
-        if (cls.url) { try { (global as any).__OFD_SOURCE__ = 'fix_duplicates'; } catch {} await updateSaleOfdUrlsByOrderId(userId, orderId, { ofdFullUrl: cls.url }); changed = true; }
+        // неверно записан как предоплата — перенесём в полный; при strict удаляем из предоплаты
+        if (cls.url) {
+          try { (global as any).__OFD_SOURCE__ = 'fix_duplicates'; } catch {}
+          await updateSaleOfdUrlsByOrderId(userId, orderId, { ofdFullUrl: cls.url, ...(strict ? { ofdUrl: null } : {}) });
+          changed = true;
+        }
       }
     }
     // Обрабатываем id полного расчёта
@@ -73,8 +79,13 @@ export async function POST(req: Request) {
       const cls = await classifyByRid(sale.ofdFullId);
       if (cls.pm === 4) {
         if (cls.url && sale.ofdFullUrl !== cls.url) { try { (global as any).__OFD_SOURCE__ = 'fix_duplicates'; } catch {} await updateSaleOfdUrlsByOrderId(userId, orderId, { ofdFullUrl: cls.url }); changed = true; }
+        if (strict && sale.ofdUrl === cls.url) { try { (global as any).__OFD_SOURCE__ = 'fix_duplicates'; } catch {} await updateSaleOfdUrlsByOrderId(userId, orderId, { ofdUrl: null }); changed = true; }
       } else if (cls.pm === 1) {
-        if (cls.url) { try { (global as any).__OFD_SOURCE__ = 'fix_duplicates'; } catch {} await updateSaleOfdUrlsByOrderId(userId, orderId, { ofdUrl: cls.url }); changed = true; }
+        if (cls.url) {
+          try { (global as any).__OFD_SOURCE__ = 'fix_duplicates'; } catch {}
+          await updateSaleOfdUrlsByOrderId(userId, orderId, { ofdUrl: cls.url, ...(strict ? { ofdFullUrl: null } : {}) });
+          changed = true;
+        }
       }
     }
 
