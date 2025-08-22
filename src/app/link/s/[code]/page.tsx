@@ -1,11 +1,22 @@
 "use client";
 
-import { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useEffect, useState, useMemo, useRef } from 'react';
+
+type Receipts = { prepay?: string | null; full?: string | null; commission?: string | null; npd?: string | null };
 
 export default function PermanentSaleRedirect(props: any) {
   const code = typeof props?.params?.code === 'string' ? props.params.code : '';
-  const router = useRouter();
+  const [orderId, setOrderId] = useState<number | null>(null);
+  const [userId, setUserId] = useState<string | null>(null);
+  const [taskId, setTaskId] = useState<string | number | null>(null);
+  const [receipts, setReceipts] = useState<Receipts>({});
+  const [summary, setSummary] = useState<{ amountRub?: number; description?: string | null; createdAt?: string | null } | null>(null);
+  const [isAgent, setIsAgent] = useState<boolean | null>(null);
+  const [detailsOpen, setDetailsOpen] = useState(true);
+  const [dots, setDots] = useState('.');
+  const pollRef = useRef<number | null>(null);
+
+  useEffect(() => { const t = window.setInterval(() => setDots((p) => (p.length >= 3 ? '.' : p + '.')), 400) as unknown as number; return () => { window.clearInterval(t); }; }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -14,22 +25,81 @@ export default function PermanentSaleRedirect(props: any) {
         const r = await fetch(`/api/sale-page/${encodeURIComponent(code)}`, { cache: 'no-store' });
         if (r.ok) {
           const d = await r.json();
-          const orderId = d?.orderId;
-          if (!cancelled && orderId != null) {
-            router.replace(`/link/success?order=${encodeURIComponent(String(orderId))}`);
-            return;
+          if (d?.userId) setUserId(String(d.userId));
+          if (d?.orderId != null) setOrderId(Number(d.orderId));
+          if (d?.sale) {
+            setTaskId(d.sale.taskId || null);
+            setIsAgent(typeof d.sale.isAgent === 'boolean' ? Boolean(d.sale.isAgent) : null);
+            setSummary({ amountRub: d.sale.amountRub, description: d.sale.description, createdAt: d.sale.createdAt });
+            setReceipts({ prepay: d.sale.ofdUrl || null, full: d.sale.ofdFullUrl || null, commission: d.sale.commissionUrl || null, npd: d.sale.npdReceiptUri || null });
+          }
+        } else {
+          // fallback to legacy link behavior
+          const r2 = await fetch(`/api/links/${encodeURIComponent(code)}`, { cache: 'no-store' });
+          const d2 = await r2.json();
+          if (r2.ok) { setUserId(String(d2?.userId || '')); }
+        }
+      } catch {}
+    })();
+    return () => { cancelled = true; };
+  }, [code]);
+
+  useEffect(() => {
+    if (!taskId || !userId) return;
+    const tick = async () => {
+      try {
+        const sr = await fetch(`/api/sales/by-task/${encodeURIComponent(String(taskId))}`, { cache: 'no-store', headers: { 'x-user-id': userId } as any });
+        if (sr.ok) {
+          const sj = await sr.json();
+          const sl = sj?.sale;
+          if (sl) {
+            setIsAgent(typeof sl.isAgent === 'boolean' ? Boolean(sl.isAgent) : isAgent);
+            setReceipts((prev) => ({
+              prepay: sl?.ofdUrl ?? prev.prepay ?? null,
+              full: sl?.ofdFullUrl ?? prev.full ?? null,
+              commission: sl?.additionalCommissionOfdUrl ?? prev.commission ?? null,
+              npd: sl?.npdReceiptUri ?? prev.npd ?? null,
+            }));
+            if (!summary) setSummary({ amountRub: sl.amountGrossRub, description: sl.description, createdAt: sl.createdAtRw || sl.createdAt });
           }
         }
       } catch {}
-      if (!cancelled) router.replace(`/link/${encodeURIComponent(code)}`);
-    })();
-    return () => { cancelled = true; };
-  }, [code, router]);
+      pollRef.current = window.setTimeout(tick, 1500) as unknown as number;
+    };
+    pollRef.current = window.setTimeout(tick, 1000) as unknown as number;
+    return () => { if (pollRef.current) { window.clearTimeout(pollRef.current); pollRef.current = null; } };
+  }, [taskId, userId]);
 
   return (
     <div className="max-w-xl mx-auto p-4">
-      <h1 className="text-xl font-semibold mb-2">Оплата</h1>
-      <div className="text-gray-600">Загрузка…</div>
+      <h1 className="text-xl font-semibold mb-1">Платёж успешно выполнен</h1>
+      <div className="text-sm text-gray-600 mb-2">Спасибо! Мы сформируем чек(и) автоматически и отправим на почту.</div>
+      <div className="mt-4 rounded-lg border border-gray-200 bg-white p-3 text-sm">
+        <div className="grid grid-cols-[9rem_1fr] gap-y-2 mb-2">
+          <div className="text-gray-500">За что платим</div>
+          <div>{summary?.description || '—'}</div>
+          <div className="text-gray-500">Сумма</div>
+          <div>{typeof summary?.amountRub === 'number' ? new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB' }).format(summary!.amountRub!) : '—'}</div>
+          <div className="text-gray-500">Дата оплаты</div>
+          <div>{summary?.createdAt ? new Date(summary.createdAt).toLocaleString('ru-RU', { timeZone: 'Europe/Moscow' }) : '—'}</div>
+          <div className="text-gray-500">Чек на покупку</div>
+          {(receipts.full || receipts.prepay) ? (
+            <a className="text-black font-semibold hover:underline" href={(receipts.full || receipts.prepay)!} target="_blank" rel="noreferrer">Открыть</a>
+          ) : (
+            <div className="text-gray-600">Подтягиваем данные{dots}</div>
+          )}
+        </div>
+        {isAgent ? (
+          <div className="grid grid-cols-[9rem_1fr] gap-y-2">
+            <div className="text-gray-500">Чек на комиссию</div>
+            {receipts.commission ? (
+              <a className="text-black font-semibold hover:underline" href={receipts.commission!} target="_blank" rel="noreferrer">Открыть</a>
+            ) : (
+              <div className="text-gray-600">Подтягиваем данные{dots}</div>
+            )}
+          </div>
+        ) : null}
+      </div>
     </div>
   );
 }
