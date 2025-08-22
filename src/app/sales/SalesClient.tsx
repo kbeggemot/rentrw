@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 
@@ -235,7 +236,9 @@ export default function SalesClient({ initial }: { initial: Sale[] }) {
   const fmtDate = (d?: string | null) => (d ? new Date(d).toLocaleDateString('ru-RU', { timeZone: 'Europe/Moscow' }) : '-');
   const [checksOpenId, setChecksOpenId] = useState<string | number | null>(null);
   const [menuOpenId, setMenuOpenId] = useState<string | number | null>(null);
+  const [menuPos, setMenuPos] = useState<{ top: number; left: number } | null>(null);
   const [pageCodes, setPageCodes] = useState<Record<number, string>>({});
+  const openSale = useMemo(() => filtered.find((x) => x.taskId === menuOpenId) || null, [filtered, menuOpenId]);
   async function ensurePageCode(orderId: number): Promise<string | null> {
     if (pageCodes[orderId]) return pageCodes[orderId];
     try {
@@ -264,6 +267,7 @@ export default function SalesClient({ initial }: { initial: Sale[] }) {
       const target = e.target as HTMLElement | null;
       if (target && target.closest('[data-menu-root]')) return;
       setMenuOpenId(null);
+      setMenuPos(null);
     };
     document.addEventListener('mousedown', close, true);
     document.addEventListener('touchstart', close, true);
@@ -442,6 +446,33 @@ export default function SalesClient({ initial }: { initial: Sale[] }) {
           </div>
         ) : null}
       </div>
+
+      {/* Global context menu portal to appear above the table */}
+      {menuOpenId != null && menuPos && openSale ? createPortal(
+        <div className="fixed z-[10000]" style={{ top: menuPos.top, left: menuPos.left, width: 192 }} data-menu-root>
+          <div className="w-48 bg-white dark:bg-gray-950 border border-gray-200 dark:border-gray-800 rounded shadow-sm">
+            {(() => {
+              const fin = String(openSale.status || '').toLowerCase();
+              const isFinal = fin === 'paid' || fin === 'transfered' || fin === 'transferred';
+              if (!isFinal) return null;
+              const code = pageCodes[openSale.orderId];
+              return code ? (
+                <a className="block px-3 py-2 text-sm font-medium text-left hover:bg-gray-50 dark:hover:bg-gray-900" href={`/link/s/${encodeURIComponent(code)}`} target="_blank" rel="noreferrer" onClick={() => setMenuOpenId(null)}>Страница продажи</a>
+              ) : (
+                <div className="px-3 py-2 text-sm text-gray-500">Готовим ссылку…</div>
+              );
+            })()}
+            {openSale.hidden ? (
+              <button className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 dark:hover:bg-gray-900" onClick={async () => { try { await fetch('/api/sales', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ taskId: openSale.taskId, hidden: false }) }); await load(false); } catch {} finally { setMenuOpenId(null); } }}>
+                Отобразить
+              </button>
+            ) : (
+              <button className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 dark:hover:bg-gray-900" onClick={async () => { try { await fetch('/api/sales', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ taskId: openSale.taskId, hidden: true }) }); await load(false); } catch {} finally { setMenuOpenId(null); } }}>
+                Скрыть
+              </button>
+            )}
+          </div>
+        </div>, document.body) : null}
       {/* Mobile cards */}
       <div className="md:hidden space-y-3">
         {paged.length === 0 ? (
@@ -556,33 +587,9 @@ export default function SalesClient({ initial }: { initial: Sale[] }) {
                 <td className="px-3 py-2">{s.createdAtRw ? new Date(s.createdAtRw).toLocaleDateString('ru-RU', { timeZone: 'Europe/Moscow' }) : '-'}</td>
                 <td className="px-3 py-2">{s.serviceEndDate ? new Date(s.serviceEndDate).toLocaleDateString('ru-RU', { timeZone: 'Europe/Moscow' }) : '-'}</td>
                 <td className="px-1 py-2 text-center">
-                  <div className="relative inline-block" data-menu-root>
-                    <Button aria-label="Действия" variant="secondary" size="icon" onClick={() => setMenuOpenId((id) => (id === s.taskId ? null : s.taskId))}><IconEdit /></Button>
+                  <div className="relative inline-block">
+                    <Button aria-label="Действия" variant="secondary" size="icon" onClick={(ev) => { const r = (ev.currentTarget as HTMLElement).getBoundingClientRect(); setMenuPos({ top: r.bottom + window.scrollY + 8, left: r.right + window.scrollX - 192 }); setMenuOpenId((id) => (id === s.taskId ? null : s.taskId)); void ensurePageCode(s.orderId); }}><IconEdit /></Button>
                   </div>
-                  {menuOpenId === s.taskId ? (
-                    <div className="absolute right-2 mt-2 w-48 bg-white dark:bg-gray-950 border border-gray-200 dark:border-gray-800 rounded shadow-sm z-[9999]" data-menu-root>
-                      {(() => {
-                        const fin = String(s.status || '').toLowerCase();
-                        const isFinal = fin === 'paid' || fin === 'transfered' || fin === 'transferred';
-                        if (!isFinal) return null;
-                        const code = pageCodes[s.orderId];
-                        return code ? (
-                          <a className="block px-3 py-2 text-sm font-medium text-left hover:bg-gray-50 dark:hover:bg-gray-900" href={`/link/s/${encodeURIComponent(code)}`} target="_blank" rel="noreferrer" onClick={() => setMenuOpenId(null)}>Страница продажи</a>
-                        ) : (
-                          <div className="px-3 py-2 text-sm text-gray-500">Готовим ссылку…</div>
-                        );
-                      })()}
-                      {s.hidden ? (
-                        <button className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 dark:hover:bg-gray-900" onClick={async () => { try { await fetch('/api/sales', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ taskId: s.taskId, hidden: false }) }); await load(false); } catch {} finally { setMenuOpenId(null); } }}>
-                          Отобразить
-                        </button>
-                      ) : (
-                        <button className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 dark:hover:bg-gray-900" onClick={async () => { try { await fetch('/api/sales', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ taskId: s.taskId, hidden: true }) }); await load(false); } catch {} finally { setMenuOpenId(null); } }}>
-                          Скрыть
-                        </button>
-                      )}
-                    </div>
-                  ) : null}
                 </td>
               </tr>
             ))}
