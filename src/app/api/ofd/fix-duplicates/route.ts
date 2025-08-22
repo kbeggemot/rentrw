@@ -43,7 +43,7 @@ export async function POST(req: Request) {
     const dateFromIncl = fmtMsk(startExt);
     const dateToIncl = fmtMsk(endExt);
 
-    async function classifyByRid(rid: string): Promise<{ pm?: number; pt?: number; url?: string }> {
+    async function classifyByRid(rid: string): Promise<{ pm?: number; pt?: number; url?: string; rid: string }> {
       const [ext, det, min] = await Promise.all([
         fermaGetReceiptExtended({ receiptId: String(rid), dateFromIncl, dateToIncl }, { baseUrl, authToken: token }).catch(() => ({ rawText: '' })),
         fermaGetReceiptStatusDetailed(String(rid), { startUtc: dateFromIncl.replace(' ', 'T'), endUtc: dateToIncl.replace(' ', 'T'), startLocal: dateFromIncl.replace(' ', 'T'), endLocal: dateToIncl.replace(' ', 'T') }, { baseUrl, authToken: token }).catch(() => ({ rawText: '' } as any)),
@@ -53,7 +53,7 @@ export async function POST(req: Request) {
       try { const o = ext.rawText ? JSON.parse(ext.rawText) : {}; const item = o?.Data?.Receipts?.[0]?.Items?.[0]; if (item && typeof item.CalculationMethod === 'number') pm = item.CalculationMethod; } catch {}
       try { const o = det.rawText ? JSON.parse(det.rawText) : {}; const cr = o?.Data?.[0]?.Receipt?.CustomerReceipt ?? o?.Data?.CustomerReceipt; const it = cr?.Items?.[0]; if (it && typeof it.PaymentMethod === 'number') pm = pm ?? it.PaymentMethod; const pi = Array.isArray(cr?.PaymentItems) ? cr.PaymentItems[0] : undefined; if (pi && typeof pi.PaymentType === 'number') pt = pi.PaymentType; } catch {}
       try { const o = min.rawText ? JSON.parse(min.rawText) : {}; const direct: string | undefined = o?.Data?.Device?.OfdReceiptUrl; const fn = o?.Data?.Fn || o?.Fn; const fd = o?.Data?.Fd || o?.Fd; const fp = o?.Data?.Fp || o?.Fp; url = direct && direct.length > 0 ? direct : (fn && fd != null && fp != null ? buildReceiptViewUrl(fn, fd, fp) : undefined); } catch {}
-      return { pm, pt, url };
+      return { pm, pt, url, rid: String(rid) };
     }
 
     let changed = false;
@@ -62,14 +62,14 @@ export async function POST(req: Request) {
       const cls = await classifyByRid(sale.ofdPrepayId);
       if (cls.pm === 1) {
         // должен быть в предоплате
-        if (cls.url && sale.ofdUrl !== cls.url) { try { (global as any).__OFD_SOURCE__ = 'fix_duplicates'; } catch {} await updateSaleOfdUrlsByOrderId(userId, orderId, { ofdUrl: cls.url }); changed = true; }
+        if (cls.url && sale.ofdUrl !== cls.url) { try { (global as any).__OFD_SOURCE__ = 'fix_duplicates'; } catch {} await updateSaleOfdUrlsByOrderId(userId, orderId, { ofdUrl: cls.url, ofdPrepayId: sale.ofdPrepayId }); changed = true; }
         // если лежит в полном — при strict затираем неверную колонку
-        if (strict && sale.ofdFullUrl === cls.url) { try { (global as any).__OFD_SOURCE__ = 'fix_duplicates'; } catch {} await updateSaleOfdUrlsByOrderId(userId, orderId, { ofdFullUrl: null }); changed = true; }
+        if (strict && sale.ofdFullUrl === cls.url) { try { (global as any).__OFD_SOURCE__ = 'fix_duplicates'; } catch {} await updateSaleOfdUrlsByOrderId(userId, orderId, { ofdFullUrl: null, ofdFullId: sale.ofdFullId === sale.ofdPrepayId ? null : sale.ofdFullId }); changed = true; }
       } else if (cls.pm === 4) {
         // неверно записан как предоплата — перенесём в полный; при strict удаляем из предоплаты
         if (cls.url) {
           try { (global as any).__OFD_SOURCE__ = 'fix_duplicates'; } catch {}
-          await updateSaleOfdUrlsByOrderId(userId, orderId, { ofdFullUrl: cls.url, ...(strict ? { ofdUrl: null } : {}) });
+          await updateSaleOfdUrlsByOrderId(userId, orderId, { ofdFullUrl: cls.url, ofdFullId: sale.ofdFullId || sale.ofdPrepayId, ...(strict ? { ofdUrl: null, ofdPrepayId: sale.ofdPrepayId === sale.ofdFullId ? null : sale.ofdPrepayId } : {}) });
           changed = true;
         }
       }
@@ -78,15 +78,42 @@ export async function POST(req: Request) {
     if (sale.ofdFullId) {
       const cls = await classifyByRid(sale.ofdFullId);
       if (cls.pm === 4) {
-        if (cls.url && sale.ofdFullUrl !== cls.url) { try { (global as any).__OFD_SOURCE__ = 'fix_duplicates'; } catch {} await updateSaleOfdUrlsByOrderId(userId, orderId, { ofdFullUrl: cls.url }); changed = true; }
-        if (strict && sale.ofdUrl === cls.url) { try { (global as any).__OFD_SOURCE__ = 'fix_duplicates'; } catch {} await updateSaleOfdUrlsByOrderId(userId, orderId, { ofdUrl: null }); changed = true; }
+        if (cls.url && sale.ofdFullUrl !== cls.url) { try { (global as any).__OFD_SOURCE__ = 'fix_duplicates'; } catch {} await updateSaleOfdUrlsByOrderId(userId, orderId, { ofdFullUrl: cls.url, ofdFullId: sale.ofdFullId }); changed = true; }
+        if (strict && sale.ofdUrl === cls.url) { try { (global as any).__OFD_SOURCE__ = 'fix_duplicates'; } catch {} await updateSaleOfdUrlsByOrderId(userId, orderId, { ofdUrl: null, ofdPrepayId: sale.ofdPrepayId === sale.ofdFullId ? null : sale.ofdPrepayId }); changed = true; }
       } else if (cls.pm === 1) {
         if (cls.url) {
           try { (global as any).__OFD_SOURCE__ = 'fix_duplicates'; } catch {}
-          await updateSaleOfdUrlsByOrderId(userId, orderId, { ofdUrl: cls.url, ...(strict ? { ofdFullUrl: null } : {}) });
+          await updateSaleOfdUrlsByOrderId(userId, orderId, { ofdUrl: cls.url, ofdPrepayId: sale.ofdPrepayId || sale.ofdFullId, ...(strict ? { ofdFullUrl: null, ofdFullId: sale.ofdFullId === sale.ofdPrepayId ? null : sale.ofdFullId } : {}) });
           changed = true;
         }
       }
+    }
+
+    // Если один из ReceiptId отсутствует — попробуем восстановить его по InvoiceId
+    if (!sale.ofdPrepayId || !sale.ofdFullId) {
+      try {
+        const { getInvoiceIdString } = await import('@/server/orderStore');
+        const invoiceId = await getInvoiceIdString(orderId);
+        const resp = await fermaGetReceiptStatus(String(invoiceId), { baseUrl, authToken: token });
+        const obj = resp.rawText ? JSON.parse(resp.rawText) : {};
+        const foundRid: string | undefined = obj?.Data?.ReceiptId || obj?.ReceiptId;
+        if (foundRid && foundRid !== sale.ofdPrepayId && foundRid !== sale.ofdFullId) {
+          const cls = await classifyByRid(foundRid);
+          if (cls.pm === 1) {
+            const patch: any = { ofdPrepayId: foundRid };
+            if (cls.url) patch.ofdUrl = cls.url;
+            try { (global as any).__OFD_SOURCE__ = 'fix_duplicates'; } catch {}
+            await updateSaleOfdUrlsByOrderId(userId, orderId, patch);
+            changed = true;
+          } else if (cls.pm === 4) {
+            const patch: any = { ofdFullId: foundRid };
+            if (cls.url) patch.ofdFullUrl = cls.url;
+            try { (global as any).__OFD_SOURCE__ = 'fix_duplicates'; } catch {}
+            await updateSaleOfdUrlsByOrderId(userId, orderId, patch);
+            changed = true;
+          }
+        }
+      } catch {}
     }
 
     return NextResponse.json({ ok: true, changed });
