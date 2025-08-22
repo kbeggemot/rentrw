@@ -162,9 +162,15 @@ export async function fermaGetReceiptStatusDetailed(
   const envAuth = getAuth();
   const auth = { ...envAuth, ...opts } as FermaAuth & { statusPath?: string };
   if (!auth.baseUrl) throw new Error('FERMA_BASE_URL not configured');
-  const pathTpl = opts?.statusPath || process.env.FERMA_STATUS_PATH || '/api/kkt/cloud/status';
+  // Detailed list endpoint (returns full payload with PaymentMethod/PaymentType)
+  const pathTpl = opts?.statusPath || process.env.FERMA_LIST2_PATH || '/api/kkt/cloud/list2';
   const isGetByPath = /\{id\}/.test(pathTpl);
-  const url = joinUrl(auth.baseUrl, isGetByPath ? pathTpl.replace('{id}', encodeURIComponent(id)) : pathTpl);
+  let url = joinUrl(auth.baseUrl, isGetByPath ? pathTpl.replace('{id}', encodeURIComponent(id)) : pathTpl);
+  if (auth.authToken) {
+    const u = new URL(url);
+    u.searchParams.set('AuthToken', auth.authToken);
+    url = u.toString();
+  }
   const headers = authHeaders(auth);
   const fmt = (v: string | undefined) => (v && v.length > 0 ? v : undefined);
   const payload: any = {
