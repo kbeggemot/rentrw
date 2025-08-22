@@ -33,7 +33,11 @@ export async function POST(req: Request) {
         const aoStatus = String(t?.acquiring_order?.status || '').toLowerCase();
         const rootStatus = String(t?.status || '').toLowerCase();
         const hasAgent = Boolean(t?.additional_commission_value);
-        if (hasAgent && aoStatus === 'transfered' && rootStatus === 'completed' && !npd) {
+        // Gate by presence of full receipt in our store
+        const { findSaleByTaskId } = await import('@/server/taskStore');
+        const saleRec = await findSaleByTaskId(userId, s.taskId);
+        const hasFull = Boolean(saleRec?.ofdFullUrl);
+        if (hasAgent && aoStatus === 'transfered' && rootStatus === 'completed' && hasFull && !npd) {
           const payUrl = new URL(`tasks/${encodeURIComponent(String(s.taskId))}/pay`, base.endsWith('/') ? base : base + '/').toString();
           await fetch(payUrl, { method: 'PATCH', headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }, cache: 'no-store' });
         }

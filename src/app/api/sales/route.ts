@@ -100,8 +100,11 @@ export async function GET(req: Request) {
               const aoStatus = String(normalized?.acquiring_order?.status || '').toLowerCase();
               const rootStatus = String(normalized?.status || '').toLowerCase();
               const hasAgent = Boolean(normalized?.additional_commission_value);
-              // If agent and transferred, but no NPD receipt yet, keep trying (trigger pay)
-              if (hasAgent && aoStatus === 'transfered' && rootStatus === 'completed' && !npdReceipt) {
+              const { findSaleByTaskId } = await import('@/server/taskStore');
+              const rec = await findSaleByTaskId(userId, s.taskId);
+              const saleHasFull = Boolean(rec?.ofdFullUrl);
+              // Trigger pay only if agent, transferred, completed, and ofdFullUrl exists in store
+              if (hasAgent && aoStatus === 'transfered' && rootStatus === 'completed' && saleHasFull && !npdReceipt) {
                 const payUrl = new URL(`tasks/${encodeURIComponent(String(s.taskId))}/pay`, base.endsWith('/') ? base : base + '/').toString();
                 await fetch(payUrl, { method: 'PATCH', headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }, cache: 'no-store' });
                 // And poll a few times specifically for NPD receipt

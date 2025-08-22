@@ -95,7 +95,10 @@ export async function GET(_: Request) {
       const aoStatus = String(normalized?.acquiring_order?.status || '').toLowerCase();
       const rootStatus = String(normalized?.status || '').toLowerCase();
       const hasAgent = Boolean(normalized?.additional_commission_value);
-      if (hasAgent && aoStatus === 'transfered' && rootStatus === 'completed') {
+      // New gate: require full-settlement receipt link present in our store
+      let saleHasFull = false;
+      try { const s = await findSaleByTaskId(userId, taskId); saleHasFull = Boolean(s?.ofdFullUrl); } catch {}
+      if (hasAgent && aoStatus === 'transfered' && rootStatus === 'completed' && saleHasFull) {
         const payUrl = new URL(`tasks/${encodeURIComponent(taskId)}/pay`, base.endsWith('/') ? base : base + '/').toString();
         await fetch(payUrl, { method: 'PATCH', headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }, cache: 'no-store' });
         // After pay, poll specifically until NPD receipt appears
