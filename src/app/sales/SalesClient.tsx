@@ -46,6 +46,15 @@ export default function SalesClient({ initial }: { initial: Sale[] }) {
     );
   }
 
+  function IconArrowDown() {
+    return (
+      <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+        <path d="M8 3v8" />
+        <path d="M4.5 8.5L8 12l3.5-3.5" />
+      </svg>
+    );
+  }
+
   // Filters
   const [query, setQuery] = useState('');
   const [status, setStatus] = useState<'all' | 'pending' | 'paying' | 'paid' | 'transfered'>('all');
@@ -239,6 +248,40 @@ export default function SalesClient({ initial }: { initial: Sale[] }) {
   const [menuPos, setMenuPos] = useState<{ top: number; left: number } | null>(null);
   const [pageCodes, setPageCodes] = useState<Record<number, string>>({});
   const openSale = useMemo(() => filtered.find((x) => x.taskId === menuOpenId) || null, [filtered, menuOpenId]);
+
+  const exportXlsx = async () => {
+    try {
+      const header = ['№', 'Тип', 'Сумма, ₽', 'Комиссия, ₽', 'Статус', 'Чек предоплаты', 'Чек полного расчёта', 'Чек комиссии', 'Чек НПД', 'Дата продажи', 'Дата окончания оказания услуги'];
+      const rows = filtered.map((s) => [
+        String(s.taskId ?? ''),
+        s.isAgent ? 'Агентская' : 'Прямая',
+        typeof s.amountGrossRub === 'number' ? s.amountGrossRub.toFixed(2) : '',
+        s.isAgent && typeof s.retainedCommissionRub === 'number' ? s.retainedCommissionRub.toFixed(2) : '',
+        s.status ?? '',
+        s.ofdUrl ?? '',
+        s.ofdFullUrl ?? '',
+        s.additionalCommissionOfdUrl ?? '',
+        s.npdReceiptUri ?? '',
+        (s.createdAtRw ? new Date(s.createdAtRw) : (s.createdAt ? new Date(s.createdAt) : null))?.toLocaleString('ru-RU', { timeZone: 'Europe/Moscow' }) || '',
+        s.serviceEndDate ? new Date(s.serviceEndDate).toLocaleDateString('ru-RU', { timeZone: 'Europe/Moscow' }) : ''
+      ]);
+      // Build simple Excel-compatible HTML table (opens in Excel). Covers all filtered data, ignores pagination
+      const esc = (t: string) => String(t ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      const thead = `<tr>${header.map((h) => `<th style="text-align:left; border:1px solid #ccc; padding:4px; background:#f6f6f6">${esc(h)}</th>`).join('')}</tr>`;
+      const tbody = rows.map(r => `<tr>${r.map((v, idx) => `<td style="border:1px solid #ccc; padding:4px; ${idx===2||idx===3 ? 'mso-number-format:\"0.00\";' : ''}">${esc(String(v))}</td>`).join('')}</tr>`).join('');
+      const html = `<!DOCTYPE html><html><head><meta charset="utf-8" /></head><body><table>${thead}${tbody}</table></body></html>`;
+      const blob = new Blob([html], { type: 'application/vnd.ms-excel;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      const ts = new Date().toISOString().slice(0,19).replace(/[:T]/g,'-');
+      a.href = url;
+      a.download = `sales_${ts}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch {}
+  };
   async function ensurePageCode(orderId: number): Promise<string | null> {
     if (pageCodes[orderId]) return pageCodes[orderId];
     try {
@@ -299,6 +342,10 @@ export default function SalesClient({ initial }: { initial: Sale[] }) {
             Сбросить
           </Button>
           <Button variant="secondary" onClick={() => load(true)} disabled={loading}>{loading ? 'Обновляю…' : 'Обновить'}</Button>
+          <div className="flex-1" />
+          <Button aria-label="Выгрузить XLSX" variant="secondary" size="icon" onClick={exportXlsx} title="Выгрузить XLSX">
+            <IconArrowDown />
+          </Button>
         </div>
         {visibleFilters.length > 0 ? (
           <div className="flex flex-wrap gap-3 items-end text-sm">
