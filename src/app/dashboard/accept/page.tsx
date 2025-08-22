@@ -738,10 +738,9 @@ function AcceptPaymentContent() {
                 onClick={async () => {
                   try {
                     await navigator.clipboard.writeText(paymentUrl);
-                    setMessage('Ссылка скопирована');
-                    setTimeout(() => setMessage(null), 1500);
+                    showToast('Ссылка скопирована', 'success');
                   } catch {
-                    setMessage('Не удалось скопировать');
+                    showToast('Не удалось скопировать', 'error');
                   }
                 }}
               >
@@ -766,7 +765,7 @@ function AcceptPaymentContent() {
             <div className="flex gap-2 items-end">
               <Input label="Чек на покупку" value={purchaseReceiptUrl ?? ''} readOnly placeholder="Ожидаем чек…" className="flex-1" onFocus={(e) => e.currentTarget.select()} />
               {purchaseReceiptUrl ? (
-                <Button type="button" variant="secondary" onClick={async () => { try { if (purchaseReceiptUrl) await navigator.clipboard.writeText(purchaseReceiptUrl); setMessage('Ссылка скопирована'); setTimeout(() => setMessage(null), 1500); } catch {} }}>Копировать</Button>
+                <Button type="button" variant="secondary" onClick={async () => { try { if (purchaseReceiptUrl) await navigator.clipboard.writeText(purchaseReceiptUrl); showToast('Ссылка скопирована', 'success'); } catch { showToast('Не удалось скопировать', 'error'); } }}>Копировать</Button>
               ) : (
                 <div className="w-9 h-9 flex items-center justify-center"><span className="inline-block w-4 h-4 rounded-full border-2 border-gray-300 border-t-gray-600 animate-spin" /></div>
               )}
@@ -775,7 +774,7 @@ function AcceptPaymentContent() {
               <div className="flex gap-2 items-end">
                 <Input label="Чек на комиссию" value={commissionReceiptUrl ?? ''} readOnly placeholder="Ожидаем чек…" className="flex-1" onFocus={(e) => e.currentTarget.select()} />
                 {commissionReceiptUrl ? (
-                  <Button type="button" variant="secondary" onClick={async () => { try { if (commissionReceiptUrl) await navigator.clipboard.writeText(commissionReceiptUrl); setMessage('Ссылка скопирована'); setTimeout(() => setMessage(null), 1500); } catch {} }}>Копировать</Button>
+                  <Button type="button" variant="secondary" onClick={async () => { try { if (commissionReceiptUrl) await navigator.clipboard.writeText(commissionReceiptUrl); showToast('Ссылка скопирована', 'success'); } catch { showToast('Не удалось скопировать', 'error'); } }}>Копировать</Button>
                 ) : (
                   <div className="w-9 h-9 flex items-center justify-center"><span className="inline-block w-4 h-4 rounded-full border-2 border-gray-300 border-t-gray-600 animate-spin" /></div>
                 )}
