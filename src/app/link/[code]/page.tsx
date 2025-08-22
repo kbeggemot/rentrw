@@ -19,9 +19,9 @@ type LinkData = {
 };
 
 export default function PublicPayPage(props: any) {
-  const rawCode = typeof props?.params?.code === 'string' ? props.params.code : '';
-  // Support numerical orderId-based code (e.g., 123-xxxx) by stripping suffix to restore order-specific link
-  const code = rawCode;
+  const raw = typeof props?.params?.code === 'string' ? props.params.code : '';
+  // Accept /link/[code] and /link/s/[code]
+  const code = raw;
   const [data, setData] = useState<LinkData | null>(null);
   const [amount, setAmount] = useState('');
   const [method, setMethod] = useState<'qr' | 'card'>('qr');
@@ -36,6 +36,7 @@ export default function PublicPayPage(props: any) {
   const [awaitingPay, setAwaitingPay] = useState(false);
   const [receipts, setReceipts] = useState<{ prepay?: string | null; full?: string | null; commission?: string | null; npd?: string | null }>({});
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const [summary, setSummary] = useState<{ amountRub?: number; description?: string | null; createdAt?: string | null } | null>(null);
 
   const pollRef = useRef<number | null>(null);
   const payUrlPollRef = useRef<number | null>(null);
@@ -61,18 +62,44 @@ export default function PublicPayPage(props: any) {
   useEffect(() => {
     let cancelled = false;
     (async () => {
+      // Resolve sale page by code first; fallback to payment link by code
       try {
-        const res = await fetch(`/api/links/${encodeURIComponent(code)}`, { cache: 'force-cache' });
-        const d = await res.json();
-        if (!res.ok) throw new Error(d?.error || 'NOT_FOUND');
-        if (cancelled) return;
-        setData(d);
-        if (d?.sumMode === 'fixed' && typeof d?.amountRub === 'number') setAmount(String(d.amountRub));
-        if (d?.method === 'card') setMethod('card'); else setMethod('qr');
-      } catch (e) { if (!cancelled) setMsg('Ссылка не найдена'); }
+        const r1 = await fetch(`/api/sale-page/${encodeURIComponent(code)}`, { cache: 'no-store' });
+        if (r1.ok) {
+          const d = await r1.json();
+          const userId: string | undefined = d?.userId;
+          const sale = d?.sale;
+          if (userId) {
+            setData((prev) => (prev || { code, userId, title: '', description: '' } as any));
+          }
+          if (sale) {
+            setTaskId(sale.taskId);
+            setSummaryFromSale(sale);
+          }
+        } else {
+          throw new Error('not_sale_page');
+        }
+      } catch {
+        try {
+          const res = await fetch(`/api/links/${encodeURIComponent(code)}`, { cache: 'force-cache' });
+          const d = await res.json();
+          if (!res.ok) throw new Error(d?.error || 'NOT_FOUND');
+          if (cancelled) return;
+          setData(d);
+          if (d?.sumMode === 'fixed' && typeof d?.amountRub === 'number') setAmount(String(d.amountRub));
+          if (d?.method === 'card') setMethod('card'); else setMethod('qr');
+        } catch (e) { if (!cancelled) setMsg('Ссылка не найдена'); }
+      }
     })();
     return () => { cancelled = true; };
   }, [code]);
+
+  function setSummaryFromSale(sale: any) {
+    try {
+      setSummary({ amountRub: sale.amountRub, description: sale.description, createdAt: sale.createdAt });
+      setReceipts({ prepay: sale.ofdUrl || null, full: sale.ofdFullUrl || null, commission: sale.commissionUrl || null, npd: sale.npdReceiptUri || null });
+    } catch {}
+  }
 
   // If returned from bank (?paid=1), try to restore last taskId from localStorage and resume polling
   useEffect(() => {

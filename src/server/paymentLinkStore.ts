@@ -43,9 +43,15 @@ function genCode(len = 4): string {
 
 export async function createPaymentLink(userId: string, data: Omit<PaymentLink, 'code' | 'userId' | 'createdAt'>): Promise<PaymentLink> {
   const store = await readStore();
-  let code = genCode(4);
   const exists = new Set(store.items.map((i) => i.code));
-  while (exists.has(code)) code = genCode(4);
+  let len = 4;
+  let attempts = 0;
+  let code = genCode(len);
+  while (exists.has(code)) {
+    attempts += 1;
+    if (attempts > 2000) { len += 1; attempts = 0; }
+    code = genCode(len);
+  }
   const now = new Date().toISOString();
   const item: PaymentLink = {
     code,
