@@ -267,21 +267,73 @@ export default function SalesClient({ initial }: { initial: Sale[] }) {
       ]);
       // Build simple Excel-compatible HTML table (opens in Excel). Covers all filtered data, ignores pagination
       const esc = (t: string) => String(t ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-      const thead = `<tr>${header.map((h) => `<th style="text-align:left; border:1px solid #ccc; padding:4px; background:#f6f6f6">${esc(h)}</th>`).join('')}</tr>`;
-      const tbody = rows.map(r => `<tr>${r.map((v, idx) => `<td style="border:1px solid #ccc; padding:4px; ${idx===2||idx===3 ? 'mso-number-format:\"0.00\";' : ''}">${esc(String(v))}</td>`).join('')}</tr>`).join('');
-      const html = `<!DOCTYPE html><html><head><meta charset="utf-8" /></head><body><table>${thead}${tbody}</table></body></html>`;
-      const blob = new Blob([html], { type: 'application/vnd.ms-excel;charset=utf-8;' });
-      const url = URL.createObjectURL(blob);
+      // Build real XLSX (OOXML) with a tiny ZIP writer (store only)
+      const xmlEsc = (s: string) => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&apos;');
+      const rowsXml = [
+        `<row r="1">${header.map((h,i)=>`<c r="${String.fromCharCode(65+i)}1" t="inlineStr"><is><t>${xmlEsc(h)}</t></is></c>`).join('')}</row>`,
+        ...rows.map((r,ri)=>`<row r="${ri+2}">${r.map((v,ci)=>{ const a=`${String.fromCharCode(65+ci)}${ri+2}`; const isNum = (ci===2||ci===3) && v!=='' && !isNaN(Number(v)); return isNum ? `<c r="${a}" t="n"><v>${Number(v)}</v></c>` : `<c r="${a}" t="inlineStr"><is><t>${xmlEsc(String(v))}</t></is></c>`; }).join('')}</row>`)
+      ].join('');
+      const sheet = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>${rowsXml}</sheetData></worksheet>`;
+      const workbook = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Sales" sheetId="1" r:id="rId1"/></sheets></workbook>`;
+      const rels = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="xl/worksheets/sheet1.xml"/></Relationships>`;
+      const contentTypes = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/></Types>`;
+
+      const zip = buildZip([
+        { name: '[Content_Types].xml', data: new TextEncoder().encode(contentTypes) },
+        { name: '_rels/.rels', data: new TextEncoder().encode(rels) },
+        { name: 'xl/workbook.xml', data: new TextEncoder().encode(workbook) },
+        { name: 'xl/worksheets/sheet1.xml', data: new TextEncoder().encode(sheet) },
+      ]);
       const a = document.createElement('a');
       const ts = new Date().toISOString().slice(0,19).replace(/[:T]/g,'-');
-      a.href = url;
+      const ab = new ArrayBuffer(zip.length); const u8 = new Uint8Array(ab); u8.set(zip);
+      a.href = URL.createObjectURL(new Blob([ab], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
       a.download = `sales_${ts}.xlsx`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
+      document.body.appendChild(a); a.click(); a.remove();
     } catch {}
   };
+
+  function buildZip(files: Array<{ name: string; data: Uint8Array }>): Uint8Array {
+    const te = new TextEncoder();
+    const makeUInt32 = (n: number) => { const b = new Uint8Array(4); new DataView(b.buffer).setUint32(0, n >>> 0, true); return b; };
+    const makeUInt16 = (n: number) => { const b = new Uint8Array(2); new DataView(b.buffer).setUint16(0, n & 0xffff, true); return b; };
+    const table = (()=>{ const t = new Uint32Array(256); for(let n=0;n<256;n++){ let c=n; for(let k=0;k<8;k++){ c = (c & 1) ? (0xEDB88320 ^ (c>>>1)) : (c>>>1); } t[n]=c>>>0; } return t; })();
+    const crc32 = (buf: Uint8Array) => { let c = ~0; for (let i=0;i<buf.length;i++){ c = (c>>>8) ^ table[(c ^ buf[i]) & 0xFF]; } return (~c) >>> 0; };
+    const parts: Uint8Array[] = [];
+    const centrals: Uint8Array[] = [];
+    let offset = 0;
+    for (const f of files) {
+      const name = te.encode(f.name);
+      const crc = crc32(f.data);
+      const local = new Uint8Array(30 + name.length);
+      const dv = new DataView(local.buffer);
+      dv.setUint32(0, 0x04034b50, true); dv.setUint16(4, 20, true); dv.setUint16(6, 0, true); dv.setUint16(8, 0, true); dv.setUint16(10, 0, true); dv.setUint16(12, 0, true);
+      dv.setUint32(14, crc, true); dv.setUint32(18, f.data.length, true); dv.setUint32(22, f.data.length, true); dv.setUint16(26, name.length, true); dv.setUint16(28, 0, true);
+      local.set(name, 30);
+      parts.push(local, f.data); const localOffset = offset; offset += local.length + f.data.length;
+
+      const central = new Uint8Array(46 + name.length);
+      const cv = new DataView(central.buffer);
+      cv.setUint32(0, 0x02014b50, true); cv.setUint16(4, 20, true); cv.setUint16(6, 20, true); cv.setUint16(8, 0, true); cv.setUint16(10, 0, true); cv.setUint16(12, 0, true); cv.setUint16(14, 0, true);
+      cv.setUint32(16, crc, true); cv.setUint32(20, f.data.length, true); cv.setUint32(24, f.data.length, true);
+      cv.setUint16(28, name.length, true); cv.setUint16(30, 0, true); cv.setUint16(32, 0, true); cv.setUint16(34, 0, true); cv.setUint16(36, 0, true);
+      cv.setUint32(42, localOffset, true);
+      central.set(name, 46);
+      centrals.push(central);
+    }
+    const centralSize = centrals.reduce((s,a)=>s+a.length,0);
+    const centralOffset = offset;
+    const end = new Uint8Array(22);
+    const ev = new DataView(end.buffer);
+    ev.setUint32(0, 0x06054b50, true);
+    ev.setUint16(8, files.length, true); ev.setUint16(10, files.length, true);
+    ev.setUint32(12, centralSize, true); ev.setUint32(16, centralOffset, true);
+    const out = new Uint8Array(offset + centralSize + end.length);
+    let p = 0; for (const part of parts) { out.set(part, p); p += part.length; }
+    for (const c of centrals) { out.set(c, p); p += c.length; }
+    out.set(end, p);
+    return out;
+  }
   async function ensurePageCode(orderId: number): Promise<string | null> {
     if (pageCodes[orderId]) return pageCodes[orderId];
     try {
@@ -342,8 +394,9 @@ export default function SalesClient({ initial }: { initial: Sale[] }) {
             Сбросить
           </Button>
           <Button variant="secondary" onClick={() => load(true)} disabled={loading}>{loading ? 'Обновляю…' : 'Обновить'}</Button>
-          <div className="flex-1" />
-          <Button aria-label="Выгрузить XLSX" variant="secondary" size="icon" onClick={exportXlsx} title="Выгрузить XLSX">
+        </div>
+        <div className="w-full flex justify-center">
+          <Button aria-label="Выгрузить XLS" variant="secondary" size="icon" onClick={exportXlsx} title="Выгрузить XLS" className="bg-white text-black border border-black hover:bg-gray-50">
             <IconArrowDown />
           </Button>
         </div>
