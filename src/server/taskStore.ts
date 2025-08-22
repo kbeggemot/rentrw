@@ -157,6 +157,7 @@ export async function updateSaleOfdUrlsByOrderId(userId: string, orderId: number
   if (idx !== -1) {
     const current = store.sales[idx];
     const next = { ...current } as SaleRecord;
+    const before: any = process.env.OFD_AUDIT === '1' ? { ofdUrl: next.ofdUrl ?? null, ofdFullUrl: next.ofdFullUrl ?? null, ofdPrepayId: (next as any).ofdPrepayId ?? null, ofdFullId: (next as any).ofdFullId ?? null } : null;
     if (typeof patch.ofdUrl !== 'undefined') next.ofdUrl = patch.ofdUrl ?? null;
     if (typeof patch.ofdFullUrl !== 'undefined') next.ofdFullUrl = patch.ofdFullUrl ?? null;
     if (typeof patch.ofdPrepayId !== 'undefined') next.ofdPrepayId = patch.ofdPrepayId ?? null;
@@ -165,6 +166,12 @@ export async function updateSaleOfdUrlsByOrderId(userId: string, orderId: number
     store.sales[idx] = next;
     await writeTasks(store);
     try { getHub().publish(userId, 'sales:update'); } catch {}
+    try {
+      if (process.env.OFD_AUDIT === '1') {
+        const { appendOfdAudit } = await import('./audit');
+        await appendOfdAudit({ ts: new Date().toISOString(), source: (global as any).__OFD_SOURCE__ || 'unknown', userId, orderId, taskId: current.taskId, action: 'update_ofd_urls', patch, before, after: { ofdUrl: next.ofdUrl ?? null, ofdFullUrl: next.ofdFullUrl ?? null, ofdPrepayId: (next as any).ofdPrepayId ?? null, ofdFullId: (next as any).ofdFullId ?? null } });
+      }
+    } catch {}
   }
 }
 
