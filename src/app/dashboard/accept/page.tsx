@@ -781,12 +781,7 @@ function AcceptPaymentContent() {
               </div>
             ) : null}
           </div>
-        ) : (
-          // Until final status — show waiting message only (no receipt placeholders here per request)
-          (qrDataUrl || aoStatus) ? (
-            <div className="mt-3 text-sm text-gray-600">Ждём подтверждения оплаты{dots}</div>
-          ) : null
-        )}
+        ) : null}
         {loading ? (
           <div className="mt-2 flex items-center gap-3 text-sm">
             <Button

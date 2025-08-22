@@ -451,22 +451,7 @@ export default function SalesClient({ initial }: { initial: Sale[] }) {
                       <IconEdit />
                     </Button>
                     <div className={`absolute right-0 mt-2 w-48 bg-white dark:bg-gray-950 border border-gray-200 dark:border-gray-800 rounded shadow-sm z-[100] ${menuOpenId === s.taskId ? '' : 'hidden'}`}>
-                      <a
-                        className="block px-3 py-2 text-sm font-medium text-left hover:bg-gray-50 dark:hover:bg-gray-900"
-                        href={(() => {
-                          try {
-                            const sidLocal = typeof window !== 'undefined' ? (sessionStorage.getItem(`paySid:${String(s.orderId)}`) || '') : '';
-                            if (sidLocal) return `/link/success?sid=${encodeURIComponent(sidLocal)}`;
-                            // fallback: create server-side resume token on demand
-                            if (typeof window !== 'undefined') {
-                              fetch(`/api/pay-resume/create?order=${encodeURIComponent(String(s.orderId))}`, { method: 'GET', cache: 'no-store', credentials: 'include' })
-                                .then(r => r.json()).then(d => { if (d?.sid) try { localStorage.setItem('lastSid', d.sid); window.open(`/link/success?sid=${encodeURIComponent(d.sid)}`, '_blank'); } catch {} });
-                            }
-                            return `/link/success`;
-                          } catch { return `/link/success`; }
-                        })()}
-                        target="_blank" rel="noreferrer" onClick={() => setMenuOpenId(null)}
-                      >Страница продажи</a>
+                      <a className="block px-3 py-2 text-sm font-medium text-left hover:bg-gray-50 dark:hover:bg-gray-900" href={(() => { try { const sid = typeof window !== 'undefined' ? (sessionStorage.getItem(`paySid:${String(s.orderId)}`) || '') : ''; return `/link/success?sid=${encodeURIComponent(sid)}`; } catch { return `/link/success`; } })()} target="_blank" rel="noreferrer" onClick={() => setMenuOpenId(null)}>Страница продажи</a>
                       {s.hidden ? (
                         <button className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 dark:hover:bg-gray-900" onClick={async () => { try { await fetch('/api/sales', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ taskId: s.taskId, hidden: false }) }); await load(false); } catch {} finally { setMenuOpenId(null); } }}>
                           Отобразить
@@ -542,21 +527,7 @@ export default function SalesClient({ initial }: { initial: Sale[] }) {
                   </div>
                   {menuOpenId === s.taskId ? (
                     <div className="absolute right-2 mt-2 w-48 bg-white dark:bg-gray-950 border border-gray-200 dark:border-gray-800 rounded shadow-sm z-[100]" data-menu-root>
-                      <a
-                        className="block px-3 py-2 text-sm font-medium text-left hover:bg-gray-50 dark:hover:bg-gray-900"
-                        href={(() => {
-                          try {
-                            const sidLocal = typeof window !== 'undefined' ? (sessionStorage.getItem(`paySid:${String(s.orderId)}`) || '') : '';
-                            if (sidLocal) return `/link/success?sid=${encodeURIComponent(sidLocal)}`;
-                            if (typeof window !== 'undefined') {
-                              fetch(`/api/pay-resume/create?order=${encodeURIComponent(String(s.orderId))}`, { method: 'GET', cache: 'no-store', credentials: 'include' })
-                                .then(r => r.json()).then(d => { if (d?.sid) try { localStorage.setItem('lastSid', d.sid); window.open(`/link/success?sid=${encodeURIComponent(d.sid)}`, '_blank'); } catch {} });
-                            }
-                            return `/link/success`;
-                          } catch { return `/link/success`; }
-                        })()}
-                        target="_blank" rel="noreferrer" onClick={() => setMenuOpenId(null)}
-                      >Страница продажи</a>
+                      <a className="block px-3 py-2 text-sm font-medium text-left hover:bg-gray-50 dark:hover:bg-gray-900" href={(() => { try { const sid = typeof window !== 'undefined' ? (sessionStorage.getItem(`paySid:${String(s.orderId)}`) || '') : ''; return `/link/success?sid=${encodeURIComponent(sid)}`; } catch { return `/link/success`; } })()} target="_blank" rel="noreferrer" onClick={() => setMenuOpenId(null)}>Страница продажи</a>
                       {s.hidden ? (
                         <button className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 dark:hover:bg-gray-900" onClick={async () => { try { await fetch('/api/sales', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ taskId: s.taskId, hidden: false }) }); await load(false); } catch {} finally { setMenuOpenId(null); } }}>
                           Отобразить
