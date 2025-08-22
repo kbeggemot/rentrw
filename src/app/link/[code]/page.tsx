@@ -34,7 +34,6 @@ export default function PublicPayPage(props: any) {
   const [awaitingPay, setAwaitingPay] = useState(false);
   const [receipts, setReceipts] = useState<{ prepay?: string | null; full?: string | null; commission?: string | null; npd?: string | null }>({});
   const [detailsOpen, setDetailsOpen] = useState(false);
-  const [isFinal, setIsFinal] = useState(false);
 
   const pollRef = useRef<number | null>(null);
   const payUrlPollRef = useRef<number | null>(null);
@@ -121,7 +120,6 @@ export default function PublicPayPage(props: any) {
         const r = await fetch(`/api/rocketwork/tasks/${encodeURIComponent(String(uid))}?t=${Date.now()}`, { cache: 'no-store', headers: data?.userId ? { 'x-user-id': data.userId } as any : undefined });
         const t = await r.json();
         const aoStatus = String((t?.acquiring_order?.status || t?.task?.acquiring_order?.status || '')).toLowerCase();
-        if (aoStatus) setIsFinal(['paid', 'transfered', 'transferred'].includes(aoStatus));
         // Try to read receipts directly from RW if available (rare when with_ofd_receipt=false)
         const rwPre = t?.ofd_url || t?.acquiring_order?.ofd_url || null;
         const rwFull = t?.ofd_full_url || t?.acquiring_order?.ofd_full_url || null;
@@ -381,7 +379,7 @@ export default function PublicPayPage(props: any) {
                 {awaitingPay && !(receipts.prepay || receipts.full || receipts.commission || receipts.npd) ? (
                   <div className="text-gray-600">{`Ждём подтверждения оплаты${dots}`}</div>
                 ) : null}
-                {isFinal ? (
+                {(receipts.prepay || receipts.full || receipts.commission || (data?.isAgent ?? false)) ? (
                   <div className="mt-1 p-2">
                     <div className="text-green-700 font-medium mb-2">Успешно оплачено</div>
                     <div className="grid grid-cols-[9rem_1fr] gap-y-2">
@@ -407,9 +405,7 @@ export default function PublicPayPage(props: any) {
                       ) : null}
                     </div>
                   </div>
-                ) : (
-                  <div className="mt-1 p-2 text-gray-600">Ждём подтверждения оплаты{dots}</div>
-                )}
+                ) : null}
               </div>
             )}
           </div>
