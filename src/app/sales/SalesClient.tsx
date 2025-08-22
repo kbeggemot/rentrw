@@ -474,7 +474,7 @@ export default function SalesClient({ initial }: { initial: Sale[] }) {
                     <Button aria-label="Действия" variant="secondary" size="icon" onClick={() => setMenuOpenId((id) => (id === s.taskId ? null : s.taskId))}>
                       <IconEdit />
           </Button>
-                    <div className={`absolute right-0 mt-2 w-48 bg-white dark:bg-gray-950 border border-gray-200 dark:border-gray-800 rounded shadow-sm z-[100] ${menuOpenId === s.taskId ? '' : 'hidden'}`}>
+                    <div className={`absolute right-0 mt-2 w-48 bg-white dark:bg-gray-950 border border-gray-200 dark:border-gray-800 rounded shadow-sm z-[9999] ${menuOpenId === s.taskId ? '' : 'hidden'}`}>
                       {(() => {
                         const fin = String(s.status || '').toLowerCase();
                         const isFinal = fin === 'paid' || fin === 'transfered' || fin === 'transferred';
@@ -519,7 +519,7 @@ export default function SalesClient({ initial }: { initial: Sale[] }) {
 
       {/* Desktop table */}
       {/* Context menu container placed above the table for clipping safety */}
-      <div className="hidden md:block overflow-x-auto overflow-y-visible relative bg-white dark:bg-gray-950 border border-gray-200 dark:border-gray-800 rounded-lg">
+      <div className="hidden md:block overflow-x-auto overflow-y-visible relative bg-white dark:bg-gray-950 border border-gray-200 dark:border-gray-800 rounded-lg z-[1]">
         <table className="min-w-full text-sm">
           <thead className="bg-gray-50 dark:bg-gray-900">
             <tr>
@@ -560,7 +560,7 @@ export default function SalesClient({ initial }: { initial: Sale[] }) {
                     <Button aria-label="Действия" variant="secondary" size="icon" onClick={() => setMenuOpenId((id) => (id === s.taskId ? null : s.taskId))}><IconEdit /></Button>
                   </div>
                   {menuOpenId === s.taskId ? (
-                    <div className="absolute right-2 mt-2 w-48 bg-white dark:bg-gray-950 border border-gray-200 dark:border-gray-800 rounded shadow-sm z-[100]" data-menu-root>
+                    <div className="absolute right-2 mt-2 w-48 bg-white dark:bg-gray-950 border border-gray-200 dark:border-gray-800 rounded shadow-sm z-[9999]" data-menu-root>
                       {(() => {
                         const fin = String(s.status || '').toLowerCase();
                         const isFinal = fin === 'paid' || fin === 'transfered' || fin === 'transferred';
