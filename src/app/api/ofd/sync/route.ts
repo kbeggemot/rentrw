@@ -37,6 +37,7 @@ export async function GET(req: Request) {
         const fn = obj?.Data?.Fn || obj?.Fn; const fd = obj?.Data?.Fd || obj?.Fd; const fp = obj?.Data?.Fp || obj?.Fp;
         const url = direct && direct.length > 0 ? direct : (fn && fd != null && fp != null ? buildReceiptViewUrl(fn, fd, fp) : undefined);
         if (url) {
+          try { (global as any).__OFD_SOURCE__ = 'sync'; } catch {}
           await updateSaleOfdUrlsByOrderId(userId, s.orderId, { ofdFullUrl: url });
           updated += 1;
         }

@@ -79,6 +79,7 @@ export async function GET(req: Request) {
             await updateSaleFromStatus(userId, s.taskId, patch);
             // Force-exclusive placement: if we classified RW ofd_url, clear the opposite column
             if (ofdUrl) {
+              try { (global as any).__OFD_SOURCE__ = 'refresh'; } catch {}
               try {
                 const createdAt = (normalized as any)?.created_at || s.createdAtRw || s.createdAt;
                 const createdDate = createdAt ? String(createdAt).slice(0, 10) : null;

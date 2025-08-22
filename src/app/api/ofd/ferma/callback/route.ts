@@ -107,6 +107,7 @@ export async function POST(req: Request) {
         if (classify === 'prepay') patch.ofdPrepayId = receiptId; else patch.ofdFullId = receiptId;
       }
       if (Object.keys(patch).length > 0) {
+        try { (global as any).__OFD_SOURCE__ = 'ofd_callback'; } catch {}
         try { await updateSaleOfdUrlsByOrderId(userId, Number(orderId), patch); } catch {}
       }
     }

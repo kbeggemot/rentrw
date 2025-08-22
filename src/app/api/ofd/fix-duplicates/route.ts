@@ -26,6 +26,7 @@ export async function POST(req: Request) {
 
     let changed = false;
     if (sale.ofdUrl && sale.ofdFullUrl && sale.ofdUrl === sale.ofdFullUrl) {
+      try { (global as any).__OFD_SOURCE__ = 'fix_duplicates'; } catch {}
       await updateSaleOfdUrlsByOrderId(userId, orderId, { ofdUrl: null });
       changed = true;
     }

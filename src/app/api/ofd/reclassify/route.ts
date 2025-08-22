@@ -103,6 +103,7 @@ export async function POST(req: Request) {
       }
 
       if (Object.keys(patch).length > 0) {
+        try { (global as any).__OFD_SOURCE__ = 'reclassify'; } catch {}
         await updateSaleOfdUrlsByOrderId(userId, s.orderId, patch);
         fixed += 1;
       }
