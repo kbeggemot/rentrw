@@ -46,10 +46,11 @@ export default function PublicPayPage(props: any) {
   const [dots, setDots] = useState('.');
   useEffect(() => {
     let timer: number | null = null;
-    const hasReceipts = Boolean(receipts.prepay || receipts.full || receipts.commission || receipts.npd);
     const waitingForLink = Boolean(taskId) && !payUrl;
-    const waitingForConfirm = awaitingPay && !hasReceipts;
-    const active = loading || waitingForLink || waitingForConfirm;
+    // Keep animating if any receipt is still missing (e.g., commission not yet available)
+    const someReceiptMissing = (!(receipts.prepay || receipts.full)) || (Boolean(data?.isAgent) && !receipts.commission);
+    const waitingForConfirm = awaitingPay;
+    const active = loading || waitingForLink || waitingForConfirm || someReceiptMissing;
     if (active) {
       timer = window.setInterval(() => {
         setDots((prev) => (prev.length >= 3 ? '.' : prev + '.'));
@@ -58,7 +59,7 @@ export default function PublicPayPage(props: any) {
       setDots('.');
     }
     return () => { if (timer) window.clearInterval(timer); };
-  }, [loading, taskId, payUrl, awaitingPay, receipts.prepay, receipts.full, receipts.commission, receipts.npd]);
+  }, [loading, taskId, payUrl, awaitingPay, receipts.prepay, receipts.full, receipts.commission, receipts.npd, data?.isAgent]);
 
   useEffect(() => {
     let cancelled = false;

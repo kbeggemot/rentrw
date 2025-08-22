@@ -41,6 +41,7 @@ export async function GET(req: Request) {
         amountRub: sale.amountGrossRub,
         createdAt: sale.createdAtRw || sale.createdAt,
         status: sale.status ?? null,
+        isAgent: !!sale.isAgent,
         ofdUrl: sale.ofdUrl ?? null,
         ofdFullUrl: sale.ofdFullUrl ?? null,
         commissionUrl: sale.additionalCommissionOfdUrl ?? null,

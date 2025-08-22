@@ -15,6 +15,7 @@ export default function PublicSuccessUnifiedPage() {
   const [waiting, setWaiting] = useState(false);
   const [summary, setSummary] = useState<{ amountRub?: number; description?: string | null; createdAt?: string | null } | null>(null);
   const [payMethod, setPayMethod] = useState<string | null>(null);
+  const [isAgent, setIsAgent] = useState<boolean | null>(null);
   const pollRef = useRef<number | null>(null);
   const [dots, setDots] = useState(".");
 
@@ -59,7 +60,10 @@ export default function PublicSuccessUnifiedPage() {
                 setTaskId(d.taskId);
                 setInfo({ code: '', userId: String(d.userId || ''), title: undefined, orgName: d?.orgName || null });
                 setOrderId(Number(d.orderId || 0) || null);
-                if (d?.sale) setSummary({ amountRub: d.sale.amountRub, description: d.sale.description, createdAt: d.sale.createdAt ?? null });
+                if (d?.sale) {
+                  setSummary({ amountRub: d.sale.amountRub, description: d.sale.description, createdAt: d.sale.createdAt ?? null });
+                  if (typeof d.sale.isAgent === 'boolean') setIsAgent(Boolean(d.sale.isAgent));
+                }
                 if (d?.sale) {
                   setReceipts({
                     prepay: d.sale.ofdUrl || null,
@@ -109,6 +113,7 @@ export default function PublicSuccessUnifiedPage() {
               if (sres.ok) {
                 const sj = await sres.json();
                 const sl = sj?.sale;
+                if (typeof sl?.isAgent === 'boolean') setIsAgent(Boolean(sl.isAgent));
                 setReceipts((prev) => ({
                   prepay: (sl?.ofdUrl ?? prev.prepay) || null,
                   full: (sl?.ofdFullUrl ?? prev.full) || null,
@@ -121,6 +126,7 @@ export default function PublicSuccessUnifiedPage() {
               if (sres.ok) {
                 const sj = await sres.json();
                 const sl = sj?.sale;
+                if (typeof sl?.isAgent === 'boolean') setIsAgent(Boolean(sl.isAgent));
                 setReceipts((prev) => ({
                   prepay: (sl?.ofdUrl ?? prev.prepay) || null,
                   full: (sl?.ofdFullUrl ?? prev.full) || null,
@@ -217,10 +223,14 @@ export default function PublicSuccessUnifiedPage() {
                 )}
               </div>
             </div>
-            {receipts.commission ? (
+            {isAgent ? (
               <div className="grid grid-cols-[9rem_1fr] gap-y-2 text-gray-800 dark:text-gray-200">
                 <div className="text-gray-500 dark:text-gray-400">Чек на комиссию</div>
-                <a className="text-black dark:text-white font-semibold hover:underline" href={receipts.commission!} target="_blank" rel="noreferrer">Открыть</a>
+                {receipts.commission ? (
+                  <a className="text-black dark:text-white font-semibold hover:underline" href={receipts.commission!} target="_blank" rel="noreferrer">Открыть</a>
+                ) : (
+                  <span className="text-gray-600 dark:text-gray-300">Подтягиваем данные{dots}</span>
+                )}
               </div>
             ) : null}
           </div>
