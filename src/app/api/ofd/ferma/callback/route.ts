@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { upsertOfdReceipt } from '@/server/ofdStore';
-import { updateSaleOfdUrlsByOrderId } from '@/server/taskStore';
+import { updateSaleOfdUrlsByOrderId, listSales } from '@/server/taskStore';
 import { fermaGetAuthTokenCached, fermaGetReceiptStatus, buildReceiptViewUrl } from '@/server/ofdFerma';
 import { writeText } from '@/server/storage';
 
@@ -93,22 +93,43 @@ export async function POST(req: Request) {
     }
     if (Number.isFinite(orderId)) {
       const patch: any = {};
-      // Decide classification: offset (pt=2 or docTypeOffset), else by docType or serviceEndDate
-      const isOffset = pt === 2; // offset indicated by PaymentItems.PaymentType=2
-      let classify: 'prepay' | 'full' = 'full';
-      if (pm === 1) classify = 'prepay';
-      else if (pm === 4) classify = 'full';
-      else if (/IncomePrepayment/i.test(docTypeRaw)) classify = 'prepay';
-      else if (/(^|[^A-Za-z])Income($|[^A-Za-z])/i.test(docTypeRaw)) classify = 'full';
-      if (receiptUrl) {
-        if (classify === 'prepay') patch.ofdUrl = receiptUrl; else patch.ofdFullUrl = receiptUrl;
-      }
-      if (receiptId) {
-        if (classify === 'prepay') patch.ofdPrepayId = receiptId; else patch.ofdFullId = receiptId;
+      const orderNum = Number(orderId);
+      // Prefer mapping by stored InvoiceId variants
+      let mappedByInvoice = false;
+      try {
+        const sales = await listSales(userId);
+        const sale = sales.find((s) => s.orderId === orderNum);
+        if (sale && typeof invoiceIdRaw !== 'undefined' && invoiceIdRaw !== null) {
+          const invStr = String(invoiceIdRaw);
+          if (sale.invoiceIdPrepay && invStr === String(sale.invoiceIdPrepay)) {
+            if (receiptUrl) patch.ofdUrl = receiptUrl;
+            if (receiptId) patch.ofdPrepayId = receiptId;
+            mappedByInvoice = true;
+          } else if ((sale.invoiceIdOffset && invStr === String(sale.invoiceIdOffset)) || (sale.invoiceIdFull && invStr === String(sale.invoiceIdFull))) {
+            if (receiptUrl) patch.ofdFullUrl = receiptUrl;
+            if (receiptId) patch.ofdFullId = receiptId;
+            mappedByInvoice = true;
+          }
+        }
+      } catch {}
+      // Fallback mapping by pm/docType if invoice-based mapping not possible
+      if (!mappedByInvoice) {
+        const isOffset = pt === 2; // unused in mapping but kept for possible future use
+        let classify: 'prepay' | 'full' = 'full';
+        if (pm === 1) classify = 'prepay';
+        else if (pm === 4) classify = 'full';
+        else if (/IncomePrepayment/i.test(docTypeRaw)) classify = 'prepay';
+        else if (/(^|[^A-Za-z])Income($|[^A-Za-z])/i.test(docTypeRaw)) classify = 'full';
+        if (receiptUrl) {
+          if (classify === 'prepay') patch.ofdUrl = receiptUrl; else patch.ofdFullUrl = receiptUrl;
+        }
+        if (receiptId) {
+          if (classify === 'prepay') patch.ofdPrepayId = receiptId; else patch.ofdFullId = receiptId;
+        }
       }
       if (Object.keys(patch).length > 0) {
         try { (global as any).__OFD_SOURCE__ = 'ofd_callback'; } catch {}
-        try { await updateSaleOfdUrlsByOrderId(userId, Number(orderId), patch); } catch {}
+        try { await updateSaleOfdUrlsByOrderId(userId, orderNum, patch); } catch {}
       }
     }
     // Debug logs (prod-safe; secret redacted)
