@@ -36,6 +36,7 @@ export default function PublicPayPage(props: any) {
   const [awaitingPay, setAwaitingPay] = useState(false);
   const [receipts, setReceipts] = useState<{ prepay?: string | null; full?: string | null; commission?: string | null; npd?: string | null }>({});
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const [isFinal, setIsFinal] = useState(false);
   const [summary, setSummary] = useState<{ amountRub?: number; description?: string | null; createdAt?: string | null } | null>(null);
 
   const pollRef = useRef<number | null>(null);
@@ -149,6 +150,7 @@ export default function PublicPayPage(props: any) {
         const r = await fetch(`/api/rocketwork/tasks/${encodeURIComponent(String(uid))}?t=${Date.now()}`, { cache: 'no-store', headers: data?.userId ? { 'x-user-id': data.userId } as any : undefined });
         const t = await r.json();
         const aoStatus = String((t?.acquiring_order?.status || t?.task?.acquiring_order?.status || '')).toLowerCase();
+        if (aoStatus) setIsFinal(['paid', 'transfered', 'transferred'].includes(aoStatus));
         // Try to read receipts directly from RW if available (rare when with_ofd_receipt=false)
         const rwPre = t?.ofd_url || t?.acquiring_order?.ofd_url || null;
         const rwFull = t?.ofd_full_url || t?.acquiring_order?.ofd_full_url || null;
@@ -398,17 +400,17 @@ export default function PublicPayPage(props: any) {
                 {!payUrl ? (
                   <div className="text-gray-600">{`Формируем платежную ссылку${dots}`}</div>
                 ) : (
-                  !(receipts.prepay || receipts.full || receipts.commission || receipts.npd) ? (
+                  !isFinal ? (
                     <div className="grid grid-cols-[9rem_1fr] gap-y-2">
                       <div className="text-gray-500">Платежная ссылка</div>
                       <a className={`${awaitingPay ? 'text-gray-500' : 'text-black font-semibold'} hover:underline`} href={payUrl} target="_blank" rel="noreferrer" onClick={() => setAwaitingPay(true)}>Оплатить</a>
                     </div>
                   ) : null
                 )}
-                {awaitingPay && !(receipts.prepay || receipts.full || receipts.commission || receipts.npd) ? (
+                {awaitingPay && !isFinal ? (
                   <div className="text-gray-600">{`Ждём подтверждения оплаты${dots}`}</div>
                 ) : null}
-                {(receipts.prepay || receipts.full || receipts.commission || (data?.isAgent ?? false)) ? (
+                {isFinal ? (
                   <div className="mt-1 p-2">
                     <div className="text-green-700 font-medium mb-2">Успешно оплачено</div>
                     <div className="grid grid-cols-[9rem_1fr] gap-y-2">
