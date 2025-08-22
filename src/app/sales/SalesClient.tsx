@@ -527,7 +527,7 @@ export default function SalesClient({ initial }: { initial: Sale[] }) {
                   </div>
                   {menuOpenId === s.taskId ? (
                     <div className="absolute right-2 mt-2 w-48 bg-white dark:bg-gray-950 border border-gray-200 dark:border-gray-800 rounded shadow-sm z-[100]" data-menu-root>
-                      <a className="block px-3 py-2 text-sm font-medium text-left hover:bg-gray-50 dark:hover:bg-gray-900" href={(() => { try { const sid = typeof window !== 'undefined' ? (sessionStorage.getItem(`paySid:${String(s.orderId)}`) || '') : ''; return `/link/success?sid=${encodeURIComponent(sid)}`; } catch { return `/link/success`; } })()} target="_blank" rel="noreferrer" onClick={() => setMenuOpenId(null)}>Страница продажи</a>
+                      <a className="block px-3 py-2 text-sm font-medium text-left hover:bg-gray-50 dark:hover:bg-gray-900" href={(() => { try { return `/link/${encodeURIComponent(String(s.orderId))}`; } catch { return `/link`; } })()} target="_blank" rel="noreferrer" onClick={() => setMenuOpenId(null)}>Страница продажи</a>
                       {s.hidden ? (
                         <button className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 dark:hover:bg-gray-900" onClick={async () => { try { await fetch('/api/sales', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ taskId: s.taskId, hidden: false }) }); await load(false); } catch {} finally { setMenuOpenId(null); } }}>
                           Отобразить

@@ -19,7 +19,9 @@ type LinkData = {
 };
 
 export default function PublicPayPage(props: any) {
-  const code = typeof props?.params?.code === 'string' ? props.params.code : '';
+  const rawCode = typeof props?.params?.code === 'string' ? props.params.code : '';
+  // Support numerical orderId-based code (e.g., 123-xxxx) by stripping suffix to restore order-specific link
+  const code = rawCode;
   const [data, setData] = useState<LinkData | null>(null);
   const [amount, setAmount] = useState('');
   const [method, setMethod] = useState<'qr' | 'card'>('qr');
