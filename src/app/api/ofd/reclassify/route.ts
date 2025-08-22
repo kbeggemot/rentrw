@@ -12,7 +12,7 @@ function getUserId(req: Request): string | null {
   return hdr && hdr.trim().length > 0 ? hdr.trim() : null;
 }
 
-async function classifySaleWithOfd(sale: any): Promise<{ pm?: number; pt?: number; url?: string; rid?: string }> {
+async function classifySaleWithOfd(sale: any): Promise<Array<{ pm?: number; pt?: number; url?: string; rid: string }>> {
   const baseUrl = process.env.FERMA_BASE_URL || 'https://ferma.ofd.ru/';
   const token = await fermaGetAuthTokenCached(process.env.FERMA_LOGIN || '', process.env.FERMA_PASSWORD || '', { baseUrl });
 
@@ -30,7 +30,7 @@ async function classifySaleWithOfd(sale: any): Promise<{ pm?: number; pt?: numbe
   const dateFromIncl = formatMsk(startExt).replace(/\u00A0/g, ' ').trim();
   const dateToIncl = formatMsk(endExt).replace(/\u00A0/g, ' ').trim();
 
-  async function byRid(rid: string): Promise<{ pm?: number; pt?: number; url?: string; rid?: string }> {
+  async function byRid(rid: string): Promise<{ pm?: number; pt?: number; url?: string; rid: string }> {
     const [ext, det, min] = await Promise.all([
       fermaGetReceiptExtended({ receiptId: String(rid), dateFromIncl, dateToIncl }, { baseUrl, authToken: token }).catch(() => ({ rawStatus: 0, rawText: '' })),
       fermaGetReceiptStatusDetailed(String(rid), { startUtc: dateFromIncl.replace(' ', 'T'), endUtc: dateToIncl.replace(' ', 'T'), startLocal: dateFromIncl.replace(' ', 'T'), endLocal: dateToIncl.replace(' ', 'T') }, { baseUrl, authToken: token }).catch(() => ({ rawStatus: 0, rawText: '' } as any)),
@@ -40,11 +40,17 @@ async function classifySaleWithOfd(sale: any): Promise<{ pm?: number; pt?: numbe
     try { const o = ext.rawText ? JSON.parse(ext.rawText) : {}; const item = o?.Data?.Receipts?.[0]?.Items?.[0]; if (item && typeof item.CalculationMethod === 'number') pm = item.CalculationMethod; } catch {}
     try { const o = det.rawText ? JSON.parse(det.rawText) : {}; const cr = o?.Data?.[0]?.Receipt?.CustomerReceipt ?? o?.Data?.CustomerReceipt; const it = cr?.Items?.[0]; if (it && typeof it.PaymentMethod === 'number') pm = pm ?? it.PaymentMethod; const pi = Array.isArray(cr?.PaymentItems) ? cr.PaymentItems[0] : undefined; if (pi && typeof pi.PaymentType === 'number') pt = pi.PaymentType; } catch {}
     try { const o = min.rawText ? JSON.parse(min.rawText) : {}; outRid = o?.Data?.ReceiptId || o?.ReceiptId || outRid; const direct: string | undefined = o?.Data?.Device?.OfdReceiptUrl; const fn = o?.Data?.Fn || o?.Fn; const fd = o?.Data?.Fd || o?.Fd; const fp = o?.Data?.Fp || o?.Fp; url = direct && direct.length > 0 ? direct : (fn && fd != null && fp != null ? buildReceiptViewUrl(fn, fd, fp) : url); } catch {}
-    return { pm, pt, url, rid: outRid || rid };
+    return { pm, pt, url, rid: (outRid || rid) };
   }
 
-  let rid: string | undefined = sale?.ofdFullId || sale?.ofdPrepayId || undefined;
-  if (rid) return byRid(rid);
+  const ridList: string[] = [];
+  if (sale?.ofdFullId) ridList.push(String(sale.ofdFullId));
+  if (sale?.ofdPrepayId) ridList.push(String(sale.ofdPrepayId));
+  const uniq = Array.from(new Set(ridList));
+  if (uniq.length > 0) {
+    const results = await Promise.all(uniq.map(byRid));
+    return results;
+  }
 
   // Fallback by InvoiceId: get minimal to resolve ReceiptId then repeat
   try {
@@ -57,11 +63,11 @@ async function classifySaleWithOfd(sale: any): Promise<{ pm?: number; pt?: numbe
     rid = (obj?.Data?.ReceiptId || obj?.ReceiptId) as string | undefined;
     if (rid) {
       const rest = await byRid(rid);
-      return { pm: rest.pm, pt: rest.pt, url: rest.url || url, rid: rest.rid || rid };
+      return [{ pm: rest.pm, pt: rest.pt, url: rest.url || url, rid: rest.rid || rid }];
     }
-    return { url };
+    return url ? [{ url, rid: 'unknown' }] : [];
   } catch {
-    return {};
+    return [];
   }
 }
 
@@ -76,20 +82,16 @@ export async function POST(req: Request) {
     let fixed = 0;
     for (const s of sales) {
       const patch: any = {};
-      const cls = await classifySaleWithOfd(s);
-      let decided: 'prepay' | 'full' | null = null;
-      if (typeof cls.pm === 'number') decided = (cls.pm === 1 ? 'prepay' : 'full');
-      const decidedUrl = cls.url || null;
-      const decidedRid = cls.rid || null;
-
-      // Применяем решение без принудительного очищения противоположной колонки
-      if (decided && decidedUrl) {
-        if (decided === 'prepay') {
-          patch.ofdUrl = decidedUrl;
-          if (decidedRid) patch.ofdPrepayId = decidedRid;
-        } else {
-          patch.ofdFullUrl = decidedUrl;
-          if (decidedRid) patch.ofdFullId = decidedRid;
+      const results = await classifySaleWithOfd(s);
+      for (const r of results) {
+        if (typeof r.pm === 'number' && r.url) {
+          if (r.pm === 1) {
+            patch.ofdUrl = patch.ofdUrl ?? r.url;
+            if (r.rid && !patch.ofdPrepayId) patch.ofdPrepayId = r.rid;
+          } else if (r.pm === 4) {
+            patch.ofdFullUrl = patch.ofdFullUrl ?? r.url;
+            if (r.rid && !patch.ofdFullId) patch.ofdFullId = r.rid;
+          }
         }
       }
 
