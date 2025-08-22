@@ -59,26 +59,15 @@ export async function GET(req: Request) {
           const endMsk = formatMsk(endExt);
           const startParam = startMsk.replace(/\u00A0/g, ' ').trim();
           const endParam = endMsk.replace(/\u00A0/g, ' ').trim();
-          // 1) Try extended GET first (returns CustomerReceipt)
-          const ext = await fermaGetReceiptExtended({ receiptId: String(rid), dateFromIncl: startParam, dateToIncl: endParam, fn: (sale as any)?.fn, zn: (sale as any)?.zn }, { baseUrl, authToken: token });
-          if (ext.rawStatus >= 200 && ext.rawStatus < 300 && ext.rawText) {
-            try {
-              const obj = JSON.parse(ext.rawText);
-              const hasReceipts = Array.isArray(obj?.Data?.Receipts) && obj.Data.Receipts.length > 0;
-              if (hasReceipts) {
-                const mini = await fermaGetReceiptStatus(String(rid), { baseUrl, authToken: token });
-                return NextResponse.json({ extended: ext, status: mini }, { status: ext.rawStatus });
-              }
-            } catch {}
-          }
-          // 2) Fallback to detailed POST
-          let byRid = await fermaGetReceiptStatusDetailed(String(rid), { startUtc: startParam.replace(' ', 'T'), endUtc: endParam.replace(' ', 'T'), startLocal: startParam.replace(' ', 'T'), endLocal: endParam.replace(' ', 'T') }, { baseUrl, authToken: token });
-          if (byRid.rawStatus >= 200 && byRid.rawStatus < 300 && byRid.rawText && byRid.rawText.indexOf('CustomerReceipt') !== -1) {
-            return NextResponse.json(byRid, { status: byRid.rawStatus });
-          }
-          // 3) Fallback to minimal status
-          byRid = await fermaGetReceiptStatus(String(rid), { baseUrl, authToken: token });
-          return NextResponse.json(byRid, { status: byRid.rawStatus || 200 });
+          // Run all three requests in parallel and return all results
+          const extP = fermaGetReceiptExtended({ receiptId: String(rid), dateFromIncl: startParam, dateToIncl: endParam, fn: (sale as any)?.fn, zn: (sale as any)?.zn }, { baseUrl, authToken: token })
+            .catch((e: any) => ({ rawStatus: 0, rawText: JSON.stringify({ error: String(e?.message || e) }) }));
+          const detP = fermaGetReceiptStatusDetailed(String(rid), { startUtc: startParam.replace(' ', 'T'), endUtc: endParam.replace(' ', 'T'), startLocal: startParam.replace(' ', 'T'), endLocal: endParam.replace(' ', 'T') }, { baseUrl, authToken: token })
+            .catch((e: any) => ({ rawStatus: 0, rawText: JSON.stringify({ error: String(e?.message || e) }) } as any));
+          const minP = fermaGetReceiptStatus(String(rid), { baseUrl, authToken: token })
+            .catch((e: any) => ({ rawStatus: 0, rawText: JSON.stringify({ error: String(e?.message || e) }) } as any));
+          const [extended, detailed, statusObj] = await Promise.all([extP, detP, minP]);
+          return NextResponse.json({ extended, detailed, status: statusObj }, { status: 200 });
         }
       } catch {}
     }
