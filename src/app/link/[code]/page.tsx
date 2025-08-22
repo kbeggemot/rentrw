@@ -147,7 +147,10 @@ export default function PublicPayPage(props: any) {
         const npd = (saleNpd ?? rwNpd ?? null) as string | null;
         setReceipts({ prepay: pre, full, commission: com, npd });
         if (['paid', 'transfered', 'transferred'].includes(aoStatus)) {
-          if (pre || full || com || npd) {
+          // Stop when we have purchase and, if agent sale, commission (or when any receipt exists and it's not agent)
+          const purchaseReady = Boolean(pre || full);
+          const commissionReady = data?.isAgent ? Boolean(com) : true;
+          if ((purchaseReady && commissionReady) || npd) {
             if (pollRef.current) { window.clearTimeout(pollRef.current); pollRef.current = null; }
             setAwaitingPay(false);
             return;
@@ -376,22 +379,28 @@ export default function PublicPayPage(props: any) {
                 {awaitingPay && !(receipts.prepay || receipts.full || receipts.commission || receipts.npd) ? (
                   <div className="text-gray-600">{`Ждём подтверждения оплаты${dots}`}</div>
                 ) : null}
-                {(receipts.prepay || receipts.full || receipts.commission) ? (
+                {(receipts.prepay || receipts.full || receipts.commission || (data?.isAgent ?? false)) ? (
                   <div className="mt-1 p-2">
                     <div className="text-green-700 font-medium mb-2">Успешно оплачено</div>
                     <div className="grid grid-cols-[9rem_1fr] gap-y-2">
-                      {/* Покупка: показываем либо предоплату, либо полный расчёт */}
-                      {(receipts.full || receipts.prepay) ? (
-                        <>
-                          <div className="text-gray-500">Чек на покупку</div>
+                      {/* Покупка: всегда показываем строку, если ещё нет ссылки — «Подгружаем…» */}
+                      <>
+                        <div className="text-gray-500">Чек на покупку</div>
+                        {receipts.full || receipts.prepay ? (
                           <a className="text-black font-semibold hover:underline" href={(receipts.full || receipts.prepay)!} target="_blank" rel="noreferrer">Открыть</a>
-                        </>
-                      ) : null}
-                      {/* Комиссия: показываем только если есть */}
-                      {receipts.commission ? (
+                        ) : (
+                          <div className="text-gray-600">Подгружаем{dots}</div>
+                        )}
+                      </>
+                      {/* Комиссия: показываем строку для агентских продаж */}
+                      {data?.isAgent ? (
                         <>
                           <div className="text-gray-500">Чек на комиссию</div>
-                          <a className="text-black font-semibold hover:underline" href={receipts.commission!} target="_blank" rel="noreferrer">Открыть</a>
+                          {receipts.commission ? (
+                            <a className="text-black font-semibold hover:underline" href={receipts.commission!} target="_blank" rel="noreferrer">Открыть</a>
+                          ) : (
+                            <div className="text-gray-600">Подгружаем{dots}</div>
+                          )}
                         </>
                       ) : null}
                     </div>

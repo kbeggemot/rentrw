@@ -763,7 +763,7 @@ function AcceptPaymentContent() {
           <div className="mt-4 space-y-3">
             <div className="text-green-700 dark:text-green-400 text-sm">Успешно оплачено</div>
             <div className="flex gap-2 items-end">
-              <Input label="Чек на покупку" value={purchaseReceiptUrl ?? ''} readOnly placeholder="Ожидаем чек…" className="flex-1" onFocus={(e) => e.currentTarget.select()} />
+              <Input label="Чек на покупку" value={purchaseReceiptUrl ?? ''} readOnly placeholder={`Подгружаем${dots}`} className="flex-1" onFocus={(e) => e.currentTarget.select()} />
               {purchaseReceiptUrl ? (
                 <Button type="button" variant="secondary" onClick={async () => { try { if (purchaseReceiptUrl) await navigator.clipboard.writeText(purchaseReceiptUrl); showToast('Ссылка скопирована', 'success'); } catch { showToast('Не удалось скопировать', 'error'); } }}>Копировать</Button>
               ) : (
@@ -772,7 +772,7 @@ function AcceptPaymentContent() {
             </div>
             {taskIsAgent ? (
               <div className="flex gap-2 items-end">
-                <Input label="Чек на комиссию" value={commissionReceiptUrl ?? ''} readOnly placeholder="Ожидаем чек…" className="flex-1" onFocus={(e) => e.currentTarget.select()} />
+                <Input label="Чек на комиссию" value={commissionReceiptUrl ?? ''} readOnly placeholder={`Подгружаем${dots}`} className="flex-1" onFocus={(e) => e.currentTarget.select()} />
                 {commissionReceiptUrl ? (
                   <Button type="button" variant="secondary" onClick={async () => { try { if (commissionReceiptUrl) await navigator.clipboard.writeText(commissionReceiptUrl); showToast('Ссылка скопирована', 'success'); } catch { showToast('Не удалось скопировать', 'error'); } }}>Копировать</Button>
                 ) : (
