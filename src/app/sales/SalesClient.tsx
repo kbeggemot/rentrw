@@ -236,14 +236,17 @@ export default function SalesClient({ initial }: { initial: Sale[] }) {
   const [checksOpenId, setChecksOpenId] = useState<string | number | null>(null);
   const [menuOpenId, setMenuOpenId] = useState<string | number | null>(null);
   const [pageCodes, setPageCodes] = useState<Record<number, string>>({});
+  const [successUrls, setSuccessUrls] = useState<Record<number, string>>({});
   async function ensurePageCode(orderId: number): Promise<string | null> {
     if (pageCodes[orderId]) return pageCodes[orderId];
     try {
       const r = await fetch(`/api/sales/by-order/${encodeURIComponent(String(orderId))}`, { cache: 'no-store', credentials: 'include' });
       const d = await r.json();
       const code: string | undefined = d?.pageCode;
+      const successUrl: string | undefined = d?.successUrl;
       if (code) {
         setPageCodes((prev) => (prev[orderId] ? prev : { ...prev, [orderId]: code! }));
+        if (successUrl) setSuccessUrls((prev) => (prev[orderId] ? prev : { ...prev, [orderId]: successUrl! }));
         return code;
       }
     } catch {}
@@ -481,7 +484,7 @@ export default function SalesClient({ initial }: { initial: Sale[] }) {
                         if (!isFinal) return null;
                         const code = pageCodes[s.orderId];
                         return code ? (
-                          <a className="block px-3 py-2 text-sm font-medium text-left hover:bg-gray-50 dark:hover:bg-gray-900" href={`/link/s/${encodeURIComponent(code)}`} target="_blank" rel="noreferrer" onClick={() => setMenuOpenId(null)}>Страница продажи</a>
+                          <a className="block px-3 py-2 text-sm font-medium text-left hover:bg-gray-50 dark:hover:bg-gray-900" href={(successUrls[s.orderId] || `/link/s/${encodeURIComponent(code)}`)} target="_blank" rel="noreferrer" onClick={() => setMenuOpenId(null)}>Страница продажи</a>
                         ) : (
                           <div className="px-3 py-2 text-sm text-gray-500">Готовим ссылку…</div>
                         );
@@ -567,7 +570,7 @@ export default function SalesClient({ initial }: { initial: Sale[] }) {
                         if (!isFinal) return null;
                         const code = pageCodes[s.orderId];
                         return code ? (
-                          <a className="block px-3 py-2 text-sm font-medium text-left hover:bg-gray-50 dark:hover:bg-gray-900" href={`/link/s/${encodeURIComponent(code)}`} target="_blank" rel="noreferrer" onClick={() => setMenuOpenId(null)}>Страница продажи</a>
+                          <a className="block px-3 py-2 text-sm font-medium text-left hover:bg-gray-50 dark:hover:bg-gray-900" href={(successUrls[s.orderId] || `/link/s/${encodeURIComponent(code)}`)} target="_blank" rel="noreferrer" onClick={() => setMenuOpenId(null)}>Страница продажи</a>
                         ) : (
                           <div className="px-3 py-2 text-sm text-gray-500">Готовим ссылку…</div>
                         );

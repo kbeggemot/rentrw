@@ -30,6 +30,7 @@ export default function PublicSuccessUnifiedPage() {
     try {
       const params = new URLSearchParams(window.location.search);
       const sid = params.get("sid");
+      const orderParam = params.get("order");
       const now = Date.now();
       const keys = Object.keys(localStorage).filter((k) => k.startsWith("lastPay:"));
       const candidates: Array<{ key: string; code: string; taskId: any; ts: number; sid?: string }> = [];
@@ -49,12 +50,13 @@ export default function PublicSuccessUnifiedPage() {
       candidates.sort((a, b) => b.ts - a.ts);
       const chosen = candidates[0];
       if (!chosen || !chosen.taskId) {
-        // Если на клиенте ничего нет — пробуем резолвить sid на сервере и показать лоадер
-        if (sid) {
+        // Если на клиенте ничего нет — пробуем резолвить по sid или order на сервере и показать лоадер
+        if (sid || orderParam) {
           setWaiting(true);
           (async () => {
             try {
-              const r = await fetch(`/api/pay-resume?sid=${encodeURIComponent(sid)}`, { cache: 'no-store' });
+              const url = sid ? `/api/pay-resume?sid=${encodeURIComponent(sid)}` : `/api/pay-resume?order=${encodeURIComponent(String(orderParam))}`;
+              const r = await fetch(url, { cache: 'no-store' });
               const d = await r.json();
               if (r.ok && d?.taskId) {
                 setTaskId(d.taskId);

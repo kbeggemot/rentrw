@@ -76,7 +76,7 @@ export async function GET(req: Request) {
     }
     if (!sale) return NextResponse.json({ error: 'NOT_FOUND' }, { status: 404 });
     let pageCode: string | null = null; try { pageCode = await getOrCreateSalePageCode(userId, sale.orderId); } catch {}
-    return NextResponse.json({ sale, pageCode }, { status: 200 });
+    return NextResponse.json({ sale, pageCode, successUrl: pageCode ? `/link/s/${encodeURIComponent(pageCode)}?order=${encodeURIComponent(String(sale.orderId))}` : null }, { status: 200 });
   } catch (error) {
     const msg = error instanceof Error ? error.message : 'Server error';
     return NextResponse.json({ error: msg }, { status: 500 });
