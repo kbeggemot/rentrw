@@ -25,6 +25,7 @@ export async function GET(req: Request) {
           amountRub: s.amountGrossRub,
           createdAt: s.createdAtRw || s.createdAt,
           status: s.status || null,
+          isAgent: !!s.isAgent,
           ofdUrl: s.ofdUrl || null,
           ofdFullUrl: s.ofdFullUrl || null,
           commissionUrl: s.additionalCommissionOfdUrl || null,

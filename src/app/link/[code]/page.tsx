@@ -77,6 +77,8 @@ export default function PublicPayPage(props: any) {
           if (sale) {
             setTaskId(sale.taskId);
             setSummaryFromSale(sale);
+            // Open details automatically for sale pages to show success-like panel
+            setDetailsOpen(true);
           }
         } else {
           throw new Error('not_sale_page');
@@ -100,6 +102,7 @@ export default function PublicPayPage(props: any) {
     try {
       setSummary({ amountRub: sale.amountRub, description: sale.description, createdAt: sale.createdAt });
       setReceipts({ prepay: sale.ofdUrl || null, full: sale.ofdFullUrl || null, commission: sale.commissionUrl || null, npd: sale.npdReceiptUri || null });
+      if (typeof sale?.isAgent === 'boolean') setData((prev) => (prev ? { ...prev, isAgent: Boolean(sale.isAgent) } as any : prev));
     } catch {}
   }
 

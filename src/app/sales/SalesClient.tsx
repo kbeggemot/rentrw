@@ -251,14 +251,14 @@ export default function SalesClient({ initial }: { initial: Sale[] }) {
   }
 
   useEffect(() => {
-    if (menuOpenId == null) return;
-    const sale = filtered.find((s) => s.taskId === menuOpenId);
-    if (!sale) return;
-    const fin = String(sale.status || '').toLowerCase();
-    const isFinal = fin === 'paid' || fin === 'transfered' || fin === 'transferred';
-    if (isFinal) void ensurePageCode(sale.orderId);
+    // Предзагрузка pageCode для всех видимых финальных продаж, чтобы ссылка не мигала в меню
+    const finals = filtered.filter((s) => {
+      const fin = String(s.status || '').toLowerCase();
+      return fin === 'paid' || fin === 'transfered' || fin === 'transferred';
+    });
+    finals.forEach((s) => { void ensurePageCode(s.orderId); });
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [menuOpenId]);
+  }, [filtered]);
   useEffect(() => {
     const close = (e: Event) => {
       const target = e.target as HTMLElement | null;
@@ -316,12 +316,12 @@ export default function SalesClient({ initial }: { initial: Sale[] }) {
                 <div className="text-sm mb-1 text-gray-600 dark:text-gray-400">Статус</div>
                 <div className="flex items-center gap-2">
                   <select className="border rounded-lg px-2 h-9 text-sm bg-white dark:bg-gray-950 w-44" value={status} onChange={(e) => setStatus(e.target.value as any)}>
-                    <option value="all">Все</option>
-                    <option value="pending">pending</option>
-                    <option value="paying">paying</option>
-                    <option value="paid">paid</option>
-                    <option value="transfered">transfered</option>
-                  </select>
+              <option value="all">Все</option>
+              <option value="pending">pending</option>
+              <option value="paying">paying</option>
+              <option value="paid">paid</option>
+              <option value="transfered">transfered</option>
+            </select>
                   <Button aria-label="Убрать фильтр" variant="ghost" size="icon" onClick={() => removeFilter('status')}>×</Button>
                 </div>
               </div>
@@ -350,43 +350,43 @@ export default function SalesClient({ initial }: { initial: Sale[] }) {
                   </select>
                   <Button aria-label="Убрать фильтр" variant="ghost" size="icon" onClick={() => removeFilter('prepay')}>×</Button>
                 </div>
-              </div>
+          </div>
             ) : null}
             {visibleFilters.includes('full') ? (
-              <div>
+          <div>
                 <div className="text-sm mb-1 text-gray-600 dark:text-gray-400">Чек полного расчёта</div>
                 <div className="flex items-center gap-2">
                   <select className="border rounded-lg px-2 h-9 text-sm bg-white dark:bg-gray-950 w-44" value={fullReceipt} onChange={(e) => setFullReceipt(e.target.value as any)}>
-                    <option value="all">Все</option>
+              <option value="all">Все</option>
                     <option value="yes">Есть</option>
-                    <option value="no">Нет</option>
-                  </select>
+              <option value="no">Нет</option>
+            </select>
                   <Button aria-label="Убрать фильтр" variant="ghost" size="icon" onClick={() => removeFilter('full')}>×</Button>
                 </div>
-              </div>
+          </div>
             ) : null}
             {visibleFilters.includes('commission') ? (
-              <div>
+          <div>
                 <div className="text-sm mb-1 text-gray-600 dark:text-gray-400">Чек комиссии</div>
                 <div className="flex items-center gap-2">
                   <select className="border rounded-lg px-2 h-9 text-sm bg-white dark:bg-gray-950 w-44" value={commissionReceipt} onChange={(e) => setCommissionReceipt(e.target.value as any)}>
-                    <option value="all">Все</option>
-                    <option value="yes">Есть</option>
-                    <option value="no">Нет</option>
-                  </select>
+              <option value="all">Все</option>
+              <option value="yes">Есть</option>
+              <option value="no">Нет</option>
+            </select>
                   <Button aria-label="Убрать фильтр" variant="ghost" size="icon" onClick={() => removeFilter('commission')}>×</Button>
                 </div>
-              </div>
+          </div>
             ) : null}
             {visibleFilters.includes('npd') ? (
-              <div>
+          <div>
                 <div className="text-sm mb-1 text-gray-600 dark:text-gray-400">Чек НПД</div>
                 <div className="flex items-center gap-2">
                   <select className="border rounded-lg px-2 h-9 text-sm bg-white dark:bg-gray-950 w-44" value={npdReceipt} onChange={(e) => setNpdReceipt(e.target.value as any)}>
-                    <option value="all">Все</option>
-                    <option value="yes">Есть</option>
-                    <option value="no">Нет</option>
-                  </select>
+              <option value="all">Все</option>
+              <option value="yes">Есть</option>
+              <option value="no">Нет</option>
+            </select>
                   <Button aria-label="Убрать фильтр" variant="ghost" size="icon" onClick={() => removeFilter('npd')}>×</Button>
                 </div>
               </div>
@@ -416,10 +416,10 @@ export default function SalesClient({ initial }: { initial: Sale[] }) {
                   <input className="border rounded-lg px-2 h-9 text-sm bg-white dark:bg-gray-950" type="date" value={endFrom} onChange={(e) => setEndFrom(e.target.value)} />
                   <Button aria-label="Убрать фильтр" variant="ghost" size="icon" onClick={() => removeFilter('endFrom')}>×</Button>
                 </div>
-              </div>
+          </div>
             ) : null}
             {visibleFilters.includes('endTo') ? (
-              <div>
+          <div>
                 <div className="text-sm mb-1 text-gray-600 dark:text-gray-400">Окончание услуги по</div>
                 <div className="flex items-center gap-2">
                   <input className="border rounded-lg px-2 h-9 text-sm bg-white dark:bg-gray-950" type="date" value={endTo} onChange={(e) => setEndTo(e.target.value)} />
@@ -466,14 +466,14 @@ export default function SalesClient({ initial }: { initial: Sale[] }) {
                 <div className="col-span-3">{s.isAgent ? 'Агентская' : 'Прямая'}</div>
               </div>
               <div className="mt-3 grid grid-cols-2 items-center">
-                <div>
+          <div>
                   <Button variant="secondary" onClick={() => setChecksOpenId((id) => (id === s.taskId ? null : s.taskId))}>Чеки</Button>
-                </div>
+          </div>
                 <div className="justify-self-end">
                   <div className="relative" data-menu-root>
                     <Button aria-label="Действия" variant="secondary" size="icon" onClick={() => setMenuOpenId((id) => (id === s.taskId ? null : s.taskId))}>
                       <IconEdit />
-                    </Button>
+          </Button>
                     <div className={`absolute right-0 mt-2 w-48 bg-white dark:bg-gray-950 border border-gray-200 dark:border-gray-800 rounded shadow-sm z-[100] ${menuOpenId === s.taskId ? '' : 'hidden'}`}>
                       {(() => {
                         const fin = String(s.status || '').toLowerCase();
@@ -510,9 +510,9 @@ export default function SalesClient({ initial }: { initial: Sale[] }) {
                       <div className="col-span-2 text-gray-500">Чеки недоступны</div>
                     ) : null}
                   </div>
-                </div>
+        </div>
               ) : null}
-            </div>
+        </div>
           ))
         )}
       </div>
