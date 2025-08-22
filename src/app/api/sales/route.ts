@@ -85,9 +85,9 @@ export async function GET(req: Request) {
                 const createdDate = createdAt ? String(createdAt).slice(0, 10) : null;
                 const endStr = (s.serviceEndDate || '') as string;
                 if (createdDate && endStr && createdDate === endStr) {
-                  await updateSaleOfdUrlsByOrderId(userId, s.orderId, { ofdFullUrl: ofdUrl, ofdUrl: null });
+                  await updateSaleOfdUrlsByOrderId(userId, s.orderId, { ofdFullUrl: ofdUrl });
                 } else {
-                  await updateSaleOfdUrlsByOrderId(userId, s.orderId, { ofdUrl: ofdUrl, ofdFullUrl: null });
+                  await updateSaleOfdUrlsByOrderId(userId, s.orderId, { ofdUrl: ofdUrl });
                 }
               } catch {}
             }

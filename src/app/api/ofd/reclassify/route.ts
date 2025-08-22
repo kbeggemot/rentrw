@@ -82,23 +82,14 @@ export async function POST(req: Request) {
       const decidedUrl = cls.url || null;
       const decidedRid = cls.rid || null;
 
-      // 3) Apply decision and force-clear opposite column to remove duplicates
+      // Применяем решение без принудительного очищения противоположной колонки
       if (decided && decidedUrl) {
         if (decided === 'prepay') {
           patch.ofdUrl = decidedUrl;
-          patch.ofdPrepayId = decidedRid || null;
-          patch.ofdFullUrl = null; // ensure duplicate removal
-          patch.ofdFullId = null;
+          if (decidedRid) patch.ofdPrepayId = decidedRid;
         } else {
           patch.ofdFullUrl = decidedUrl;
-          patch.ofdFullId = decidedRid || null;
-          patch.ofdUrl = null; // ensure duplicate removal
-          patch.ofdPrepayId = null;
-        }
-      } else {
-        // If we couldn't determine URL/type but both columns have the same link, keep only full by default
-        if (s.ofdUrl && s.ofdFullUrl && s.ofdUrl === s.ofdFullUrl) {
-          patch.ofdUrl = null;
+          if (decidedRid) patch.ofdFullId = decidedRid;
         }
       }
 

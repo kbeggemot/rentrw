@@ -25,11 +25,7 @@ export async function POST(req: Request) {
     if (!sale) return NextResponse.json({ error: 'NOT_FOUND' }, { status: 404 });
 
     let changed = false;
-    if (sale.ofdUrl && sale.ofdFullUrl && sale.ofdUrl === sale.ofdFullUrl) {
-      try { (global as any).__OFD_SOURCE__ = 'fix_duplicates'; } catch {}
-      await updateSaleOfdUrlsByOrderId(userId, orderId, { ofdUrl: null });
-      changed = true;
-    }
+    // больше не очищаем автоматически — оставляем обе колонки, если совпадают
     return NextResponse.json({ ok: true, changed });
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'Server error';
