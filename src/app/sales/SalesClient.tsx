@@ -282,9 +282,7 @@ export default function SalesClient({ initial }: { initial: Sale[] }) {
         return;
       }
       const thRect = th.getBoundingClientRect();
-      const left = Math.round(thRect.left + thRect.width / 2 - wrapRect.left - btnW / 2);
       const right = Math.round(wrapRect.right - (thRect.left + thRect.width / 2) - btnW / 2);
-      setExportLeft(Math.max(0, left));
       setExportRight(Math.max(0, right));
       setShowFilterExport(false);
     };
@@ -715,7 +713,7 @@ export default function SalesClient({ initial }: { initial: Sale[] }) {
       {/* Desktop table */}
       {/* Context menu container placed above the table for clipping safety */}
       <div className="hidden md:block overflow-x-auto overflow-y-visible relative bg-white dark:bg-gray-950 border border-gray-200 dark:border-gray-800 rounded-lg z-[1]" ref={tableWrapRef}>
-        <div ref={exportWrapRef} className="absolute -top-12" style={{ left: exportLeft, right: exportRight }}>
+        <div ref={exportWrapRef} className="absolute -top-12" style={{ right: exportRight }}>
           <Button aria-label="Выгрузить XLS" variant="secondary" size="icon" onClick={exportXlsx} title="Выгрузить XLS" className="bg-white text-black border border-black hover:bg-gray-50">
             <IconArrowDown />
           </Button>
