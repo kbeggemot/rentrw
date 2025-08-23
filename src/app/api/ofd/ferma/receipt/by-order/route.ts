@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getInvoiceIdString } from '@/server/orderStore';
-import { fermaGetAuthTokenCached, fermaGetReceiptStatus, fermaGetReceiptStatusDetailed, fermaGetReceiptExtended } from '@/server/ofdFerma';
-import { listSales } from '@/server/taskStore';
+import { fermaGetAuthTokenCached, fermaGetReceiptStatus, fermaGetReceiptStatusDetailed, fermaGetReceiptExtended, buildReceiptViewUrl } from '@/server/ofdFerma';
+import { listSales, updateSaleOfdUrlsByOrderId } from '@/server/taskStore';
 
 export const runtime = 'nodejs';
 
@@ -76,6 +76,41 @@ export async function GET(req: Request) {
           const list = [ridFull, ridPrepay].filter((x): x is string => !!x);
           const uniq = Array.from(new Set(list));
           const receipts = await Promise.all(uniq.map(triple));
+          // Try to persist found links into local store (best effort)
+          try {
+            const patch: any = {};
+            for (const rec of receipts) {
+              const take = (txt?: string) => {
+                if (!txt) return { url: undefined as string | undefined, invoice: undefined as string | undefined };
+                try {
+                  const obj = txt ? JSON.parse(txt) : null;
+                  let url: string | undefined;
+                  let invoice: string | undefined;
+                  const dev = obj?.Data?.Device;
+                  if (dev?.OfdReceiptUrl) url = dev.OfdReceiptUrl as string;
+                  if (!url) {
+                    const fn = dev?.FN || obj?.Data?.Fn || obj?.Fn || obj?.Data?.Receipts?.[0]?.FnNumber;
+                    const fd = dev?.FDN || obj?.Data?.Fd || obj?.Fd || obj?.Data?.Receipts?.[0]?.FDN;
+                    const fp = dev?.FPD || obj?.Data?.Fp || obj?.Fp || obj?.Data?.Receipts?.[0]?.DecimalFiscalSign;
+                    if (fn && fd != null && fp != null) url = buildReceiptViewUrl(fn, fd, fp);
+                  }
+                  invoice = obj?.Data?.InvoiceId || obj?.InvoiceId || obj?.Data?.Receipts?.[0]?.InvoiceId || obj?.Data?.Receipt?.InvoiceId;
+                  return { url, invoice };
+                } catch { return { url: undefined, invoice: undefined }; }
+              };
+              const s1 = take(rec.status?.rawText);
+              const s2 = take(rec.detailed?.rawText);
+              const s3 = take(rec.extended?.rawText);
+              const url = s1.url || s2.url || s3.url;
+              const invoice = s1.invoice || s2.invoice || s3.invoice;
+              if (!url || !invoice) continue;
+              if (/\-A\-/.test(String(invoice))) patch.ofdUrl = url;
+              else patch.ofdFullUrl = url;
+            }
+            if (Object.keys(patch).length > 0 && userId) {
+              await updateSaleOfdUrlsByOrderId(userId, orderId, patch);
+            }
+          } catch {}
           if (receipts.length > 0) return NextResponse.json({ receipts }, { status: 200 });
           return NextResponse.json({ extended: null, detailed: null, status: null }, { status: 200 });
         }
