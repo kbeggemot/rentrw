@@ -716,7 +716,7 @@ export default function SalesClient({ initial }: { initial: Sale[] }) {
       {/* Desktop table */}
       {/* Context menu container placed above the table for clipping safety */}
       <div className="overflow-x-auto overflow-y-visible relative bg-white dark:bg-gray-950 border border-gray-200 dark:border-gray-800 rounded-lg z-[1]" ref={tableWrapRef}>
-        <div ref={exportWrapRef} className="fixed z-[2]" style={{ top: exportTop, left: exportLeft }}>
+        <div ref={exportWrapRef} className="hidden md:block fixed z-[2]" style={{ top: exportTop, left: exportLeft }}>
           <Button aria-label="Выгрузить XLS" variant="secondary" size="icon" onClick={exportXlsx} title="Выгрузить XLS" className="bg-white text-black border border-black hover:bg-gray-50">
             <IconArrowDown />
           </Button>
