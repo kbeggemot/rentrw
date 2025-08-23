@@ -460,10 +460,7 @@ export default function SalesClient({ initial }: { initial: Sale[] }) {
           </Button>
           <Button variant="secondary" onClick={() => load(true, paged.map((s) => s.orderId))} disabled={loading}>{loading ? 'Обновляю…' : 'Обновить'}</Button>
           <div className="ml-auto" />
-          {/* Mobile inline export button (desktop uses floating button) */}
-          <Button aria-label="Выгрузить XLS" variant="secondary" size="icon" onClick={exportXlsx} title="Выгрузить XLS" className="md:hidden bg-white text-black border border-black hover:bg-gray-50">
-            <IconArrowDown />
-          </Button>
+          {/* inline export on mobile removed; using floating button aligned to actions */}
         </div>
         
         {visibleFilters.length > 0 ? (
@@ -716,11 +713,7 @@ export default function SalesClient({ initial }: { initial: Sale[] }) {
 
       {/* Desktop table */}
       {/* Context menu container placed above the table for clipping safety */}
-<<<<<<< HEAD
       <div className="hidden md:block overflow-x-auto overflow-y-visible relative bg-white dark:bg-gray-950 border border-gray-200 dark:border-gray-800 rounded-lg z-[1]" ref={tableWrapRef}>
-=======
-      <div className="overflow-x-auto overflow-y-visible relative bg-white dark:bg-gray-950 border border-gray-200 dark:border-gray-800 rounded-lg z-[1]" ref={tableWrapRef}>
->>>>>>> parent of 8f7654e (Update SalesClient.tsx)
         <div ref={exportWrapRef} className="hidden md:block fixed z-[2]" style={{ top: exportTop, left: exportLeft }}>
           <Button aria-label="Выгрузить XLS" variant="secondary" size="icon" onClick={exportXlsx} title="Выгрузить XLS" className="bg-white text-black border border-black hover:bg-gray-50">
             <IconArrowDown />
