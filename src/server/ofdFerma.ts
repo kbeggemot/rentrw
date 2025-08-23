@@ -200,6 +200,7 @@ export async function fermaGetReceiptStatusDetailed(
   if (fmt(range.startLocal)) payload.StartDateLocal = fmt(range.startLocal);
   if (fmt(range.endLocal)) payload.EndDateLocal = fmt(range.endLocal);
   const body = JSON.stringify({ Request: payload });
+  await rateLimit('detailed');
   const res = await fetch(url, { method: 'POST', headers, body, cache: 'no-store' });
   const text = await res.text();
   let data: any = null; try { data = text ? JSON.parse(text) : null; } catch { data = text; }
@@ -224,6 +225,7 @@ export async function fermaGetReceiptExtended(
   if (params.zn) u.searchParams.set('zn', params.zn);
   if (params.fn) u.searchParams.set('fn', params.fn);
   const headers = authHeaders(auth);
+  await rateLimit('extended');
   const res = await fetch(u.toString(), { method: 'GET', headers, cache: 'no-store' });
   const text = await res.text();
   return { rawStatus: res.status, rawText: text };

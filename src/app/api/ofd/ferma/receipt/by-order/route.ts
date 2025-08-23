@@ -75,7 +75,11 @@ export async function GET(req: Request) {
           }
           const list = [ridFull, ridPrepay].filter((x): x is string => !!x);
           const uniq = Array.from(new Set(list));
-          const receipts = await Promise.all(uniq.map(triple));
+          const receipts: any[] = [];
+          for (const rid of uniq) {
+            receipts.push(await triple(rid));
+            await new Promise((r) => setTimeout(r, 350));
+          }
           // Try to persist found links into local store (best effort)
           try {
             const patch: any = {};
