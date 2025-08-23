@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -28,6 +28,10 @@ export default function SalesClient({ initial }: { initial: Sale[] }) {
   const [page, setPage] = useState(1);
   const pageSize = 15;
   const [sseOn, setSseOn] = useState(false);
+  const tableWrapRef = useRef<HTMLDivElement | null>(null);
+  const actionsThRef = useRef<HTMLTableCellElement | null>(null);
+  const exportWrapRef = useRef<HTMLDivElement | null>(null);
+  const [exportLeft, setExportLeft] = useState<number>(0);
 
   function IconChevronRight() {
     return (
@@ -175,6 +179,8 @@ export default function SalesClient({ initial }: { initial: Sale[] }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // (moved below after `filtered` declaration)
+
   const filtered = useMemo(() => {
     const q = query.trim();
     const fromTs = dateFrom ? new Date(dateFrom).getTime() : null;
@@ -241,6 +247,30 @@ export default function SalesClient({ initial }: { initial: Sale[] }) {
   }, [filtered, page]);
 
   useEffect(() => { setPage(1); }, [query, status, agent, showHidden, purchaseReceipt, fullReceipt, commissionReceipt, npdReceipt, dateFrom, dateTo, endFrom, endTo, amountMin, amountMax]);
+
+  // Выравнивание кнопки выгрузки по вертикали колонки «Действия»
+  useEffect(() => {
+    const update = () => {
+      const wrap = tableWrapRef.current;
+      const th = actionsThRef.current;
+      const btnWrap = exportWrapRef.current;
+      if (!wrap || !th) return;
+      const wrapRect = wrap.getBoundingClientRect();
+      const thRect = th.getBoundingClientRect();
+      const btnW = btnWrap?.offsetWidth ?? 36;
+      const left = Math.max(0, Math.round(thRect.left + thRect.width / 2 - wrapRect.left - btnW / 2));
+      setExportLeft(left);
+    };
+    const r = () => { requestAnimationFrame(update); };
+    r();
+    const wrap = tableWrapRef.current;
+    wrap?.addEventListener('scroll', r, { passive: true } as any);
+    window.addEventListener('resize', r);
+    return () => {
+      wrap?.removeEventListener('scroll', r as any);
+      window.removeEventListener('resize', r);
+    };
+  }, [filtered]);
 
   const fmtDate = (d?: string | null) => (d ? new Date(d).toLocaleDateString('ru-RU', { timeZone: 'Europe/Moscow' }) : '-');
   const [checksOpenId, setChecksOpenId] = useState<string | number | null>(null);
@@ -401,9 +431,6 @@ export default function SalesClient({ initial }: { initial: Sale[] }) {
           </Button>
           <Button variant="secondary" onClick={() => load(true)} disabled={loading}>{loading ? 'Обновляю…' : 'Обновить'}</Button>
           <div className="ml-auto" />
-          <Button aria-label="Выгрузить XLS" variant="secondary" size="icon" onClick={exportXlsx} title="Выгрузить XLS" className="bg-white text-black border border-black hover:bg-gray-50">
-            <IconArrowDown />
-          </Button>
         </div>
         {visibleFilters.length > 0 ? (
           <div className="flex flex-wrap gap-3 items-end text-sm">
@@ -655,8 +682,8 @@ export default function SalesClient({ initial }: { initial: Sale[] }) {
 
       {/* Desktop table */}
       {/* Context menu container placed above the table for clipping safety */}
-      <div className="hidden md:block overflow-x-auto overflow-y-visible relative bg-white dark:bg-gray-950 border border-gray-200 dark:border-gray-800 rounded-lg z-[1]">
-        <div className="absolute right-2 -top-12">
+      <div className="hidden md:block overflow-x-auto overflow-y-visible relative bg-white dark:bg-gray-950 border border-gray-200 dark:border-gray-800 rounded-lg z-[1]" ref={tableWrapRef}>
+        <div ref={exportWrapRef} className="absolute -top-12" style={{ left: exportLeft }}>
           <Button aria-label="Выгрузить XLS" variant="secondary" size="icon" onClick={exportXlsx} title="Выгрузить XLS" className="bg-white text-black border border-black hover:bg-gray-50">
             <IconArrowDown />
           </Button>
@@ -675,7 +702,7 @@ export default function SalesClient({ initial }: { initial: Sale[] }) {
               <th className="text-left px-1 py-2 w-10">Чек НПД</th>
               <th className="text-left px-3 py-2">Дата продажи</th>
               <th className="text-left px-3 py-2">Дата окончания оказания услуги</th>
-              <th className="text-left px-3 py-2 w-14">Действия</th>
+              <th ref={actionsThRef} className="text-left px-3 py-2 w-14">Действия</th>
             </tr>
           </thead>
           <tbody>
