@@ -268,7 +268,10 @@ export default function SalesClient({ initial }: { initial: Sale[] }) {
       const wrapRect = wrap.getBoundingClientRect();
       const btnW = btnWrap?.offsetWidth ?? 36;
       // Prefer aligning to the first visible row action button for pixel-perfect match
-      const probe = actionProbeRef.current;
+      let probe: HTMLElement | null = actionProbeRef.current as any;
+      if (!probe) {
+        try { probe = wrap.querySelector('tbody button[aria-label="Действия"]') as HTMLElement | null; } catch {}
+      }
       if (probe) {
         const pRect = probe.getBoundingClientRect();
         const left = Math.round(pRect.left + pRect.width / 2 - wrapRect.left - btnW / 2);
