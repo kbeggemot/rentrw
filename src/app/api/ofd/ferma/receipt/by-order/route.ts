@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getInvoiceIdString } from '@/server/orderStore';
 import { fermaGetAuthTokenCached, fermaGetReceiptStatus, fermaGetReceiptStatusDetailed, fermaGetReceiptExtended, buildReceiptViewUrl } from '@/server/ofdFerma';
-import { listSales, updateSaleOfdUrlsByOrderId } from '@/server/taskStore';
+import { listSales, listAllSales, updateSaleOfdUrlsByOrderId } from '@/server/taskStore';
 
 export const runtime = 'nodejs';
 
@@ -107,12 +107,26 @@ export async function GET(req: Request) {
               const s3 = take(rec.extended?.rawText);
               const url = s1.url || s2.url || s3.url;
               const invoice = s1.invoice || s2.invoice || s3.invoice;
-              if (!url || !invoice) continue;
-              if (/\-A\-/.test(String(invoice))) patch.ofdUrl = url;
-              else patch.ofdFullUrl = url;
+              if (!url) continue;
+              const isFullByRid = rec.receiptId === ridFull;
+              const isPrepayByRid = rec.receiptId === ridPrepay;
+              const isPrepayByInv = /\-A\-/.test(String(invoice || '')); // A=prepay
+              const isFullByInv = /\-B\-/.test(String(invoice || '')) || /\-C\-/.test(String(invoice || ''));
+              if (isPrepayByRid || isPrepayByInv) patch.ofdUrl = url;
+              else if (isFullByRid || isFullByInv) patch.ofdFullUrl = url;
             }
-            if (Object.keys(patch).length > 0 && userId) {
-              await updateSaleOfdUrlsByOrderId(userId, orderId, patch);
+            if (Object.keys(patch).length > 0) {
+              let uid: string | null = userId;
+              if (!uid) {
+                try {
+                  const all = await listAllSales();
+                  const found = all.find((s) => Number(s.orderId) === Number(orderId));
+                  uid = found?.userId ? String(found.userId) : null;
+                } catch {}
+              }
+              if (uid) {
+                await updateSaleOfdUrlsByOrderId(uid, orderId, patch);
+              }
             }
           } catch {}
           if (receipts.length > 0) return NextResponse.json({ receipts }, { status: 200 });
