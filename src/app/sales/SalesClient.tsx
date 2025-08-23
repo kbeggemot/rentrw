@@ -256,6 +256,10 @@ export default function SalesClient({ initial }: { initial: Sale[] }) {
       const th = actionsThRef.current;
       const btnWrap = exportWrapRef.current;
       if (!wrap || !th) { setShowFilterExport(true); return; }
+      // If desktop table is hidden (mobile), keep fallback button
+      const wrapVisible = (wrap.offsetWidth > 0 && wrap.offsetHeight > 0);
+      const thVisible = (th.offsetWidth > 0 && th.offsetHeight > 0);
+      if (!wrapVisible || !thVisible) { setShowFilterExport(true); return; }
       const wrapRect = wrap.getBoundingClientRect();
       const thRect = th.getBoundingClientRect();
       const btnW = btnWrap?.offsetWidth ?? 36;
@@ -263,7 +267,8 @@ export default function SalesClient({ initial }: { initial: Sale[] }) {
       setExportLeft(left);
       setShowFilterExport(false);
     };
-    const r = () => { requestAnimationFrame(update); };
+    let raf = 0;
+    const r = () => { cancelAnimationFrame(raf); raf = requestAnimationFrame(update); };
     r();
     const wrap = tableWrapRef.current;
     wrap?.addEventListener('scroll', r, { passive: true } as any);
@@ -271,6 +276,7 @@ export default function SalesClient({ initial }: { initial: Sale[] }) {
     return () => {
       wrap?.removeEventListener('scroll', r as any);
       window.removeEventListener('resize', r);
+      cancelAnimationFrame(raf);
     };
   }, [filtered]);
 
