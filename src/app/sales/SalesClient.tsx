@@ -395,11 +395,6 @@ export default function SalesClient({ initial }: { initial: Sale[] }) {
           </Button>
           <Button variant="secondary" onClick={() => load(true)} disabled={loading}>{loading ? 'Обновляю…' : 'Обновить'}</Button>
         </div>
-        <div className="w-full flex justify-center">
-          <Button aria-label="Выгрузить XLS" variant="secondary" size="icon" onClick={exportXlsx} title="Выгрузить XLS" className="bg-white text-black border border-black hover:bg-gray-50">
-            <IconArrowDown />
-          </Button>
-        </div>
         {visibleFilters.length > 0 ? (
           <div className="flex flex-wrap gap-3 items-end text-sm">
             {visibleFilters.includes('showHidden') ? (
@@ -665,7 +660,14 @@ export default function SalesClient({ initial }: { initial: Sale[] }) {
               <th className="text-left px-1 py-2 w-10">Чек НПД</th>
               <th className="text-left px-3 py-2">Дата продажи</th>
               <th className="text-left px-3 py-2">Дата окончания оказания услуги</th>
-              <th className="text-left px-3 py-2 w-14">Действия</th>
+              <th className="text-left px-3 py-2 w-14">
+                <div className="flex items-center gap-2">
+                  <span>Действия</span>
+                  <Button aria-label="Выгрузить XLS" variant="secondary" size="icon" onClick={exportXlsx} title="Выгрузить XLS" className="bg-white text-black border border-black hover:bg-gray-50">
+                    <IconArrowDown />
+                  </Button>
+                </div>
+              </th>
             </tr>
           </thead>
           <tbody>
