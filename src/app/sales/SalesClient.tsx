@@ -106,7 +106,7 @@ export default function SalesClient({ initial }: { initial: Sale[] }) {
     try {
       const syncMissing = async (arr: Sale[]) => {
         try {
-          const need = arr.filter((s) => !s.ofdUrl && !s.ofdFullUrl);
+          const need = arr.filter((s) => (!s.ofdUrl) || (!s.ofdFullUrl));
           await Promise.allSettled(need.map((s) => fetch(`/api/ofd/sync?order=${encodeURIComponent(String(s.orderId))}`, { cache: 'no-store', credentials: 'include' })));
           // soft refresh after sync attempts
           const r2 = await fetch('/api/sales', { cache: 'no-store', credentials: 'include' });

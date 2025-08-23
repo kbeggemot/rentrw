@@ -42,6 +42,20 @@ function shouldLog(): boolean {
   return process.env.OFD_FERMA_LOG_DEBUG === '1' || process.env.NODE_ENV !== 'production';
 }
 
+// Simple in-memory rate limiter per key (endpoint) to avoid OFD 429
+const rateBuckets = new Map<string, { lastMs: number; minGapMs: number }>();
+async function rateLimit(key: string, minGapMs = 350): Promise<void> {
+  const now = Date.now();
+  const b = rateBuckets.get(key) || { lastMs: 0, minGapMs };
+  const gap = now - b.lastMs;
+  if (gap < b.minGapMs) {
+    await new Promise((r) => setTimeout(r, b.minGapMs - gap));
+  }
+  b.lastMs = Date.now();
+  b.minGapMs = minGapMs;
+  rateBuckets.set(key, b);
+}
+
 export function buildReceiptViewUrl(fn: string | number, fd: string | number, fp: string | number): string {
   const base = process.env.FERMA_BASE_URL || process.env.OFD_FERMA_BASE_URL || 'https://ferma.ofd.ru/';
   const viewerBase = /ferma-test/i.test(base) ? 'https://check-demo.ofd.ru' : 'https://check.ofd.ru';
@@ -96,6 +110,7 @@ export async function fermaCreateReceipt(payload: unknown, opts?: Partial<FermaA
     try { await writeText('.data/ofd_last_request.json', JSON.stringify({ ts: new Date().toISOString(), url, body: payload }, null, 2)); } catch {}
   }
 
+  await rateLimit('create');
   const res = await fetch(url, { method: 'POST', headers, body, cache: 'no-store' });
   const text = await res.text();
   if (shouldLog()) {
@@ -125,6 +140,7 @@ export async function fermaGetReceiptStatus(id: string, opts?: Partial<FermaAuth
   const headers = authHeaders(auth);
   let text = '';
   if (isGetByPath) {
+    await rateLimit('status');
     const res = await fetch(url, { method: 'GET', headers, cache: 'no-store' });
     text = await res.text();
     let data: any = null; try { data = text ? JSON.parse(text) : null; } catch { data = text; }
@@ -133,6 +149,7 @@ export async function fermaGetReceiptStatus(id: string, opts?: Partial<FermaAuth
   // POST status by ReceiptId first, with minimal and expanded bodies; then fallback to InvoiceId if not found
   const statusBody = (payload: any) => JSON.stringify({ Request: payload });
   // 1) minimal by ReceiptId
+  await rateLimit('status');
   let res = await fetch(url, { method: 'POST', headers, body: statusBody({ ReceiptId: id }), cache: 'no-store' });
   text = await res.text();
   if (res.status === 404 || /not\s*found/i.test(text) || /не\s*найден/i.test(text)) {
@@ -142,11 +159,13 @@ export async function fermaGetReceiptStatus(id: string, opts?: Partial<FermaAuth
     const end = new Date(now.getTime() + 1 * 24 * 60 * 60 * 1000);
     const fmt = (d: Date) => d.toISOString().slice(0, 19);
     const ext = { ReceiptId: id, StartDateUtc: fmt(start), EndDateUtc: fmt(end), StartDateLocal: fmt(start), EndDateLocal: fmt(end) };
+    await rateLimit('status');
     res = await fetch(url, { method: 'POST', headers, body: statusBody(ext), cache: 'no-store' });
     text = await res.text();
   }
   if (res.status === 404 || /not\s*found/i.test(text) || /не\s*найден/i.test(text)) {
     // 3) fallback by InvoiceId
+    await rateLimit('status');
     res = await fetch(url, { method: 'POST', headers, body: statusBody({ InvoiceId: id }), cache: 'no-store' });
     text = await res.text();
   }
