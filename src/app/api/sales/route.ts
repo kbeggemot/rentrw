@@ -34,8 +34,8 @@ export async function GET(req: Request) {
           const st = (s.status || '').toLowerCase();
           // a) always refresh pending, paying, paid
           const needA = st === 'pending' || st === 'paying' || st === 'paid';
-          // b) refresh transferred/transfered only if receipts are missing
-          const missingReceipts = (!s.ofdUrl && !s.ofdFullUrl) || (s.isAgent && (!s.additionalCommissionOfdUrl || !s.npdReceiptUri));
+          // b) refresh transferred/transfered if any required receipt/link is missing
+          const missingReceipts = (!s.ofdUrl || !s.ofdFullUrl || (s as any).ofdFullId) || (s.isAgent && (!s.additionalCommissionOfdUrl || !s.npdReceiptUri));
           const needB = (st === 'transferred' || st === 'transfered') && missingReceipts;
           // c) also refresh any sale that lacks createdAtRw to retrieve RW creation time
           const needC = !s.createdAtRw;
