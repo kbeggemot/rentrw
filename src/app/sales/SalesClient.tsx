@@ -32,6 +32,7 @@ export default function SalesClient({ initial }: { initial: Sale[] }) {
   const actionsThRef = useRef<HTMLTableCellElement | null>(null);
   const exportWrapRef = useRef<HTMLDivElement | null>(null);
   const [exportLeft, setExportLeft] = useState<number>(0);
+  const [showFilterExport, setShowFilterExport] = useState<boolean>(true);
 
   function IconChevronRight() {
     return (
@@ -254,12 +255,13 @@ export default function SalesClient({ initial }: { initial: Sale[] }) {
       const wrap = tableWrapRef.current;
       const th = actionsThRef.current;
       const btnWrap = exportWrapRef.current;
-      if (!wrap || !th) return;
+      if (!wrap || !th) { setShowFilterExport(true); return; }
       const wrapRect = wrap.getBoundingClientRect();
       const thRect = th.getBoundingClientRect();
       const btnW = btnWrap?.offsetWidth ?? 36;
       const left = Math.max(0, Math.round(thRect.left + thRect.width / 2 - wrapRect.left - btnW / 2));
       setExportLeft(left);
+      setShowFilterExport(false);
     };
     const r = () => { requestAnimationFrame(update); };
     r();
@@ -431,6 +433,11 @@ export default function SalesClient({ initial }: { initial: Sale[] }) {
           </Button>
           <Button variant="secondary" onClick={() => load(true)} disabled={loading}>{loading ? 'Обновляю…' : 'Обновить'}</Button>
           <div className="ml-auto" />
+          {showFilterExport ? (
+            <Button aria-label="Выгрузить XLS" variant="secondary" size="icon" onClick={exportXlsx} title="Выгрузить XLS" className="bg-white text-black border border-black hover:bg-gray-50">
+              <IconArrowDown />
+            </Button>
+          ) : null}
         </div>
         {visibleFilters.length > 0 ? (
           <div className="flex flex-wrap gap-3 items-end text-sm">

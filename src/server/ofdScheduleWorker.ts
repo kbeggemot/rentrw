@@ -1,6 +1,6 @@
 import { readText, writeText } from './storage';
 import path from 'path';
-import { fermaGetAuthTokenCached, fermaCreateReceipt } from './ofdFerma';
+import { fermaGetAuthTokenCached, fermaCreateReceipt, fermaGetReceiptStatus, buildReceiptViewUrl } from './ofdFerma';
 import { buildFermaReceiptPayload, PAYMENT_METHOD_FULL_PAYMENT, VatRate } from '@/app/api/ofd/ferma/build-payload';
 import { getUserOrgInn, getUserPayoutRequisites } from './userStore';
 import { getDecryptedApiToken } from './secureStore';
@@ -155,7 +155,30 @@ export async function runDueOffsetJobs(): Promise<void> {
       const created = await fermaCreateReceipt(payload, { baseUrl, authToken: token });
       try {
         const { updateSaleOfdUrlsByOrderId } = await import('./taskStore');
+        try { (global as any).__OFD_SOURCE__ = 'schedule_worker'; } catch {}
         await updateSaleOfdUrlsByOrderId(job.userId, job.orderId, { ofdFullId: created.id || null });
+        // Try to resolve the receipt URL right away to avoid waiting for callback/sync
+        const key = String(created.id || job.orderId);
+        let url: string | undefined;
+        let tries = 0;
+        while (!url && tries < 20 && created.id) {
+          try {
+            const st = await fermaGetReceiptStatus(String(created.id), { baseUrl, authToken: token });
+            const obj = st.rawText ? JSON.parse(st.rawText) : {};
+            const fn = obj?.Data?.Fn || obj?.Fn;
+            const fd = obj?.Data?.Fd || obj?.Fd;
+            const fp = obj?.Data?.Fp || obj?.Fp;
+            const direct = obj?.Data?.Device?.OfdReceiptUrl as string | undefined;
+            if (direct && direct.length > 0) { url = direct; break; }
+            if (fn && fd != null && fp != null) { url = buildReceiptViewUrl(fn, fd, fp); break; }
+          } catch {}
+          tries += 1;
+          await new Promise((r) => setTimeout(r, 1000));
+        }
+        if (url) {
+          try { (global as any).__OFD_SOURCE__ = 'schedule_worker'; } catch {}
+          await updateSaleOfdUrlsByOrderId(job.userId, job.orderId, { ofdFullUrl: url });
+        }
       } catch {}
     } catch {
       // keep the job for next attempt
