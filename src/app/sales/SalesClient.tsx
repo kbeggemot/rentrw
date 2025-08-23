@@ -35,7 +35,6 @@ export default function SalesClient({ initial }: { initial: Sale[] }) {
   const [exportTop, setExportTop] = useState<number>(0);
   const [showFilterExport, setShowFilterExport] = useState<boolean>(true);
   const actionProbeRef = useRef<HTMLButtonElement | null>(null);
-  const [isMobile, setIsMobile] = useState<boolean>(false);
 
   function IconChevronRight() {
     return (
@@ -262,11 +261,12 @@ export default function SalesClient({ initial }: { initial: Sale[] }) {
       const th = actionsThRef.current;
       const btnWrap = exportWrapRef.current;
       if (!wrap || !th) { setShowFilterExport(true); return; }
+      // If desktop table is hidden (mobile), keep fallback button
+      const wrapVisible = (wrap.offsetWidth > 0 && wrap.offsetHeight > 0);
+      const thVisible = (th.offsetWidth > 0 && th.offsetHeight > 0);
+      if (!wrapVisible || !thVisible) { setShowFilterExport(true); return; }
       const wrapRect = wrap.getBoundingClientRect();
       const btnW = btnWrap?.offsetWidth ?? 36;
-      // Detect mobile width
-      const mobile = typeof window !== 'undefined' ? window.innerWidth < 768 : false;
-      setIsMobile(mobile);
       // Prefer aligning to the first visible row action button for pixel-perfect match
       let probe: HTMLElement | null = actionProbeRef.current as any;
       if (!probe) {
@@ -275,7 +275,7 @@ export default function SalesClient({ initial }: { initial: Sale[] }) {
       if (probe) {
         const pRect = probe.getBoundingClientRect();
         const left = Math.round(pRect.left + pRect.width / 2 - btnW / 2);
-        const top = Math.round((mobile ? th.getBoundingClientRect().top - 56 : th.getBoundingClientRect().top - 48));
+        const top = Math.round(th.getBoundingClientRect().top - 48);
         setExportLeft(left);
         setExportTop(Math.max(0, top));
         setShowFilterExport(false);
@@ -283,12 +283,13 @@ export default function SalesClient({ initial }: { initial: Sale[] }) {
       }
       const thRect = th.getBoundingClientRect();
       const left = Math.round(thRect.left + thRect.width / 2 - btnW / 2);
-      const top = Math.round((mobile ? thRect.top - 56 : thRect.top - 48));
+      const top = Math.round(thRect.top - 48);
       setExportLeft(left);
       setExportTop(Math.max(0, top));
       setShowFilterExport(false);
     };
-    const r = () => { cancelAnimationFrame((r as any)._id); (r as any)._id = requestAnimationFrame(update); };
+    let raf = 0;
+    const r = () => { cancelAnimationFrame(raf); raf = requestAnimationFrame(update); };
     r();
     const wrap = tableWrapRef.current;
     wrap?.addEventListener('scroll', r, { passive: true } as any);
@@ -296,7 +297,7 @@ export default function SalesClient({ initial }: { initial: Sale[] }) {
     return () => {
       wrap?.removeEventListener('scroll', r as any);
       window.removeEventListener('resize', r);
-      cancelAnimationFrame((r as any)._id);
+      cancelAnimationFrame(raf);
     };
   }, [filtered]);
 
@@ -712,8 +713,8 @@ export default function SalesClient({ initial }: { initial: Sale[] }) {
 
       {/* Desktop table */}
       {/* Context menu container placed above the table for clipping safety */}
-      <div className="overflow-x-auto overflow-y-visible relative bg-white dark:bg-gray-950 border border-gray-200 dark:border-gray-800 rounded-lg z-[1]" ref={tableWrapRef}>
-        <div ref={exportWrapRef} className="fixed z-[2]" style={{ top: exportTop, left: exportLeft }}>
+      <div className="hidden md:block overflow-x-auto overflow-y-visible relative bg-white dark:bg-gray-950 border border-gray-200 dark:border-gray-800 rounded-lg z-[1]" ref={tableWrapRef}>
+        <div ref={exportWrapRef} className="hidden md:block fixed z-[2]" style={{ top: exportTop, left: exportLeft }}>
           <Button aria-label="Выгрузить XLS" variant="secondary" size="icon" onClick={exportXlsx} title="Выгрузить XLS" className="bg-white text-black border border-black hover:bg-gray-50">
             <IconArrowDown />
           </Button>
