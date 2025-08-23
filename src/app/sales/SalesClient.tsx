@@ -32,7 +32,7 @@ export default function SalesClient({ initial }: { initial: Sale[] }) {
   const actionsThRef = useRef<HTMLTableCellElement | null>(null);
   const exportWrapRef = useRef<HTMLDivElement | null>(null);
   const [exportLeft, setExportLeft] = useState<number>(0);
-  const [exportRight, setExportRight] = useState<number>(0);
+  const [exportTop, setExportTop] = useState<number>(0);
   const [showFilterExport, setShowFilterExport] = useState<boolean>(true);
   const actionProbeRef = useRef<HTMLButtonElement | null>(null);
 
@@ -274,16 +274,18 @@ export default function SalesClient({ initial }: { initial: Sale[] }) {
       }
       if (probe) {
         const pRect = probe.getBoundingClientRect();
-        const left = Math.round(pRect.left + pRect.width / 2 - wrapRect.left - btnW / 2);
-        const right = Math.round(wrapRect.right - (pRect.left + pRect.width / 2) - btnW / 2);
-        setExportLeft(Math.max(0, left));
-        setExportRight(Math.max(0, right));
+        const left = Math.round(pRect.left + pRect.width / 2 - btnW / 2);
+        const top = Math.round(th.getBoundingClientRect().top - 48);
+        setExportLeft(left);
+        setExportTop(Math.max(0, top));
         setShowFilterExport(false);
         return;
       }
       const thRect = th.getBoundingClientRect();
-      const right = Math.round(wrapRect.right - (thRect.left + thRect.width / 2) - btnW / 2);
-      setExportRight(Math.max(0, right));
+      const left = Math.round(thRect.left + thRect.width / 2 - btnW / 2);
+      const top = Math.round(thRect.top - 48);
+      setExportLeft(left);
+      setExportTop(Math.max(0, top));
       setShowFilterExport(false);
     };
     let raf = 0;
@@ -713,7 +715,7 @@ export default function SalesClient({ initial }: { initial: Sale[] }) {
       {/* Desktop table */}
       {/* Context menu container placed above the table for clipping safety */}
       <div className="hidden md:block overflow-x-auto overflow-y-visible relative bg-white dark:bg-gray-950 border border-gray-200 dark:border-gray-800 rounded-lg z-[1]" ref={tableWrapRef}>
-        <div ref={exportWrapRef} className="absolute -top-12" style={{ right: exportRight }}>
+        <div ref={exportWrapRef} className="fixed z-[2]" style={{ top: exportTop, left: exportLeft }}>
           <Button aria-label="Выгрузить XLS" variant="secondary" size="icon" onClick={exportXlsx} title="Выгрузить XLS" className="bg-white text-black border border-black hover:bg-gray-50">
             <IconArrowDown />
           </Button>
