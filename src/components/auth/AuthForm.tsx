@@ -15,6 +15,7 @@ export function AuthForm() {
   const [confirm, setConfirm] = useState('');
   const [loading, setLoading] = useState(false);
   const [awaitCode, setAwaitCode] = useState(false);
+  const [resendIn, setResendIn] = useState<number>(0);
   const [error, setError] = useState<string | null>(null);
   const [passwordError, setPasswordError] = useState<string | null>(null);
   const [canBioLogin, setCanBioLogin] = useState(false);
@@ -32,6 +33,7 @@ export function AuthForm() {
   // На свежей загрузке / при переходе на страницу авторизации — сбрасываем любые промежуточные данные
   useEffect(() => {
     setAwaitCode(false);
+    setResendIn(0);
     setIsRegister(false);
     setPhone('');
     setEmail('');
@@ -39,6 +41,14 @@ export function AuthForm() {
     setConfirm('');
     try { sessionStorage.removeItem('reg.pending'); } catch {}
   }, []);
+
+  // Тикер обратного отсчёта для повторной отправки кода
+  useEffect(() => {
+    if (!isRegister || !awaitCode) return;
+    if (resendIn <= 0) return;
+    const t = setInterval(() => { setResendIn((s) => (s > 0 ? s - 1 : 0)); }, 1000);
+    return () => clearInterval(t);
+  }, [isRegister, awaitCode, resendIn]);
 
   // Определяем, показывать ли кнопку входа по биометрии (показываем сразу, если есть токен и ключ)
   useEffect(() => {
@@ -134,6 +144,7 @@ export function AuthForm() {
         // Перешли на шаг подтверждения
         setAwaitCode(true);
         setIsRegister(true);
+        setResendIn(60);
         try { sessionStorage.setItem('reg.pending', JSON.stringify({ phone, email: email.trim(), awaitCode: true })); } catch {}
         setError('Мы отправили код на вашу почту. Введите его, чтобы завершить регистрацию.');
         setPassword('');
@@ -219,6 +230,26 @@ export function AuthForm() {
             onChange={(e) => setConfirm(e.target.value)}
             required
           />
+        ) : null}
+        {isRegister && awaitCode ? (
+          <div className="text-xs text-gray-600 dark:text-gray-400 -mt-2">
+            {resendIn > 0 ? (
+              <span>Можно отправить код повторно через {resendIn} с</span>
+            ) : (
+              <button type="button" className="text-foreground hover:underline" onClick={async () => {
+                try {
+                  setLoading(true);
+                  await fetch('/api/auth/register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ phone, password, email: email.trim() }) });
+                  setResendIn(60);
+                  setError('Мы отправили код на вашу почту. Проверьте входящие.');
+                } catch {
+                  setError('Не удалось отправить код. Попробуйте позже.');
+                } finally {
+                  setLoading(false);
+                }
+              }}>Отправить код ещё раз</button>
+            )}
+          </div>
         ) : null}
         {error ? (
           <div className="text-sm text-red-600" role="alert">
