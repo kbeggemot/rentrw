@@ -40,7 +40,14 @@ export async function GET(req: Request) {
           if (!url && !rid) continue;
           const patch: any = {};
           if (target === 'prepay') { if (url) patch.ofdUrl = url; if (rid) patch.ofdPrepayId = rid; }
-          else { if (url) patch.ofdFullUrl = url; if (rid) patch.ofdFullId = rid; }
+          else {
+            if (url) patch.ofdFullUrl = url; if (rid) patch.ofdFullId = rid;
+            // если ofdFullUrl совпадает с ofdUrl — перепишем позже при наличии валидных Fn/Fd/Fp
+            if (s.ofdUrl && patch.ofdFullUrl === s.ofdUrl) {
+              const url2 = fn && fd != null && fp != null ? buildReceiptViewUrl(fn, fd, fp) : undefined;
+              if (url2) patch.ofdFullUrl = url2;
+            }
+          }
           if (Object.keys(patch).length > 0) {
             try { (global as any).__OFD_SOURCE__ = 'sync'; } catch {}
             await updateSaleOfdUrlsByOrderId(userId, s.orderId, patch);

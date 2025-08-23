@@ -144,7 +144,9 @@ export async function GET(req: Request) {
                     }
                   } catch {}
                 }
-                if (!s.ofdFullUrl && (s as any).ofdFullId) {
+                // Fix cases where ofdFullUrl был записан ссылкой предоплаты: перезапрашиваем по ofdFullId,
+                // если он есть и (ссылка отсутствует ИЛИ совпадает с ofdUrl)
+                if ((s as any).ofdFullId && (!s.ofdFullUrl || s.ofdFullUrl === s.ofdUrl)) {
                   try {
                     const st = await fermaGetReceiptStatus((s as any).ofdFullId, { baseUrl, authToken: tokenOfd });
                     const obj = st.rawText ? JSON.parse(st.rawText) : {};
