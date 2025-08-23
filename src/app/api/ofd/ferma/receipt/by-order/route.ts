@@ -62,13 +62,15 @@ export async function GET(req: Request) {
           const startParam = startMsk.replace(/\u00A0/g, ' ').trim();
           const endParam = endMsk.replace(/\u00A0/g, ' ').trim();
           async function triple(ridX: string) {
-            const extP = fermaGetReceiptExtended({ receiptId: String(ridX), dateFromIncl: startParam, dateToIncl: endParam, fn: (sale as any)?.fn, zn: (sale as any)?.zn }, { baseUrl, authToken: token })
+            // последовательные вызовы с небольшими задержками, чтобы не ловить 429
+            const extended = await fermaGetReceiptExtended({ receiptId: String(ridX), dateFromIncl: startParam, dateToIncl: endParam, fn: (sale as any)?.fn, zn: (sale as any)?.zn }, { baseUrl, authToken: token })
               .catch((e: any) => ({ rawStatus: 0, rawText: JSON.stringify({ error: String(e?.message || e) }) }));
-            const detP = fermaGetReceiptStatusDetailed(String(ridX), { startUtc: startParam.replace(' ', 'T'), endUtc: endParam.replace(' ', 'T'), startLocal: startParam.replace(' ', 'T'), endLocal: endParam.replace(' ', 'T') }, { baseUrl, authToken: token })
+            await new Promise((r) => setTimeout(r, 350));
+            const detailed = await fermaGetReceiptStatusDetailed(String(ridX), { startUtc: startParam.replace(' ', 'T'), endUtc: endParam.replace(' ', 'T'), startLocal: startParam.replace(' ', 'T'), endLocal: endParam.replace(' ', 'T') }, { baseUrl, authToken: token })
               .catch((e: any) => ({ rawStatus: 0, rawText: JSON.stringify({ error: String(e?.message || e) }) } as any));
-            const minP = fermaGetReceiptStatus(String(ridX), { baseUrl, authToken: token })
+            await new Promise((r) => setTimeout(r, 350));
+            const statusObj = await fermaGetReceiptStatus(String(ridX), { baseUrl, authToken: token })
               .catch((e: any) => ({ rawStatus: 0, rawText: JSON.stringify({ error: String(e?.message || e) }) } as any));
-            const [extended, detailed, statusObj] = await Promise.all([extP, detP, minP]);
             return { receiptId: ridX, extended, detailed, status: statusObj };
           }
           const list = [ridFull, ridPrepay].filter((x): x is string => !!x);
