@@ -460,14 +460,12 @@ export default function SalesClient({ initial }: { initial: Sale[] }) {
           </Button>
           <Button variant="secondary" onClick={() => load(true, paged.map((s) => s.orderId))} disabled={loading}>{loading ? 'Обновляю…' : 'Обновить'}</Button>
           <div className="ml-auto" />
-          {/* floating export button is rendered above the table; no duplicate here */}
-        </div>
-        {/* Mobile-only export button */}
-        <div className="md:hidden flex justify-end">
-          <Button aria-label="Выгрузить XLS" variant="secondary" size="icon" onClick={exportXlsx} title="Выгрузить XLS" className="bg-white text-black border border-black hover:bg-gray-50">
+          {/* Mobile inline export button (desktop uses floating button) */}
+          <Button aria-label="Выгрузить XLS" variant="secondary" size="icon" onClick={exportXlsx} title="Выгрузить XLS" className="md:hidden bg-white text-black border border-black hover:bg-gray-50">
             <IconArrowDown />
           </Button>
         </div>
+        
         {visibleFilters.length > 0 ? (
           <div className="flex flex-wrap gap-3 items-end text-sm">
             {visibleFilters.includes('showHidden') ? (
