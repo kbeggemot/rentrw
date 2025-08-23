@@ -101,12 +101,14 @@ export default function SalesClient({ initial }: { initial: Sale[] }) {
     setVisibleFilters((prev) => prev.filter((k) => k !== key));
   };
 
-  const load = async (refresh = false) => {
+  const load = async (refresh = false, onlyOrders?: number[]) => {
     setLoading(true);
     try {
       const syncMissing = async (arr: Sale[]) => {
         try {
-          const need = arr.filter((s) => (!s.ofdUrl) || (!s.ofdFullUrl));
+          const ordersSet = new Set((onlyOrders || []).map((n) => Number(n)));
+          const pool = onlyOrders && onlyOrders.length > 0 ? arr.filter((s) => ordersSet.has(Number(s.orderId))) : arr;
+          const need = pool.filter((s) => (!s.ofdUrl) || (!s.ofdFullUrl));
           await Promise.allSettled(need.map((s) => fetch(`/api/ofd/sync?order=${encodeURIComponent(String(s.orderId))}`, { cache: 'no-store', credentials: 'include' })));
           // soft refresh after sync attempts
           const r2 = await fetch('/api/sales', { cache: 'no-store', credentials: 'include' });
@@ -116,7 +118,8 @@ export default function SalesClient({ initial }: { initial: Sale[] }) {
         } catch {}
       };
       if (refresh) {
-        void fetch('/api/sales?refresh=1', { cache: 'no-store', credentials: 'include' })
+        const qs = onlyOrders && onlyOrders.length > 0 ? `&orders=${encodeURIComponent(onlyOrders.join(','))}` : '';
+        void fetch(`/api/sales?refresh=1${qs}`, { cache: 'no-store', credentials: 'include' })
           .then(() => fetch('/api/sales', { cache: 'no-store', credentials: 'include' }))
           .then((r) => r.json())
           .then((d) => {
@@ -175,7 +178,7 @@ export default function SalesClient({ initial }: { initial: Sale[] }) {
     const isProd = typeof window !== 'undefined' && window.location.hostname !== 'localhost';
     if (!isProd) return;
     // подождем кадр, чтобы не блокировать пеинт
-    const t = setTimeout(() => { void load(true); }, 0);
+    const t = setTimeout(() => { void load(true, paged.map((s) => s.orderId)); }, 0);
     return () => clearTimeout(t);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -437,7 +440,7 @@ export default function SalesClient({ initial }: { initial: Sale[] }) {
           <Button variant="ghost" onClick={() => { setVisibleFilters([]); setQuery(''); setStatus('all'); setAgent('all'); setPurchaseReceipt('all'); setFullReceipt('all'); setCommissionReceipt('all'); setNpdReceipt('all'); setShowHidden('no'); setDateFrom(''); setDateTo(''); setEndFrom(''); setEndTo(''); setAmountMin(''); setAmountMax(''); }}>
             Сбросить
           </Button>
-          <Button variant="secondary" onClick={() => load(true)} disabled={loading}>{loading ? 'Обновляю…' : 'Обновить'}</Button>
+          <Button variant="secondary" onClick={() => load(true, paged.map((s) => s.orderId))} disabled={loading}>{loading ? 'Обновляю…' : 'Обновить'}</Button>
           <div className="ml-auto" />
           {showFilterExport ? (
             <Button aria-label="Выгрузить XLS" variant="secondary" size="icon" onClick={exportXlsx} title="Выгрузить XLS" className="bg-white text-black border border-black hover:bg-gray-50">

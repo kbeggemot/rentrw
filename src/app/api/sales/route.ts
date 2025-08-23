@@ -23,12 +23,18 @@ export async function GET(req: Request) {
     if (!userId) return NextResponse.json({ error: 'NO_USER' }, { status: 401 });
     const urlObj = new URL(req.url);
     const shouldRefresh = urlObj.searchParams.get('refresh') === '1';
+    const ordersParam = urlObj.searchParams.get('orders');
+    const onlyOrders: number[] | null = ordersParam ? ordersParam.split(',').map((s) => Number(s)).filter((n) => Number.isFinite(n)) : null;
     if (shouldRefresh) {
       const token = await getDecryptedApiToken(userId);
       if (token) {
         const base = process.env.ROCKETWORK_API_BASE_URL || 'https://app.rocketwork.ru/api/';
         // Берём только продажи, инициированные нашим UI (source === 'ui')
-        const current = (await listSales(userId)).filter((s: any) => (s as any).source === 'ui');
+        let current = (await listSales(userId)).filter((s: any) => (s as any).source === 'ui');
+        if (onlyOrders && onlyOrders.length > 0) {
+          const set = new Set(onlyOrders.map((n) => Number(n)));
+          current = current.filter((s) => set.has(Number(s.orderId)));
+        }
         // Decide which sales to refresh
         const toRefresh = current.filter((s) => {
           const st = (s.status || '').toLowerCase();
