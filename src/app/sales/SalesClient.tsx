@@ -266,7 +266,7 @@ export default function SalesClient({ initial }: { initial: Sale[] }) {
       const wrapRect = wrap.getBoundingClientRect();
       const thRect = th.getBoundingClientRect();
       const btnW = btnWrap?.offsetWidth ?? 36;
-      const left = Math.max(0, Math.round(thRect.left + thRect.width / 2 - wrapRect.left - btnW / 2));
+      const left = Math.max(0, Math.round(thRect.left + thRect.width / 2 - wrapRect.left - btnW / 2 - 6));
       setExportLeft(left);
       setShowFilterExport(false);
     };
