@@ -1,17 +1,14 @@
-import { cookies } from 'next/headers';
 import SalesClient from './SalesClient';
-import { listSales } from '@/server/taskStore';
 
-export default async function SalesPage() {
-	const cookieStore = await cookies();
-	const userId = cookieStore.get('session_user')?.value || '';
-	const initial = userId ? await listSales(userId) : [];
-	return (
-		<>
-			<h1 className="md:hidden sr-only">Продажи</h1>
-			<SalesClient initial={initial} />
-		</>
-	);
+export default function SalesPage() {
+  return (
+    <div className="relative">
+      <div className="absolute right-2 -top-12">
+        {/* The actual button is rendered inside SalesClient to keep logic together; this placeholder keeps spacing */}
+      </div>
+      <SalesClient initial={[]} />
+    </div>
+  );
 }
 
 

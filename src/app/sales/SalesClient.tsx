@@ -275,13 +275,17 @@ export default function SalesClient({ initial }: { initial: Sale[] }) {
       ].join('');
       const sheet = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>${rowsXml}</sheetData></worksheet>`;
       const workbook = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Sales" sheetId="1" r:id="rId1"/></sheets></workbook>`;
-      const rels = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="xl/worksheets/sheet1.xml"/></Relationships>`;
+      // Root relationships: point to the workbook part
+      const rootRels = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>`;
+      // Workbook relationships: point to the worksheet part
+      const wbRels = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/></Relationships>`;
       const contentTypes = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/></Types>`;
 
       const zip = buildZip([
         { name: '[Content_Types].xml', data: new TextEncoder().encode(contentTypes) },
-        { name: '_rels/.rels', data: new TextEncoder().encode(rels) },
+        { name: '_rels/.rels', data: new TextEncoder().encode(rootRels) },
         { name: 'xl/workbook.xml', data: new TextEncoder().encode(workbook) },
+        { name: 'xl/_rels/workbook.xml.rels', data: new TextEncoder().encode(wbRels) },
         { name: 'xl/worksheets/sheet1.xml', data: new TextEncoder().encode(sheet) },
       ]);
       const a = document.createElement('a');
@@ -645,6 +649,14 @@ export default function SalesClient({ initial }: { initial: Sale[] }) {
 
       {/* Desktop table */}
       {/* Context menu container placed above the table for clipping safety */}
+      {/* Export button outside (above-right) */}
+      <div className="hidden md:block">
+        <div className="flex justify-end mb-2 -mt-8 pr-2">
+          <Button aria-label="Выгрузить XLS" variant="secondary" size="icon" onClick={exportXlsx} title="Выгрузить XLS" className="bg-white text-black border border-black hover:bg-gray-50">
+            <IconArrowDown />
+          </Button>
+        </div>
+      </div>
       <div className="hidden md:block overflow-x-auto overflow-y-visible relative bg-white dark:bg-gray-950 border border-gray-200 dark:border-gray-800 rounded-lg z-[1]">
         <table className="min-w-full text-sm">
           <thead className="bg-gray-50 dark:bg-gray-900">
@@ -660,14 +672,7 @@ export default function SalesClient({ initial }: { initial: Sale[] }) {
               <th className="text-left px-1 py-2 w-10">Чек НПД</th>
               <th className="text-left px-3 py-2">Дата продажи</th>
               <th className="text-left px-3 py-2">Дата окончания оказания услуги</th>
-              <th className="text-left px-3 py-2 w-14">
-                <div className="flex items-center gap-2">
-                  <span>Действия</span>
-                  <Button aria-label="Выгрузить XLS" variant="secondary" size="icon" onClick={exportXlsx} title="Выгрузить XLS" className="bg-white text-black border border-black hover:bg-gray-50">
-                    <IconArrowDown />
-                  </Button>
-                </div>
-              </th>
+              <th className="text-left px-3 py-2 w-14">Действия</th>
             </tr>
           </thead>
           <tbody>
