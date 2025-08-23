@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, useRef } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -248,8 +248,6 @@ export default function SalesClient({ initial }: { initial: Sale[] }) {
   const [menuPos, setMenuPos] = useState<{ top: number; left: number } | null>(null);
   const [pageCodes, setPageCodes] = useState<Record<number, string>>({});
   const openSale = useMemo(() => filtered.find((x) => x.taskId === menuOpenId) || null, [filtered, menuOpenId]);
-  const tableWrapRef = useRef<HTMLDivElement | null>(null);
-  const [exportLeft, setExportLeft] = useState<number | null>(null);
 
   const exportXlsx = async () => {
     try {
@@ -299,25 +297,7 @@ export default function SalesClient({ initial }: { initial: Sale[] }) {
     } catch {}
   };
 
-  // Position export button above the Actions column
-  useEffect(() => {
-    const place = () => {
-      const wrap = tableWrapRef.current; if (!wrap) return;
-      const ths = wrap.querySelectorAll('thead th');
-      if (!ths || ths.length === 0) return;
-      const last = ths[ths.length - 1] as HTMLElement;
-      const wrapRect = wrap.getBoundingClientRect();
-      const rect = last.getBoundingClientRect();
-      const center = rect.left + rect.width / 2 - wrapRect.left; // relative to wrapper
-      setExportLeft(Math.max(0, center - 16)); // minus half button (~32px/2)
-    };
-    place();
-    window.addEventListener('resize', place);
-    const wrap = tableWrapRef.current;
-    const sc = () => place();
-    wrap?.addEventListener('scroll', sc, true);
-    return () => { window.removeEventListener('resize', place); wrap?.removeEventListener('scroll', sc, true); };
-  }, [filtered.length]);
+  // no-op
 
   function buildZip(files: Array<{ name: string; data: Uint8Array }>): Uint8Array {
     const te = new TextEncoder();
@@ -671,14 +651,12 @@ export default function SalesClient({ initial }: { initial: Sale[] }) {
 
       {/* Desktop table */}
       {/* Context menu container placed above the table for clipping safety */}
-      <div ref={tableWrapRef} className="hidden md:block overflow-x-auto overflow-y-visible relative bg-white dark:bg-gray-950 border border-gray-200 dark:border-gray-800 rounded-lg z-[1]">
-        {exportLeft != null ? (
-          <div style={{ position: 'absolute', top: -44, left: exportLeft }}>
-            <Button aria-label="Выгрузить XLS" variant="secondary" size="icon" onClick={exportXlsx} title="Выгрузить XLS" className="bg-white text-black border border-black hover:bg-gray-50">
-              <IconArrowDown />
-            </Button>
-          </div>
-        ) : null}
+      <div className="hidden md:block overflow-x-auto overflow-y-visible relative bg-white dark:bg-gray-950 border border-gray-200 dark:border-gray-800 rounded-lg z-[1]">
+        <div className="absolute right-2 -top-12">
+          <Button aria-label="Выгрузить XLS" variant="secondary" size="icon" onClick={exportXlsx} title="Выгрузить XLS" className="bg-white text-black border border-black hover:bg-gray-50">
+            <IconArrowDown />
+          </Button>
+        </div>
         <table className="min-w-full text-sm">
           <thead className="bg-gray-50 dark:bg-gray-900">
             <tr>
