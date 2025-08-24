@@ -293,7 +293,7 @@ export default function SettingsClient({ initial, userId }: { initial: SettingsP
               </div>
             ) : null}
             <div className="flex items-center gap-3">
-              <Input type="password" placeholder="Введите новый токен" value={token} onChange={(e) => setToken(e.target.value)} className="min-w-[260px]" />
+              <Input type="password" placeholder="Введите новый токен" value={token} onChange={(e) => setToken(e.target.value)} className="w-[320px] max-w-full" />
               <Button type="submit" disabled={token.length === 0} loading={saving}>{saving ? 'Сохраняю' : 'Сохранить'}</Button>
             </div>
           </div>
