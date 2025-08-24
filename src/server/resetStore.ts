@@ -1,5 +1,4 @@
-import { promises as fs } from 'fs';
-import path from 'path';
+import { readText, writeText } from './storage';
 
 export type ResetTokenRecord = {
   userId: string;
@@ -8,22 +7,19 @@ export type ResetTokenRecord = {
   expiresAt: number; // epoch ms
 };
 
-const DATA_DIR = path.join(process.cwd(), '.data');
-const RESET_FILE = path.join(DATA_DIR, 'reset_tokens.json');
+const RESET_FILE = '.data/reset_tokens.json';
 
 async function readAll(): Promise<ResetTokenRecord[]> {
+  const raw = await readText(RESET_FILE);
+  if (!raw) return [];
   try {
-    const raw = await fs.readFile(RESET_FILE, 'utf8');
     const parsed = JSON.parse(raw) as { items?: ResetTokenRecord[] };
     return Array.isArray(parsed?.items) ? parsed.items : [];
-  } catch {
-    return [];
-  }
+  } catch { return []; }
 }
 
 async function writeAll(items: ResetTokenRecord[]): Promise<void> {
-  await fs.mkdir(DATA_DIR, { recursive: true });
-  await fs.writeFile(RESET_FILE, JSON.stringify({ items }, null, 2), 'utf8');
+  await writeText(RESET_FILE, JSON.stringify({ items }, null, 2));
 }
 
 export async function createResetToken(rec: ResetTokenRecord): Promise<void> {
