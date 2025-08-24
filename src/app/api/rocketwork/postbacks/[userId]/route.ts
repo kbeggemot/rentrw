@@ -9,6 +9,7 @@ import { fermaGetAuthTokenCached, fermaCreateReceipt } from '@/server/ofdFerma';
 import { buildFermaReceiptPayload, PAYMENT_METHOD_PREPAY_FULL, PAYMENT_METHOD_FULL_PAYMENT } from '@/app/api/ofd/ferma/build-payload';
 import { getUserOrgInn, getUserPayoutRequisites } from '@/server/userStore';
 import { enqueueOffsetJob, startOfdScheduleWorker } from '@/server/ofdScheduleWorker';
+import { appendOfdAudit } from '@/server/audit';
 // duplicated import removed
 
 export const runtime = 'nodejs';
@@ -98,6 +99,25 @@ export async function POST(req: Request) {
         additionalCommissionOfdUrl: additionalCommissionOfdUrl || undefined,
         npdReceiptUri: npdReceiptUri || undefined,
       });
+      // Background pay trigger with unchanged conditions (agent, transfered, completed, has full receipt)
+      try {
+        const sale = await findSaleByTaskId(userId, taskId);
+        const aoStatus = String(aoStatusRaw || status || '').toLowerCase();
+        const rootStatus = String(rootStatusRaw || '').toLowerCase();
+        if (sale && sale.isAgent && sale.ofdFullUrl && aoStatus === 'transfered' && rootStatus === 'completed') {
+          const token = await getDecryptedApiToken(userId);
+          if (token) {
+            const base = process.env.ROCKETWORK_API_BASE_URL || 'https://app.rocketwork.ru/api/';
+            const payUrl = new URL(`tasks/${encodeURIComponent(String(taskId))}/pay`, base.endsWith('/') ? base : base + '/').toString();
+            try {
+              if (process.env.OFD_AUDIT === '1') {
+                await appendOfdAudit({ ts: new Date().toISOString(), source: 'postback', userId, orderId: sale.orderId, taskId, action: 'background_pay', patch: { reason: 'agent_transfered_completed_has_full', payUrl } });
+              }
+            } catch {}
+            await fetch(payUrl, { method: 'PATCH', headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }, cache: 'no-store' });
+          }
+        }
+      } catch {}
       // If paid/transfered — write a local marker so UI can hide QR instantly
       try {
         const fin = String((status || aoStatusRaw || '') as string).toLowerCase();

@@ -1,4 +1,5 @@
-import { listSales, updateSaleOfdUrlsByOrderId, listAllSales } from './taskStore';
+import { listSales, updateSaleOfdUrlsByOrderId, listAllSales, updateSaleFromStatus } from './taskStore';
+import { appendOfdAudit } from './audit';
 import { fermaGetAuthTokenCached, fermaCreateReceipt, fermaGetReceiptStatus, buildReceiptViewUrl } from './ofdFerma';
 import { buildFermaReceiptPayload, PAYMENT_METHOD_FULL_PAYMENT, PAYMENT_METHOD_PREPAY_FULL } from '@/app/api/ofd/ferma/build-payload';
 import { getUserOrgInn, getUserPayoutRequisites } from './userStore';
@@ -38,6 +39,10 @@ export async function repairUserSales(userId: string): Promise<void> {
   if (sales.length === 0) return;
   const baseUrl = process.env.FERMA_BASE_URL || 'https://ferma.ofd.ru/';
   const ofdToken = await fermaGetAuthTokenCached(process.env.FERMA_LOGIN || '', process.env.FERMA_PASSWORD || '', { baseUrl });
+  // RW API settings for background pay trigger
+  const rwBase = process.env.ROCKETWORK_API_BASE_URL || 'https://app.rocketwork.ru/api/';
+  let rwToken: string | null = null;
+  try { rwToken = await getDecryptedApiToken(userId); } catch { rwToken = null; }
   const defaultEmail = process.env.OFD_DEFAULT_EMAIL || process.env.DEFAULT_RECEIPT_EMAIL || 'ofd@rockethumans.com';
   for (const s of sales) {
     const status = String(s.status || '').toLowerCase();
@@ -145,6 +150,48 @@ export async function repairUserSales(userId: string): Promise<void> {
         }
       } catch {}
     }
+    // Background pay trigger (same conditions as in tasks GET handler), but in the background
+    try {
+      const aoStatus = String(s.status || '').toLowerCase();
+      const hasFull = Boolean(s.ofdFullUrl);
+      if (s.isAgent && hasFull && aoStatus === 'transfered' && rwToken) {
+        const tUrl = new URL(`tasks/${encodeURIComponent(String(s.taskId))}`, rwBase.endsWith('/') ? rwBase : rwBase + '/').toString();
+        const res = await fetch(tUrl, { headers: { Authorization: `Bearer ${rwToken}`, Accept: 'application/json' }, cache: 'no-store' });
+        const txt = await res.text();
+        let d: any = null; try { d = txt ? JSON.parse(txt) : null; } catch { d = txt; }
+        const taskObj = (d && typeof d === 'object' && 'task' in d) ? (d.task as any) : d;
+        const rootStatus = String(taskObj?.status || '').toLowerCase();
+        if (rootStatus === 'completed') {
+          const payUrl = new URL(`tasks/${encodeURIComponent(String(s.taskId))}/pay`, rwBase.endsWith('/') ? rwBase : rwBase + '/').toString();
+          try {
+            if (process.env.OFD_AUDIT === '1') {
+              await appendOfdAudit({ ts: new Date().toISOString(), source: 'repair_worker', userId, orderId: s.orderId, taskId: s.taskId, action: 'background_pay', patch: { reason: 'agent_transfered_completed_has_full', payUrl } });
+            }
+          } catch {}
+          await fetch(payUrl, { method: 'PATCH', headers: { Authorization: `Bearer ${rwToken}`, Accept: 'application/json' }, cache: 'no-store' });
+          // After pay, poll briefly to capture receipt_uri and refresh local store
+          let triesNpd = 0;
+          while (triesNpd < 5) {
+            await new Promise((r) => setTimeout(r, 1200));
+            const r2 = await fetch(tUrl, { headers: { Authorization: `Bearer ${rwToken}`, Accept: 'application/json' }, cache: 'no-store' });
+            const t2 = await r2.text();
+            let o2: any = null; try { o2 = t2 ? JSON.parse(t2) : null; } catch { o2 = t2; }
+            const norm = (o2 && typeof o2 === 'object' && 'task' in o2) ? (o2.task as any) : o2;
+            const npd = (norm?.receipt_uri as string | undefined) ?? undefined;
+            const ofd = (norm?.ofd_url as string | undefined)
+              ?? (norm?.ofd_receipt_url as string | undefined)
+              ?? (norm?.acquiring_order?.ofd_url as string | undefined)
+              ?? (norm?.acquiring_order?.ofd_receipt_url as string | undefined)
+              ?? undefined;
+            const add = (norm?.additional_commission_ofd_url as string | undefined) ?? undefined;
+            const aoSt = (norm?.acquiring_order?.status as string | undefined) ?? undefined;
+            try { await updateSaleFromStatus(userId, s.taskId, { status: aoSt, ofdUrl: ofd, additionalCommissionOfdUrl: add, npdReceiptUri: npd }); } catch {}
+            if (npd) break;
+            triesNpd += 1;
+          }
+        }
+      }
+    } catch {}
   }
 }
 

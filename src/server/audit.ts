@@ -7,7 +7,7 @@ export type OfdAuditEntry = {
   userId: string;
   orderId: number;
   taskId?: string | number | null;
-  action: 'update_ofd_urls';
+  action: 'update_ofd_urls' | 'background_pay';
   patch: Record<string, unknown>;
   before?: Record<string, unknown> | null;
   after?: Record<string, unknown> | null;
