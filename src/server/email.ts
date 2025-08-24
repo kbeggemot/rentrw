@@ -21,6 +21,7 @@ export async function sendEmail(params: SendEmailParams): Promise<void> {
   const host = process.env.SMTP_HOST;
   const from = process.env.SMTP_FROM || 'no-reply@rentrw.local';
   const fromName = process.env.SMTP_FROM_NAME || 'RentRW';
+  const logToFile = String(process.env.SMTP_DEBUG_FILE || '').trim() === '1';
 
   async function sendViaOutbox(suffix = '') {
     const fname = `.data/outbox/email-${Date.now()}${suffix ? `-${suffix}` : ''}.txt`;
@@ -51,6 +52,9 @@ export async function sendEmail(params: SendEmailParams): Promise<void> {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), Number(process.env.SENDGRID_TIMEOUT || 15000));
     try {
+      if (logToFile) {
+        try { await writeText('.data/last_email_attempt.json', JSON.stringify({ ts: new Date().toISOString(), via: 'sendgrid', to: params.to, subject: params.subject, from, fromName }, null, 2)); } catch {}
+      }
       const res = await fetch('https://api.sendgrid.com/v3/mail/send', {
         method: 'POST',
         headers: {
@@ -71,6 +75,12 @@ export async function sendEmail(params: SendEmailParams): Promise<void> {
   }
 
   // If SMTP host is not configured but SendGrid is — use SendGrid; else write to outbox (dev)
+  if (logToFile) {
+    try {
+      await writeText('.data/last_email_branch.json', JSON.stringify({ ts: new Date().toISOString(), hasSmtpHost: Boolean(host), hasSendgrid: Boolean(process.env.SENDGRID_API_KEY), to: params.to, subject: params.subject }, null, 2));
+    } catch {}
+  }
+
   if (!host) {
     if (process.env.SENDGRID_API_KEY) {
       await sendViaSendgrid();
@@ -107,9 +117,20 @@ export async function sendEmail(params: SendEmailParams): Promise<void> {
     socketTimeout: Number(process.env.SMTP_SOCKET_TIMEOUT || 20000),
   } as any);
 
+  if (logToFile) {
+    try {
+      await writeText('.data/last_smtp_attempt.json', JSON.stringify({ ts: new Date().toISOString(), via: 'smtp', phase: 'setup', host, port, secure, name, user: Boolean(user), from, to: params.to, subject: params.subject }, null, 2));
+    } catch {}
+  }
+
   // Optional: verify connection/auth to fail fast with clear error
   try {
     if (String(process.env.SMTP_VERIFY || '1') === '1') {
+      if (logToFile) {
+        try {
+          await writeText('.data/last_smtp_attempt.json', JSON.stringify({ ts: new Date().toISOString(), via: 'smtp', phase: 'verify', host, port, secure, name, user: Boolean(user), timeouts: { conn: process.env.SMTP_CONN_TIMEOUT || 10000, greet: process.env.SMTP_GREET_TIMEOUT || 10000, socket: process.env.SMTP_SOCKET_TIMEOUT || 20000 }, from, to: params.to, subject: params.subject }, null, 2));
+        } catch {}
+      }
       await transporter.verify();
     }
   } catch (e) {
@@ -122,6 +143,11 @@ export async function sendEmail(params: SendEmailParams): Promise<void> {
 
   const html = params.html ?? (params.text ? `<pre>${params.text}</pre>` : undefined);
   try {
+    if (logToFile) {
+      try {
+        await writeText('.data/last_smtp_attempt.json', JSON.stringify({ ts: new Date().toISOString(), via: 'smtp', phase: 'send', host, port, secure, name, user: Boolean(user), from, to: params.to, subject: params.subject }, null, 2));
+      } catch {}
+    }
     await transporter.sendMail({
       from: `${fromName} <${from}>`,
       sender: from,
