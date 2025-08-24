@@ -65,7 +65,7 @@ export async function POST(req: Request) {
     try {
       await sendEmail({
         to: targetEmail!,
-        subject: 'Подтверждение email в RentRW',
+        subject: 'Подтверждение email в YPLA',
         text: `Ваш код подтверждения: ${code}\n\nЕсли вы его не запрашивали, просто проигнорируйте это письмо.`,
       });
     } catch (e) {

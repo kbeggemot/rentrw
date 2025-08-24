@@ -19,8 +19,8 @@ export async function sendEmail(params: SendEmailParams): Promise<void> {
     return;
   }
   const host = process.env.SMTP_HOST || process.env.MAIL_SERVICE || process.env.MAIL_HOST;
-  const from = process.env.SMTP_FROM || process.env.MAIL_FROM || 'no-reply@rentrw.local';
-  const fromName = process.env.SMTP_FROM_NAME || process.env.MAIL_FROM_NAME || 'RentRW';
+  const from = process.env.SMTP_FROM || process.env.MAIL_FROM || 'no-reply@ypla.local';
+  const fromName = process.env.SMTP_FROM_NAME || process.env.MAIL_FROM_NAME || 'YPLA';
   const logToFile = String(process.env.SMTP_DEBUG_FILE || '').trim() === '1';
 
   async function sendViaOutbox(suffix = '') {

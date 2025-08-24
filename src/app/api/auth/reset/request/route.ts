@@ -28,7 +28,8 @@ export async function POST(req: Request) {
     try {
       await sendEmail({
         to: user.email,
-        subject: 'Сброс пароля в RentRW',
+
+        subject: 'Сброс пароля в YPLA',
         text: `Вы запросили смену пароля. Перейдите по ссылке и задайте новый пароль: ${fullLink}`,
         html: `<p>Вы запросили смену пароля.</p><p><a href="${fullLink}" target="_blank" rel="noopener noreferrer">Перейти</a></p>`,
       });

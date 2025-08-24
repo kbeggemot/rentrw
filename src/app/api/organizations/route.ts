@@ -42,47 +42,4 @@ export async function POST(req: Request) {
   }
 }
 
-// Public status endpoint: check if user/org has any active token. Accepts either cookie org or ?uid
-export async function OPTIONS() { return NextResponse.json({ ok: true }); }
-
-export async function PUT(req: Request) { return NextResponse.json({ error: 'NOT_ALLOWED' }, { status: 405 }); }
-
-export async function DELETE(req: Request) { return NextResponse.json({ error: 'NOT_ALLOWED' }, { status: 405 }); }
-
-export async function PATCH(req: Request) { return NextResponse.json({ error: 'NOT_ALLOWED' }, { status: 405 }); }
-
-export async function HEAD(req: Request) { return NextResponse.json({ ok: true }); }
-
-export async function POST_status() {}
-
-export async function GET_status(req: Request) {
-  try {
-    const url = new URL(req.url);
-    const userId = url.searchParams.get('uid') || ((): string | null => {
-      const cookie = req.headers.get('cookie') || '';
-      const m = /(?:^|;\s*)session_user=([^;]+)/.exec(cookie);
-      return m ? decodeURIComponent(m[1]) : null;
-    })();
-    if (!userId) return NextResponse.json({ hasToken: false });
-    const orgFromQuery = url.searchParams.get('org') || null;
-    const orgCookie = ((): string | null => {
-      const cookie = req.headers.get('cookie') || '';
-      const m = /(?:^|;\s*)org_inn=([^;]+)/.exec(cookie);
-      return m ? decodeURIComponent(m[1]) : null;
-    })();
-    let has = false;
-    try {
-      const { getTokenForOrg, listActiveTokensForOrg } = await import('@/server/orgStore');
-      const targetOrg = orgFromQuery || orgCookie;
-      if (targetOrg) {
-        const tokens = await listActiveTokensForOrg(targetOrg, userId);
-        has = tokens.length > 0;
-      }
-    } catch {}
-    return NextResponse.json({ hasToken: has });
-  } catch (e) {
-    return NextResponse.json({ hasToken: false });
-  }
-}
-
 

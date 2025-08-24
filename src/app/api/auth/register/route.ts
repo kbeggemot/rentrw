@@ -32,7 +32,7 @@ export async function POST(req: Request) {
     const code = String(Math.floor(100000 + Math.random() * 900000));
     await upsertPending({ phone, email, password, code, expiresAt: Date.now() + 15 * 60 * 1000 });
     try {
-      await sendEmail({ to: email, subject: 'Подтверждение регистрации RentRW', text: `Код подтверждения: ${code}`, html: `<p>Код подтверждения: <b>${code}</b></p><p>Если вы не запрашивали регистрацию, проигнорируйте это письмо.</p>` });
+      await sendEmail({ to: email, subject: 'Подтверждение регистрации YPLA', text: `Код подтверждения: ${code}`, html: `<p>Код подтверждения: <b>${code}</b></p><p>Если вы не запрашивали регистрацию, проигнорируйте это письмо.</p>` });
       return NextResponse.json({ ok: true, step: 'confirm', phone, email });
     } catch {
       return NextResponse.json({ error: 'EMAIL_SEND_FAILED' }, { status: 502 });
