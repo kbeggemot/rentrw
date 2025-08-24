@@ -18,9 +18,9 @@ export async function sendEmail(params: SendEmailParams): Promise<void> {
     // Explicitly disabled: no-op (useful on platforms без диска/SMTP)
     return;
   }
-  const host = process.env.SMTP_HOST;
-  const from = process.env.SMTP_FROM || 'no-reply@rentrw.local';
-  const fromName = process.env.SMTP_FROM_NAME || 'RentRW';
+  const host = process.env.SMTP_HOST || process.env.MAIL_SERVICE || process.env.MAIL_HOST;
+  const from = process.env.SMTP_FROM || process.env.MAIL_FROM || 'no-reply@rentrw.local';
+  const fromName = process.env.SMTP_FROM_NAME || process.env.MAIL_FROM_NAME || 'RentRW';
   const logToFile = String(process.env.SMTP_DEBUG_FILE || '').trim() === '1';
 
   async function sendViaOutbox(suffix = '') {
@@ -98,11 +98,11 @@ export async function sendEmail(params: SendEmailParams): Promise<void> {
       dns.setDefaultResultOrder('ipv4first');
     }
   } catch {}
-  const port = Number(process.env.SMTP_PORT || 587);
-  const secure = String(process.env.SMTP_SECURE || '').toLowerCase() === 'true' || port === 465;
-  const user = process.env.SMTP_USER || undefined;
-  const pass = process.env.SMTP_PASS || undefined;
-  const name = process.env.SMTP_NAME || undefined; // EHLO/HELO client name
+  const port = Number(process.env.SMTP_PORT || process.env.MAIL_PORT || 587);
+  const secure = (String(process.env.SMTP_SECURE || process.env.MAIL_SECURE || '').toLowerCase() === 'true') || port === 465;
+  const user = process.env.SMTP_USER || process.env.MAIL_USER || undefined;
+  const pass = process.env.SMTP_PASS || process.env.MAIL_PASSWORD || process.env.MAIL_PASS || undefined;
+  const name = process.env.SMTP_NAME || process.env.MAIL_NAME || undefined; // EHLO/HELO client name
 
   const transporter = nodemailer.createTransport({
     host,
