@@ -107,6 +107,16 @@ export async function setWebauthnOptOut(userId: string, value: boolean): Promise
   await writeUsers(users);
 }
 
+export async function setUserPassword(userId: string, newPassword: string): Promise<void> {
+  const users = await readUsers();
+  const idx = users.findIndex((u) => u.id === userId);
+  if (idx === -1) throw new Error('USER_NOT_FOUND');
+  const { hash, salt } = hashPassword(newPassword);
+  users[idx].passHash = hash;
+  users[idx].passSalt = salt;
+  await writeUsers(users);
+}
+
 export async function updateUserEmail(userId: string, email: string): Promise<void> {
   const users = await readUsers();
   const idx = users.findIndex((u) => u.id === userId);

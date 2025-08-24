@@ -478,7 +478,7 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
         {!payLocked && msg ? <div className="mt-3 text-sm text-gray-600">{msg}</div> : null}
       </div>
       <div className="mt-3">
-        <img src="/logo.svg" alt="YPLA" className="inline-block align-baseline" style={{ height: '0.85em', width: 'auto' }} />
+        <img src="/logo.svg" alt="YPLA" className="inline-block align-baseline dark:invert" style={{ height: '0.75em', width: 'auto', marginLeft: '-6px' }} />
       </div>
     </div>
   );

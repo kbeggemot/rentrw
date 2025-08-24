@@ -19,7 +19,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: true });
     }
     const token = randomBytes(24).toString('hex');
-    const ttl = 1000 * 60 * 30; // 30 minutes
+    const ttl = 1000 * 60 * 60 * 24; // 24 hours TTL
     await createResetToken({ userId: user.id, email: user.email, token, expiresAt: Date.now() + ttl });
     const hdrProto = req.headers.get('x-forwarded-proto') || req.headers.get('x-forwarded-protocol') || 'https';
     const hdrHost = req.headers.get('x-forwarded-host') || req.headers.get('host') || '';
