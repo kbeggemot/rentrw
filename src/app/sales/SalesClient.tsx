@@ -29,11 +29,6 @@ export default function SalesClient({ initial }: { initial: Sale[] }) {
   const pageSize = 15;
   const [sseOn, setSseOn] = useState(false);
   const tableWrapRef = useRef<HTMLDivElement | null>(null);
-  const actionsThRef = useRef<HTMLTableCellElement | null>(null);
-  const exportWrapRef = useRef<HTMLDivElement | null>(null);
-  const [exportLeft, setExportLeft] = useState<number>(0);
-  const [exportTop, setExportTop] = useState<number>(0);
-  const [showFilterExport, setShowFilterExport] = useState<boolean>(true);
   const actionProbeRef = useRef<HTMLButtonElement | null>(null);
 
   function IconChevronRight() {
@@ -254,52 +249,7 @@ export default function SalesClient({ initial }: { initial: Sale[] }) {
 
   useEffect(() => { setPage(1); }, [query, status, agent, showHidden, purchaseReceipt, fullReceipt, commissionReceipt, npdReceipt, dateFrom, dateTo, endFrom, endTo, amountMin, amountMax]);
 
-  // Выравнивание кнопки выгрузки по вертикали колонки «Действия»
-  useEffect(() => {
-    const update = () => {
-      const wrap = tableWrapRef.current;
-      const th = actionsThRef.current;
-      const btnWrap = exportWrapRef.current;
-      if (!wrap || !th) { setShowFilterExport(true); return; }
-      // If desktop table is hidden (mobile), keep fallback button
-      const wrapVisible = (wrap.offsetWidth > 0 && wrap.offsetHeight > 0);
-      const thVisible = (th.offsetWidth > 0 && th.offsetHeight > 0);
-      if (!wrapVisible || !thVisible) { setShowFilterExport(true); return; }
-      const wrapRect = wrap.getBoundingClientRect();
-      const btnW = btnWrap?.offsetWidth ?? 36;
-      // Prefer aligning to the first visible row action button for pixel-perfect match
-      let probe: HTMLElement | null = actionProbeRef.current as any;
-      if (!probe) {
-        try { probe = wrap.querySelector('tbody button[aria-label="Действия"]') as HTMLElement | null; } catch {}
-      }
-      if (probe) {
-        const pRect = probe.getBoundingClientRect();
-        const left = Math.round(pRect.left + pRect.width / 2 - btnW / 2);
-        const top = Math.round(th.getBoundingClientRect().top - 48);
-        setExportLeft(left);
-        setExportTop(Math.max(0, top));
-        setShowFilterExport(false);
-        return;
-      }
-      const thRect = th.getBoundingClientRect();
-      const left = Math.round(thRect.left + thRect.width / 2 - btnW / 2);
-      const top = Math.round(thRect.top - 48);
-      setExportLeft(left);
-      setExportTop(Math.max(0, top));
-      setShowFilterExport(false);
-    };
-    let raf = 0;
-    const r = () => { cancelAnimationFrame(raf); raf = requestAnimationFrame(update); };
-    r();
-    const wrap = tableWrapRef.current;
-    wrap?.addEventListener('scroll', r, { passive: true } as any);
-    window.addEventListener('resize', r);
-    return () => {
-      wrap?.removeEventListener('scroll', r as any);
-      window.removeEventListener('resize', r);
-      cancelAnimationFrame(raf);
-    };
-  }, [filtered]);
+  // export button is now in the toolbar; no floating positioning required
 
   const fmtDate = (d?: string | null) => (d ? new Date(d).toLocaleDateString('ru-RU', { timeZone: 'Europe/Moscow' }) : '-');
   const [checksOpenId, setChecksOpenId] = useState<string | number | null>(null);
@@ -459,13 +409,11 @@ export default function SalesClient({ initial }: { initial: Sale[] }) {
             Сбросить
           </Button>
           <Button variant="secondary" onClick={() => load(true, paged.map((s) => s.orderId))} disabled={loading}>{loading ? 'Обновляю…' : 'Обновить'}</Button>
+          <Button variant="secondary" onClick={exportXlsx} className="flex items-center gap-1">
+            <IconArrowDown />
+            Выгрузить XLS
+          </Button>
           <div className="ml-auto" />
-          {/* Mobile inline export button pinned to top-right */}
-          <div className="md:hidden">
-            <Button aria-label="Выгрузить XLS" variant="secondary" size="icon" onClick={exportXlsx} title="Выгрузить XLS" className="bg-white text-black border border-black hover:bg-gray-50">
-              <IconArrowDown />
-            </Button>
-          </div>
         </div>
         
         {visibleFilters.length > 0 ? (
@@ -719,11 +667,6 @@ export default function SalesClient({ initial }: { initial: Sale[] }) {
       {/* Desktop table */}
       {/* Context menu container placed above the table for clipping safety */}
       <div className="hidden md:block overflow-x-auto overflow-y-visible relative bg-white dark:bg-gray-950 border border-gray-200 dark:border-gray-800 rounded-lg z-[1]" ref={tableWrapRef}>
-        <div ref={exportWrapRef} className="hidden md:block fixed z-[2]" style={{ top: exportTop, left: exportLeft }}>
-          <Button aria-label="Выгрузить XLS" variant="secondary" size="icon" onClick={exportXlsx} title="Выгрузить XLS" className="bg-white text-black border border-black hover:bg-gray-50">
-            <IconArrowDown />
-          </Button>
-        </div>
         <table className="min-w-full text-sm">
           <thead className="bg-gray-50 dark:bg-gray-900">
             <tr>
@@ -738,7 +681,7 @@ export default function SalesClient({ initial }: { initial: Sale[] }) {
               <th className="text-left px-1 py-2 w-10">Чек НПД</th>
               <th className="text-left px-3 py-2">Дата продажи</th>
               <th className="text-left px-3 py-2">Дата окончания оказания услуги</th>
-              <th ref={actionsThRef} className="text-left px-3 py-2 w-14">Действия</th>
+              <th className="text-left px-3 py-2 w-14">Действия</th>
             </tr>
           </thead>
           <tbody>
