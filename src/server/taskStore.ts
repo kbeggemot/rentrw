@@ -261,6 +261,7 @@ export async function listSalesForOrg(userId: string, orgInn: string): Promise<S
 export async function ensureSaleFromTask(params: {
   userId: string;
   taskId: number | string;
+  orgInn?: string | null;
   task: Partial<{
     acquiring_order?: { order?: string | number; status?: string | null; ofd_url?: string | null } | null;
     amount_gross?: number | string | null;
@@ -268,7 +269,7 @@ export async function ensureSaleFromTask(params: {
     created_at?: string | null;
   }>;
 }): Promise<void> {
-  const { userId, taskId, task } = params;
+  const { userId, taskId, task, orgInn } = params;
   const store = await readTasks();
   if (!store.sales) store.sales = [];
   const exists = store.sales.some((s) => s.userId === userId && s.taskId == taskId);
@@ -296,6 +297,7 @@ export async function ensureSaleFromTask(params: {
     taskId,
     orderId: resolvedOrderId!,
     userId,
+    orgInn: (orgInn && orgInn.trim().length > 0) ? orgInn.replace(/\D/g, '') : 'неизвестно',
     clientEmail: (typeof clientEmail === 'string' ? clientEmail : null) as any,
     amountGrossRub: amountRub || 0,
     isAgent,

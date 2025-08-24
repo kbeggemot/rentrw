@@ -13,7 +13,12 @@ export default async function SalesPage() {
     try { hasToken = !!(await getTokenForOrg(inn, userId)); } catch { hasToken = false; }
   }
   let initial: any[] = [];
-  try { initial = (inn && hasToken) ? await listSalesForOrg(userId, inn) : (hasToken ? await listSales(userId) : []); } catch {}
+  try {
+    if (hasToken) {
+      const all = await listSales(userId);
+      initial = inn ? all.filter((s: any) => String((s as any).orgInn || 'неизвестно') === inn || (s as any).orgInn == null || String((s as any).orgInn) === 'неизвестно') : all;
+    }
+  } catch {}
   return (
     <div className="relative">
       {!inn ? (

@@ -74,7 +74,7 @@ export async function GET(_: Request) {
     let normalized: RocketworkTask = (maybeObj?.task as RocketworkTask) ?? (data as RocketworkTask);
 
     // Ensure a local sale record exists for this task (creates if missing)
-    try { await ensureSaleFromTask({ userId, taskId, task: normalized as any }); } catch {}
+    try { const currentInn = getSelectedOrgInn(_); await ensureSaleFromTask({ userId, taskId, task: normalized as any, orgInn: currentInn || null }); } catch {}
 
     // Attempt short polling for receipts if already paid/transferred and receipts missing
     let tries = 0;
