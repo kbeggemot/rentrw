@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useState, useMemo, useRef } from 'react';
+import { use, useEffect, useState, useMemo, useRef } from 'react';
 
 type Receipts = { prepay?: string | null; full?: string | null; commission?: string | null; npd?: string | null };
 
-export default function PermanentSaleRedirect(props: any) {
-  const code = typeof props?.params?.code === 'string' ? props.params.code : '';
+export default function PermanentSaleRedirect(props: { params: Promise<{ code?: string }> }) {
+  const p = use(props.params) || {} as { code?: string };
+  const code = typeof p.code === 'string' ? p.code : '';
   const [orderId, setOrderId] = useState<number | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
   const [taskId, setTaskId] = useState<string | number | null>(null);
@@ -26,6 +27,15 @@ export default function PermanentSaleRedirect(props: any) {
         if (r.ok) {
           const d = await r.json();
           if (d?.userId) setUserId(String(d.userId));
+          // Проверим наличие активного токена организации для оплаты
+          try {
+            const orgRes = await fetch(`/api/organizations/status?uid=${encodeURIComponent(String(d?.userId || ''))}${d?.sale?.orgInn ? `&org=${encodeURIComponent(String(d.sale.orgInn))}` : ''}`, { cache: 'no-store' });
+            const orgD = await orgRes.json().catch(() => ({}));
+            if (!orgRes.ok || orgD?.hasToken !== true) {
+              // если нет токена — не показываем детали оплаты
+              setDetailsOpen(false);
+            }
+          } catch {}
           if (d?.orderId != null) setOrderId(Number(d.orderId));
           if (d?.sale) {
             setTaskId(d.sale.taskId || null);

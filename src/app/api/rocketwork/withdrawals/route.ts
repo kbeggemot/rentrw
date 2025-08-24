@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { listWithdrawals, upsertWithdrawal } from '@/server/withdrawalStore';
-import { getDecryptedApiToken } from '@/server/secureStore';
+import { resolveRwTokenWithFingerprint } from '@/server/rwToken';
+import { getSelectedOrgInn } from '@/server/orgContext';
 
 export const runtime = 'nodejs';
 
@@ -21,7 +22,8 @@ export async function GET(req: Request) {
     // 2) If empty, try fetch last 50 RW tasks and backfill withdrawals
     if (items.length === 0) {
       try {
-        const token = await getDecryptedApiToken(userId);
+        const inn = getSelectedOrgInn(req);
+        const { token } = await resolveRwTokenWithFingerprint(req, userId, inn, null);
         if (token) {
           const base = process.env.ROCKETWORK_API_BASE_URL || 'https://app.rocketwork.ru/api/';
           const url = new URL('tasks?limit=50', base.endsWith('/') ? base : base + '/').toString();

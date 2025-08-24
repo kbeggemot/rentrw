@@ -22,8 +22,9 @@ type Sale = {
   createdAt: string;
 };
 
-export default function SalesClient({ initial }: { initial: Sale[] }) {
+export default function SalesClient({ initial, hasTokenInitial }: { initial: Sale[]; hasTokenInitial?: boolean }) {
   const [sales, setSales] = useState<Sale[]>(initial);
+  const [hasToken, setHasToken] = useState<boolean | null>(typeof hasTokenInitial === 'boolean' ? hasTokenInitial : null);
   const [loading, setLoading] = useState(false);
   const [page, setPage] = useState(1);
   const pageSize = 15;
@@ -257,6 +258,62 @@ export default function SalesClient({ initial }: { initial: Sale[] }) {
   const [menuPos, setMenuPos] = useState<{ top: number; left: number } | null>(null);
   const [pageCodes, setPageCodes] = useState<Record<number, string>>({});
   const openSale = useMemo(() => filtered.find((x) => x.taskId === menuOpenId) || null, [filtered, menuOpenId]);
+  // Предзагрузка pageCode для всех видимых финальных продаж, чтобы ссылка не мигала в меню
+  useEffect(() => {
+    const finals = filtered.filter((s) => {
+      const fin = String(s.status || '').toLowerCase();
+      return fin === 'paid' || fin === 'transfered' || fin === 'transferred';
+    });
+    finals.forEach((s) => { void ensurePageCode(s.orderId); });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filtered]);
+  // Глобальное закрытие контекстного меню по клику вне
+  useEffect(() => {
+    const close = (e: Event) => {
+      const target = e.target as HTMLElement | null;
+      if (target && target.closest('[data-menu-root]')) return;
+      setMenuOpenId(null);
+      setMenuPos(null);
+    };
+    document.addEventListener('mousedown', close, true);
+    document.addEventListener('touchstart', close, true);
+    return () => {
+      document.removeEventListener('mousedown', close, true);
+      document.removeEventListener('touchstart', close, true);
+    };
+  }, []);
+  // Синхронизируем флаг с SSR, а клиентскую проверку делаем только если флаг не пришёл
+  useEffect(() => { if (typeof hasTokenInitial === 'boolean') setHasToken(hasTokenInitial); }, [hasTokenInitial]);
+  useEffect(() => {
+    if (typeof hasTokenInitial === 'boolean') return;
+    let aborted = false;
+    (async () => {
+      try {
+        const r = await fetch('/api/settings/token', { cache: 'no-store', credentials: 'include' });
+        const d = await r.json();
+        if (!aborted) setHasToken(Boolean(d?.token));
+      } catch {
+        if (!aborted) setHasToken(false);
+      }
+    })();
+    return () => { aborted = true; };
+  }, [hasTokenInitial]);
+
+  if (hasToken === false) {
+    return (
+      <div className="max-w-3xl mx-auto">
+        <div className="bg-white dark:bg-gray-950 border border-gray-200 dark:border-gray-800 rounded-lg p-6 shadow-sm">
+          <p className="text-sm text-gray-700 dark:text-gray-300 mb-3">
+            Для начала работы укажите токен своей организации, полученный в Рокет Ворк.
+          </p>
+          <a href="/settings" className="inline-block">
+            <Button>Перейти в настройки</Button>
+          </a>
+        </div>
+      </div>
+    );
+  }
+
 
   const exportXlsx = async () => {
     try {
@@ -364,29 +421,6 @@ export default function SalesClient({ initial }: { initial: Sale[] }) {
     return null;
   }
 
-  useEffect(() => {
-    // Предзагрузка pageCode для всех видимых финальных продаж, чтобы ссылка не мигала в меню
-    const finals = filtered.filter((s) => {
-      const fin = String(s.status || '').toLowerCase();
-      return fin === 'paid' || fin === 'transfered' || fin === 'transferred';
-    });
-    finals.forEach((s) => { void ensurePageCode(s.orderId); });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filtered]);
-  useEffect(() => {
-    const close = (e: Event) => {
-      const target = e.target as HTMLElement | null;
-      if (target && target.closest('[data-menu-root]')) return;
-      setMenuOpenId(null);
-      setMenuPos(null);
-    };
-    document.addEventListener('mousedown', close, true);
-    document.addEventListener('touchstart', close, true);
-    return () => {
-      document.removeEventListener('mousedown', close, true);
-      document.removeEventListener('touchstart', close, true);
-    };
-  }, []);
 
   return (
     <div className="max-w-5xl mx-auto">
@@ -688,7 +722,7 @@ export default function SalesClient({ initial }: { initial: Sale[] }) {
           <tbody>
             {filtered.length === 0 ? (
               <tr>
-                <td colSpan={7} className="px-3 py-6 text-center text-gray-500">Нет данных</td>
+                <td colSpan={12} className="px-3 py-6 text-center text-gray-500">Нет данных</td>
               </tr>
             ) : paged.map((s) => (
               <tr key={String(s.taskId)} className="border-t border-gray-100 dark:border-gray-800">

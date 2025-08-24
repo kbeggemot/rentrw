@@ -1,16 +1,24 @@
 import { cookies, headers } from 'next/headers';
 import SettingsClient, { type SettingsPrefetch } from './SettingsClient';
 import { getMaskedToken } from '@/server/secureStore';
+import { getMaskedTokenForOrg, findOrgByInn } from '@/server/orgStore';
 import { getUserById, getUserAgentSettings, getUserPayoutRequisites } from '@/server/userStore';
 
 export default async function SettingsPage() {
   try {
     const cookieStore = await cookies();
     const userId = cookieStore.get('session_user')?.value || '';
-    const maskedToken = userId ? await getMaskedToken(userId) : null;
+    const orgInn = cookieStore.get('org_inn')?.value || '';
+    // В контексте выбранной организации показываем токен только этой организации
+    const maskedToken = userId ? (orgInn ? await getMaskedTokenForOrg(orgInn, userId) : await getMaskedToken(userId)) : null;
     const user = userId ? await getUserById(userId) : null;
     const agent = userId ? await getUserAgentSettings(userId) : { agentDescription: null, defaultCommission: null };
     const payout = userId ? await getUserPayoutRequisites(userId) : { bik: null, account: null, orgName: null };
+    // Переопределяем orgName названием выбранной организации (если есть)
+    let orgNameFromOrg: string | null = null;
+    if (orgInn) {
+      try { const org = await findOrgByInn(orgInn); orgNameFromOrg = org?.name ?? null; } catch {}
+    }
 
     function maskEmail(email: string): string {
       const [local, domainFull] = email.split('@');
@@ -33,7 +41,7 @@ export default async function SettingsPage() {
       keys: [],
       payoutBik: payout.bik,
       payoutAccount: payout.account,
-      payoutOrgName: payout.orgName,
+      payoutOrgName: orgNameFromOrg ?? payout.orgName,
     };
 
     // Fallback: if everything looks empty on prod (e.g., data in S3 under a different prefix), try internal APIs

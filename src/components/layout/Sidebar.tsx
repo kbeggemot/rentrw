@@ -76,6 +76,8 @@ export function Sidebar() {
         </Link>
       </nav>
       <div className="block md:hidden p-2 pt-0 mt-auto">
+        {/* Организация: перенесена вниз, над кнопкой выхода */}
+        <OrgSelector />
         <form action="/api/auth/logout" method="post" className="w-full">
           <button
             type="submit"
@@ -86,6 +88,8 @@ export function Sidebar() {
         </form>
       </div>
       <div className="hidden md:block mt-auto p-2">
+        {/* Организация: перенесена вниз, над кнопкой выхода */}
+        <OrgSelector />
         <form action="/api/auth/logout" method="post" className="w-full">
           <button
             type="submit"
@@ -96,6 +100,72 @@ export function Sidebar() {
         </form>
       </div>
     </aside>
+  );
+}
+
+function OrgSelector() {
+  // Считываем cookie синхронно для начального значения, чтобы не мигать
+  let cookieInn: string | null = null;
+  try {
+    const m = /(?:^|;\s*)org_inn=([^;]+)/.exec(typeof document !== 'undefined' ? (document.cookie || '') : '');
+    cookieInn = m ? decodeURIComponent(m[1]) : null;
+  } catch {}
+  const [orgs, setOrgs] = useState<Array<{ inn: string; name: string | null; maskedToken?: string | null }>>(() => {
+    try { const raw = localStorage.getItem('orgs_cache_v1'); const arr = raw ? JSON.parse(raw) : null; return Array.isArray(arr) ? arr : []; } catch { return []; }
+  });
+  const [inn, setInn] = useState<string | null>(cookieInn);
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const r = await fetch('/api/organizations', { cache: 'no-store', credentials: 'include' });
+        const d = await r.json();
+        if (!cancelled && Array.isArray(d?.items)) {
+          setOrgs(d.items);
+          try { localStorage.setItem('orgs_cache_v1', JSON.stringify(d.items)); } catch {}
+        }
+      } catch {}
+      if (inn == null) {
+        try {
+          const m = /(?:^|;\s*)org_inn=([^;]+)/.exec(document.cookie || '');
+          const val = m ? decodeURIComponent(m[1]) : null;
+          if (!cancelled) setInn(val);
+        } catch {}
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [inn]);
+  if (!mounted) {
+    return (
+      <div className="mb-2">
+        <label className="block text-xs text-gray-500 mb-1">Организация</label>
+        <select className="w-full px-2 h-9 rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-950 text-sm" disabled>
+          <option>Загрузка…</option>
+        </select>
+      </div>
+    );
+  }
+  return (
+    <div className="mb-2">
+      <label className="block text-xs text-gray-500 mb-1">Организация</label>
+      <select
+        className="w-full px-2 h-9 rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-950 text-sm"
+        value={inn ?? (orgs[0]?.inn || '')}
+        onChange={async (e) => {
+          const next = e.target.value || '';
+          setInn(next || null);
+          try { await fetch('/api/organizations', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ inn: next }), credentials: 'include' }); } catch {}
+          // мягко перезагрузим страницу, чтобы применить контекст
+          try { window.location.reload(); } catch {}
+        }}
+      >
+        {(orgs && orgs.length > 0 ? orgs : (inn ? [{ inn, name: null }] : [])).map((o) => (
+          <option key={o.inn} value={o.inn}>{o.name ? `${o.name} (${o.inn})` : o.inn}</option>
+        ))}
+      </select>
+    </div>
   );
 }
 

@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import { promises as fs } from 'fs';
 import path from 'path';
 import { getDecryptedApiToken } from '@/server/secureStore';
+import { resolveRwToken } from '@/server/rwToken';
+import { getSelectedOrgInn } from '@/server/orgContext';
 import { getNextOrderId } from '@/server/orderStore';
 import { saveTaskId, recordSaleOnCreate } from '@/server/taskStore';
 import { getUserAgentSettings } from '@/server/userStore';
@@ -37,7 +39,7 @@ export async function POST(req: Request) {
     const cookie = req.headers.get('cookie') || '';
     const mc = /(?:^|;\s*)session_user=([^;]+)/.exec(cookie);
     const userId = (mc ? decodeURIComponent(mc[1]) : undefined) || req.headers.get('x-user-id') || 'default';
-    const token = await getDecryptedApiToken(userId);
+    const { token, orgInn, fingerprint } = await resolveRwToken(req, userId);
     if (!token) return NextResponse.json({ error: 'API токен не задан' }, { status: 400 });
 
     const body = (await req.json()) as BodyIn | any;
@@ -367,6 +369,8 @@ export async function POST(req: Request) {
         userId,
         taskId,
         orderId,
+        orgInn: orgInn ?? null,
+        rwTokenFp: fingerprint ?? null,
         clientEmail,
         description,
         amountGrossRub: amountRub,

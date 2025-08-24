@@ -14,10 +14,12 @@ export async function GET(req: Request) {
     if (!entry) return NextResponse.json({ error: 'NOT_FOUND' }, { status: 404 });
     const { userId, orderId } = entry;
     let sale: any = null;
+    let orgInn: string | null = null;
     try {
       const all = await listSales(userId);
       const s = all.find((x) => x.orderId === orderId) || null;
       if (s) {
+        orgInn = (s as any).orgInn || null;
         sale = {
           orderId: s.orderId,
           taskId: s.taskId,
@@ -30,10 +32,11 @@ export async function GET(req: Request) {
           ofdFullUrl: s.ofdFullUrl || null,
           commissionUrl: s.additionalCommissionOfdUrl || null,
           npdReceiptUri: s.npdReceiptUri || null,
+          orgInn: (s as any).orgInn || null,
         };
       }
     } catch {}
-    return NextResponse.json({ userId, orderId, sale });
+    return NextResponse.json({ userId, orderId, sale, orgInn });
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'Server error';
     return NextResponse.json({ error: msg }, { status: 500 });

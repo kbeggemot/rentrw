@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import { getMaskedToken, saveApiToken, deleteApiToken, getDecryptedApiToken } from '@/server/secureStore';
 import { setUserOrgName, setUserOrgInn } from '@/server/userStore';
 import { enqueueSubscriptionJob, ensureSubscriptions, startSubscriptionWorker } from '@/server/subscriptionWorker';
+import { upsertOrganization, addMemberToOrg, setUserOrgToken, deleteUserOrgToken, userHasTokenForOrg } from '@/server/orgStore';
+import { getSelectedOrgInn } from '@/server/orgContext';
 
 export const runtime = 'nodejs';
 
@@ -17,8 +19,20 @@ export async function GET(req: Request) {
   try {
     const userId = getUserId(req);
     if (!userId) return NextResponse.json({ error: 'NO_USER' }, { status: 401 });
-    const masked = await getMaskedToken(userId);
-    return NextResponse.json({ token: masked });
+    // If org is selected, prefer token masked for that org; otherwise fallback to per-user store
+    const innCookie = getSelectedOrgInn(req);
+    if (innCookie) {
+      try {
+        const { getMaskedTokenForOrg } = await import('@/server/orgStore');
+        const masked = await getMaskedTokenForOrg(innCookie, userId);
+        // В контексте выбранной организации не показываем legacy-токен пользователя
+        return NextResponse.json({ token: masked ?? null });
+      } catch {}
+      return NextResponse.json({ token: null });
+    } else {
+      const masked = await getMaskedToken(userId);
+      return NextResponse.json({ token: masked });
+    }
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Server error';
     return NextResponse.json({ error: message }, { status: 500 });
@@ -51,7 +65,39 @@ export async function POST(req: Request) {
       // Network error → allow save, continue in degraded mode
     }
 
-    // 2) Save token
+    // 2) Determine org by calling account; keep degraded behavior if fails
+    let orgInn: string | null = null;
+    let orgName: string | null = null;
+    try {
+      const accUrl = new URL('account', base.endsWith('/') ? base : base + '/').toString();
+      const r = await fetch(accUrl, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }, cache: 'no-store' });
+      const txt = await r.text();
+      let d: any = null; try { d = txt ? JSON.parse(txt) : null; } catch { d = txt; }
+      orgName = (d?.company_name as string | undefined) ?? null;
+      const gotInn: string | undefined = (d?.inn as string | undefined) ?? (d?.company_inn as string | undefined) ?? undefined;
+      orgInn = (gotInn || '').replace(/\D/g, '') || null;
+    } catch {}
+
+    // 2a) If org info is available: upsert org, add membership, assign token to user within that org
+    if (orgInn) {
+      try {
+        await upsertOrganization(orgInn, orgName);
+        await addMemberToOrg(orgInn, userId);
+        // Reject if this user already имеет токен для этой организации
+        const already = await userHasTokenForOrg(orgInn, userId);
+        if (already) {
+          // переключим контекст на эту организацию и вернём ошибку для тоста
+          const res = NextResponse.json({ error: 'ORG_ALREADY_ADDED', inn: orgInn }, { status: 409 });
+          res.headers.set('Set-Cookie', `org_inn=${encodeURIComponent(orgInn)}; Path=/; SameSite=Lax; Max-Age=31536000`);
+          return res;
+        }
+        await setUserOrgToken(orgInn, userId, token);
+        // persist last known org info for user profile (read-only hints)
+        try { await setUserOrgName(userId, orgName); } catch {}
+        try { await setUserOrgInn(userId, orgInn); } catch {}
+      } catch {}
+    }
+    // 2b) Save token in legacy per-user store for backward compatibility (non-org flows)
     await saveApiToken(userId, token);
     // After saving token, ensure Rocket Work webhook subscriptions are created
     try {
@@ -112,7 +158,12 @@ export async function POST(req: Request) {
     } catch {}
     const last4 = token.slice(-4);
     const masked = `••••••••${last4}`;
-    return NextResponse.json({ token: masked }, { status: 201 });
+    // Если добавили новую организацию — переключаем контекст на неё
+    const res = NextResponse.json({ token: masked, inn: orgInn }, { status: 201 });
+    if (orgInn) {
+      res.headers.set('Set-Cookie', `org_inn=${encodeURIComponent(orgInn)}; Path=/; SameSite=Lax; Max-Age=31536000`);
+    }
+    return res;
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Server error';
     return NextResponse.json({ error: message }, { status: 500 });
@@ -123,9 +174,16 @@ export async function DELETE(req: Request) {
   try {
     const userId = getUserId(req);
     if (!userId) return NextResponse.json({ error: 'NO_USER' }, { status: 401 });
-    await deleteApiToken(userId);
-    try { await setUserOrgName(userId, null); } catch {}
-    return NextResponse.json({ ok: true });
+    const inn = getSelectedOrgInn(req);
+    if (inn) {
+      try { await deleteUserOrgToken(inn, userId); } catch {}
+      // Do not delete legacy token to avoid impacting other orgs; gating will hide UI without org token
+      return NextResponse.json({ ok: true, scope: 'org' });
+    } else {
+      await deleteApiToken(userId);
+      try { await setUserOrgName(userId, null); } catch {}
+      return NextResponse.json({ ok: true, scope: 'user' });
+    }
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Server error';
     return NextResponse.json({ error: message }, { status: 500 });

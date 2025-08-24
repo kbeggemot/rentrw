@@ -4,6 +4,7 @@ import { fermaGetAuthTokenCached, fermaCreateReceipt, fermaGetReceiptStatus, bui
 import { buildFermaReceiptPayload, PAYMENT_METHOD_FULL_PAYMENT, VatRate } from '@/app/api/ofd/ferma/build-payload';
 import { getUserOrgInn, getUserPayoutRequisites } from './userStore';
 import { getDecryptedApiToken } from './secureStore';
+import { resolveRwTokenWithFingerprint } from './rwToken';
 import { listSales } from './taskStore';
 
 // Offset jobs are created only when invoiceIdOffset was assigned at creation
@@ -88,7 +89,15 @@ export async function runDueOffsetJobs(): Promise<void> {
         let partnerName = (job.partnerName || '').trim();
         if (partnerName.length === 0) {
           try {
-            const token = await getDecryptedApiToken(job.userId);
+            let token: string | null = null;
+            try {
+              const sales = await listSales(job.userId);
+              const sale = sales.find((s) => s.orderId === job.orderId);
+              const inn = sale?.orgInn || null;
+              const fp = (sale as any)?.rwTokenFp || null;
+              const res = await resolveRwTokenWithFingerprint({ headers: new Headers() } as any, job.userId, inn || undefined, fp || undefined);
+              token = res.token;
+            } catch {}
             if (token) {
               const sales = await listSales(job.userId);
               const sale = sales.find((s) => s.orderId === job.orderId);

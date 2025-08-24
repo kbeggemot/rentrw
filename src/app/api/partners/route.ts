@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getDecryptedApiToken } from '@/server/secureStore';
-import { listPartners, upsertPartner, softDeletePartner } from '@/server/partnerStore';
+import { listPartners, listPartnersForOrg, upsertPartner, softDeletePartner, upsertPartnerFromValidation } from '@/server/partnerStore';
+import { getSelectedOrgInn } from '@/server/orgContext';
 
 export const runtime = 'nodejs';
 
@@ -11,7 +12,8 @@ export async function GET(req: Request) {
     const cookie = req.headers.get('cookie') || '';
     const mc = /(?:^|;\s*)session_user=([^;]+)/.exec(cookie);
     const userId = (mc ? decodeURIComponent(mc[1]) : undefined) || req.headers.get('x-user-id') || 'default';
-    const partners = await listPartners(userId);
+    const inn = getSelectedOrgInn(req);
+    const partners = inn ? await listPartnersForOrg(userId, inn) : await listPartners(userId);
     return NextResponse.json({ partners }, { status: 200 });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Server error';
@@ -28,6 +30,7 @@ export async function POST(req: Request) {
     if (!token) return NextResponse.json({ error: 'API токен не задан' }, { status: 400 });
 
     const body = await req.json() as { phone?: string };
+    const inn = getSelectedOrgInn(req);
     const phone = String(body?.phone || '').trim();
     if (!phone) return NextResponse.json({ error: 'Введите телефон' }, { status: 400 });
 
@@ -91,12 +94,7 @@ export async function POST(req: Request) {
       ?? (chosen.data?.executor?.selfemployed_status as string | undefined)
       ?? null;
 
-    await upsertPartner(userId, {
-      phone,
-      fio,
-      status,
-      updatedAt: new Date().toISOString(),
-    });
+    await upsertPartnerFromValidation(userId, phone, chosen.data, inn ?? null);
 
     return NextResponse.json({ ok: true, partner: { phone, fio, status } }, { status: 201 });
   } catch (error) {

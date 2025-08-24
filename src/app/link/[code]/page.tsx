@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { use, useEffect, useMemo, useRef, useState } from 'react';
 
 type LinkData = {
   code: string;
@@ -18,8 +18,10 @@ type LinkData = {
   method?: 'any' | 'qr' | 'card';
 };
 
-export default function PublicPayPage(props: any) {
-  const raw = typeof props?.params?.code === 'string' ? props.params.code : '';
+export default function PublicPayPage(props: { params: Promise<{ code?: string }> }) {
+  // In Next 15, route params in Client Components are a Promise. Unwrap with React.use()
+  const unwrapped = use(props.params) || {} as { code?: string };
+  const raw = typeof unwrapped.code === 'string' ? unwrapped.code : '';
   // Accept /link/[code] and /link/s/[code]
   const code = raw;
   const [data, setData] = useState<LinkData | null>(null);
@@ -29,6 +31,7 @@ export default function PublicPayPage(props: any) {
   const [msg, setMsg] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [started, setStarted] = useState(false);
+  const [payLocked, setPayLocked] = useState(false);
 
   // Flow state
   const [taskId, setTaskId] = useState<string | number | null>(null);
@@ -73,6 +76,15 @@ export default function PublicPayPage(props: any) {
           const sale = d?.sale;
           if (userId) {
             setData((prev) => (prev || { code, userId, title: '', description: '' } as any));
+            // Проверяем наличие активного токена организации для оплаты
+            try {
+              const orgRes = await fetch(`/api/organizations/status?uid=${encodeURIComponent(userId)}${d?.orgInn ? `&org=${encodeURIComponent(String(d.orgInn))}` : ''}`, { cache: 'no-store' });
+              const orgD = await orgRes.json().catch(() => ({}));
+              if (!orgRes.ok || orgD?.hasToken !== true) {
+                setPayLocked(true);
+                setMsg('Оплата временно недоступна. Пожалуйста, уточните детали у продавца.');
+              }
+            } catch {}
           }
           if (sale) {
             setTaskId(sale.taskId);
@@ -90,6 +102,17 @@ export default function PublicPayPage(props: any) {
           if (!res.ok) throw new Error(d?.error || 'NOT_FOUND');
           if (cancelled) return;
           setData(d);
+          // Проверяем наличие токена и для режима оплаты по ссылке, если есть владелец
+          try {
+            if (d?.userId) {
+              const orgRes = await fetch(`/api/organizations/status?uid=${encodeURIComponent(String(d.userId))}${d?.orgInn ? `&org=${encodeURIComponent(String(d.orgInn))}` : ''}`, { cache: 'no-store' });
+              const orgD = await orgRes.json().catch(() => ({}));
+              if (!orgRes.ok || orgD?.hasToken !== true) {
+                setPayLocked(true);
+                setMsg('Оплата временно недоступна. Пожалуйста, уточните детали у продавца.');
+              }
+            }
+          } catch {}
           if (d?.sumMode === 'fixed' && typeof d?.amountRub === 'number') setAmount(String(d.amountRub));
           if (d?.method === 'card') setMethod('card'); else setMethod('qr');
         } catch (e) { if (!cancelled) setMsg('Ссылка не найдена'); }
@@ -347,7 +370,7 @@ export default function PublicPayPage(props: any) {
     );
   }
 
-  const canStart = canPay && !started && !loading;
+  const canStart = canPay && !started && !loading && !payLocked;
   const actionBtnClasses = `inline-flex items-center justify-center rounded-lg ${canStart ? 'bg-black text-white' : 'bg-gray-200 text-gray-600'} px-4 h-9 text-sm`;
 
   return (
@@ -355,6 +378,10 @@ export default function PublicPayPage(props: any) {
       <h1 className="text-xl font-semibold mb-1">{data.title}</h1>
       <div className="text-sm text-gray-600 mb-4">Оплата в пользу {data.orgName || 'Организация'}</div>
       <div className="bg-white dark:bg-gray-950 border border-gray-200 dark:border-gray-800 rounded-lg p-4">
+        {payLocked ? (
+          <div className="text-sm text-gray-700">Оплата временно недоступна. Пожалуйста, уточните детали у продавца.</div>
+        ) : (
+        <>
         <div className="mb-3">
           <div className="text-sm text-gray-600">За что платим</div>
           <div className="text-sm">{data.description}</div>
@@ -445,8 +472,10 @@ export default function PublicPayPage(props: any) {
             )}
           </div>
         ) : null}
+        </>
+        )}
 
-        {msg ? <div className="mt-3 text-sm text-gray-600">{msg}</div> : null}
+        {!payLocked && msg ? <div className="mt-3 text-sm text-gray-600">{msg}</div> : null}
       </div>
     </div>
   );

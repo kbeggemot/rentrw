@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import { getUserPayoutRequisites, updateUserPayoutRequisites, getUserOrgInn } from '@/server/userStore';
 import { getDecryptedApiToken } from '@/server/secureStore';
 import { writeText } from '@/server/storage';
+import { findOrgByInn } from '@/server/orgStore';
+import { getSelectedOrgInn } from '@/server/orgContext';
 
 export const runtime = 'nodejs';
 
@@ -18,7 +20,16 @@ export async function GET(req: Request) {
     const userId = getUserId(req);
     if (!userId) return NextResponse.json({ error: 'NO_USER' }, { status: 401 });
     const reqs = await getUserPayoutRequisites(userId);
-    return NextResponse.json({ bik: reqs.bik, account: reqs.account, orgName: reqs.orgName });
+    // Отображаем название выбранной организации из orgStore, а не из userStore
+    let orgName: string | null = null;
+    try {
+      const inn = getSelectedOrgInn(req);
+      if (inn) {
+        const org = await findOrgByInn(inn);
+        orgName = (org?.name ?? null) as string | null;
+      }
+    } catch {}
+    return NextResponse.json({ bik: reqs.bik, account: reqs.account, orgName });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Server error';
     return NextResponse.json({ error: message }, { status: 500 });
@@ -83,7 +94,16 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'EXECUTOR_CREATE_FAILED' }, { status: 502 });
     }
     const reqs = await getUserPayoutRequisites(userId);
-    return NextResponse.json({ bik: reqs.bik, account: reqs.account, orgName: reqs.orgName });
+    // Возвращаем название текущей организации из orgStore
+    let orgName: string | null = null;
+    try {
+      const inn = getSelectedOrgInn(req);
+      if (inn) {
+        const org = await findOrgByInn(inn);
+        orgName = (org?.name ?? null) as string | null;
+      }
+    } catch {}
+    return NextResponse.json({ bik: reqs.bik, account: reqs.account, orgName });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Server error';
     return NextResponse.json({ error: message }, { status: 500 });

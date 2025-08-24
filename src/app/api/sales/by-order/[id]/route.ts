@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import { listSales, updateSaleOfdUrlsByOrderId } from '@/server/taskStore';
+import { listSales, listSalesForOrg, updateSaleOfdUrlsByOrderId } from '@/server/taskStore';
+import { getSelectedOrgInn } from '@/server/orgContext';
 import { getOrCreateSalePageCode } from '@/server/salePageStore';
 import { fermaGetAuthTokenCached, fermaGetReceiptStatus, buildReceiptViewUrl } from '@/server/ofdFerma';
 
@@ -22,7 +23,8 @@ export async function GET(req: Request) {
     const idStr = decodeURIComponent(segs[segs.length - 1] || '');
     const orderId = Number(idStr);
     if (!Number.isFinite(orderId)) return NextResponse.json({ error: 'BAD_ORDER' }, { status: 400 });
-    const sales = await listSales(userId);
+    const inn = getSelectedOrgInn(req);
+    const sales = inn ? await listSalesForOrg(userId, inn) : await listSales(userId);
     const sale = sales.find((s) => s.orderId === orderId) || null;
     if (sale) {
       const baseUrl = process.env.FERMA_BASE_URL || 'https://ferma.ofd.ru/';

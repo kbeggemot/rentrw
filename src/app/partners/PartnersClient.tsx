@@ -13,8 +13,9 @@ function formatPhoneForDisplay(phone: string): string {
   return digits ? `+${digits}` : phone;
 }
 
-export default function PartnersClient({ initial }: { initial: Partner[] }) {
+export default function PartnersClient({ initial, hasTokenInitial }: { initial: Partner[]; hasTokenInitial?: boolean }) {
   const [partners, setPartners] = useState<Partner[]>(initial);
+  const [hasToken, setHasToken] = useState<boolean | null>(typeof hasTokenInitial === 'boolean' ? hasTokenInitial : null);
   const [loading, setLoading] = useState(false);
   const [phone, setPhone] = useState('');
   const [toast, setToast] = useState<{ msg: string; kind: 'success' | 'error' | 'info' } | null>(null);
@@ -27,6 +28,38 @@ export default function PartnersClient({ initial }: { initial: Partner[] }) {
   const [page, setPage] = useState(1);
   const pageSize = 15;
   const [deleting, setDeleting] = useState<string | null>(null);
+  // SSR уже передал флаг; если он не был передан, проверим на клиенте
+  useEffect(() => { if (typeof hasTokenInitial === 'boolean') setHasToken(hasTokenInitial); }, [hasTokenInitial]);
+  useEffect(() => {
+    if (typeof hasTokenInitial === 'boolean') return;
+    let aborted = false;
+    (async () => {
+      try {
+        const r = await fetch('/api/settings/token', { cache: 'no-store', credentials: 'include' });
+        const d = await r.json();
+        if (!aborted) setHasToken(Boolean(d?.token));
+      } catch {
+        if (!aborted) setHasToken(false);
+      }
+    })();
+    return () => { aborted = true; };
+  }, [hasTokenInitial]);
+
+  if (hasToken === false) {
+    return (
+      <div className="max-w-3xl mx-auto">
+        <div className="bg-white dark:bg-gray-950 border border-gray-200 dark:border-gray-800 rounded-lg p-6 shadow-sm">
+          <p className="text-sm text-gray-700 dark:text-gray-300 mb-3">
+            Для начала работы укажите токен своей организации, полученный в Рокет Ворк.
+          </p>
+          <a href="/settings" className="inline-block">
+            <Button>Перейти в настройки</Button>
+          </a>
+        </div>
+      </div>
+    );
+  }
+
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();

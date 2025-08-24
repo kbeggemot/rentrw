@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import { getDecryptedApiToken } from '@/server/secureStore';
+import { resolveRwTokenWithFingerprint } from '@/server/rwToken';
+import { getSelectedOrgInn } from '@/server/orgContext';
 
 export const runtime = 'nodejs';
 
@@ -22,7 +23,8 @@ export async function POST(req: Request) {
     
     const base = process.env.ROCKETWORK_API_BASE_URL || 'https://app.rocketwork.ru/api/';
     const digits = phone.replace(/\D/g, '');
-    const token = await getDecryptedApiToken(userId);
+    const orgInn = getSelectedOrgInn(req);
+    const { token } = await resolveRwTokenWithFingerprint(req, userId, orgInn, null);
     if (!token) return NextResponse.json({ error: 'NO_TOKEN' }, { status: 400 });
     const commonHeaders: Record<string, string> = {
       Authorization: `Bearer ${token}`,
@@ -52,7 +54,7 @@ export async function POST(req: Request) {
       ?? (raw?.selfemployed_status as string | undefined)
       ?? (ex?.status as string | undefined)
       ?? (raw?.status as string | undefined);
-    const inn = ex?.inn ?? raw?.inn ?? null;
+    const partnerInn = ex?.inn ?? raw?.inn ?? null;
     const fio = ex ? [ex.last_name, ex.first_name, ex.second_name].filter(Boolean).join(' ').trim() || null : null;
 
     // Check registration first (HTTP 404 or completely empty payload)
@@ -67,7 +69,7 @@ export async function POST(req: Request) {
     if (!res.ok) {
       return NextResponse.json({ 
         error: (executorData?.error as string) || 'RW_ERROR',
-        partnerData: { phone: digits, fio, status, inn, updatedAt: new Date().toISOString() }
+        partnerData: { phone: digits, fio, status, inn: partnerInn, updatedAt: new Date().toISOString() }
       }, { status: 400 });
     }
     
@@ -75,7 +77,7 @@ export async function POST(req: Request) {
     if (status && status !== 'validated') {
       return NextResponse.json({ 
         error: 'PARTNER_NOT_VALIDATED',
-        partnerData: { phone: digits, fio, status, inn, updatedAt: new Date().toISOString() }
+        partnerData: { phone: digits, fio, status, inn: partnerInn, updatedAt: new Date().toISOString() }
       }, { status: 400 });
     }
     
@@ -83,7 +85,7 @@ export async function POST(req: Request) {
     if (!status) {
       return NextResponse.json({ 
         error: 'PARTNER_NOT_REGISTERED',
-        partnerData: { phone: digits, fio, status: null, inn, updatedAt: new Date().toISOString() }
+        partnerData: { phone: digits, fio, status: null, inn: partnerInn, updatedAt: new Date().toISOString() }
       }, { status: 400 });
     }
 
@@ -91,7 +93,7 @@ export async function POST(req: Request) {
     if (!paymentInfo) {
       return NextResponse.json({ 
         error: 'PARTNER_NO_PAYMENT_INFO',
-        partnerData: { phone: digits, fio, status, inn, updatedAt: new Date().toISOString() }
+        partnerData: { phone: digits, fio, status, inn: partnerInn, updatedAt: new Date().toISOString() }
       }, { status: 400 });
     }
     
@@ -99,8 +101,8 @@ export async function POST(req: Request) {
       ok: true, 
       executor: executorData?.executor || executorData,
       status,
-      inn,
-      partnerData: { phone: digits, fio, status, inn, updatedAt: new Date().toISOString() }
+      inn: partnerInn,
+      partnerData: { phone: digits, fio, status, inn: partnerInn, updatedAt: new Date().toISOString() }
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'Server error';

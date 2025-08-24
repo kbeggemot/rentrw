@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import { listSales, updateSaleFromStatus, updateSaleOfdUrlsByOrderId, setSaleCreatedAtRw, setSaleHidden } from '@/server/taskStore';
+import { listSales, listSalesForOrg, updateSaleFromStatus, updateSaleOfdUrlsByOrderId, setSaleCreatedAtRw, setSaleHidden } from '@/server/taskStore';
+import { getSelectedOrgInn } from '@/server/orgContext';
 import type { RocketworkTask } from '@/types/rocketwork';
 import { getDecryptedApiToken } from '@/server/secureStore';
 import { fermaGetAuthTokenCached, fermaGetReceiptStatus, buildReceiptViewUrl } from '@/server/ofdFerma';
@@ -30,7 +31,11 @@ export async function GET(req: Request) {
       if (token) {
         const base = process.env.ROCKETWORK_API_BASE_URL || 'https://app.rocketwork.ru/api/';
         // Берём только продажи, инициированные нашим UI (source === 'ui')
-        let current = (await listSales(userId)).filter((s: any) => (s as any).source === 'ui');
+        const inn = getSelectedOrgInn(req);
+        const all = await listSales(userId);
+        let current = all.filter((s: any) => (s as any).source === 'ui' && (
+          !inn || String((s as any).orgInn || 'неизвестно') === inn || (s as any).orgInn == null || String((s as any).orgInn) === 'неизвестно'
+        ));
         if (onlyOrders && onlyOrders.length > 0) {
           const set = new Set(onlyOrders.map((n) => Number(n)));
           current = current.filter((s) => set.has(Number(s.orderId)));
@@ -207,7 +212,9 @@ export async function GET(req: Request) {
         }
       }
     }
-    const sales = await listSales(userId);
+    const inn = getSelectedOrgInn(req);
+    const allSales = await listSales(userId);
+    const sales = inn ? allSales.filter((s: any) => String((s as any).orgInn || 'неизвестно') === inn || (s as any).orgInn == null || String((s as any).orgInn) === 'неизвестно') : allSales;
     return NextResponse.json({ sales });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Server error';

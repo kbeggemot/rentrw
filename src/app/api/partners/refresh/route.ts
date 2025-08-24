@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import { getDecryptedApiToken } from '@/server/secureStore';
+import { resolveRwTokenWithFingerprint } from '@/server/rwToken';
+import { getSelectedOrgInn } from '@/server/orgContext';
 import { listPartners, upsertPartner } from '@/server/partnerStore';
 
 export const runtime = 'nodejs';
@@ -11,7 +12,8 @@ export async function POST(req: Request) {
     const cookie = req.headers.get('cookie') || '';
     const mc = /(?:^|;\s*)session_user=([^;]+)/.exec(cookie);
     const userId = (mc ? decodeURIComponent(mc[1]) : undefined) || req.headers.get('x-user-id') || 'default';
-    const token = await getDecryptedApiToken(userId);
+    const inn = getSelectedOrgInn(req);
+    const { token } = await resolveRwTokenWithFingerprint(req, userId, inn, null);
     if (!token) return NextResponse.json({ error: 'API токен не задан' }, { status: 400 });
 
     const base = process.env.ROCKETWORK_API_BASE_URL || DEFAULT_BASE_URL;

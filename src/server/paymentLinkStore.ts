@@ -3,6 +3,7 @@ import { readText, writeText } from './storage';
 export type PaymentLink = {
   code: string;
   userId: string;
+  orgInn?: string | null;
   title: string;
   description: string;
   sumMode: 'custom' | 'fixed';
@@ -56,6 +57,7 @@ export async function createPaymentLink(userId: string, data: Omit<PaymentLink, 
   const item: PaymentLink = {
     code,
     userId,
+    orgInn: (data as any)?.orgInn ? String((data as any).orgInn).replace(/\D/g, '') : 'неизвестно',
     title: data.title,
     description: data.description,
     sumMode: data.sumMode,
@@ -78,6 +80,12 @@ export async function createPaymentLink(userId: string, data: Omit<PaymentLink, 
 export async function listPaymentLinks(userId: string): Promise<PaymentLink[]> {
   const store = await readStore();
   return store.items.filter((i) => i.userId === userId).sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
+}
+
+export async function listPaymentLinksForOrg(userId: string, orgInn: string): Promise<PaymentLink[]> {
+  const store = await readStore();
+  const inn = (orgInn || '').replace(/\D/g, '');
+  return store.items.filter((i) => i.userId === userId && (i.orgInn || '') === inn).sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
 }
 
 export async function findLinkByCode(code: string): Promise<PaymentLink | null> {

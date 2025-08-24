@@ -16,6 +16,7 @@ export type SaleRecord = {
   taskId: number | string;
   orderId: number;
   userId: string;
+  orgInn?: string | null; // digits-only INN; 'неизвестно' if unknown
   clientEmail?: string | null;
   description?: string | null;
   amountGrossRub: number;
@@ -35,6 +36,7 @@ export type SaleRecord = {
   vatRate?: string | null; // e.g. none|0|10|20
   createdAtRw?: string | null; // created_at from RW task (ISO)
   hidden?: boolean; // soft-hide from UI
+  rwTokenFp?: string | null; // sha256 of RW token used to create
   createdAt: string;
   updatedAt: string;
   // New: stored invoice ids (A=prepay, B=offset, C=full)
@@ -69,6 +71,8 @@ export async function recordSaleOnCreate(params: {
   userId: string;
   taskId: number | string;
   orderId: number;
+  orgInn?: string | null;
+  rwTokenFp?: string | null;
   clientEmail?: string | null;
   description?: string;
   amountGrossRub: number;
@@ -78,7 +82,7 @@ export async function recordSaleOnCreate(params: {
   serviceEndDate?: string;
   vatRate?: string;
 }): Promise<void> {
-  const { userId, taskId, orderId, clientEmail, description, amountGrossRub, isAgent, commissionType, commissionValue, serviceEndDate, vatRate } = params;
+  const { userId, taskId, orderId, orgInn, rwTokenFp, clientEmail, description, amountGrossRub, isAgent, commissionType, commissionValue, serviceEndDate, vatRate } = params;
   let retained = 0;
   if (isAgent && commissionValue !== undefined) {
     if (commissionType === 'percent') retained = (amountGrossRub * commissionValue) / 100;
@@ -111,6 +115,7 @@ export async function recordSaleOnCreate(params: {
     taskId,
     orderId,
     userId,
+    orgInn: (orgInn && orgInn.trim().length > 0) ? orgInn.replace(/\D/g, '') : 'неизвестно',
     clientEmail: (clientEmail ?? null),
     description: description ?? null,
     amountGrossRub,
@@ -129,6 +134,7 @@ export async function recordSaleOnCreate(params: {
     vatRate: vatRate ?? null,
     createdAtRw: null,
     hidden: false,
+    rwTokenFp: rwTokenFp ?? null,
     createdAt: now,
     updatedAt: now,
     invoiceIdPrepay,
@@ -240,6 +246,13 @@ export async function findSaleByTaskId(userId: string, taskId: number | string):
   const store = await readTasks();
   const arr = (store.sales ?? []).filter((s) => s.userId === userId && s.taskId == taskId);
   return arr.length > 0 ? arr[0] : null;
+}
+
+export async function listSalesForOrg(userId: string, orgInn: string): Promise<SaleRecord[]> {
+  const store = await readTasks();
+  const inn = (orgInn || '').replace(/\D/g, '');
+  const arr = (store.sales ?? []).filter((s) => s.userId === userId && (s.orgInn || '') === inn);
+  return arr.sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
 }
 
 

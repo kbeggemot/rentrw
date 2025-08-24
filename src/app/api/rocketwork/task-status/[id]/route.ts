@@ -1,5 +1,8 @@
 import { NextResponse } from 'next/server';
 import { getDecryptedApiToken } from '@/server/secureStore';
+import { resolveRwTokenWithFingerprint } from '@/server/rwToken';
+import { listSales, findSaleByTaskId } from '@/server/taskStore';
+import { getSelectedOrgInn } from '@/server/orgContext';
 import { promises as fs } from 'fs';
 import path from 'path';
 
@@ -12,11 +15,7 @@ export async function GET(_: Request) {
     const cookie = _.headers.get('cookie') || '';
     const mc = /(?:^|;\s*)session_user=([^;]+)/.exec(cookie);
     const userId = (mc ? decodeURIComponent(mc[1]) : undefined) || _.headers.get('x-user-id') || 'default';
-    const token = await getDecryptedApiToken(userId);
-    if (!token) return NextResponse.json({ error: 'API токен не задан' }, { status: 400 });
-
-    const base = process.env.ROCKETWORK_API_BASE_URL || DEFAULT_BASE_URL;
-    // поддерживаем специальный id last: берём последний task_id из локального стора
+    // Try resolve via sale.rwTokenFp where possible
     const urlObj = new URL(_.url);
     const segs = urlObj.pathname.split('/');
     let taskId = decodeURIComponent(segs[segs.length - 1] || '');
@@ -28,6 +27,14 @@ export async function GET(_: Request) {
         if (last != null) taskId = String(last);
       } catch {}
     }
+    let rwTokenFp: string | null = null;
+    try { const s = await findSaleByTaskId(userId, taskId); rwTokenFp = (s as any)?.rwTokenFp ?? null; } catch {}
+    const inn = getSelectedOrgInn(_);
+    const { token } = await resolveRwTokenWithFingerprint(_, userId, inn, rwTokenFp);
+    if (!token) return NextResponse.json({ error: 'API токен не задан' }, { status: 400 });
+
+    const base = process.env.ROCKETWORK_API_BASE_URL || DEFAULT_BASE_URL;
+    // поддерживаем специальный id last: берём последний task_id из локального стора
     const url = new URL(`tasks/${encodeURIComponent(taskId)}`, base.endsWith('/') ? base : base + '/').toString();
 
     const res = await fetch(url, {

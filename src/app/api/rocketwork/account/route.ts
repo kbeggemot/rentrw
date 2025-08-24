@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getDecryptedApiToken } from '@/server/secureStore';
+import { getSelectedOrgInn } from '@/server/orgContext';
+import { getTokenForOrg } from '@/server/orgStore';
 
 export const runtime = 'nodejs';
 
@@ -10,7 +12,12 @@ export async function GET(req: Request) {
     const cookie = req.headers.get('cookie') || '';
     const mc = /(?:^|;\s*)session_user=([^;]+)/.exec(cookie);
     const userId = (mc ? decodeURIComponent(mc[1]) : undefined) || req.headers.get('x-user-id') || 'default';
-    const token = await getDecryptedApiToken(userId);
+    const inn = getSelectedOrgInn(req);
+    let token: string | null = null;
+    if (inn) {
+      try { token = await getTokenForOrg(inn, userId); } catch { token = null; }
+    }
+    if (!token) token = await getDecryptedApiToken(userId);
     if (!token) {
       return NextResponse.json({ error: 'API токен не задан' }, { status: 400 });
     }

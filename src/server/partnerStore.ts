@@ -6,6 +6,7 @@ export type PartnerRecord = {
   fio: string | null;
   status: string | null; // e.g., validated, pending, etc.
   inn?: string | null;
+  orgInn?: string | null; // owning organization INN (digits) or 'неизвестно'
   updatedAt: string; // ISO
   hidden?: boolean; // soft delete flag
 };
@@ -43,6 +44,13 @@ export async function listPartners(userId: string): Promise<PartnerRecord[]> {
   const store = await readStore();
   const arr = Array.isArray(store.users[userId]) ? store.users[userId] : [];
   return arr.filter((p) => !p.hidden);
+}
+
+export async function listPartnersForOrg(userId: string, orgInn: string): Promise<PartnerRecord[]> {
+  const store = await readStore();
+  const arr = Array.isArray(store.users[userId]) ? store.users[userId] : [];
+  const inn = (orgInn || '').replace(/\D/g, '');
+  return arr.filter((p) => !p.hidden && (p.orgInn || '') === inn);
 }
 
 export async function upsertPartner(userId: string, partner: PartnerRecord): Promise<void> {
@@ -104,7 +112,8 @@ export async function partnerExists(userId: string, phone: string): Promise<bool
 export async function upsertPartnerFromValidation(
   userId: string, 
   phone: string, 
-  executorData: any
+  executorData: any,
+  orgInn?: string | null
 ): Promise<void> {
   const fio = executorData?.executor ? [
     executorData.executor.last_name,
@@ -120,6 +129,7 @@ export async function upsertPartnerFromValidation(
     fio: fio || null,
     status: status || null,
     inn: inn || null,
+    orgInn: orgInn ? orgInn.replace(/\D/g, '') : 'неизвестно',
     updatedAt: new Date().toISOString(),
     hidden: false
   };

@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getDecryptedApiToken } from '@/server/secureStore';
+import { resolveRwTokenWithFingerprint } from '@/server/rwToken';
+import { getSelectedOrgInn } from '@/server/orgContext';
 import { promises as fs } from 'fs';
 import path from 'path';
 import { updateSaleFromStatus, findSaleByTaskId, updateSaleOfdUrlsByOrderId, setSaleCreatedAtRw } from '@/server/taskStore';
@@ -19,14 +21,18 @@ export async function GET(_: Request) {
     const cookie = _.headers.get('cookie') || '';
     const mc = /(?:^|;\s*)session_user=([^;]+)/.exec(cookie);
     const userId = (mc ? decodeURIComponent(mc[1]) : undefined) || _.headers.get('x-user-id') || 'default';
-    const token = await getDecryptedApiToken(userId);
+    const urlObj = new URL(_.url);
+    const segs = urlObj.pathname.split('/');
+    let taskId = decodeURIComponent(segs[segs.length - 1] || '');
+    let rwTokenFp: string | null = null;
+    try { const s = await findSaleByTaskId(userId, taskId); rwTokenFp = (s as any)?.rwTokenFp ?? null; } catch {}
+    const inn = getSelectedOrgInn(_);
+    const { token } = await resolveRwTokenWithFingerprint(_, userId, inn, rwTokenFp);
     if (!token) return NextResponse.json({ error: 'API токен не задан' }, { status: 400 });
 
     const base = process.env.ROCKETWORK_API_BASE_URL || DEFAULT_BASE_URL;
     // поддерживаем специальный id last из локального стора для дебага
-    const urlObj = new URL(_.url);
-    const segs = urlObj.pathname.split('/');
-    let taskId = decodeURIComponent(segs[segs.length - 1] || '');
+    taskId = decodeURIComponent(segs[segs.length - 1] || '');
     if (taskId === 'last') {
       try {
         const raw = await fs.readFile(path.join(process.cwd(), '.data', 'tasks.json'), 'utf8');

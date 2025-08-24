@@ -167,10 +167,16 @@ export default function SettingsClient({ initial, userId }: { initial: SettingsP
         body: JSON.stringify({ token }),
       });
       const text = await res.text();
-      let data: { token?: string; error?: string } | null = null;
-      try { data = text ? (JSON.parse(text) as { token?: string; error?: string }) : null; } catch {}
+      let data: { token?: string; error?: string; inn?: string } | null = null;
+      try { data = text ? (JSON.parse(text) as { token?: string; error?: string; inn?: string }) : null; } catch {}
       if (!res.ok) {
         const code = data?.error || text || 'ERROR';
+        if (code === 'ORG_ALREADY_ADDED') {
+          showToast('Эта организация уже добавлена', 'error');
+          // переключение контекста уже произошло на сервере; мягко перезагрузим UI
+          try { window.location.reload(); } catch {}
+          return;
+        }
         if (code === 'INVALID_TOKEN') throw new Error('Указан некорректный токен');
         if (code === 'TECH_ERROR') throw new Error('Техническая ошибка. Попробуйте ещё раз');
         throw new Error('Ошибка сохранения');
@@ -179,6 +185,10 @@ export default function SettingsClient({ initial, userId }: { initial: SettingsP
       setToken('');
       setMessage('Токен сохранён');
       try { showToast('Токен сохранён', 'success'); } catch {}
+      // Переключение на новую организацию — сервер уже выставил cookie; обновим страницу
+      if (data?.inn) {
+        try { window.location.reload(); } catch {}
+      }
       // refresh payout org name after token save
       try {
         const pr = await fetch('/api/settings/payout', { cache: 'no-store' });
@@ -198,7 +208,7 @@ export default function SettingsClient({ initial, userId }: { initial: SettingsP
     setDeletingToken(true);
     setMessage(null);
     try {
-      const res = await fetch('/api/settings/token', { method: 'DELETE' });
+      const res = await fetch('/api/settings/token', { method: 'DELETE', credentials: 'include' });
       const t = await res.text();
       let d: any = null; try { d = t ? JSON.parse(t) : null; } catch {}
       if (!res.ok) throw new Error(d?.error || t || 'DELETE_FAILED');
@@ -207,6 +217,8 @@ export default function SettingsClient({ initial, userId }: { initial: SettingsP
       setMessage('Токен удалён');
       try { showToast('Токен удалён', 'success'); } catch {}
       setOrgName('');
+      // Перезагрузим страницу, чтобы пересчитать серверные значения и баннеры в других разделах
+      try { setTimeout(() => { window.location.reload(); }, 300); } catch {}
     } catch (e) {
       setMessage('Не удалось удалить токен');
       showToast('Не удалось удалить токен', 'error');
@@ -273,17 +285,18 @@ export default function SettingsClient({ initial, userId }: { initial: SettingsP
       <form onSubmit={submit} className="space-y-4">
         <div>
           <label className="block text-sm text-gray-700 dark:text-gray-300 mb-1">Токен Рокет Ворк</label>
-          {currentMasked ? (
+          <div className="flex flex-col gap-3">
+            {currentMasked ? (
+              <div className="flex items-center gap-3">
+                <Input type="text" value={currentMasked} readOnly className="min-w-[220px]" />
+                <Button type="button" variant="secondary" loading={deletingToken} onClick={deleteToken}>Удалить токен</Button>
+              </div>
+            ) : null}
             <div className="flex items-center gap-3">
-              <Input type="text" value={currentMasked} readOnly />
-              <Button type="button" variant="secondary" loading={deletingToken} onClick={deleteToken}>Удалить токен</Button>
+              <Input type="password" placeholder="Введите новый токен" value={token} onChange={(e) => setToken(e.target.value)} className="min-w-[260px]" />
+              <Button type="submit" disabled={token.length === 0} loading={saving}>{saving ? 'Сохраняю' : 'Сохранить'}</Button>
             </div>
-          ) : (
-            <div className="flex items-center gap-3">
-              <Input type="password" placeholder="Введите токен" value={token} onChange={(e) => setToken(e.target.value)} />
-              <Button type="submit" disabled={token.length === 0} loading={saving}>Сохранить</Button>
-            </div>
-          )}
+          </div>
         </div>
 
         <div>

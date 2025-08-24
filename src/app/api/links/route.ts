@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
-import { createPaymentLink, listPaymentLinks } from '@/server/paymentLinkStore';
-import { getDecryptedApiToken } from '@/server/secureStore';
+import { createPaymentLink, listPaymentLinks, listPaymentLinksForOrg } from '@/server/paymentLinkStore';
+import { resolveRwTokenWithFingerprint } from '@/server/rwToken';
+import { getSelectedOrgInn } from '@/server/orgContext';
 import { partnerExists, upsertPartnerFromValidation } from '@/server/partnerStore';
 
 export const runtime = 'nodejs';
@@ -17,7 +18,8 @@ export async function GET(req: Request) {
   try {
     const userId = getUserId(req);
     if (!userId) return NextResponse.json({ error: 'NO_USER' }, { status: 401 });
-    const items = await listPaymentLinks(userId);
+    const inn = getSelectedOrgInn(req);
+    const items = inn ? await listPaymentLinksForOrg(userId, inn) : await listPaymentLinks(userId);
     return NextResponse.json({ items });
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'Server error';
@@ -30,6 +32,7 @@ export async function POST(req: Request) {
     const userId = getUserId(req);
     if (!userId) return NextResponse.json({ error: 'NO_USER' }, { status: 401 });
     const body = await req.json().catch(() => null);
+    const inn = getSelectedOrgInn(req);
     const title = String(body?.title || '').trim();
     const description = String(body?.description || '').trim();
     const sumMode = (body?.sumMode === 'fixed' ? 'fixed' : 'custom') as 'custom' | 'fixed';
@@ -52,7 +55,8 @@ export async function POST(req: Request) {
       if (!partnerPhone) return NextResponse.json({ error: 'PARTNER_PHONE_REQUIRED' }, { status: 400 });
       // Check partner via RW similar to main flow
       try {
-        const token = await getDecryptedApiToken(userId);
+        const inn = getSelectedOrgInn(req);
+        const { token } = await resolveRwTokenWithFingerprint(req, userId, inn, null);
         if (!token) return NextResponse.json({ error: 'NO_TOKEN' }, { status: 400 });
         const base = process.env.ROCKETWORK_API_BASE_URL || 'https://app.rocketwork.ru/api/';
         const digits = String(partnerPhone).replace(/\D/g, '');
@@ -81,7 +85,7 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: msg }, { status: 400 });
       }
     }
-    const item = await createPaymentLink(userId, { title, description, sumMode, amountRub: amountRub ?? undefined, vatRate, isAgent, commissionType: commissionType as any, commissionValue: commissionValue ?? undefined, partnerPhone, method });
+    const item = await createPaymentLink(userId, { title, description, sumMode, amountRub: amountRub ?? undefined, vatRate, isAgent, commissionType: commissionType as any, commissionValue: commissionValue ?? undefined, partnerPhone, method, orgInn: inn ?? undefined } as any);
     const hostHdr = req.headers.get('x-forwarded-host') || req.headers.get('host') || 'localhost:3000';
     const protoHdr = req.headers.get('x-forwarded-proto') || (hostHdr.startsWith('localhost') ? 'http' : 'https');
     const url = `${protoHdr}://${hostHdr}/link/${encodeURIComponent(item.code)}`;
