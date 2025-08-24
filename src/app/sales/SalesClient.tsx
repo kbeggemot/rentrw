@@ -260,13 +260,14 @@ export default function SalesClient({ initial }: { initial: Sale[] }) {
 
   const exportXlsx = async () => {
     try {
-      const header = ['№', 'Тип', 'Сумма, ₽', 'Комиссия, ₽', 'Статус', 'Чек предоплаты', 'Чек полного расчёта', 'Чек комиссии', 'Чек НПД', 'Дата продажи', 'Дата окончания оказания услуги'];
+      const header = ['№', 'Тип', 'Сумма, ₽', 'Комиссия, ₽', 'Статус оплаты', 'Общий статус', 'Чек предоплаты', 'Чек полного расчёта', 'Чек комиссии', 'Чек НПД', 'Дата продажи', 'Дата окончания оказания услуги'];
       const rows = filtered.map((s) => [
         String(s.taskId ?? ''),
         s.isAgent ? 'Агентская' : 'Прямая',
         typeof s.amountGrossRub === 'number' ? s.amountGrossRub.toFixed(2) : '',
         s.isAgent && typeof s.retainedCommissionRub === 'number' ? s.retainedCommissionRub.toFixed(2) : '',
         s.status ?? '',
+        (s as any).rootStatus ?? '',
         s.ofdUrl ?? '',
         s.ofdFullUrl ?? '',
         s.additionalCommissionOfdUrl ?? '',
@@ -674,7 +675,7 @@ export default function SalesClient({ initial }: { initial: Sale[] }) {
               <th className="text-left px-3 py-2">Тип</th>
               <th className="text-left px-3 py-2 whitespace-nowrap">Сумма, {'\u00A0'}₽</th>
               <th className="text-left px-3 py-2 whitespace-nowrap">Комиссия, {'\u00A0'}₽</th>
-              <th className="text-left px-3 py-2">Статус</th>
+              <th className="text-left px-3 py-2">Статус оплаты</th>
               <th className="text-left px-1 py-2 w-10">Чек предоплаты</th>
               <th className="text-left px-1 py-2 w-10">Чек полного расчёта</th>
               <th className="text-left px-1 py-2 w-10">Чек комиссии</th>

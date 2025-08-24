@@ -98,7 +98,9 @@ export async function POST(req: Request) {
         ofdUrl: ofdUrl || undefined,
         additionalCommissionOfdUrl: additionalCommissionOfdUrl || undefined,
         npdReceiptUri: npdReceiptUri || undefined,
-      });
+        // pass root status through duck-typed property so taskStore can persist it
+        rootStatus: rootStatusRaw,
+      } as any);
       // Background pay trigger with unchanged conditions (agent, transfered, completed, has full receipt)
       try {
         const sale = await findSaleByTaskId(userId, taskId);

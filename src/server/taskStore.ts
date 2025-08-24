@@ -23,7 +23,8 @@ export type SaleRecord = {
   retainedCommissionRub: number;
   source?: 'ui' | 'external';
   rwOrderId?: number | null;
-  status?: string | null;
+  status?: string | null; // acquiring_order.status (оплата)
+  rootStatus?: string | null; // корневой статус задачи (task.status)
   ofdUrl?: string | null;
   ofdFullUrl?: string | null;
   ofdPrepayId?: string | null;
@@ -146,6 +147,12 @@ export async function updateSaleFromStatus(userId: string, taskId: number | stri
     const current = store.sales[idx];
     const next = { ...current } as SaleRecord;
     if (typeof update.status !== 'undefined' && update.status !== null) next.status = update.status;
+    // Try to infer root status from textual payloads when available in update (duck-typing)
+    try {
+      const anyUpd = update as any;
+      const root = typeof anyUpd.rootStatus === 'string' ? anyUpd.rootStatus : (typeof anyUpd.taskStatus === 'string' ? anyUpd.taskStatus : undefined);
+      if (typeof root !== 'undefined' && root !== null) (next as any).rootStatus = root;
+    } catch {}
     // Auto-hide expired tasks
     if (next.status && String(next.status).toLowerCase() === 'expired') {
       next.hidden = true;

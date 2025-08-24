@@ -125,7 +125,7 @@ export async function GET(_: Request) {
       const addOfd = (normalized?.additional_commission_ofd_url as string | undefined)
         ?? null;
       const npdReceipt = (normalized?.receipt_uri as string | undefined) ?? null;
-      await updateSaleFromStatus(userId, taskId, { status: normalized?.acquiring_order?.status, ofdUrl, additionalCommissionOfdUrl: addOfd, npdReceiptUri: npdReceipt });
+      await updateSaleFromStatus(userId, taskId, { status: normalized?.acquiring_order?.status, ofdUrl, additionalCommissionOfdUrl: addOfd, npdReceiptUri: npdReceipt, rootStatus: (normalized as any)?.status } as any);
       try {
         const createdAtRw: string | undefined = (normalized as any)?.created_at || undefined;
         if (createdAtRw) await setSaleCreatedAtRw(userId, taskId, createdAtRw);
