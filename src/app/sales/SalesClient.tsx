@@ -410,11 +410,11 @@ export default function SalesClient({ initial }: { initial: Sale[] }) {
             Сбросить
           </Button>
           <Button variant="secondary" onClick={() => load(true, paged.map((s) => s.orderId))} disabled={loading}>{loading ? 'Обновляю…' : 'Обновить'}</Button>
+          <div className="ml-auto" />
           <Button variant="secondary" onClick={exportXlsx} className="flex items-center gap-1">
             <IconArrowDown />
             Выгрузить XLS
           </Button>
-          <div className="ml-auto" />
         </div>
         
         {visibleFilters.length > 0 ? (
