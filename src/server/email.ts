@@ -92,11 +92,13 @@ export async function sendEmail(params: SendEmailParams): Promise<void> {
   const secure = String(process.env.SMTP_SECURE || '').toLowerCase() === 'true' || port === 465;
   const user = process.env.SMTP_USER || undefined;
   const pass = process.env.SMTP_PASS || undefined;
+  const name = process.env.SMTP_NAME || undefined; // EHLO/HELO client name
 
   const transporter = nodemailer.createTransport({
     host,
     port,
     secure,
+    name,
     auth: user && pass ? { user, pass } : undefined,
     logger: String(process.env.SMTP_DEBUG || '').trim() === '1',
     debug: String(process.env.SMTP_DEBUG || '').trim() === '1',
