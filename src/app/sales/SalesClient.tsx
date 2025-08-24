@@ -171,15 +171,9 @@ export default function SalesClient({ initial, hasTokenInitial }: { initial: Sal
     };
   }, [sseOn]);
 
-  // Мягкий refresh при заходе в раздел продаж на проде
-  useEffect(() => {
-    const isProd = typeof window !== 'undefined' && window.location.hostname !== 'localhost';
-    if (!isProd) return;
-    // подождем кадр, чтобы не блокировать пеинт
-    const t = setTimeout(() => { void load(true, paged.map((s) => s.orderId)); }, 0);
-    return () => clearTimeout(t);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  // Автообновление на первом рендере отключено, чтобы убрать «мигание».
+  // Обновление выполняется вручную кнопкой «Обновить» и по SSE-событиям.
+  // useEffect(() => { /* intentionally disabled */ }, []);
 
   // (moved below after `filtered` declaration)
 

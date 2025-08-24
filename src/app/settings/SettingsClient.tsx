@@ -41,6 +41,7 @@ export default function SettingsClient({ initial, userId }: { initial: SettingsP
   const [emailPending, setEmailPending] = useState(false);
   const [emailMsg, setEmailMsg] = useState<string | null>(null);
   const [emailMsgKind, setEmailMsgKind] = useState<'info' | 'error'>('info');
+  const [resendIn, setResendIn] = useState(0);
 
   const [accountPhone, setAccountPhone] = useState<string | null>(initial.accountPhone);
   const [agentDesc, setAgentDesc] = useState(initial.agentDescription);
@@ -136,6 +137,13 @@ export default function SettingsClient({ initial, userId }: { initial: SettingsP
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // resend timer for email verification code
+  useEffect(() => {
+    if (resendIn <= 0) return;
+    const t = setInterval(() => setResendIn((s) => (s > 0 ? s - 1 : 0)), 1000);
+    return () => clearInterval(t);
+  }, [resendIn]);
 
   // iOS Safari: verify WebAuthn status and force refresh keys if present
   useEffect(() => {
@@ -319,7 +327,9 @@ export default function SettingsClient({ initial, userId }: { initial: SettingsP
                       // Re-send verification to saved full email on server (no masked email in payload)
                       const r = await fetch('/api/settings/email', { method: 'POST' });
                       if (!r.ok) throw new Error('SEND_FAILED');
+                      setEmailVerified(false);
                       setEmailPending(true);
+                      setResendIn(60);
                     } catch (e) {
                       setEmailMsgKind('error');
                       const msg = e instanceof Error ? e.message : 'SEND_FAILED';
@@ -361,7 +371,9 @@ export default function SettingsClient({ initial, userId }: { initial: SettingsP
                     setEmailMasked(d?.email ?? null);
                     setEmailEditing(false);
                     setEmailValue('');
+                    setEmailVerified(false);
                     setEmailPending(true);
+                    setResendIn(60);
                     setMessage('Код подтверждения отправлен на email');
                     try { showToast('Код подтверждения отправлен на email', 'success'); } catch {}
                   } catch (e) {
@@ -387,7 +399,7 @@ export default function SettingsClient({ initial, userId }: { initial: SettingsP
             </div>
           )}
         </div>
-        {emailMasked && !emailVerified ? (
+        {emailMasked && (!emailVerified || emailPending) ? (
           <div className="mt-2">
             <label className="block text-sm text-gray-700 dark:text-gray-300 mb-1">Подтверждение email</label>
             <div className="flex items-end gap-3">
@@ -430,6 +442,23 @@ export default function SettingsClient({ initial, userId }: { initial: SettingsP
                   }
                 }}
               >Подтвердить</Button>
+              <Button
+                type="button"
+                variant="ghost"
+                disabled={resendIn > 0}
+                onClick={async () => {
+                  try {
+                    const r = await fetch('/api/settings/email', { method: 'POST' });
+                    if (!r.ok) throw new Error('SEND_FAILED');
+                    setEmailVerified(false);
+                    setEmailPending(true);
+                    setResendIn(60);
+                  } catch {
+                    setEmailMsgKind('error');
+                    setEmailMsg('Не удалось отправить код повторно');
+                  }
+                }}
+              >{resendIn > 0 ? `Отправить повторно (${resendIn}с)` : 'Отправить повторно'}</Button>
             </div>
             {emailPending ? <div className="text-xs text-gray-500 mt-1">Мы отправили код на ваш email.</div> : null}
             {emailMsg ? (
@@ -437,7 +466,7 @@ export default function SettingsClient({ initial, userId }: { initial: SettingsP
             ) : null}
           </div>
         ) : null}
-        {emailVerified ? (
+        {emailVerified && !emailPending ? (
           emailMsgKind === 'error' && emailMsg ? (
             <div className="text-sm text-red-600">{emailMsg}</div>
           ) : (
