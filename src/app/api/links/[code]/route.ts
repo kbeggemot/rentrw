@@ -23,7 +23,7 @@ export async function GET(req: Request) {
     const { userId, title, description, sumMode, amountRub, vatRate, isAgent, commissionType, commissionValue, partnerPhone, method } = item;
     let orgName: string | null = null;
     try { const reqs = await getUserPayoutRequisites(userId); orgName = reqs.orgName || null; } catch {}
-    return NextResponse.json({ code, userId, title, description, sumMode, amountRub, vatRate, isAgent, commissionType, commissionValue, partnerPhone, method, orgName }, { status: 200 });
+    return NextResponse.json({ code, userId, title, description, sumMode, amountRub, vatRate, isAgent, commissionType, commissionValue, partnerPhone, method, orgName, orgInn: item.orgInn || null }, { status: 200 });
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'Server error';
     return NextResponse.json({ error: msg }, { status: 500 });

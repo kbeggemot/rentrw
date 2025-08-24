@@ -252,7 +252,7 @@ export async function GET(_: Request) {
       const hint = { ofdTarget: isToday ? 'full' : 'prepay', orderId: sale?.orderId } as Record<string, unknown>;
       return new NextResponse(JSON.stringify({ ...(normalized as any), __hint: hint }), { status: 200, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store, no-cache, max-age=0, must-revalidate' } });
     } catch {
-      return new NextResponse(JSON.stringify(normalized), { status: 200, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store, no-cache, max-age=0, must-revalidate' } });
+    return new NextResponse(JSON.stringify(normalized), { status: 200, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store, no-cache, max-age=0, must-revalidate' } });
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Server error';

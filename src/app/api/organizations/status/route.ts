@@ -16,10 +16,18 @@ export async function GET(req: Request) {
 
     let has = false;
     try {
-      const { listActiveTokensForOrg } = await import('@/server/orgStore');
+      const { listActiveTokensForOrg, findOrgByInn } = await import('@/server/orgStore');
       if (orgInn) {
-        const tokens = await listActiveTokensForOrg(orgInn, userId);
-        has = tokens.length > 0;
+        // 1) Быстрая проверка «есть ли активные токены вообще» (без привязки к пользователю)
+        const org = await findOrgByInn(orgInn);
+        const anyActive = !!org && org.tokens.some((t: any) => Array.isArray(t?.holderUserIds) && t.holderUserIds.length > 0);
+        if (anyActive) {
+          has = true;
+        } else {
+          // 2) fallback: соберём реальные токены (если вдруг хранилище без holderUserIds)
+          const tokens = await listActiveTokensForOrg(orgInn, userId);
+          has = tokens.length > 0;
+        }
       }
     } catch {}
     return NextResponse.json({ hasToken: has });
