@@ -62,7 +62,7 @@ export default function SaveButton({ label = 'Сохранить', successText =
             signal: controller.signal,
           });
           window.clearTimeout(timer);
-          if (res.ok) {
+          if (res.ok || (res.status >= 300 && res.status < 400) || res.status === 405) {
             toast(successText, 'success');
             // Follow redirect manually when possible
             const url = (res as any).url as string | undefined;
