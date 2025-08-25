@@ -1,17 +1,23 @@
+import { headers as nextHeaders, cookies as nextCookies } from 'next/headers';
 import SaveButton from '@/components/admin/SaveButton';
 
 async function getItem(uid: string, task: string) {
   const qs = `?uid=${encodeURIComponent(uid)}&task=${encodeURIComponent(task)}`;
-  const res = await fetch(`/api/admin/data/sales${qs}`, { cache: 'no-store' });
-  if (res.ok) {
-    try { const d = await res.json(); return d?.item || null; } catch { return null; }
-  }
-  // Fallback: load list and find locally (на всякий случай)
+  const hdrs = await nextHeaders();
+  const proto = hdrs.get('x-forwarded-proto') || 'http';
+  const host = hdrs.get('x-forwarded-host') || hdrs.get('host') || 'localhost:3000';
+  const base = `${proto}://${host}`;
+  const cookie = (await nextCookies()).toString();
   try {
-    const r2 = await fetch(`/api/admin/data/sales`, { cache: 'no-store' });
+    const res = await fetch(`${base}/api/admin/data/sales${qs}`, { cache: 'no-store', headers: { cookie } as any });
+    if (res.ok) { const d = await res.json(); return d?.item || null; }
+  } catch {}
+  try {
+    const r2 = await fetch(`${base}/api/admin/data/sales`, { cache: 'no-store', headers: { cookie } as any });
+    if (!r2.ok) return null;
     const d2 = await r2.json();
     const list = Array.isArray(d2?.items) ? d2.items : [];
-    return list.find((x: any) => String(x.taskId) == String(task)) || null;
+    return list.find((x: any) => String(x.userId) === uid && (x.taskId == (task as any))) || list.find((x: any) => (x.taskId == (task as any))) || null;
   } catch { return null; }
 }
 
