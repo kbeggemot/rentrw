@@ -30,7 +30,9 @@ export async function GET(req: Request) {
   const task = url.searchParams.get('task');
   const list = Array.isArray(s.sales) ? s.sales : [];
   if (uid && task) {
-    const one = list.find((x) => String(x.userId) === uid && (x.taskId == (task as any)));
+    let one = list.find((x) => String(x.userId) === uid && (x.taskId == (task as any)));
+    // Fallback: find by taskId only (uid might be missing/mismatched in legacy records)
+    if (!one) one = list.find((x) => (x.taskId == (task as any)));
     return NextResponse.json({ item: one || null });
   }
   const sorted = [...list].sort((a: any, b: any) => {
