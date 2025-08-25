@@ -347,6 +347,7 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
         commissionValue: data.isAgent ? (typeof data.commissionValue === 'number' ? data.commissionValue : undefined) : undefined,
         vatRate: (data.vatRate || 'none'),
         serviceEndDate: mskToday(),
+        orgInn: (data as any)?.orgInn ? String((data as any).orgInn).replace(/\D/g,'') : undefined,
       };
       const res = await fetch('/api/rocketwork/tasks', { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-user-id': data.userId }, body: JSON.stringify(body) });
       const txt = await res.text();
