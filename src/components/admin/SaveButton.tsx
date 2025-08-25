@@ -35,7 +35,16 @@ export default function SaveButton({ label = 'Сохранить', successText =
       type="submit"
       disabled={loading}
       className={className + (loading ? ' opacity-70 cursor-not-allowed' : '')}
-      onClick={() => { if (!loading) setLoading(true); /* нативная отправка формы */ }}
+      onClick={(e) => {
+        if (loading) return;
+        e.preventDefault();
+        setLoading(true);
+        try {
+          const btn = e.currentTarget as HTMLButtonElement;
+          const form = btn.closest('form') as HTMLFormElement | null;
+          if (form) form.submit();
+        } catch {}
+      }}
     >
       {loading ? 'Сохраняю…' : label}
     </button>
