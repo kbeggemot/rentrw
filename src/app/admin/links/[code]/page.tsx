@@ -18,7 +18,7 @@ export default async function AdminLinkEditor(props: { params: Promise<{ code: s
       {!item ? (
         <div className="text-sm text-gray-600">Запись не найдена</div>
       ) : (
-        <form id="link-edit-form" action={`/admin/links/${encodeURIComponent(p.code)}/save`} method="post" className="space-y-3">
+        <form action={`/admin/links/${encodeURIComponent(p.code)}/save`} method="post" className="space-y-3">
           <input type="hidden" name="code" defaultValue={p.code} />
           <div className="grid grid-cols-2 gap-3">
             <label className="block text-sm">orgInn<input name="orgInn" defaultValue={item.orgInn||''} className="w-full border rounded px-2 py-1" /></label>
@@ -68,7 +68,7 @@ export default async function AdminLinkEditor(props: { params: Promise<{ code: s
             </label>
           </div>
           <div className="flex gap-2">
-            <SaveButton formId="link-edit-form">Сохранить</SaveButton>
+            <SaveButton>Сохранить</SaveButton>
             <a className="px-3 py-2 border rounded" href="/admin?tab=links">Назад</a>
           </div>
         </form>

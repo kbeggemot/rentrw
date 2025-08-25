@@ -1,80 +1,57 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { getAdminUser } from '@/server/adminAuth';
+import { NextResponse } from 'next/server';
 import { readText, writeText } from '@/server/storage';
-import { PaymentLink } from '@/types/admin';
 
-export async function POST(req: NextRequest) {
-  const adminUser = await getAdminUser(req);
-  if (!adminUser) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+export const runtime = 'nodejs';
 
-  if (adminUser.role !== 'superadmin') {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-  }
+function authed(req: Request): boolean {
+  const cookie = req.headers.get('cookie') || '';
+  return /(?:^|;\s*)admin_user=([^;]+)/.test(cookie);
+}
 
-  try {
-    const formData = await req.formData();
-    const code = formData.get('code') as string;
-    
-    if (!code) {
-      return NextResponse.json({ error: 'Missing code' }, { status: 400 });
-    }
+type Store = { items?: any[] };
 
-    // Read current links data
-    const rawData = await readText('.data/payment_links.json');
-    if (!rawData) {
-      return NextResponse.json({ error: 'No links data found' }, { status: 404 });
-    }
-    
-    const data = JSON.parse(rawData);
-    const links = data.links || [];
-    
-    // Find the link to update
-    const linkIndex = links.findIndex((l: PaymentLink) => l.code === code);
-    if (linkIndex === -1) {
-      return NextResponse.json({ error: 'Link not found' }, { status: 404 });
-    }
+async function readStore(): Promise<Store> {
+  const raw = await readText('.data/payment_links.json');
+  if (!raw) return { items: [] };
+  try { return JSON.parse(raw) as Store; } catch { return { items: [] }; }
+}
 
-    // Update link fields from form data
-    const updatedLink = { ...links[linkIndex] };
-    
-    // Update all possible fields
-    const fieldsToUpdate = [
-      'userId', 'orgInn', 'sumMode', 'vatRate', 'isAgent', 'commissionType', 'method'
-    ];
+async function writeStore(s: Store): Promise<void> {
+  await writeText('.data/payment_links.json', JSON.stringify(s, null, 2));
+}
 
-    fieldsToUpdate.forEach(field => {
-      const value = formData.get(field);
-      if (value !== null) {
-        if (field === 'isAgent') {
-          updatedLink[field] = value === 'true';
-        } else {
-          updatedLink[field] = value === '' ? null : value as string;
-        }
-      }
-    });
+export async function POST(req: Request) {
+  if (!authed(req)) return NextResponse.redirect(new URL('/admin', req.url));
+  const body = await req.formData();
+  const code = String(body.get('code') || '');
+  const s = await readStore();
+  const arr = Array.isArray(s.items) ? s.items : [];
+  const idx = arr.findIndex((x) => String(x.code) === code);
+  if (idx === -1) return NextResponse.redirect(new URL('/admin', req.url));
+  const next: any = { ...arr[idx] };
+  // Parse and coerce types correctly so UI and public API see fresh values
+  const val = (k: string) => (body.has(k) ? String(body.get(k) || '').trim() : undefined);
+  const num = (v: string | undefined) => {
+    if (typeof v === 'undefined') return undefined as any;
+    const n = Number(String(v).replace(',', '.'));
+    return Number.isFinite(n) ? n : null;
+  };
+  const nz = (v: string | undefined) => (typeof v === 'undefined' ? undefined as any : (v.length ? v : null));
 
-    // Update the link in the array
-    links[linkIndex] = updatedLink;
-
-    // Write back to storage
-    await writeText('.data/payment_links.json', JSON.stringify(data, null, 2));
-
-    // Return success response for client-side navigation
-    return NextResponse.json({ 
-      success: true, 
-      message: 'Ссылка успешно обновлена',
-      redirectUrl: `/admin?tab=links`
-    });
-
-  } catch (error) {
-    console.error('Error updating link:', error);
-    return NextResponse.json({ 
-      error: 'Internal server error',
-      details: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 });
-  }
+  const orgInn = val('orgInn'); if (orgInn !== undefined) next.orgInn = orgInn ? orgInn.replace(/\D/g,'') || null : null;
+  const title = nz(val('title')); if (title !== undefined) next.title = title;
+  const description = nz(val('description')); if (description !== undefined) next.description = description;
+  const sumMode = val('sumMode'); if (sumMode !== undefined) next.sumMode = (sumMode === 'fixed' ? 'fixed' : 'custom');
+  const amountRubRaw = val('amountRub'); if (amountRubRaw !== undefined) next.amountRub = num(amountRubRaw);
+  const vatRate = val('vatRate'); if (vatRate !== undefined) next.vatRate = (['none','0','10','20'].includes(vatRate) ? vatRate : null);
+  const isAgent = val('isAgent'); if (isAgent !== undefined) next.isAgent = isAgent === 'true';
+  const commissionType = val('commissionType'); if (commissionType !== undefined) next.commissionType = (['percent','fixed'].includes(commissionType) ? commissionType : null);
+  const commissionValueRaw = val('commissionValue'); if (commissionValueRaw !== undefined) next.commissionValue = num(commissionValueRaw);
+  const partnerPhone = nz(val('partnerPhone')); if (partnerPhone !== undefined) next.partnerPhone = partnerPhone;
+  const method = val('method'); if (method !== undefined) next.method = (['any','qr','card'].includes(method) ? method : 'any');
+  arr[idx] = next;
+  await writeStore({ items: arr });
+  return NextResponse.redirect(new URL(`/admin/links/${encodeURIComponent(code)}`, req.url));
 }
 
 
