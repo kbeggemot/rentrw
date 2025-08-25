@@ -88,7 +88,7 @@ export default async function AdminSaleEditor(props: { params: Promise<{ uid: st
               <label className="block text-sm">rwOrderId<input name="rwOrderId" defaultValue={String(item.rwOrderId||'')} className="w-full border rounded px-2 py-1" /></label>
             </div>
             <div className="flex gap-2">
-              <SaveButton label="Сохранить" />
+              <SaveButton>Сохранить</SaveButton>
               <a className="px-3 py-2 border rounded" href="/admin?tab=sales">Назад</a>
             </div>
           </form>
