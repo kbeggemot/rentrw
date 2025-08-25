@@ -19,13 +19,13 @@ export default async function AdminOrgEditor(props: { params: Promise<{ inn: str
       {!item ? (
         <div className="text-sm text-gray-600">Запись не найдена</div>
       ) : (
-        <form action={`/admin/orgs/${encodeURIComponent(p.inn)}/save`} method="post" className="space-y-3">
+        <form id="org-edit-form" action={`/admin/orgs/${encodeURIComponent(p.inn)}/save`} method="post" className="space-y-3">
           <input type="hidden" name="inn" defaultValue={p.inn} />
           <div className="grid grid-cols-2 gap-3">
             <label className="block text-sm col-span-2">Название<input name="name" defaultValue={item.name||''} className="w-full border rounded px-2 py-1" /></label>
           </div>
           <div className="flex gap-2">
-            <SaveButton>Сохранить</SaveButton>
+            <SaveButton formId="org-edit-form">Сохранить</SaveButton>
             <a className="px-3 py-2 border rounded" href="/admin?tab=orgs">Назад</a>
           </div>
         </form>

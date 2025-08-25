@@ -1,38 +1,72 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
+import { getAdminUser } from '@/server/adminAuth';
 import { readText, writeText } from '@/server/storage';
+import { OrganizationRecord } from '@/types/admin';
 
 export const runtime = 'nodejs';
 
-function authed(req: Request): boolean {
-  const cookie = req.headers.get('cookie') || '';
-  return /(?:^|;\s*)admin_user=([^;]+)/.test(cookie);
-}
+export async function POST(req: NextRequest) {
+  const adminUser = await getAdminUser(req);
+  if (!adminUser) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
 
-type OrgStore = { orgs?: Record<string, any> };
+  if (adminUser.role !== 'superadmin') {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
 
-async function readStore(): Promise<OrgStore> {
-  const raw = await readText('.data/orgs.json');
-  if (!raw) return { orgs: {} };
-  try { return JSON.parse(raw) as OrgStore; } catch { return { orgs: {} }; }
-}
+  try {
+    const formData = await req.formData();
+    const inn = formData.get('inn') as string;
+    
+    if (!inn) {
+      return NextResponse.json({ error: 'Missing inn' }, { status: 400 });
+    }
 
-async function writeStore(s: OrgStore): Promise<void> {
-  await writeText('.data/orgs.json', JSON.stringify(s, null, 2));
-}
+    // Read current organizations data
+    const rawData = await readText('.data/orgs.json');
+    if (!rawData) {
+      return NextResponse.json({ error: 'No organizations data found' }, { status: 404 });
+    }
+    
+    const data = JSON.parse(rawData);
+    const orgs = data.orgs || [];
+    
+    // Find the organization to update
+    const orgIndex = orgs.findIndex((o: OrganizationRecord) => o.inn === inn);
+    if (orgIndex === -1) {
+      return NextResponse.json({ error: 'Organization not found' }, { status: 404 });
+    }
 
-export async function POST(req: Request) {
-  if (!authed(req)) return NextResponse.redirect(new URL('/admin', req.url));
-  const body = await req.formData();
-  const inn = String(body.get('inn') || '').replace(/\D/g,'');
-  const name = String(body.get('name') || '').trim() || null;
-  const s = await readStore();
-  if (!s.orgs) s.orgs = {} as any;
-  const cur = (s.orgs as any)[inn];
-  if (!cur) return NextResponse.redirect(new URL('/admin', req.url));
-  const next: any = { ...cur, name, updatedAt: new Date().toISOString() };
-  (s.orgs as any)[inn] = next;
-  await writeStore(s);
-  return NextResponse.redirect(new URL(`/admin/orgs/${encodeURIComponent(inn)}`, req.url));
+    // Update organization fields from form data
+    const updatedOrg = { ...orgs[orgIndex] };
+    
+    // Update name field
+    const name = formData.get('name');
+    if (name !== null) {
+      updatedOrg.name = name === '' ? null : name as string;
+    }
+
+    // Update the organization in the array
+    orgs[orgIndex] = updatedOrg;
+
+    // Write back to storage
+    await writeText('.data/orgs.json', JSON.stringify(data, null, 2));
+
+    // Return success response for client-side navigation
+    return NextResponse.json({ 
+      success: true, 
+      message: 'Организация успешно обновлена',
+      redirectUrl: `/admin?tab=orgs`
+    });
+
+  } catch (error) {
+    console.error('Error updating organization:', error);
+    return NextResponse.json({ 
+      error: 'Internal server error',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    }, { status: 500 });
+  }
 }
 
 

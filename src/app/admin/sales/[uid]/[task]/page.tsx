@@ -24,7 +24,7 @@ export default async function AdminSaleEditor(props: { params: Promise<{ uid: st
         <div className="text-sm text-gray-600">Запись не найдена</div>
       ) : (
         <div className="space-y-6">
-          <form action={`/admin/sales/${encodeURIComponent(p.uid)}/${encodeURIComponent(p.task)}/save`} method="post" className="space-y-3">
+          <form id="sale-edit-form" action={`/admin/sales/${encodeURIComponent(p.uid)}/${encodeURIComponent(p.task)}/save`} method="post" className="space-y-3">
             <input type="hidden" name="uid" defaultValue={p.uid} />
             <input type="hidden" name="taskId" defaultValue={p.task} />
             <div className="grid grid-cols-2 gap-3">
@@ -88,7 +88,7 @@ export default async function AdminSaleEditor(props: { params: Promise<{ uid: st
               <label className="block text-sm">rwOrderId<input name="rwOrderId" defaultValue={String(item.rwOrderId||'')} className="w-full border rounded px-2 py-1" /></label>
             </div>
             <div className="flex gap-2">
-              <SaveButton>Сохранить</SaveButton>
+              <SaveButton formId="sale-edit-form">Сохранить</SaveButton>
               <a className="px-3 py-2 border rounded" href="/admin?tab=sales">Назад</a>
             </div>
           </form>
