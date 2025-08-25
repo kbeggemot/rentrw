@@ -2,59 +2,43 @@
 
 import { useState } from 'react';
 
-interface SaveButtonProps {
-  children: React.ReactNode;
+type Props = {
+  label?: string;
+  successText?: string;
+  errorText?: string;
   className?: string;
-}
+};
 
-export default function SaveButton({ children, className = '' }: SaveButtonProps) {
-  const [isLoading, setIsLoading] = useState(false);
+export default function SaveButton({ label = 'Сохранить', successText = 'Сохранено', errorText = 'Ошибка сохранения', className = 'px-3 py-2 bg-gray-900 text-white rounded' }: Props) {
+  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    setIsLoading(true);
-
+  function toast(text: string, kind: 'success' | 'error' | 'info' = 'info') {
     try {
-      const formData = new FormData(event.currentTarget);
-      const response = await fetch(event.currentTarget.action, {
-        method: 'POST',
-        body: formData,
-      });
-
-      const result = await response.json();
-
-      if (result.success) {
-        // Show success message
-        alert(result.message || 'Сохранено успешно');
-        
-        // Navigate back to admin panel
-        if (result.redirectUrl) {
-          window.location.href = result.redirectUrl;
-        } else {
-          window.location.href = '/admin';
-        }
-      } else {
-        // Show error message
-        alert(result.error || 'Ошибка при сохранении');
-        setIsLoading(false);
-      }
-    } catch (error) {
-      console.error('Save error:', error);
-      alert('Ошибка при сохранении: ' + (error instanceof Error ? error.message : 'Неизвестная ошибка'));
-      setIsLoading(false);
-    }
-  };
+      const el = document.createElement('div');
+      el.textContent = text;
+      el.style.position = 'fixed';
+      el.style.right = '12px';
+      el.style.bottom = '12px';
+      el.style.zIndex = '9999';
+      el.style.padding = '10px 12px';
+      el.style.borderRadius = '8px';
+      el.style.color = kind === 'error' ? '#fff' : '#111';
+      el.style.background = kind === 'error' ? '#ef4444' : (kind === 'success' ? '#86efac' : '#e5e7eb');
+      el.style.boxShadow = '0 6px 20px rgba(0,0,0,.12)';
+      document.body.appendChild(el);
+      setTimeout(() => { try { el.remove(); } catch {} }, 2200);
+    } catch {}
+  }
 
   return (
-    <form onSubmit={handleSubmit} className="inline">
-      <button
-        type="submit"
-        disabled={isLoading}
-        className={`px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed ${className}`}
-      >
-        {isLoading ? 'Сохраняю...' : children}
-      </button>
-    </form>
+    <button
+      type="submit"
+      disabled={loading}
+      className={className + (loading ? ' opacity-70 cursor-not-allowed' : '')}
+      onClick={() => { if (!loading) setLoading(true); }}
+    >
+      {loading ? 'Сохраняю…' : label}
+    </button>
   );
 }
 

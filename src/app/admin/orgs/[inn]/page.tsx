@@ -25,7 +25,7 @@ export default async function AdminOrgEditor(props: { params: Promise<{ inn: str
             <label className="block text-sm col-span-2">Название<input name="name" defaultValue={item.name||''} className="w-full border rounded px-2 py-1" /></label>
           </div>
           <div className="flex gap-2">
-            <SaveButton>Сохранить</SaveButton>
+            <SaveButton label="Сохранить" />
             <a className="px-3 py-2 border rounded" href="/admin?tab=orgs">Назад</a>
           </div>
         </form>

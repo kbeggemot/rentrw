@@ -1,86 +1,83 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { getAdminUser } from '@/server/adminAuth';
+import { NextResponse } from 'next/server';
 import { readText, writeText } from '@/server/storage';
-import { SaleRecord } from '@/types/admin';
 
-export async function POST(req: NextRequest) {
-  const adminUser = await getAdminUser(req);
-  if (!adminUser) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+export const runtime = 'nodejs';
 
-  if (adminUser.role !== 'superadmin') {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-  }
+function authed(req: Request): boolean {
+  const cookie = req.headers.get('cookie') || '';
+  return /(?:^|;\s*)admin_user=([^;]+)/.test(cookie);
+}
 
+type Store = { tasks?: any[]; sales?: any[] };
+
+async function readStore(): Promise<Store> {
+  const raw = await readText('.data/tasks.json');
+  if (!raw) return { tasks: [], sales: [] };
+  try { return JSON.parse(raw) as Store; } catch { return { tasks: [], sales: [] }; }
+}
+
+async function writeStore(s: Store): Promise<void> {
+  await writeText('.data/tasks.json', JSON.stringify(s, null, 2));
+}
+
+export async function POST(req: Request) {
+  if (!authed(req)) return NextResponse.redirect(new URL('/admin', req.url));
+  const body = await req.formData();
+  const uid = String(body.get('uid') || '');
+  const taskId = body.get('taskId');
+  if (!uid || typeof taskId === 'undefined') return NextResponse.redirect(new URL('/admin', req.url));
+  const s = await readStore();
+  const arr = Array.isArray(s.sales) ? s.sales : [];
+  const idx = arr.findIndex((x) => String(x.userId) === uid && (x.taskId == (taskId as any)));
+  if (idx === -1) return NextResponse.redirect(new URL('/admin', req.url));
+  const next: any = { ...arr[idx] };
+  const val = (k: string) => (body.has(k) ? String(body.get(k) || '').trim() : undefined);
+  const nz = (v: string | undefined) => (typeof v === 'undefined' ? undefined as any : (v.length ? v : null));
+  const num = (v: string | undefined) => {
+    if (typeof v === 'undefined') return undefined as any;
+    const n = Number(String(v).replace(',', '.'));
+    return Number.isFinite(n) ? n : null;
+  };
+  const bool = (v: string | undefined) => (typeof v === 'undefined' ? undefined as any : v === 'true');
+
+  const orgInn = val('orgInn'); if (orgInn !== undefined) next.orgInn = orgInn ? orgInn.replace(/\D/g,'') || null : null;
+  const clientEmail = nz(val('clientEmail')); if (clientEmail !== undefined) next.clientEmail = clientEmail;
+  const description = nz(val('description')); if (description !== undefined) next.description = description;
+  const amountGrossRub = num(val('amountGrossRub')); if (amountGrossRub !== undefined) next.amountGrossRub = amountGrossRub;
+  const isAgent = bool(val('isAgent')); if (isAgent !== undefined) next.isAgent = isAgent;
+  const retainedCommissionRub = num(val('retainedCommissionRub')); if (retainedCommissionRub !== undefined) next.retainedCommissionRub = retainedCommissionRub;
+  const status = nz(val('status')); if (status !== undefined) next.status = status;
+  const rootStatus = nz(val('rootStatus')); if (rootStatus !== undefined) next.rootStatus = rootStatus;
+  const ofdUrl = nz(val('ofdUrl')); if (ofdUrl !== undefined) next.ofdUrl = ofdUrl;
+  const ofdFullUrl = nz(val('ofdFullUrl')); if (ofdFullUrl !== undefined) next.ofdFullUrl = ofdFullUrl;
+  const ofdPrepayId = nz(val('ofdPrepayId')); if (ofdPrepayId !== undefined) next.ofdPrepayId = ofdPrepayId;
+  const ofdFullId = nz(val('ofdFullId')); if (ofdFullId !== undefined) next.ofdFullId = ofdFullId;
+  const additionalCommissionOfdUrl = nz(val('additionalCommissionOfdUrl')); if (additionalCommissionOfdUrl !== undefined) next.additionalCommissionOfdUrl = additionalCommissionOfdUrl;
+  const npdReceiptUri = nz(val('npdReceiptUri')); if (npdReceiptUri !== undefined) next.npdReceiptUri = npdReceiptUri;
+  const serviceEndDate = nz(val('serviceEndDate')); if (serviceEndDate !== undefined) next.serviceEndDate = serviceEndDate;
+  const vatRate = val('vatRate'); if (vatRate !== undefined) next.vatRate = (['none','0','10','20'].includes(vatRate) ? vatRate : null);
+  const hidden = bool(val('hidden')); if (hidden !== undefined) next.hidden = hidden;
+  const invoiceIdPrepay = nz(val('invoiceIdPrepay')); if (invoiceIdPrepay !== undefined) next.invoiceIdPrepay = invoiceIdPrepay;
+  const invoiceIdOffset = nz(val('invoiceIdOffset')); if (invoiceIdOffset !== undefined) next.invoiceIdOffset = invoiceIdOffset;
+  const invoiceIdFull = nz(val('invoiceIdFull')); if (invoiceIdFull !== undefined) next.invoiceIdFull = invoiceIdFull;
+  const rwTokenFp = nz(val('rwTokenFp')); if (rwTokenFp !== undefined) next.rwTokenFp = rwTokenFp;
+  const rwOrderId = nz(val('rwOrderId')); if (rwOrderId !== undefined) next.rwOrderId = rwOrderId;
+  next.updatedAt = new Date().toISOString();
+  arr[idx] = next;
+  await writeStore({ ...(s as any), sales: arr });
+  const back = new URL(`/admin/sales/${encodeURIComponent(uid)}/${encodeURIComponent(String(taskId))}`, req.url);
+  // Robust navigation: JS redirect + meta refresh + 303, so любой агент уйдёт на GET
+  const html = `<!doctype html><html><head><meta http-equiv="refresh" content="0;url=${back.toString()}"></head><body><script>location.replace(${JSON.stringify(back.toString())});</script><a href=${JSON.stringify(back.toString())}>Перейти назад</a></body></html>`;
   try {
-    const formData = await req.formData();
-    const uid = formData.get('uid') as string;
-    const taskId = formData.get('taskId') as string;
-    
-    if (!uid || !taskId) {
-      return NextResponse.json({ error: 'Missing uid or taskId' }, { status: 400 });
-    }
-
-    // Read current sales data
-    const rawData = await readText('.data/tasks.json');
-    if (!rawData) {
-      return NextResponse.json({ error: 'No sales data found' }, { status: 404 });
-    }
-    
-    const data = JSON.parse(rawData);
-    const sales = data.sales || [];
-    
-    // Find the sale to update
-    const saleIndex = sales.findIndex((s: SaleRecord) => s.userId === uid && s.taskId == taskId);
-    if (saleIndex === -1) {
-      return NextResponse.json({ error: 'Sale not found' }, { status: 404 });
-    }
-
-    // Update sale fields from form data
-    const updatedSale = { ...sales[saleIndex] };
-    
-    // Update all possible fields
-    const fieldsToUpdate = [
-      'orgInn', 'amount', 'commission', 'vatRate', 'isAgent', 'commissionType',
-      'method', 'status', 'createdAt', 'updatedAt', 'createdAtRw', 'updatedAtRw',
-      'orderId', 'receiptId', 'invoiceId', 'type'
-    ];
-
-    fieldsToUpdate.forEach(field => {
-      const value = formData.get(field);
-      if (value !== null) {
-        if (field === 'amount' || field === 'commission' || field === 'vatRate') {
-          updatedSale[field] = value === '' ? null : Number(value);
-        } else if (field === 'isAgent') {
-          updatedSale[field] = value === 'true';
-        } else if (field === 'createdAt' || field === 'updatedAt' || field === 'createdAtRw' || field === 'updatedAtRw') {
-          updatedSale[field] = value === '' ? null : value as string;
-        } else {
-          updatedSale[field] = value === '' ? null : value as string;
-        }
-      }
-    });
-
-    // Update the sale in the array
-    sales[saleIndex] = updatedSale;
-
-    // Write back to storage
-    await writeText('.data/tasks.json', JSON.stringify(data, null, 2));
-
-    // Return success response for client-side navigation
-    return NextResponse.json({ 
-      success: true, 
-      message: 'Продажа успешно обновлена',
-      redirectUrl: `/admin?tab=sales`
-    });
-
-  } catch (error) {
-    console.error('Error updating sale:', error);
-    return NextResponse.json({ 
-      error: 'Internal server error',
-      details: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 });
+    // Try 303 first (современные браузеры)
+    const r = NextResponse.redirect(back, 303);
+    r.headers.set('Content-Type', 'text/html; charset=utf-8');
+    r.headers.set('Content-Length', String(html.length));
+    // Include HTML fallback for proxies, some hosts игнорирующих Location
+    (r as any).body = html as any;
+    return r;
+  } catch {
+    return new NextResponse(html, { status: 200, headers: { 'Content-Type': 'text/html; charset=utf-8' } });
   }
 }
 

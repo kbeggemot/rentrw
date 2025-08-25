@@ -45,7 +45,7 @@ export default async function AdminPartnerEditor(props: { params: Promise<{ uid:
             </label>
           </div>
           <div className="flex gap-2">
-            <SaveButton>Сохранить</SaveButton>
+            <SaveButton label="Сохранить" />
             <a className="px-3 py-2 border rounded" href="/admin?tab=partners">Назад</a>
           </div>
         </form>

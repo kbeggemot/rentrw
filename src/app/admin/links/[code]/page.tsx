@@ -68,7 +68,7 @@ export default async function AdminLinkEditor(props: { params: Promise<{ code: s
             </label>
           </div>
           <div className="flex gap-2">
-            <SaveButton>Сохранить</SaveButton>
+            <SaveButton label="Сохранить" />
             <a className="px-3 py-2 border rounded" href="/admin?tab=links">Назад</a>
           </div>
         </form>
