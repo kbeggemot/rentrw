@@ -66,7 +66,8 @@ export async function POST(req: Request) {
   arr[idx] = next;
   await writeStore({ ...(s as any), sales: arr });
   const back = new URL(`/admin/sales/${encodeURIComponent(uid)}/${encodeURIComponent(String(taskId))}`, req.url);
-  return NextResponse.redirect(back);
+  // Use 303 See Other to ensure browsers perform GET after POST
+  return NextResponse.redirect(back, 303);
 }
 
 
