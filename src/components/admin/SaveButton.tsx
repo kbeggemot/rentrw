@@ -46,7 +46,22 @@ export default function SaveButton({ label = 'Сохранить', successText =
           const action = form.getAttribute('action') || form.action;
           const method = (form.getAttribute('method') || form.method || 'post').toUpperCase();
           const fd = new FormData(form);
-          const res = await fetch(action, { method, body: fd, redirect: 'follow' as RequestRedirect });
+          const controller = new AbortController();
+          const timer = window.setTimeout(() => {
+            try { controller.abort(); } catch {}
+            // Надёжный фоллбек: нативная навигация (браузер сам последует редиректу)
+            try { form.submit(); } catch { window.location.href = action; }
+          }, 15000) as unknown as number;
+          const res = await fetch(action, {
+            method,
+            body: fd,
+            redirect: 'follow' as RequestRedirect,
+            credentials: 'include',
+            cache: 'no-store',
+            keepalive: true,
+            signal: controller.signal,
+          });
+          window.clearTimeout(timer);
           if (res.ok) {
             toast(successText, 'success');
             // Follow redirect manually when possible
