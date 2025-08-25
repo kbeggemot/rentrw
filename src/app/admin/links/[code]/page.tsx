@@ -1,16 +1,12 @@
-import { headers as nextHeaders, cookies as nextCookies } from 'next/headers';
 import SaveButton from '@/components/admin/SaveButton';
 
 async function getItem(code: string) {
-  const hdrs = await nextHeaders();
-  const proto = hdrs.get('x-forwarded-proto') || 'http';
-  const host = hdrs.get('x-forwarded-host') || hdrs.get('host') || 'localhost:3000';
-  const base = `${proto}://${host}`;
-  const cookie = (await nextCookies()).toString();
-  const res = await fetch(`${base}/api/admin/data/links`, { cache: 'no-store', headers: { cookie } as any });
-  const d = await res.json();
-  const list = Array.isArray(d?.items) ? d.items : [];
-  return list.find((x: any) => String(x.code) === code) || null;
+  try {
+    const res = await fetch(`/api/admin/data/links`, { cache: 'no-store' });
+    const d = await res.json();
+    const list = Array.isArray(d?.items) ? d.items : [];
+    return list.find((x: any) => String(x.code) === code) || null;
+  } catch { return null; }
 }
 
 export default async function AdminLinkEditor(props: { params: Promise<{ code: string }> }) {

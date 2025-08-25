@@ -1,17 +1,13 @@
-import { headers as nextHeaders, cookies as nextCookies } from 'next/headers';
 import SaveButton from '@/components/admin/SaveButton';
 
 async function getItem(uid: string, phone: string) {
-  const hdrs = await nextHeaders();
-  const proto = hdrs.get('x-forwarded-proto') || 'http';
-  const host = hdrs.get('x-forwarded-host') || hdrs.get('host') || 'localhost:3000';
-  const base = `${proto}://${host}`;
-  const cookie = (await nextCookies()).toString();
-  const res = await fetch(`${base}/api/admin/data/partners`, { cache: 'no-store', headers: { cookie } as any });
-  const d = await res.json();
-  const list = Array.isArray(d?.items) ? d.items : [];
-  const norm = (x: string) => x.replace(/\D/g, '');
-  return list.find((x: any) => String(x.userId) === uid && norm(String(x.phone||'')) === norm(phone)) || null;
+  try {
+    const res = await fetch(`/api/admin/data/partners`, { cache: 'no-store' });
+    const d = await res.json();
+    const list = Array.isArray(d?.items) ? d.items : [];
+    const norm = (x: string) => x.replace(/\D/g, '');
+    return list.find((x: any) => String(x.userId) === uid && norm(String(x.phone||'')) === norm(phone)) || null;
+  } catch { return null; }
 }
 
 export default async function AdminPartnerEditor(props: { params: Promise<{ uid: string; phone: string }> }) {
