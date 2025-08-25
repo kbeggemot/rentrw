@@ -75,9 +75,17 @@ export default function SaveButton({ label = 'Сохранить', successText =
             let msg = errorText;
             try { const t = await res.text(); if (t) msg = `${errorText}: ${t.slice(0, 200)}`; } catch {}
             toast(msg, 'error');
+            // Принудительно отправляем форму нативно, чтобы перейти по редиректу/увидеть серверную ошибку
+            try { form.submit(); return; } catch { window.location.href = action; return; }
           }
         } catch {
           toast(errorText, 'error');
+          // Фоллбек при исключении в fetch
+          try {
+            const btn = e.currentTarget as HTMLButtonElement;
+            const form = btn.closest('form') as HTMLFormElement | null;
+            if (form) { form.submit(); return; }
+          } catch {}
         } finally {
           setLoading(false);
         }
