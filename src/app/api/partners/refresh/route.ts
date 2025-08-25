@@ -60,7 +60,7 @@ export async function POST(req: Request) {
           const status = (chosen.data?.selfemployed_status as string | undefined)
             ?? (chosen.data?.executor?.selfemployed_status as string | undefined)
             ?? null;
-          await upsertPartner(userId, { phone: p.phone, fio, status, updatedAt: new Date().toISOString() });
+          await upsertPartner(userId, { phone: p.phone, fio, status, createdAt: p.createdAt, updatedAt: new Date().toISOString() });
           updated += 1;
         }
       } catch {}

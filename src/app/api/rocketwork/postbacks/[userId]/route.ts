@@ -258,6 +258,7 @@ export async function POST(req: Request) {
         fio: null,
         status: null,
         inn: null,
+        createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
       const next = {
@@ -265,6 +266,7 @@ export async function POST(req: Request) {
         fio: fio ?? current.fio,
         status: status ?? current.status,
         inn: inn ?? current.inn,
+        createdAt: current.createdAt || new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
       await upsertPartner(userId, next);

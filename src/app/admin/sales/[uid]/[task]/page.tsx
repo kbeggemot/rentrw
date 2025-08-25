@@ -13,8 +13,8 @@ async function getItem(uid: string, task: string) {
   return d?.item || null;
 }
 
-export default async function AdminSaleEditor({ params }: { params: { uid: string; task: string } }) {
-  const p = await params;
+export default async function AdminSaleEditor(props: { params: Promise<{ uid: string; task: string }> }) {
+  const p = await props.params;
   const item = await getItem(p.uid, p.task);
   return (
     <div className="max-w-3xl mx-auto p-4">

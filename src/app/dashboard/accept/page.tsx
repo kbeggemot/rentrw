@@ -231,18 +231,18 @@ function AcceptPaymentContent() {
         if (stRes.ok && found) {
           if (attemptIdRef.current !== attemptId || activeTaskIdRef.current !== taskId) return;
           if (paymentUrlRef.current !== found) {
-            setPaymentUrl(found);
+          setPaymentUrl(found);
             paymentUrlRef.current = found;
-            try {
+          try {
               if (lastQrUrlRef.current !== found) {
-                const dataUrl = await QRCode.toDataURL(found, { margin: 1, scale: 6 });
-                setQrDataUrl(dataUrl);
+            const dataUrl = await QRCode.toDataURL(found, { margin: 1, scale: 6 });
+            setQrDataUrl(dataUrl);
                 lastQrUrlRef.current = found;
               }
-            } catch {}
-            setMessage(null);
-            loadingRef.current = false;
-            setLoading(false);
+          } catch {}
+          setMessage(null);
+          loadingRef.current = false;
+          setLoading(false);
           }
         }
       } catch {}
@@ -553,9 +553,9 @@ function AcceptPaymentContent() {
                 }
               } catch {}
               setMessage(null);
-              setLoading(false);
+        setLoading(false);
             }
-          }
+      }
         } catch {}
         startPolling(taskId, myAttempt);
         startStatusWatcher(taskId, myAttempt, isAgentSale);
@@ -798,17 +798,17 @@ function AcceptPaymentContent() {
                   const found = (st?.acquiring_order?.url as string | undefined) ?? (st?.task?.acquiring_order?.url as string | undefined);
                   if (found) {
                     if (paymentUrlRef.current !== found) {
-                      setPaymentUrl(found);
+                    setPaymentUrl(found);
                       paymentUrlRef.current = found;
-                      try {
+                    try {
                         if (lastQrUrlRef.current !== found) {
-                          const dataUrl = await QRCode.toDataURL(found, { margin: 1, scale: 6 });
-                          setQrDataUrl(dataUrl);
+                      const dataUrl = await QRCode.toDataURL(found, { margin: 1, scale: 6 });
+                      setQrDataUrl(dataUrl);
                           lastQrUrlRef.current = found;
                         }
-                      } catch {}
-                      setMessage(null);
-                      setLoading(false);
+                    } catch {}
+                    setMessage(null);
+                    setLoading(false);
                     }
                   }
                 } catch {}

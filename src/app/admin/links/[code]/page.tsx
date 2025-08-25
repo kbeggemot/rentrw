@@ -13,8 +13,8 @@ async function getItem(code: string) {
   return list.find((x: any) => String(x.code) === code) || null;
 }
 
-export default async function AdminLinkEditor({ params }: { params: { code: string } }) {
-  const p = await params;
+export default async function AdminLinkEditor(props: { params: Promise<{ code: string }> }) {
+  const p = await props.params;
   const item = await getItem(p.code);
   return (
     <div className="max-w-3xl mx-auto p-4">

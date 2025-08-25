@@ -14,8 +14,8 @@ async function getItem(inn: string) {
   return list.find((x: any) => String(x.inn).replace(/\D/g,'') === key) || null;
 }
 
-export default async function AdminOrgEditor({ params }: { params: { inn: string } }) {
-  const p = await params;
+export default async function AdminOrgEditor(props: { params: Promise<{ inn: string }> }) {
+  const p = await props.params;
   const item = await getItem(p.inn);
   return (
     <div className="max-w-3xl mx-auto p-4">
