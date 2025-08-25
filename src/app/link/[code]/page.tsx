@@ -86,6 +86,19 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
               }
             } catch {}
           }
+          // Even если это код sale-page, подгрузим конфиг платёжной ссылки и сольём поля
+          try {
+            const lr = await fetch(`/api/links/${encodeURIComponent(code)}`, { cache: 'no-store' });
+            if (lr.ok) {
+              const ld = await lr.json();
+              if (!cancelled) {
+                setData((prev) => ({ ...(prev || {} as any), ...(ld || {} as any) } as any));
+                if (ld?.sumMode === 'fixed' && typeof ld?.amountRub === 'number') setAmount(String(ld.amountRub));
+                if (ld?.method === 'card') setMethod('card'); else setMethod('qr');
+              }
+            }
+          } catch {}
+
           if (sale) {
             setTaskId(sale.taskId);
             setSummaryFromSale(sale);
@@ -97,7 +110,7 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
         }
       } catch {
         try {
-          const res = await fetch(`/api/links/${encodeURIComponent(code)}`, { cache: 'force-cache' });
+          const res = await fetch(`/api/links/${encodeURIComponent(code)}`, { cache: 'no-store' });
           const d = await res.json();
           if (!res.ok) throw new Error(d?.error || 'NOT_FOUND');
           if (cancelled) return;

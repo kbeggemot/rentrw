@@ -7,6 +7,7 @@ export type PartnerRecord = {
   status: string | null; // e.g., validated, pending, etc.
   inn?: string | null;
   orgInn?: string | null; // owning organization INN (digits) or 'неизвестно'
+  createdAt: string; // ISO
   updatedAt: string; // ISO
   hidden?: boolean; // soft delete flag
 };
@@ -66,9 +67,14 @@ export async function upsertPartner(userId: string, partner: PartnerRecord): Pro
   
   if (idx !== -1) {
     // Update existing partner, keeping the most recent data
-    arr[idx] = { ...arr[idx], ...normalizedPartner, updatedAt: new Date().toISOString() };
+    arr[idx] = { 
+      ...arr[idx], 
+      ...normalizedPartner, 
+      createdAt: arr[idx].createdAt || arr[idx].updatedAt || new Date().toISOString(),
+      updatedAt: new Date().toISOString() 
+    };
   } else {
-    arr.push(normalizedPartner);
+    arr.push({ ...normalizedPartner, createdAt: new Date().toISOString() });
   }
   
   store.users[userId] = arr;
@@ -130,6 +136,7 @@ export async function upsertPartnerFromValidation(
     status: status || null,
     inn: inn || null,
     orgInn: orgInn ? orgInn.replace(/\D/g, '') : 'неизвестно',
+    createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
     hidden: false
   };
@@ -162,6 +169,7 @@ export async function mergeDuplicatePartners(userId: string): Promise<void> {
         status: mostRecent.status || existing.status,
         inn: mostRecent.inn || existing.inn,
         hidden: existing.hidden || mostRecent.hidden, // Keep if either is hidden
+        createdAt: existing.createdAt || partner.createdAt || existing.updatedAt || partner.updatedAt || new Date().toISOString(),
         updatedAt: new Date().toISOString()
       });
     }

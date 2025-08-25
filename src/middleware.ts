@@ -6,6 +6,7 @@ import { NextResponse } from 'next/server';
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
   const user = req.cookies.get('session_user')?.value;
+  const admin = req.cookies.get('admin_user')?.value;
 
   // If user is logged in and tries to open home or /auth → redirect to /dashboard
   if (user && (pathname === '/' || pathname === '/auth')) {
@@ -17,7 +18,17 @@ export function middleware(req: NextRequest) {
 
   const protectedPaths = ['/dashboard', '/settings', '/sales'];
   const isProtected = protectedPaths.some((p) => pathname.startsWith(p));
-  if (!isProtected) return NextResponse.next();
+  if (!isProtected) {
+    // Protect admin area with separate cookie
+    if (pathname.startsWith('/admin')) {
+      if (!admin) {
+        const url = req.nextUrl.clone();
+        url.pathname = '/admin';
+        return NextResponse.next();
+      }
+    }
+    return NextResponse.next();
+  }
 
   if (!user) {
     const url = req.nextUrl.clone();
@@ -29,7 +40,7 @@ export function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/', '/auth', '/dashboard/:path*', '/settings/:path*', '/sales/:path*'],
+  matcher: ['/', '/auth', '/dashboard/:path*', '/settings/:path*', '/sales/:path*', '/admin/:path*'],
 };
 
 
