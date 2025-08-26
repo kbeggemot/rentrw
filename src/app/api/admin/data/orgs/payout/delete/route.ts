@@ -22,7 +22,13 @@ export async function POST(req: Request) {
   if (!authed(req)) return NextResponse.json({ error: 'UNAUTHORIZED' }, { status: 401 });
   const fd = await req.formData();
   const inn = String(fd.get('inn') || '').replace(/\D/g, '');
+  const confirm = String(fd.get('confirm') || '').trim().toLowerCase();
   if (!inn) return NextResponse.json({ error: 'NO_INN' }, { status: 400 });
+  if (confirm !== 'yes') {
+    const r = NextResponse.redirect(makeBackUrl(req, `/admin/orgs/${encodeURIComponent(inn)}`), 303);
+    r.cookies.set('flash', JSON.stringify({ kind: 'error', msg: 'Нужно подтверждение удаления реквизитов' }), { path: '/' });
+    return r;
+  }
   await updateOrgPayoutRequisites(inn, { bik: null, account: null });
   const r = NextResponse.redirect(makeBackUrl(req, `/admin/orgs/${encodeURIComponent(inn)}`), 303);
   r.cookies.set('flash', JSON.stringify({ kind: 'success', msg: 'Реквизиты удалены' }), { path: '/' });

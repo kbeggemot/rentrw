@@ -58,8 +58,9 @@ export default async function AdminOrgEditor(props: { params: Promise<{ inn: str
               <div className="text-sm border rounded p-3 inline-block">
                 <div className="mb-1">БИК: <b>{(item as any)?.payoutBik || '—'}</b></div>
                 <div className="mb-2">Счёт: <b>{(item as any)?.payoutAccount || '—'}</b></div>
-                <form action="/api/admin/data/orgs/payout/delete" method="post" onSubmit={(e)=>{ if(!confirm('Удалить реквизиты организации?')) e.preventDefault(); }}>
+                <form action="/api/admin/data/orgs/payout/delete" method="post">
                   <input type="hidden" name="inn" defaultValue={p.inn} />
+                  <label className="flex items-center gap-2 text-xs mb-2"><input type="checkbox" name="confirm" value="yes" required /> Подтверждаю удаление реквизитов</label>
                   <button type="submit" className="px-3 py-2 border rounded text-red-600">Удалить реквизиты</button>
                 </form>
               </div>
