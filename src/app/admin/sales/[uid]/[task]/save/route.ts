@@ -69,6 +69,13 @@ export async function POST(req: Request) {
   await writeStore({ ...(s as any), sales: arr });
   // Build redirect using public origin from forwarded headers to avoid localhost in Location
   const path = `/admin/sales/${encodeURIComponent(uid)}/${encodeURIComponent(String(taskId))}`;
+  // Set short-lived flash cookie for success toast
+  const setFlash = (res: Response) => {
+    try {
+      (res as any).headers?.set('Set-Cookie', `flash=SALE_SAVED; Path=/; Max-Age=5; SameSite=Lax`);
+    } catch {}
+    return res;
+  };
   const xfProto = req.headers.get('x-forwarded-proto');
   const xfHost = req.headers.get('x-forwarded-host');
   const host = req.headers.get('host');
@@ -76,10 +83,10 @@ export async function POST(req: Request) {
     const proto = xfProto.split(',')[0].trim();
     const h = (xfHost || host)!.split(',')[0].trim();
     const abs = new URL(path, `${proto}://${h}`);
-    return NextResponse.redirect(abs, 303);
+    return setFlash(NextResponse.redirect(abs, 303));
   }
   // Fallback: relative redirect (proxy will resolve)
-  return NextResponse.redirect(path, 303);
+  return setFlash(NextResponse.redirect(path, 303));
 }
 
 

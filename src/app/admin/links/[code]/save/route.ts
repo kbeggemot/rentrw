@@ -51,7 +51,19 @@ export async function POST(req: Request) {
   const method = val('method'); if (method !== undefined) next.method = (['any','qr','card'].includes(method) ? method : 'any');
   arr[idx] = next;
   await writeStore({ items: arr });
-  return NextResponse.redirect(new URL(`/admin/links/${encodeURIComponent(code)}`, req.url));
+  // Build redirect with forwarded headers; also set flash cookie
+  const path = `/admin/links/${encodeURIComponent(code)}`;
+  const setFlash = (res: Response) => { try { (res as any).headers?.set('Set-Cookie', `flash=LINK_SAVED; Path=/; Max-Age=5; SameSite=Lax`); } catch {} return res; };
+  const xfProto = req.headers.get('x-forwarded-proto');
+  const xfHost = req.headers.get('x-forwarded-host');
+  const host = req.headers.get('host');
+  if (xfProto && (xfHost || host)) {
+    const proto = xfProto.split(',')[0].trim();
+    const h = (xfHost || host)!.split(',')[0].trim();
+    const abs = new URL(path, `${proto}://${h}`);
+    return setFlash(NextResponse.redirect(abs, 303));
+  }
+  return setFlash(NextResponse.redirect(path, 303));
 }
 
 

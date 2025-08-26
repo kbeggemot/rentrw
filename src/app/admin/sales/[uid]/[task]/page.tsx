@@ -1,4 +1,5 @@
 import SaveButton from '@/components/admin/SaveButton';
+import FlashToast from '@/components/admin/FlashToast';
 import { readText } from '@/server/storage';
 import { findOrgByFingerprint } from '@/server/orgStore';
 
@@ -30,6 +31,7 @@ export default async function AdminSaleEditor(props: { params: Promise<{ uid: st
   const usedSuggested = (!((item as any)?.orgInn) || String((item as any).orgInn) === 'неизвестно') && !!suggestedInn;
   return (
     <div className="max-w-3xl mx-auto p-4">
+      <FlashToast />
       <h1 className="text-xl font-bold mb-3">Редактирование продажи</h1>
       {!item ? (
         <div className="text-sm text-gray-600">Запись не найдена</div>

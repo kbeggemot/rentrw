@@ -1,4 +1,5 @@
 import SaveButton from '@/components/admin/SaveButton';
+import FlashToast from '@/components/admin/FlashToast';
 
 async function getItem(inn: string) {
   try {
@@ -15,6 +16,7 @@ export default async function AdminOrgEditor(props: { params: Promise<{ inn: str
   const item = await getItem(p.inn);
   return (
     <div className="max-w-3xl mx-auto p-4">
+      <FlashToast />
       <h1 className="text-xl font-bold mb-3">Редактирование организации</h1>
       {!item ? (
         <div className="text-sm text-gray-600">Запись не найдена</div>

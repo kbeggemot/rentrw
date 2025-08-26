@@ -32,7 +32,18 @@ export async function POST(req: Request) {
   const next: any = { ...cur, name, updatedAt: new Date().toISOString() };
   (s.orgs as any)[inn] = next;
   await writeStore(s);
-  return NextResponse.redirect(new URL(`/admin/orgs/${encodeURIComponent(inn)}`, req.url));
+  const path = `/admin/orgs/${encodeURIComponent(inn)}`;
+  const setFlash = (res: Response) => { try { (res as any).headers?.set('Set-Cookie', `flash=ORG_SAVED; Path=/; Max-Age=5; SameSite=Lax`); } catch {} return res; };
+  const xfProto = req.headers.get('x-forwarded-proto');
+  const xfHost = req.headers.get('x-forwarded-host');
+  const host = req.headers.get('host');
+  if (xfProto && (xfHost || host)) {
+    const proto = xfProto.split(',')[0].trim();
+    const h = (xfHost || host)!.split(',')[0].trim();
+    const abs = new URL(path, `${proto}://${h}`);
+    return setFlash(NextResponse.redirect(abs, 303));
+  }
+  return setFlash(NextResponse.redirect(path, 303));
 }
 
 
