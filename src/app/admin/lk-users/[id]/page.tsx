@@ -45,7 +45,7 @@ export default async function AdminLkUserPage(props: { params: Promise<{ id: str
 
         <div className="mt-6">
           <h2 className="text-lg font-semibold mb-2">Опасная зона</h2>
-          <form action={`/api/admin/data/users`} method="post" onSubmit={(e)=>{ if(!confirm('Удалить пользователя?')) e.preventDefault(); }}>
+          <form action={`/api/admin/data/users`} method="post">
             <input type="hidden" name="id" defaultValue={p.id} />
             <input type="hidden" name="_method" defaultValue="DELETE" />
             <button className="px-3 py-2 border rounded text-red-600" type="submit">Удалить пользователя</button>
