@@ -33,6 +33,7 @@ export async function recordWithdrawalCreate(userId: string, taskId: string | nu
   if (existingIdx !== -1) store.items[existingIdx] = { ...store.items[existingIdx], ...rec };
   else store.items.push(rec);
   await writeStore(store);
+  await appendWithdrawalLog(userId, taskId, `created pending (${amountRub})`, 'system');
 }
 
 export async function updateWithdrawal(userId: string, taskId: string | number, patch: Partial<WithdrawalRecord>): Promise<void> {
@@ -43,6 +44,9 @@ export async function updateWithdrawal(userId: string, taskId: string | number, 
   const next: WithdrawalRecord = { ...cur, ...patch, updatedAt: new Date().toISOString() };
   store.items[idx] = next;
   await writeStore(store);
+  const src = (patch as any).__source || 'unknown';
+  const note = JSON.stringify({ status: patch.status, paidAt: patch.paidAt });
+  await appendWithdrawalLog(userId, taskId, `update ${note}`, src);
 }
 
 export async function listWithdrawals(userId: string): Promise<WithdrawalRecord[]> {
@@ -67,6 +71,7 @@ export async function upsertWithdrawal(userId: string, payload: Partial<Withdraw
       paidAt: payload.paidAt,
     };
     store.items.push(rec);
+    await appendWithdrawalLog(userId, payload.taskId, `upsert(create) ${JSON.stringify({ status: rec.status })}`, 'backfill');
   } else {
     const cur = store.items[idx];
     store.items[idx] = {
@@ -77,8 +82,20 @@ export async function upsertWithdrawal(userId: string, payload: Partial<Withdraw
       paidAt: typeof payload.paidAt !== 'undefined' ? payload.paidAt : cur.paidAt,
       updatedAt: now,
     };
+    await appendWithdrawalLog(userId, payload.taskId, `upsert(update) ${JSON.stringify({ status: store.items[idx].status })}`, 'backfill');
   }
   await writeStore(store);
+}
+
+// ---------- Logs ----------
+export async function appendWithdrawalLog(userId: string, taskId: string | number, message: string, source: 'webhook' | 'manual' | 'backfill' | 'system' | 'unknown' = 'unknown'): Promise<void> {
+  const line = JSON.stringify({ ts: new Date().toISOString(), userId, taskId, source, message }) + '\n';
+  await writeText(`.data/withdrawal_${userId}_${String(taskId)}.log`, line, { append: true } as any);
+}
+
+export async function readWithdrawalLog(userId: string, taskId: string | number): Promise<string> {
+  const raw = await readText(`.data/withdrawal_${userId}_${String(taskId)}.log`);
+  return raw || '';
 }
 
 

@@ -55,7 +55,7 @@ export async function GET(req: Request) {
         await fs.writeFile(marker, JSON.stringify({ userId, taskId, paidAt: new Date().toISOString() }), 'utf8');
       } catch {}
     }
-    try { await updateWithdrawal(userId, taskId, { status: currentStatus, paidAt: done ? new Date().toISOString() : undefined }); } catch {}
+    try { await updateWithdrawal(userId, taskId, { status: currentStatus, paidAt: done ? new Date().toISOString() : undefined, __source: 'manual' } as any); } catch {}
     return NextResponse.json({ done, status: currentStatus, type: obj?.type ?? null });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Server error';

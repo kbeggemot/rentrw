@@ -61,7 +61,7 @@ function AdminLogin({ onLogged }: { onLogged: () => void }) {
 // Deprecated: moved to LkUsersPanel as LkUserOptions
 
 function AdminDashboard({ showToast, role }: { showToast: (m: string, k?: any) => void; role: 'superadmin' | 'admin' | null }) {
-  const [tab, setTab] = useState<'users' | 'sales' | 'links' | 'partners' | 'orgs' | 'logs' | 'files' | 'lk_users' | 'tokens'>(() => {
+  const [tab, setTab] = useState<'users' | 'sales' | 'links' | 'partners' | 'orgs' | 'logs' | 'files' | 'lk_users' | 'tokens' | 'withdrawals'>(() => {
     try { const u = new URL(window.location.href); const t = (u.searchParams.get('tab')||'') as any; if (t) return t; } catch {}
     return 'sales';
   });
@@ -76,6 +76,7 @@ function AdminDashboard({ showToast, role }: { showToast: (m: string, k?: any) =
         <Button variant={tab==='orgs'?'secondary':'ghost'} onClick={() => setTab('orgs')}>Организации</Button>
         <Button variant={tab==='lk_users'?'secondary':'ghost'} onClick={() => setTab('lk_users')}>Пользователи ЛК</Button>
         <Button variant={tab==='tokens'?'secondary':'ghost'} onClick={() => setTab('tokens')}>Токены</Button>
+        <Button variant={tab==='withdrawals'?'secondary':'ghost'} onClick={() => setTab('withdrawals')}>Выводы</Button>
         <Button variant={tab==='logs'?'secondary':'ghost'} onClick={() => setTab('logs')}>Логи</Button>
         <Button variant={tab==='files'?'secondary':'ghost'} onClick={() => setTab('files')}>Файлы</Button>
         <div className="ml-auto" />
@@ -93,6 +94,7 @@ function AdminDashboard({ showToast, role }: { showToast: (m: string, k?: any) =
       {tab === 'logs' ? <LogsPanel /> : null}
       {tab === 'files' ? <FilesPanel /> : null}
       {tab === 'tokens' ? <TokensPanel /> : null}
+      {tab === 'withdrawals' ? <WithdrawalsPanel /> : null}
     </div>
   );
 }
@@ -256,6 +258,41 @@ function TokensPanel() {
         </table>
       </div>
       <Pager total={filtered.length} page={page} setPage={setPage} />
+    </div>
+  );
+}
+
+function WithdrawalsPanel() {
+  const [items, setItems] = useState<Array<{ userId: string; taskId: string | number; amountRub: number; status?: string | null; createdAt: string; updatedAt: string; paidAt?: string | null }>>([]);
+  const [q, setQ] = useState('');
+  const [page, setPage] = useState(1);
+  const load = async () => { const r = await fetch('/api/admin/data/withdrawals', { cache: 'no-store' }); const d = await r.json(); setItems(Array.isArray(d?.items)?d.items:[]); };
+  useEffect(()=>{ void load(); },[]);
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center gap-2">
+        <Button variant="secondary" onClick={load}>Обновить</Button>
+        <input className="border rounded px-2 h-9 text-sm ml-auto" placeholder="Фильтр..." value={q} onChange={(e)=>{ setQ(e.target.value); setPage(1); }} />
+      </div>
+      <div className="border rounded overflow-x-auto">
+        <table className="min-w-full text-sm">
+          <thead><tr><th className="text-left px-2 py-1">taskId</th><th className="text-left px-2 py-1">userId</th><th className="text-left px-2 py-1">amount</th><th className="text-left px-2 py-1">status</th><th className="text-left px-2 py-1">created</th><th className="text-left px-2 py-1">paidAt</th><th className="text-left px-2 py-1">Действия</th></tr></thead>
+          <tbody>
+            {items.filter((w)=>{ const v=q.trim().toLowerCase(); if(!v) return true; const hay=[w.taskId,w.userId,w.status,w.amountRub].join(' ').toLowerCase(); return hay.includes(v); }).slice((page-1)*100, page*100).map((w)=> (
+              <tr key={w.userId+':'+w.taskId} className="border-t">
+                <td className="px-2 py-1">{w.taskId}</td>
+                <td className="px-2 py-1">{w.userId}</td>
+                <td className="px-2 py-1">{typeof w.amountRub==='number'?w.amountRub.toFixed(2):'-'}</td>
+                <td className="px-2 py-1">{w.status||'—'}</td>
+                <td className="px-2 py-1">{w.createdAt?new Date(w.createdAt).toLocaleString('ru-RU',{timeZone:'Europe/Moscow'}):'—'}</td>
+                <td className="px-2 py-1">{w.paidAt?new Date(w.paidAt).toLocaleString('ru-RU',{timeZone:'Europe/Moscow'}):'—'}</td>
+                <td className="px-2 py-1"><a className="inline-block px-2 py-1" href={`/admin/withdrawals/${encodeURIComponent(String(w.taskId))}?user=${encodeURIComponent(String(w.userId))}`}>Открыть</a></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <Pager total={items.filter((w)=>{ const v=q.trim().toLowerCase(); if(!v) return true; const hay=[w.taskId,w.userId,w.status,w.amountRub].join(' ').toLowerCase(); return hay.includes(v); }).length} page={page} setPage={setPage} />
     </div>
   );
 }
