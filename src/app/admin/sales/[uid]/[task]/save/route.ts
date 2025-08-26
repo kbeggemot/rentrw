@@ -75,19 +75,8 @@ export async function POST(req: Request) {
   arr[idx] = next;
   await writeStore({ ...(s as any), sales: arr });
   const back = new URL(`/admin/sales/${encodeURIComponent(uid)}/${encodeURIComponent(String(taskId))}`, req.url);
-  // Robust navigation: JS redirect + meta refresh + 303, so любой агент уйдёт на GET
-  const html = `<!doctype html><html><head><meta http-equiv="refresh" content="0;url=${back.toString()}"></head><body><script>location.replace(${JSON.stringify(back.toString())});</script><a href=${JSON.stringify(back.toString())}>Перейти назад</a></body></html>`;
-  try {
-    // Try 303 first (современные браузеры)
-    const r = NextResponse.redirect(back, 303);
-    r.headers.set('Content-Type', 'text/html; charset=utf-8');
-    r.headers.set('Content-Length', String(html.length));
-    // Include HTML fallback for proxies, some hosts игнорирующих Location
-    (r as any).body = html as any;
-    return r;
-  } catch {
-    return new NextResponse(html, { status: 200, headers: { 'Content-Type': 'text/html; charset=utf-8' } });
-  }
+  // Simple and robust redirect from POST to GET
+  return NextResponse.redirect(back, 303);
 }
 
 
