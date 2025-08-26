@@ -14,8 +14,20 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "RentRW",
-  description: "Платежная касса RentRW",
+  title: "YPLA",
+  description: "Платежная касса YPLA",
+  openGraph: {
+    title: 'YPLA',
+    description: 'Платежная касса YPLA',
+    url: 'https://ypla.ru',
+    siteName: 'YPLA',
+    type: 'website',
+  },
+  twitter: {
+    card: 'summary',
+    title: 'YPLA',
+    description: 'Платежная касса YPLA',
+  },
 };
 
 export default function RootLayout({
