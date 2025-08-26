@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
-import { getUserPayoutRequisites, updateUserPayoutRequisites, getUserOrgInn } from '@/server/userStore';
+import { getUserOrgInn } from '@/server/userStore';
 import { getDecryptedApiToken } from '@/server/secureStore';
 import { writeText } from '@/server/storage';
-import { findOrgByInn } from '@/server/orgStore';
+import { findOrgByInn, getOrgPayoutRequisites, updateOrgPayoutRequisites } from '@/server/orgStore';
 import { getSelectedOrgInn } from '@/server/orgContext';
 
 export const runtime = 'nodejs';
@@ -19,7 +19,9 @@ export async function GET(req: Request) {
   try {
     const userId = getUserId(req);
     if (!userId) return NextResponse.json({ error: 'NO_USER' }, { status: 401 });
-    const reqs = await getUserPayoutRequisites(userId);
+    // Read requisites from currently selected organization
+    const inn = getSelectedOrgInn(req);
+    const reqs = inn ? await getOrgPayoutRequisites(inn) : { bik: null, account: null };
     // Отображаем название выбранной организации из orgStore, а не из userStore
     let orgName: string | null = null;
     try {
@@ -46,10 +48,12 @@ export async function POST(req: Request) {
     if (typeof bik === 'undefined' && typeof account === 'undefined') {
       return NextResponse.json({ error: 'INVALID_PAYLOAD' }, { status: 400 });
     }
-    await updateUserPayoutRequisites(userId, { bik, account });
+    const innSelected = getSelectedOrgInn(req);
+    if (!innSelected) return NextResponse.json({ error: 'NO_ORG_SELECTED' }, { status: 400 });
+    await updateOrgPayoutRequisites(innSelected, { bik, account });
     // Create/update executor in RW after saving requisites and wait for confirmation
     try {
-      const inn = await getUserOrgInn(userId);
+      const inn = innSelected || (await getUserOrgInn(userId));
       const token = await getDecryptedApiToken(userId);
       if (inn && token) {
         const base = process.env.ROCKETWORK_API_BASE_URL || 'https://app.rocketwork.ru/api/';
@@ -93,7 +97,7 @@ export async function POST(req: Request) {
     } catch {
       return NextResponse.json({ error: 'EXECUTOR_CREATE_FAILED' }, { status: 502 });
     }
-    const reqs = await getUserPayoutRequisites(userId);
+    const reqs = await getOrgPayoutRequisites(innSelected);
     // Возвращаем название текущей организации из orgStore
     let orgName: string | null = null;
     try {

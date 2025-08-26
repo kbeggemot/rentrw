@@ -11,11 +11,6 @@ export type UserRecord = {
   agentDescription?: string;
   defaultAgentCommission?: { type: 'percent' | 'fixed'; value: number };
   webauthnOptOut?: boolean; // user chose not to be prompted for FaceID/TouchID
-  // payout requisites (per user)
-  payoutBik?: string; // digits only
-  payoutAccount?: string; // digits only
-  payoutOrgName?: string; // read-only, from Rocket Work account
-  payoutOrgInn?: string; // read-only, from Rocket Work account (ИНН)
   showAllDataForOrg?: boolean; // admin override: show all data for selected org regardless of owner
 };
 
@@ -189,42 +184,52 @@ export async function updateUserAgentSettings(
 }
 
 export async function getUserPayoutRequisites(userId: string): Promise<{ bik: string | null; account: string | null; orgName: string | null }> {
-  const u = await getUserById(userId);
-  return { bik: u?.payoutBik ?? null, account: u?.payoutAccount ?? null, orgName: u?.payoutOrgName ?? null };
+  // Deprecated: kept for backward compatibility in places expecting user-level requisites
+  // Return values based on selected org if available, otherwise legacy fields
+  try {
+    const { getSelectedOrgInn } = await import('./orgContext');
+    const { findOrgByInn, getOrgPayoutRequisites } = await import('./orgStore');
+    const fakeReq = { headers: new Headers() } as any;
+    const inn = getSelectedOrgInn(fakeReq) || null;
+    if (inn) {
+      const reqs = await getOrgPayoutRequisites(inn);
+      const org = await findOrgByInn(inn);
+      return { bik: reqs.bik, account: reqs.account, orgName: org?.name ?? null };
+    }
+  } catch {}
+  return { bik: null, account: null, orgName: null };
 }
 
 export async function updateUserPayoutRequisites(userId: string, reqs: { bik?: string | null; account?: string | null }): Promise<void> {
-  const users = await readUsers();
-  const idx = users.findIndex((u) => u.id === userId);
-  if (idx === -1) throw new Error('USER_NOT_FOUND');
-  // normalize to digits only if provided
-  const normBik = typeof reqs.bik === 'string' ? reqs.bik.replace(/\D/g, '') : reqs.bik;
-  const normAcc = typeof reqs.account === 'string' ? reqs.account.replace(/\D/g, '') : reqs.account;
-  if (typeof normBik !== 'undefined') users[idx].payoutBik = normBik ?? undefined;
-  if (typeof normAcc !== 'undefined') users[idx].payoutAccount = normAcc ?? undefined;
-  await writeUsers(users);
+  // Deprecated: forward to org-based storage using selected org when possible
+  try {
+    const { getSelectedOrgInn } = await import('./orgContext');
+    const { updateOrgPayoutRequisites } = await import('./orgStore');
+    const fakeReq = { headers: new Headers() } as any;
+    const inn = getSelectedOrgInn(fakeReq) || null;
+    if (inn) {
+      const normBik = typeof reqs.bik === 'string' ? reqs.bik.replace(/\D/g, '') : reqs.bik;
+      const normAcc = typeof reqs.account === 'string' ? reqs.account.replace(/\D/g, '') : reqs.account;
+      await updateOrgPayoutRequisites(inn, { bik: normBik, account: normAcc });
+      return;
+    }
+  } catch {}
+  // No-op if нет выбранной организации
 }
 
-export async function setUserOrgName(userId: string, orgName: string | null): Promise<void> {
-  const users = await readUsers();
-  const idx = users.findIndex((u) => u.id === userId);
-  if (idx === -1) throw new Error('USER_NOT_FOUND');
-  users[idx].payoutOrgName = (orgName && orgName.trim().length > 0) ? orgName.trim() : undefined;
-  await writeUsers(users);
-}
+export async function setUserOrgName(userId: string, orgName: string | null): Promise<void> { /* removed */ }
 
-export async function setUserOrgInn(userId: string, orgInn: string | null): Promise<void> {
-  const users = await readUsers();
-  const idx = users.findIndex((u) => u.id === userId);
-  if (idx === -1) throw new Error('USER_NOT_FOUND');
-  const digits = (orgInn || '').replace(/\D/g, '');
-  users[idx].payoutOrgInn = digits && digits.length > 0 ? digits : undefined;
-  await writeUsers(users);
-}
+export async function setUserOrgInn(userId: string, orgInn: string | null): Promise<void> { /* removed */ }
 
 export async function getUserOrgInn(userId: string): Promise<string | null> {
-  const u = await getUserById(userId);
-  return u?.payoutOrgInn ?? null;
+  // Prefer current cookie org_inn; this helper kept for compatibility
+  try {
+    const { getSelectedOrgInn } = await import('./orgContext');
+    const fakeReq = { headers: new Headers() } as any;
+    const inn = getSelectedOrgInn(fakeReq) || null;
+    if (inn) return inn;
+  } catch {}
+  return null;
 }
 
 

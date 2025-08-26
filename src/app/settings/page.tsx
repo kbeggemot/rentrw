@@ -1,8 +1,9 @@
 import { cookies, headers } from 'next/headers';
 import SettingsClient, { type SettingsPrefetch } from './SettingsClient';
 import { getMaskedToken } from '@/server/secureStore';
-import { getMaskedTokenForOrg, findOrgByInn } from '@/server/orgStore';
-import { getUserById, getUserAgentSettings, getUserPayoutRequisites } from '@/server/userStore';
+import { getMaskedTokenForOrg } from '@/server/orgStore';
+import { getUserById, getUserAgentSettings } from '@/server/userStore';
+import { getOrgPayoutRequisites, findOrgByInn } from '@/server/orgStore';
 
 export default async function SettingsPage() {
   try {
@@ -13,7 +14,7 @@ export default async function SettingsPage() {
     const maskedToken = userId ? (orgInn ? await getMaskedTokenForOrg(orgInn, userId) : await getMaskedToken(userId)) : null;
     const user = userId ? await getUserById(userId) : null;
     const agent = userId ? await getUserAgentSettings(userId) : { agentDescription: null, defaultCommission: null };
-    const payout = userId ? await getUserPayoutRequisites(userId) : { bik: null, account: null, orgName: null };
+    const payout = orgInn ? await getOrgPayoutRequisites(orgInn) : { bik: null, account: null };
     // Переопределяем orgName названием выбранной организации (если есть)
     let orgNameFromOrg: string | null = null;
     if (orgInn) {
@@ -41,7 +42,7 @@ export default async function SettingsPage() {
       keys: [],
       payoutBik: payout.bik,
       payoutAccount: payout.account,
-      payoutOrgName: orgNameFromOrg ?? payout.orgName,
+      payoutOrgName: orgNameFromOrg ?? null,
     };
 
     // Fallback: if everything looks empty on prod (e.g., data in S3 under a different prefix), try internal APIs

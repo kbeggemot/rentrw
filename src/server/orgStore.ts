@@ -24,6 +24,10 @@ export type OrganizationRecord = {
   name?: string | null;
   members: string[]; // userIds
   tokens: OrgTokenRecord[];
+  // Payout requisites (shared across all users of this org)
+  payoutBik?: string | null;
+  payoutAccount?: string | null;
+  payoutUpdatedAt?: string;
   createdAt: string;
   updatedAt: string;
 };
@@ -302,6 +306,31 @@ export async function removeUserFromOrgToken(inn: string, fingerprint: string, u
   org.updatedAt = tok.updatedAt;
   await writeStore(store);
   return tok.holderUserIds.length !== before;
+}
+
+// ---------- Payout requisites (per org) ----------
+export async function getOrgPayoutRequisites(inn: string): Promise<{ bik: string | null; account: string | null }> {
+  const store = await readStore();
+  const key = onlyDigits(inn);
+  const org = store.orgs[key];
+  if (!org) return { bik: null, account: null };
+  return { bik: org.payoutBik ?? null, account: org.payoutAccount ?? null };
+}
+
+export async function updateOrgPayoutRequisites(inn: string, reqs: { bik?: string | null; account?: string | null }): Promise<void> {
+  const store = await readStore();
+  const key = onlyDigits(inn);
+  const now = new Date().toISOString();
+  let org = store.orgs[key];
+  if (!org) {
+    org = { inn: key, name: null, members: [], tokens: [], createdAt: now, updatedAt: now };
+    store.orgs[key] = org;
+  }
+  if (typeof reqs.bik !== 'undefined') org.payoutBik = (reqs.bik ?? null);
+  if (typeof reqs.account !== 'undefined') org.payoutAccount = (reqs.account ?? null);
+  org.payoutUpdatedAt = now;
+  org.updatedAt = now;
+  await writeStore(store);
 }
 
 

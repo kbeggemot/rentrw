@@ -57,7 +57,7 @@ export default async function AdminLkUserPage(props: { params: Promise<{ id: str
             <label className="block text-sm">id<input name="_id" defaultValue={item.id||''} readOnly className="w-full border rounded px-2 py-1 bg-gray-50" /></label>
             <label className="block text-sm">phone<input name="_phone" defaultValue={item.phone||''} readOnly className="w-full border rounded px-2 py-1 bg-gray-50" /></label>
             <label className="block text-sm col-span-2">email<input name="email" defaultValue={item.email||''} className="w-full border rounded px-2 py-1" /></label>
-            <label className="block text-sm">orgInn<input name="_orgInn" defaultValue={item.orgInn||''} readOnly className="w-full border rounded px-2 py-1 bg-gray-50" /></label>
+            {/* orgInn убран из карточки, чтобы не вводить в заблуждение */}
             <label className="block text-sm col-span-2">Показывать все данные (по орг.)
               <select name="showAll" defaultValue={item.showAll? 'true':'false'} className="w-full border rounded px-2 py-1">
                 <option value="false">false</option>
