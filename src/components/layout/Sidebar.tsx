@@ -77,7 +77,7 @@ export function Sidebar() {
       </nav>
       <div className="block md:hidden p-2 pt-0 mt-auto">
         {/* Организация: перенесена вниз, над кнопкой выхода */}
-        <OrgSelector />
+        <OrgSelectorWrapper />
         <form action="/api/auth/logout" method="post" className="w-full">
           <button
             type="submit"
@@ -89,7 +89,7 @@ export function Sidebar() {
       </div>
       <div className="hidden md:block mt-auto p-2">
         {/* Организация: перенесена вниз, над кнопкой выхода */}
-        <OrgSelector />
+        <OrgSelectorWrapper />
         <form action="/api/auth/logout" method="post" className="w-full">
           <button
             type="submit"
@@ -101,6 +101,24 @@ export function Sidebar() {
       </div>
     </aside>
   );
+}
+
+function OrgSelectorWrapper() {
+  try {
+    const m = /(?:^|;\s*)org_inn=([^;]+)/.exec(typeof document !== 'undefined' ? (document.cookie || '') : '');
+    const cookieInn = m ? decodeURIComponent(m[1]) : null;
+    try {
+      const raw = localStorage.getItem('orgs_cache_v1');
+      const arr = raw ? JSON.parse(raw) : null;
+      const orgs = Array.isArray(arr) ? arr : [];
+      const hide = !cookieInn && orgs.length === 0;
+      return hide ? null : <OrgSelector />;
+    } catch {
+      return cookieInn ? <OrgSelector /> : null;
+    }
+  } catch {
+    return null;
+  }
 }
 
 function OrgSelector() {

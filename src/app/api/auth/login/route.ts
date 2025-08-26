@@ -19,6 +19,8 @@ export async function POST(req: Request) {
 
     const res = NextResponse.json({ ok: true, user: { id: user.id, phone: user.phone, email: user.email } });
     res.headers.set('Set-Cookie', `session_user=${user.id}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${60 * 60 * 24 * 7}`);
+    // Сбрасываем выбранную организацию при логине: новый пользователь может быть без токена/организаций
+    res.headers.append('Set-Cookie', `org_inn=; Path=/; Max-Age=0; SameSite=Lax`);
     return res;
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Server error';
