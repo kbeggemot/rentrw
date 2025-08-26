@@ -14,9 +14,9 @@ async function getItem(uid: string, phone: string) {
   } catch { return null; }
 }
 
-export default async function AdminPartnerEditor({ params }: { params: { uid: string; phone: string } }) {
-  const p = params;
-  const item = await getItem(p?.uid || '', p?.phone || '');
+export default async function AdminPartnerEditor(props: { params: Promise<{ uid: string; phone: string }> }) {
+  const p = await props.params;
+  const item = await getItem(p.uid, p.phone);
   return (
     <div className="max-w-3xl mx-auto p-4">
       <FlashToast />
