@@ -136,6 +136,26 @@ function UsersPanel({ showToast }: { showToast: (m: string, k?: any) => void }) 
   );
 }
 
+// Toggle for LK user: show all org data regardless of owner
+function LkUserOptions({ userId }: { userId: string }) {
+  const [value, setValue] = useState<boolean | null>(null);
+  useEffect(() => {
+    (async () => {
+      try {
+        const r = await fetch('/api/admin/data/users/options?id=' + encodeURIComponent(userId), { cache: 'no-store' });
+        const d = await r.json();
+        setValue(Boolean(d?.showAll));
+      } catch { setValue(false); }
+    })();
+  }, [userId]);
+  return (
+    <label className="inline-flex items-center gap-2 text-sm">
+      <input type="checkbox" checked={!!value} onChange={async (e) => { setValue(e.target.checked); try { await fetch('/api/admin/data/users/options', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: userId, showAll: e.target.checked }) }); } catch {} }} />
+      <span>Показывать все данные (по орг.)</span>
+    </label>
+  );
+}
+
 function LkUsersPanel() {
   const [items, setItems] = useState<any[]>([]);
   const [q, setQ] = useState('');

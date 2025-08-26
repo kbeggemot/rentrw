@@ -2,8 +2,7 @@ import { NextResponse } from 'next/server';
 import { getDecryptedApiToken } from '@/server/secureStore';
 import { resolveRwTokenWithFingerprint } from '@/server/rwToken';
 import { getSelectedOrgInn } from '@/server/orgContext';
-import { promises as fs } from 'fs';
-import path from 'path';
+import { readText, writeText } from '@/server/storage';
 import { updateSaleFromStatus, findSaleByTaskId, updateSaleOfdUrlsByOrderId, setSaleCreatedAtRw } from '@/server/taskStore';
 import { ensureSaleFromTask } from '@/server/taskStore';
 import type { RocketworkTask } from '@/types/rocketwork';
@@ -35,8 +34,8 @@ export async function GET(_: Request) {
     taskId = decodeURIComponent(segs[segs.length - 1] || '');
     if (taskId === 'last') {
       try {
-        const raw = await fs.readFile(path.join(process.cwd(), '.data', 'tasks.json'), 'utf8');
-        const parsed = JSON.parse(raw) as { tasks?: { id: string | number }[] };
+        const raw = await readText('.data/tasks.json');
+        const parsed = raw ? (JSON.parse(raw) as { tasks?: { id: string | number }[] }) : { tasks: [] };
         const last = parsed.tasks && parsed.tasks.length > 0 ? parsed.tasks[parsed.tasks.length - 1].id : null;
         if (last != null) taskId = String(last);
       } catch {}
@@ -58,11 +57,7 @@ export async function GET(_: Request) {
     try { data = text ? JSON.parse(text) : null; } catch { data = text; }
 
     // лог статуса для отладки
-    try {
-      const dataDir = path.join(process.cwd(), '.data');
-      await fs.mkdir(dataDir, { recursive: true });
-      await fs.writeFile(path.join(dataDir, 'last_task_status.json'), typeof data === 'string' ? data : JSON.stringify(data, null, 2), 'utf8');
-    } catch {}
+    try { await writeText('.data/last_task_status.json', typeof data === 'string' ? data : JSON.stringify(data, null, 2)); } catch {}
 
     if (!res.ok) {
       const maybeObj = typeof data === 'object' && data !== null ? (data as Record<string, unknown>) : null;
