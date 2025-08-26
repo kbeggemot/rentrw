@@ -143,6 +143,19 @@ export async function updateUserEmail(userId: string, email: string): Promise<vo
   await writeUsers(users);
 }
 
+export async function updateUserPhone(userId: string, phone: string): Promise<void> {
+  const users = await readUsers();
+  const idx = users.findIndex((u) => u.id === userId);
+  if (idx === -1) throw new Error('USER_NOT_FOUND');
+  const digits = (phone || '').replace(/\D/g, '');
+  if (!digits) throw new Error('INVALID_PHONE');
+  // prevent duplicate phone numbers across users
+  const conflict = users.find((u, i) => i !== idx && (u.phone || '').replace(/\D/g, '') === digits);
+  if (conflict) throw new Error('PHONE_TAKEN');
+  users[idx].phone = digits;
+  await writeUsers(users);
+}
+
 export async function getUserAgentSettings(userId: string): Promise<{ agentDescription: string | null; defaultCommission: { type: 'percent' | 'fixed'; value: number } | null }> {
   const u = await getUserById(userId);
   return {

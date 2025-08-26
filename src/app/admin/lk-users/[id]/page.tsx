@@ -56,7 +56,7 @@ export default async function AdminLkUserPage(props: { params: Promise<{ id: str
           <div className="grid grid-cols-2 gap-3">
             <label className="block text-sm">id<input name="_id" defaultValue={item.id||''} readOnly className="w-full border rounded px-2 py-1 bg-gray-50" /></label>
             <label className="block text-sm">phone<input name="_phone" defaultValue={item.phone||''} readOnly className="w-full border rounded px-2 py-1 bg-gray-50" /></label>
-            <label className="block text-sm col-span-2">email<input name="_email" defaultValue={item.email||''} readOnly className="w-full border rounded px-2 py-1 bg-gray-50" /></label>
+            <label className="block text-sm col-span-2">email<input name="email" defaultValue={item.email||''} className="w-full border rounded px-2 py-1" /></label>
             <label className="block text-sm">orgInn<input name="_orgInn" defaultValue={item.orgInn||''} readOnly className="w-full border rounded px-2 py-1 bg-gray-50" /></label>
             <label className="block text-sm col-span-2">Показывать все данные (по орг.)
               <select name="showAll" defaultValue={item.showAll? 'true':'false'} className="w-full border rounded px-2 py-1">
@@ -64,6 +64,13 @@ export default async function AdminLkUserPage(props: { params: Promise<{ id: str
                 <option value="true">true</option>
               </select>
             </label>
+            <label className="block text-sm">emailVerified
+              <select name="emailVerified" defaultValue={(item as any).emailVerified ? 'true':'false'} className="w-full border rounded px-2 py-1">
+                <option value="false">false</option>
+                <option value="true">true</option>
+              </select>
+            </label>
+            <label className="block text-sm">Новый телефон<input name="phone" placeholder="79001234567" className="w-full border rounded px-2 py-1" /></label>
             {Array.isArray((item as any).orgs) && (item as any).orgs.length > 0 ? (
               <div className="col-span-2">
                 <div className="text-sm mb-1">Организации пользователя</div>
@@ -96,6 +103,7 @@ export default async function AdminLkUserPage(props: { params: Promise<{ id: str
             ) : null}
           </div>
           <div className="flex gap-2">
+            <input type="hidden" name="_method" value="PATCH" />
             <button className="px-3 py-2 bg-gray-900 text-white rounded" type="submit">Сохранить</button>
             <a className="px-3 py-2 border rounded" href="/admin?tab=lk_users">Назад</a>
           </div>
@@ -103,6 +111,16 @@ export default async function AdminLkUserPage(props: { params: Promise<{ id: str
 
         <div className="mt-6">
           <h2 className="text-lg font-semibold mb-2">Опасная зона</h2>
+          <form action={`/api/admin/actions/reset-password`} method="post" className="space-y-3 mb-4">
+            <input type="hidden" name="id" defaultValue={p.id} />
+            <button className="px-3 py-2 border rounded disabled:opacity-50" type="submit" disabled={!item.email}>Отправить письмо для сброса пароля</button>
+            {!item.email ? <div className="text-xs text-gray-500">У пользователя не задан email</div> : null}
+          </form>
+          <form action={`/api/admin/data/users`} method="post" className="space-y-3 mb-4">
+            <input type="hidden" name="id" defaultValue={p.id} />
+            <input type="hidden" name="_method" defaultValue="REVOKE_WEBAUTHN" />
+            <button className="px-3 py-2 border rounded text-red-600" type="submit">Отозвать биометрические токены</button>
+          </form>
           <form action={`/api/admin/data/users`} method="post" className="space-y-3">
             <input type="hidden" name="id" defaultValue={p.id} />
             <input type="hidden" name="_method" defaultValue="DELETE" />

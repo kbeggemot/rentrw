@@ -172,14 +172,13 @@ function LkUsersPanel() {
       </div>
       <div className="border rounded overflow-x-auto">
         <table className="min-w-full text-sm">
-          <thead><tr><th className="text-left px-2 py-1">id</th><th className="text-left px-2 py-1">phone</th><th className="text-left px-2 py-1">email</th><th className="text-left px-2 py-1">orgInn</th><th className="text-left px-2 py-1">Организации</th><th className="text-left px-2 py-1">Действия</th></tr></thead>
+          <thead><tr><th className="text-left px-2 py-1">id</th><th className="text-left px-2 py-1">phone</th><th className="text-left px-2 py-1">email</th><th className="text-left px-2 py-1">Организации</th><th className="text-left px-2 py-1">Действия</th></tr></thead>
           <tbody>
-            {items.filter((u)=>{ const v=q.trim().toLowerCase(); if(!v) return true; const hay=[u.id,u.phone,u.email,u.orgInn,(u.orgs||[]).map((o:any)=>o.inn+' '+(o.name||'')).join(' ')].join(' ').toLowerCase(); return hay.includes(v); }).slice((page-1)*100, page*100).map((u)=> (
+            {items.filter((u)=>{ const v=q.trim().toLowerCase(); if(!v) return true; const hay=[u.id,u.phone,u.email,(u.orgs||[]).map((o:any)=>o.inn+' '+(o.name||'')).join(' ')].join(' ').toLowerCase(); return hay.includes(v); }).slice((page-1)*100, page*100).map((u)=> (
               <tr key={u.id} className="border-t">
                 <td className="px-2 py-1">{u.id}</td>
                 <td className="px-2 py-1">{u.phone}</td>
                 <td className="px-2 py-1">{u.email||'—'}</td>
-                <td className="px-2 py-1">{u.orgInn||'—'}</td>
                 <td className="px-2 py-1">
                   {(u.orgs||[]).length === 0 ? '—' : (
                     <div className="flex flex-wrap gap-1">
@@ -193,7 +192,7 @@ function LkUsersPanel() {
           </tbody>
         </table>
       </div>
-      <Pager total={items.filter((u)=>{ const v=q.trim().toLowerCase(); if(!v) return true; const hay=[u.id,u.phone,u.email,u.orgInn,(u.orgs||[]).map((o:any)=>o.inn+' '+(o.name||'')).join(' ')].join(' ').toLowerCase(); return hay.includes(v); }).length} page={page} setPage={setPage} />
+      <Pager total={items.filter((u)=>{ const v=q.trim().toLowerCase(); if(!v) return true; const hay=[u.id,u.phone,u.email,(u.orgs||[]).map((o:any)=>o.inn+' '+(o.name||'')).join(' ')].join(' ').toLowerCase(); return hay.includes(v); }).length} page={page} setPage={setPage} />
     </div>
   );
 }

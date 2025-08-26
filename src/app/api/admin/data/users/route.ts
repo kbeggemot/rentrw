@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 import { readText, writeText } from '@/server/storage';
+import { setUserEmailVerified, updateUserEmail, updateUserPhone } from '@/server/userStore';
+import { revokeAllCredentialsForUser } from '@/server/webauthn';
 
 export const runtime = 'nodejs';
 
@@ -47,6 +49,28 @@ export async function POST(req: Request) {
   if (ct.includes('application/x-www-form-urlencoded') || ct.includes('multipart/form-data')) {
     const fd = await req.formData();
     const method = String(fd.get('_method') || '').toUpperCase();
+    // Admin updates via form
+    if (method === 'PATCH') {
+      const id = String(fd.get('id') || '').trim();
+      if (!id) return NextResponse.json({ error: 'MISSING' }, { status: 400 });
+      const emailVerified = fd.get('emailVerified');
+      const email = fd.get('email');
+      const phone = fd.get('phone');
+      if (emailVerified !== null) await setUserEmailVerified(id, String(emailVerified) === 'true');
+      if (typeof email === 'string' && email) await updateUserEmail(id, String(email));
+      if (typeof phone === 'string' && phone) await updateUserPhone(id, String(phone));
+      const r = NextResponse.redirect(new URL('/admin?tab=lk_users', req.url), 303);
+      r.cookies.set('flash', JSON.stringify({ kind: 'success', msg: 'Пользователь обновлён' }), { path: '/' });
+      return r;
+    }
+    if (method === 'REVOKE_WEBAUTHN') {
+      const id = String(fd.get('id') || '').trim();
+      if (!id) return NextResponse.json({ error: 'MISSING' }, { status: 400 });
+      const count = await revokeAllCredentialsForUser(id);
+      const r = NextResponse.redirect(new URL('/admin?tab=lk_users', req.url), 303);
+      r.cookies.set('flash', JSON.stringify({ kind: 'success', msg: `Отозваны биометрические токены: ${count}` }), { path: '/' });
+      return r;
+    }
     if (method === 'DELETE') {
       const id = String(fd.get('id') || '').trim();
       const confirm = String(fd.get('confirm') || '').trim().toLowerCase();

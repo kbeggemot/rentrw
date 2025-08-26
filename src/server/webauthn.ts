@@ -168,4 +168,12 @@ export async function finishLoginAnonymous(response: any, rpID: string, origin: 
   return { verified: true, userId };
 }
 
+export async function revokeAllCredentialsForUser(userId: string): Promise<number> {
+  const all = await readCreds();
+  const before = Array.isArray(all[userId]) ? all[userId].length : 0;
+  if (all[userId]) delete all[userId];
+  await writeCreds(all);
+  return before;
+}
+
 
