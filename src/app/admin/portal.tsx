@@ -239,7 +239,12 @@ function TokensPanel() {
           <tbody>
             {pageItems.map((t)=> (
               <tr key={t.fingerprint+':'+t.inn} className="border-t">
-                <td className="px-2 py-1">{t.fingerprint}</td>
+                <td className="px-2 py-1">
+                  <div className="font-mono text-[12px] leading-tight break-all max-w-[520px]">
+                    <div>{String(t.fingerprint||'').slice(0,32)}</div>
+                    <div>{String(t.fingerprint||'').slice(32)}</div>
+                  </div>
+                </td>
                 <td className="px-2 py-1 whitespace-nowrap">{t.inn}</td>
                 <td className="px-2 py-1">{t.orgName || '—'}</td>
                 <td className="px-2 py-1">{(t.users||[]).length===0?'—':(t.users||[]).map((u)=> (<a key={u} className="text-blue-600 mr-1" href={`/admin/lk-users/${encodeURIComponent(String(u))}`}>{u}</a>))}</td>
