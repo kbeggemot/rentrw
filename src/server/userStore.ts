@@ -8,8 +8,10 @@ export type UserRecord = {
   passSalt: string;
   email?: string;
   emailVerified?: boolean;
-  agentDescription?: string;
-  defaultAgentCommission?: { type: 'percent' | 'fixed'; value: number };
+  agentDescription?: string; // legacy, kept for backward compatibility
+  defaultAgentCommission?: { type: 'percent' | 'fixed'; value: number }; // legacy
+  // Per-organization agent settings
+  perOrgAgent?: Record<string, { agentDescription?: string; defaultCommission?: { type: 'percent' | 'fixed'; value: number } }>; // key: digits-only inn
   webauthnOptOut?: boolean; // user chose not to be prompted for FaceID/TouchID
   showAllDataForOrg?: boolean; // admin override: show all data for selected org regardless of owner
 };
@@ -151,11 +153,21 @@ export async function updateUserPhone(userId: string, phone: string): Promise<vo
   await writeUsers(users);
 }
 
-export async function getUserAgentSettings(userId: string): Promise<{ agentDescription: string | null; defaultCommission: { type: 'percent' | 'fixed'; value: number } | null }> {
+export async function getUserAgentSettings(userId: string, orgInn?: string | null): Promise<{ agentDescription: string | null; defaultCommission: { type: 'percent' | 'fixed'; value: number } | null }> {
   const u = await getUserById(userId);
+  if (!u) return { agentDescription: null, defaultCommission: null };
+  const inn = orgInn ? onlyDigits(orgInn) : null;
+  if (inn && u.perOrgAgent && u.perOrgAgent[inn]) {
+    const per = u.perOrgAgent[inn];
+    return {
+      agentDescription: per.agentDescription ?? null,
+      defaultCommission: per.defaultCommission ?? null,
+    };
+  }
+  // fallback to legacy user-level settings
   return {
-    agentDescription: u?.agentDescription ?? null,
-    defaultCommission: u?.defaultAgentCommission ?? null,
+    agentDescription: u.agentDescription ?? null,
+    defaultCommission: u.defaultAgentCommission ?? null,
   };
 }
 
@@ -169,16 +181,29 @@ export async function setUserEmailVerified(userId: string, verified: boolean): P
 
 export async function updateUserAgentSettings(
   userId: string,
-  settings: { agentDescription?: string; defaultCommission?: { type: 'percent' | 'fixed'; value: number } }
+  settings: { agentDescription?: string; defaultCommission?: { type: 'percent' | 'fixed'; value: number } },
+  orgInn?: string | null
 ): Promise<void> {
   const users = await readUsers();
   const idx = users.findIndex((u) => u.id === userId);
   if (idx === -1) throw new Error('USER_NOT_FOUND');
-  if (typeof settings.agentDescription !== 'undefined') {
-    users[idx].agentDescription = settings.agentDescription ?? undefined;
-  }
-  if (typeof settings.defaultCommission !== 'undefined') {
-    users[idx].defaultAgentCommission = settings.defaultCommission ?? undefined;
+  const inn = orgInn ? onlyDigits(orgInn) : null;
+  if (inn) {
+    const current = users[idx].perOrgAgent || {};
+    const prev = current[inn] || {};
+    current[inn] = {
+      agentDescription: typeof settings.agentDescription !== 'undefined' ? settings.agentDescription ?? undefined : prev.agentDescription,
+      defaultCommission: typeof settings.defaultCommission !== 'undefined' ? settings.defaultCommission ?? undefined : prev.defaultCommission,
+    };
+    users[idx].perOrgAgent = current;
+  } else {
+    // legacy fallback: write to user-level fields
+    if (typeof settings.agentDescription !== 'undefined') {
+      users[idx].agentDescription = settings.agentDescription ?? undefined;
+    }
+    if (typeof settings.defaultCommission !== 'undefined') {
+      users[idx].defaultAgentCommission = settings.defaultCommission ?? undefined;
+    }
   }
   await writeUsers(users);
 }

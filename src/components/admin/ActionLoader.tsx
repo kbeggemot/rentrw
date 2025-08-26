@@ -10,7 +10,10 @@ export default function ActionLoader() {
       style.id = 'admin-action-loader-style';
       style.textContent = `
       #admin-action-progress{position:fixed;top:0;left:0;height:3px;width:0;background:#3b82f6;z-index:99999;transition:width .4s ease;}
-      #admin-action-overlay{position:fixed;inset:0;pointer-events:none;z-index:99998}
+      #admin-action-overlay{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.05);z-index:99998}
+      @keyframes adminSpin{to{transform:rotate(360deg)}}
+      .admin-btn-loading{position:relative}
+      .admin-btn-loading > .admin-spinner{width:16px;height:16px;border:2px solid #fff;border-right-color:transparent;border-radius:50%;display:inline-block;margin-right:8px;vertical-align:-3px;animation:adminSpin .8s linear infinite}
       `;
       document.head.appendChild(style);
     }
@@ -32,6 +35,26 @@ export default function ActionLoader() {
         try { bar.style.width = '100%'; } catch {}
         setTimeout(() => { try { bar.remove(); } catch {} }, 300);
       }
+      const ov = document.getElementById('admin-action-overlay');
+      if (ov) { try { ov.remove(); } catch {} }
+    }
+    function showOverlay() {
+      ensureStyles();
+      let ov = document.getElementById('admin-action-overlay');
+      if (!ov) {
+        ov = document.createElement('div');
+        ov.id = 'admin-action-overlay';
+        const spinner = document.createElement('div');
+        spinner.style.width = '36px';
+        spinner.style.height = '36px';
+        spinner.style.border = '3px solid #3b82f6';
+        spinner.style.borderRightColor = 'transparent';
+        spinner.style.borderRadius = '50%';
+        spinner.style.animation = 'adminSpin .8s linear infinite';
+        ov.appendChild(spinner);
+        document.body.appendChild(ov);
+      }
+      return ov as HTMLDivElement;
     }
     const onSubmit = (ev: Event) => {
       const se = ev as SubmitEvent;
@@ -42,11 +65,15 @@ export default function ActionLoader() {
       if (form.dataset.noLoader === '1') return;
       const btn = (se as any).submitter as HTMLButtonElement | undefined;
       if (btn) {
-        try { btn.dataset.prevText = btn.textContent || ''; btn.disabled = true; btn.textContent = 'Загрузка...'; } catch {}
+        try {
+          btn.dataset.prevHtml = btn.innerHTML;
+          btn.disabled = true;
+          btn.classList.add('admin-btn-loading');
+          btn.innerHTML = '<span class="admin-spinner"></span>' + (btn.textContent || 'Загрузка...');
+        } catch {}
       }
       showProgress();
-      // In case page doesn't navigate for some reason, auto-finish after 5s
-      setTimeout(() => finishProgress(), 5000);
+      showOverlay();
     };
     const onBeforeUnload = () => finishProgress();
     document.addEventListener('submit', onSubmit, true);

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getUserAgentSettings, updateUserAgentSettings } from '@/server/userStore';
+import { getSelectedOrgInn } from '@/server/orgContext';
 
 export const runtime = 'nodejs';
 
@@ -15,7 +16,8 @@ export async function GET(req: Request) {
   try {
     const userId = getUserId(req);
     if (!userId) return NextResponse.json({ error: 'NO_USER' }, { status: 401 });
-    const s = await getUserAgentSettings(userId);
+    const inn = getSelectedOrgInn(req);
+    const s = await getUserAgentSettings(userId, inn || undefined);
     return NextResponse.json({ agentDescription: s.agentDescription, defaultCommission: s.defaultCommission });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Server error';
@@ -33,8 +35,9 @@ export async function POST(req: Request) {
     if (defaultCommission && (defaultCommission.type !== 'percent' && defaultCommission.type !== 'fixed')) {
       return NextResponse.json({ error: 'INVALID_COMMISSION' }, { status: 400 });
     }
-    await updateUserAgentSettings(userId, { agentDescription, defaultCommission });
-    const s = await getUserAgentSettings(userId);
+    const inn = getSelectedOrgInn(req);
+    await updateUserAgentSettings(userId, { agentDescription, defaultCommission }, inn || undefined);
+    const s = await getUserAgentSettings(userId, inn || undefined);
     return NextResponse.json({ agentDescription: s.agentDescription, defaultCommission: s.defaultCommission });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Server error';

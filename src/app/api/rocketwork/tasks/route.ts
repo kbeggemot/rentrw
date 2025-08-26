@@ -283,7 +283,7 @@ export async function POST(req: Request) {
       (payload as Record<string, unknown>).additional_commission_from = 'client';
       (payload as Record<string, unknown>).additional_commission_ofd_receipt = true;
       // Get agent description from user settings; require it
-      const agentSettings = await getUserAgentSettings(userId);
+      const agentSettings = await getUserAgentSettings(userId, orgInn || undefined);
       const agentDesc = agentSettings.agentDescription?.trim();
       if (!agentDesc) {
         return NextResponse.json({ error: 'Заполните описание ваших услуг, как Агента, в настройках' }, { status: 400 });
