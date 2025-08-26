@@ -29,6 +29,7 @@ export default async function AdminOrgEditor(props: { params: Promise<{ inn: str
   const p = await props.params;
   const item = await getItem(p.inn);
   const users = await getUsersForOrg((item as any)?.members as string[] | undefined);
+  const hasPayout = Boolean((item as any)?.payoutBik || (item as any)?.payoutAccount);
   return (
     <div className="max-w-3xl mx-auto p-4">
       <FlashToast />
@@ -50,6 +51,22 @@ export default async function AdminOrgEditor(props: { params: Promise<{ inn: str
               <a className="px-3 py-2 border rounded" href="/admin?tab=orgs">Назад</a>
             </div>
           </form>
+
+          <div className="mt-6">
+            <h2 className="text-lg font-semibold mb-2">Реквизиты для вывода</h2>
+            {hasPayout ? (
+              <div className="text-sm border rounded p-3 inline-block">
+                <div className="mb-1">БИК: <b>{(item as any)?.payoutBik || '—'}</b></div>
+                <div className="mb-2">Счёт: <b>{(item as any)?.payoutAccount || '—'}</b></div>
+                <form action="/api/admin/data/orgs/payout/delete" method="post" onSubmit={(e)=>{ if(!confirm('Удалить реквизиты организации?')) e.preventDefault(); }}>
+                  <input type="hidden" name="inn" defaultValue={p.inn} />
+                  <button type="submit" className="px-3 py-2 border rounded text-red-600">Удалить реквизиты</button>
+                </form>
+              </div>
+            ) : (
+              <div className="text-sm text-gray-600">Не заданы</div>
+            )}
+          </div>
 
           <div className="mt-6">
             <h2 className="text-lg font-semibold mb-2">Доступ к организации</h2>
