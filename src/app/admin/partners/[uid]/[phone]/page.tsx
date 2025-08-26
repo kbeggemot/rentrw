@@ -8,7 +8,7 @@ async function getItem(uid: string, phone: string) {
     const d = raw ? JSON.parse(raw) : { users: {} };
     const list = Array.isArray(d?.users?.[uid]) ? d.users[uid] : [];
     const norm = (x: string) => x.replace(/\D/g, '');
-    return list.find((x: any) => String(x.userId) === uid && norm(String(x.phone||'')) === norm(phone)) || null;
+    return list.find((x: any) => norm(String(x.phone||'')) === norm(phone)) || null;
   } catch { return null; }
 }
 
