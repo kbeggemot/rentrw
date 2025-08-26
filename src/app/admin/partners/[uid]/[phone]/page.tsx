@@ -46,7 +46,10 @@ export default async function AdminPartnerEditor(props: { params: Promise<{ uid:
   return (
     <div className="max-w-3xl mx-auto p-4">
       <FlashToast />
-      <h1 className="text-xl font-bold mb-3">Редактирование партнёра</h1>
+      <div className="flex items-center justify-between mb-3">
+        <h1 className="text-xl font-bold">Редактирование партнёра</h1>
+        <a className="inline-flex items-center justify-center w-8 h-8 border rounded" href="/admin?tab=partners" aria-label="Закрыть">×</a>
+      </div>
       {!item ? (
         <div className="text-sm text-gray-600">Запись не найдена</div>
       ) : (

@@ -28,16 +28,20 @@ function readCookie(name: string): string | null {
 }
 
 function clearCookie(name: string, path: string = '/') {
-  try { document.cookie = `${name}=; Max-Age=0; path=${path}`; } catch {}
+  try { document.cookie = `${name}=; Max-Age=0; Path=${path}; SameSite=Lax`; } catch {}
 }
 
 export default function FlashToast() {
   useEffect(() => {
     const value = readCookie('flash');
     if (!value) return;
-    // Clear both / and /admin paths just in case
+    // Clear cookie on all relevant paths
     clearCookie('flash', '/');
     clearCookie('flash', '/admin');
+    clearCookie('flash', '/admin/sales');
+    clearCookie('flash', '/admin/orgs');
+    clearCookie('flash', '/admin/links');
+    clearCookie('flash', '/admin/partners');
     if (value === 'SALE_SAVED' || value === 'LINK_SAVED' || value === 'ORG_SAVED' || value === 'PARTNER_SAVED' || value === 'OK') {
       showToast('Сохранено', 'success');
     } else {

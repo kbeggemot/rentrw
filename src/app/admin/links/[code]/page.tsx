@@ -19,7 +19,10 @@ export default async function AdminLinkEditor(props: { params: Promise<{ code: s
   return (
     <div className="max-w-3xl mx-auto p-4">
       <FlashToast />
-      <h1 className="text-xl font-bold mb-3">Редактирование ссылки</h1>
+      <div className="flex items-center justify-between mb-3">
+        <h1 className="text-xl font-bold">Редактирование ссылки</h1>
+        <a className="inline-flex items-center justify-center w-8 h-8 border rounded" href="/admin?tab=links" aria-label="Закрыть">×</a>
+      </div>
       {!item ? (
         <div className="text-sm text-gray-600">Запись не найдена</div>
       ) : (
