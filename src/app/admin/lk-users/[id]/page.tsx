@@ -11,6 +11,7 @@ async function getUser(id: string) {
     const u = arr.find((x) => String(x.id) === String(id));
     // Build list of organizations by scanning orgs.json for membership (org.members includes userId)
     const orgs: Array<{ inn: string; name: string | null }> = [];
+    const tokens: Array<{ inn: string; name: string | null; fingerprint: string; masked: string }>=[];
     try {
       const rawOrgs = await readText('.data/orgs.json');
       const orgStore = rawOrgs ? JSON.parse(rawOrgs) : { orgs: {} };
@@ -20,6 +21,13 @@ async function getUser(id: string) {
         if (Array.isArray(rec?.members) && rec.members.includes(userId)) {
           const key = String(inn).replace(/\D/g, '');
           orgs.push({ inn: key, name: rec?.name ?? null });
+          // collect tokens held by this user in this org
+          const toks = Array.isArray(rec?.tokens) ? rec.tokens : [];
+          for (const t of toks) {
+            if (Array.isArray(t?.holderUserIds) && t.holderUserIds.includes(userId)) {
+              tokens.push({ inn: key, name: rec?.name ?? null, fingerprint: t.fingerprint, masked: t.masked });
+            }
+          }
         }
       }
       // Also include payoutOrgInn if present
@@ -29,7 +37,7 @@ async function getUser(id: string) {
         orgs.push({ inn: payoutInn, name: rec?.name ?? null });
       }
     } catch {}
-    return u ? { id: u.id, phone: u.phone, email: u.email ?? null, orgInn: u.payoutOrgInn ?? null, showAll: !!u.showAllDataForOrg, orgs } : null;
+    return u ? { id: u.id, phone: u.phone, email: u.email ?? null, orgInn: u.payoutOrgInn ?? null, showAll: !!u.showAllDataForOrg, orgs, tokens } : null;
   } catch { return null; }
 }
 
@@ -62,6 +70,25 @@ export default async function AdminLkUserPage(props: { params: Promise<{ id: str
                 <ul className="list-disc pl-5 text-sm">
                   {(item as any).orgs.map((o: any) => (
                     <li key={o.inn}><a className="text-blue-600" href={`/admin/orgs/${encodeURIComponent(String(o.inn))}`}>{o.inn}{o.name?` — ${o.name}`:''}</a></li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+            {Array.isArray((item as any).tokens) && (item as any).tokens.length > 0 ? (
+              <div className="col-span-2">
+                <div className="text-sm mt-2 mb-1">Токены пользователя</div>
+                <ul className="list-disc pl-5 text-sm">
+                  {(item as any).tokens.map((t: any) => (
+                    <li key={t.fingerprint+':'+t.inn}>
+                      {t.masked} — <a className="text-blue-600" href={`/admin/tokens/${encodeURIComponent(String(t.fingerprint))}`}>{t.fingerprint.slice(0,10)}…</a> — {t.inn}{t.name?` — ${t.name}`:''}
+                      <form action="/api/admin/data/tokens/unlink" method="post" className="inline ml-2">
+                        <input type="hidden" name="inn" defaultValue={t.inn} />
+                        <input type="hidden" name="fingerprint" defaultValue={t.fingerprint} />
+                        <input type="hidden" name="userId" defaultValue={item.id} />
+                        <input type="hidden" name="back" defaultValue={`/admin/lk-users/${encodeURIComponent(String(item.id))}`} />
+                        <button className="text-red-600 underline" type="submit">Отвязать</button>
+                      </form>
+                    </li>
                   ))}
                 </ul>
               </div>

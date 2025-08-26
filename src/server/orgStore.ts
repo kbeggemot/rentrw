@@ -287,4 +287,21 @@ export async function allOrganizations(): Promise<OrganizationRecord[]> {
   return Object.values(store.orgs).sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : -1));
 }
 
+// Helper: unlink user from a token fingerprint (does not delete token record)
+export async function removeUserFromOrgToken(inn: string, fingerprint: string, userId: string): Promise<boolean> {
+  const store = await readStore();
+  const key = (inn || '').replace(/\D/g, '');
+  const org = store.orgs[key];
+  if (!org) return false;
+  const idx = org.tokens.findIndex((t) => t.fingerprint === fingerprint);
+  if (idx === -1) return false;
+  const tok = org.tokens[idx];
+  const before = tok.holderUserIds.length;
+  tok.holderUserIds = tok.holderUserIds.filter((u) => u !== userId);
+  tok.updatedAt = new Date().toISOString();
+  org.updatedAt = tok.updatedAt;
+  await writeStore(store);
+  return tok.holderUserIds.length !== before;
+}
+
 

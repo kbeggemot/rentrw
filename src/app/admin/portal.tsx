@@ -61,7 +61,7 @@ function AdminLogin({ onLogged }: { onLogged: () => void }) {
 // Deprecated: moved to LkUsersPanel as LkUserOptions
 
 function AdminDashboard({ showToast, role }: { showToast: (m: string, k?: any) => void; role: 'superadmin' | 'admin' | null }) {
-  const [tab, setTab] = useState<'users' | 'sales' | 'links' | 'partners' | 'orgs' | 'logs' | 'files' | 'lk_users'>(() => {
+  const [tab, setTab] = useState<'users' | 'sales' | 'links' | 'partners' | 'orgs' | 'logs' | 'files' | 'lk_users' | 'tokens'>(() => {
     try { const u = new URL(window.location.href); const t = (u.searchParams.get('tab')||'') as any; if (t) return t; } catch {}
     return 'sales';
   });
@@ -75,6 +75,7 @@ function AdminDashboard({ showToast, role }: { showToast: (m: string, k?: any) =
         <Button variant={tab==='links'?'secondary':'ghost'} onClick={() => setTab('links')}>Ссылки</Button>
         <Button variant={tab==='orgs'?'secondary':'ghost'} onClick={() => setTab('orgs')}>Организации</Button>
         <Button variant={tab==='lk_users'?'secondary':'ghost'} onClick={() => setTab('lk_users')}>Пользователи ЛК</Button>
+        <Button variant={tab==='tokens'?'secondary':'ghost'} onClick={() => setTab('tokens')}>Токены</Button>
         <Button variant={tab==='logs'?'secondary':'ghost'} onClick={() => setTab('logs')}>Логи</Button>
         <Button variant={tab==='files'?'secondary':'ghost'} onClick={() => setTab('files')}>Файлы</Button>
         <div className="ml-auto" />
@@ -91,6 +92,7 @@ function AdminDashboard({ showToast, role }: { showToast: (m: string, k?: any) =
       {tab === 'orgs' ? <OrgsPanel showToast={showToast} role={role} /> : null}
       {tab === 'logs' ? <LogsPanel /> : null}
       {tab === 'files' ? <FilesPanel /> : null}
+      {tab === 'tokens' ? <TokensPanel /> : null}
     </div>
   );
 }
@@ -192,6 +194,39 @@ function LkUsersPanel() {
         </table>
       </div>
       <Pager total={items.filter((u)=>{ const v=q.trim().toLowerCase(); if(!v) return true; const hay=[u.id,u.phone,u.email,u.orgInn,(u.orgs||[]).map((o:any)=>o.inn+' '+(o.name||'')).join(' ')].join(' ').toLowerCase(); return hay.includes(v); }).length} page={page} setPage={setPage} />
+    </div>
+  );
+}
+
+function TokensPanel() {
+  const [items, setItems] = useState<Array<{ fingerprint: string; inn: string; orgName: string | null; users: string[]; createdAt: string; updatedAt: string }>>([]);
+  const [q, setQ] = useState('');
+  const [page, setPage] = useState(1);
+  const load = async () => { const r = await fetch('/api/admin/data/tokens', { cache: 'no-store' }); const d = await r.json(); setItems(Array.isArray(d?.items)?d.items:[]); };
+  useEffect(()=>{ void load(); },[]);
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center gap-2">
+        <Button variant="secondary" onClick={load}>Обновить</Button>
+        <input className="border rounded px-2 h-9 text-sm ml-auto" placeholder="Фильтр..." value={q} onChange={(e)=>{ setQ(e.target.value); setPage(1); }} />
+      </div>
+      <div className="border rounded overflow-x-auto">
+        <table className="min-w-full text-sm">
+          <thead><tr><th className="text-left px-2 py-1">fingerprint</th><th className="text-left px-2 py-1">org</th><th className="text-left px-2 py-1">users</th><th className="text-left px-2 py-1">created</th><th className="text-left px-2 py-1">updated</th></tr></thead>
+          <tbody>
+            {items.filter((t)=>{ const v=q.trim().toLowerCase(); if(!v) return true; const hay=[t.fingerprint,t.inn,t.orgName,(t.users||[]).join(' ')].join(' ').toLowerCase(); return hay.includes(v); }).slice((page-1)*100, page*100).map((t)=> (
+              <tr key={t.fingerprint+':'+t.inn} className="border-t">
+                <td className="px-2 py-1"><a className="text-blue-600" href={`/admin/tokens/${encodeURIComponent(String(t.fingerprint))}`}>{t.fingerprint}</a></td>
+                <td className="px-2 py-1">{t.inn}{t.orgName?` — ${t.orgName}`:''}</td>
+                <td className="px-2 py-1">{(t.users||[]).length===0?'—':(t.users||[]).map((u)=> (<a key={u} className="text-blue-600 mr-1" href={`/admin/lk-users/${encodeURIComponent(String(u))}`}>{u}</a>))}</td>
+                <td className="px-2 py-1">{t.createdAt?new Date(t.createdAt).toLocaleString('ru-RU',{timeZone:'Europe/Moscow'}):'—'}</td>
+                <td className="px-2 py-1">{t.updatedAt?new Date(t.updatedAt).toLocaleString('ru-RU',{timeZone:'Europe/Moscow'}):'—'}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <Pager total={items.filter((t)=>{ const v=q.trim().toLowerCase(); if(!v) return true; const hay=[t.fingerprint,t.inn,t.orgName,(t.users||[]).join(' ')].join(' ').toLowerCase(); return hay.includes(v); }).length} page={page} setPage={setPage} />
     </div>
   );
 }
