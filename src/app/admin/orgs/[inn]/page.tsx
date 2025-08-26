@@ -25,9 +25,9 @@ async function getUsersForOrg(members: string[] | undefined): Promise<Array<{ id
   } catch { return []; }
 }
 
-export default async function AdminOrgEditor(props: { params: Promise<{ inn: string }> }) {
-  const p = await props.params;
-  const item = await getItem(p.inn);
+export default async function AdminOrgEditor({ params }: { params: { inn: string } }) {
+  const p = params;
+  const item = await getItem(p?.inn || '');
   const users = await getUsersForOrg((item as any)?.members as string[] | undefined);
   return (
     <div className="max-w-3xl mx-auto p-4">

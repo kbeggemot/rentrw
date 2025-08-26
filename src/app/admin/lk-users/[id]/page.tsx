@@ -13,9 +13,9 @@ async function getUser(id: string) {
   } catch { return null; }
 }
 
-export default async function AdminLkUserPage(props: { params: Promise<{ id: string }> }) {
-  const p = await props.params;
-  const item = await getUser(p.id);
+export default async function AdminLkUserPage({ params }: { params: { id: string } }) {
+  const p = params;
+  const item = await getUser(p?.id || '');
   return (
     <div className="max-w-3xl mx-auto p-4">
       <h1 className="text-xl font-bold mb-3">Пользователь ЛК</h1>
