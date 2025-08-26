@@ -49,6 +49,10 @@ export async function POST(req: Request) {
     const method = String(fd.get('_method') || '').toUpperCase();
     if (method === 'DELETE') {
       const id = String(fd.get('id') || '').trim();
+      const confirm = String(fd.get('confirm') || '').trim().toLowerCase();
+      if (confirm !== 'yes') {
+        return NextResponse.json({ error: 'CONFIRM_REQUIRED' }, { status: 400 });
+      }
       if (!id) return NextResponse.json({ error: 'MISSING' }, { status: 400 });
       const u = await readUsers();
       const list = Array.isArray(u.users) ? u.users : [];

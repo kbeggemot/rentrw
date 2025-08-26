@@ -45,9 +45,13 @@ export default async function AdminLkUserPage(props: { params: Promise<{ id: str
 
         <div className="mt-6">
           <h2 className="text-lg font-semibold mb-2">Опасная зона</h2>
-          <form action={`/api/admin/data/users`} method="post">
+          <form action={`/api/admin/data/users`} method="post" className="space-y-3">
             <input type="hidden" name="id" defaultValue={p.id} />
             <input type="hidden" name="_method" defaultValue="DELETE" />
+            <label className="flex items-center gap-2 text-sm">
+              <input type="checkbox" name="confirm" value="yes" required />
+              <span>Подтверждаю удаление пользователя</span>
+            </label>
             <button className="px-3 py-2 border rounded text-red-600" type="submit">Удалить пользователя</button>
           </form>
         </div>
