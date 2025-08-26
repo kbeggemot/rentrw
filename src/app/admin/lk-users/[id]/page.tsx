@@ -1,4 +1,4 @@
-import SaveButton from '@/components/admin/SaveButton';
+// Server-rendered page; use plain HTML button to avoid client component imports here
 import { readText } from '@/server/storage';
 
 export const runtime = 'nodejs';
@@ -38,7 +38,7 @@ export default async function AdminLkUserPage(props: { params: Promise<{ id: str
             </label>
           </div>
           <div className="flex gap-2">
-            <SaveButton label="Сохранить" />
+            <button className="px-3 py-2 bg-gray-900 text-white rounded" type="submit">Сохранить</button>
             <a className="px-3 py-2 border rounded" href="/admin?tab=lk_users">Назад</a>
           </div>
         </form>
