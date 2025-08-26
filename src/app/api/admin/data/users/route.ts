@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { readText, writeText } from '@/server/storage';
-import { setUserEmailVerified, updateUserEmail, updateUserPhone } from '@/server/userStore';
+import { setUserEmailVerified, updateUserEmail, updateUserPhone, setShowAllDataFlag } from '@/server/userStore';
 import { revokeAllCredentialsForUser } from '@/server/webauthn';
 
 export const runtime = 'nodejs';
@@ -66,18 +66,25 @@ export async function POST(req: Request) {
       const emailVerified = fd.get('emailVerified');
       const email = fd.get('email');
       const phone = fd.get('phone');
+      const showAll = fd.get('showAll');
+      const back = String(fd.get('back') || `/admin/lk-users/${encodeURIComponent(id)}`);
       if (emailVerified !== null) await setUserEmailVerified(id, String(emailVerified) === 'true');
       if (typeof email === 'string' && email) await updateUserEmail(id, String(email));
       if (typeof phone === 'string' && phone) await updateUserPhone(id, String(phone));
-      const r = NextResponse.redirect(makeBackUrl(req, '/admin?tab=lk_users'), 303);
-      r.cookies.set('flash', JSON.stringify({ kind: 'success', msg: 'Пользователь обновлён' }), { path: '/' });
+      if (showAll !== null) {
+        const val = String(showAll);
+        await setShowAllDataFlag(id, val === 'true' || val === '1' || val === 'on');
+      }
+      const r = NextResponse.redirect(makeBackUrl(req, back), 303);
+      r.cookies.set('flash', JSON.stringify({ kind: 'success', msg: 'Изменения сохранены' }), { path: '/' });
       return r;
     }
     if (method === 'REVOKE_WEBAUTHN') {
       const id = String(fd.get('id') || '').trim();
       if (!id) return NextResponse.json({ error: 'MISSING' }, { status: 400 });
       const count = await revokeAllCredentialsForUser(id);
-      const r = NextResponse.redirect(makeBackUrl(req, '/admin?tab=lk_users'), 303);
+      const back = String(fd.get('back') || `/admin/lk-users/${encodeURIComponent(id)}`);
+      const r = NextResponse.redirect(makeBackUrl(req, back), 303);
       r.cookies.set('flash', JSON.stringify({ kind: 'success', msg: `Отозваны биометрические токены: ${count}` }), { path: '/' });
       return r;
     }
