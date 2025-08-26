@@ -59,7 +59,7 @@ function AdminLogin({ onLogged }: { onLogged: () => void }) {
 }
 
 function AdminDashboard({ showToast, role }: { showToast: (m: string, k?: any) => void; role: 'superadmin' | 'admin' | null }) {
-  const [tab, setTab] = useState<'users' | 'sales' | 'links' | 'partners' | 'orgs' | 'logs' | 'files'>(() => {
+  const [tab, setTab] = useState<'users' | 'sales' | 'links' | 'partners' | 'orgs' | 'logs' | 'files' | 'lk_users'>(() => {
     try { const u = new URL(window.location.href); const t = (u.searchParams.get('tab')||'') as any; if (t) return t; } catch {}
     return 'sales';
   });
@@ -75,12 +75,14 @@ function AdminDashboard({ showToast, role }: { showToast: (m: string, k?: any) =
         <Button variant={tab==='logs'?'secondary':'ghost'} onClick={() => setTab('logs')}>Логи</Button>
         <Button variant={tab==='files'?'secondary':'ghost'} onClick={() => setTab('files')}>Файлы</Button>
         <div className="ml-auto" />
-        <Button variant={tab==='users'?'secondary':'ghost'} onClick={() => setTab('users')}>Пользователи</Button>
+        <Button variant={tab==='users'?'secondary':'ghost'} onClick={() => setTab('users')}>Юзеры</Button>
+        <Button variant={tab==='lk_users'?'secondary':'ghost'} onClick={() => setTab('lk_users')}>Пользователи ЛК</Button>
         <form onSubmit={(e)=>{e.preventDefault();}}>
           <Button variant="ghost" onClick={async ()=>{ await fetch('/api/admin/session', { method:'DELETE' }); window.location.reload(); }}>Выйти</Button>
         </form>
       </div>
       {tab === 'users' ? <UsersPanel showToast={showToast} /> : null}
+      {tab === 'lk_users' ? <LkUsersPanel /> : null}
       {tab === 'sales' ? <SalesPanel showToast={showToast} role={role} /> : null}
       {tab === 'links' ? <LinksPanel showToast={showToast} role={role} /> : null}
       {tab === 'partners' ? <PartnersPanel showToast={showToast} role={role} /> : null}
@@ -132,13 +134,58 @@ function UsersPanel({ showToast }: { showToast: (m: string, k?: any) => void }) 
   );
 }
 
+function LkUsersPanel() {
+  const [items, setItems] = useState<any[]>([]);
+  const [q, setQ] = useState('');
+  const [page, setPage] = useState(1);
+  const load = async () => { const r = await fetch('/api/admin/data/users', { cache: 'no-store' }); const d = await r.json(); setItems(Array.isArray(d?.items)?d.items:[]); };
+  useEffect(()=>{ void load(); },[]);
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center gap-2">
+        <Button variant="secondary" onClick={load}>Обновить</Button>
+        <input className="border rounded px-2 h-9 text-sm ml-auto" placeholder="Фильтр..." value={q} onChange={(e)=>{ setQ(e.target.value); setPage(1); }} />
+      </div>
+      <div className="border rounded overflow-x-auto">
+        <table className="min-w-full text-sm">
+          <thead><tr><th className="text-left px-2 py-1">id</th><th className="text-left px-2 py-1">phone</th><th className="text-left px-2 py-1">email</th><th className="text-left px-2 py-1">orgInn</th><th className="text-left px-2 py-1">Организации</th></tr></thead>
+          <tbody>
+            {items.filter((u)=>{ const v=q.trim().toLowerCase(); if(!v) return true; const hay=[u.id,u.phone,u.email,u.orgInn,(u.orgs||[]).map((o:any)=>o.inn+' '+(o.name||'')).join(' ')].join(' ').toLowerCase(); return hay.includes(v); }).slice((page-1)*100, page*100).map((u)=> (
+              <tr key={u.id} className="border-t">
+                <td className="px-2 py-1">{u.id}</td>
+                <td className="px-2 py-1">{u.phone}</td>
+                <td className="px-2 py-1">{u.email||'—'}</td>
+                <td className="px-2 py-1">{u.orgInn||'—'}</td>
+                <td className="px-2 py-1">
+                  {(u.orgs||[]).length === 0 ? '—' : (
+                    <div className="flex flex-wrap gap-1">
+                      {(u.orgs||[]).map((o:any)=> (<a key={o.inn} className="inline-block px-2 py-1 border rounded" href={`/admin/orgs/${encodeURIComponent(String(o.inn))}`}>{o.inn}{o.name?` — ${o.name}`:''}</a>))}
+                    </div>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <Pager total={items.filter((u)=>{ const v=q.trim().toLowerCase(); if(!v) return true; const hay=[u.id,u.phone,u.email,u.orgInn,(u.orgs||[]).map((o:any)=>o.inn+' '+(o.name||'')).join(' ')].join(' ').toLowerCase(); return hay.includes(v); }).length} page={page} setPage={setPage} />
+    </div>
+  );
+}
+
 function SalesPanel({ showToast, role }: { showToast: (m: string, k?: any) => void; role: 'superadmin' | 'admin' | null }) {
   const [items, setItems] = useState<any[]>([]);
   const [q, setQ] = useState('');
   const [page, setPage] = useState(1);
   const load = async () => { 
-    const r = await fetch('/api/admin/data/sales', { cache: 'no-store' }); 
-    const d = await r.json(); 
+    const [rSales, rOrgs] = await Promise.all([
+      fetch('/api/admin/data/sales', { cache: 'no-store' }),
+      fetch('/api/admin/data/orgs', { cache: 'no-store' }),
+    ]);
+    const d = await rSales.json();
+    const orgs = await rOrgs.json().catch(()=>({items:[]}));
+    const orgMap = new Map<string, string>();
+    (Array.isArray(orgs?.items)?orgs.items:[]).forEach((o:any)=>{ if(o?.inn) orgMap.set(String(o.inn), o?.name||''); });
     const arr: any[] = Array.isArray(d?.items)?d.items:[];
     arr.sort((a: any, b: any) => {
       const at = Date.parse((a?.createdAtRw || a?.createdAt || a?.updatedAt || 0) as any);
@@ -148,6 +195,8 @@ function SalesPanel({ showToast, role }: { showToast: (m: string, k?: any) => vo
       if (Number.isNaN(bt)) return -1;
       return bt - at; // latest first
     });
+    // attach orgName for display
+    arr.forEach((s:any)=>{ const inn=String(s.orgInn||''); if(inn && orgMap.has(inn)) (s as any).__orgName = orgMap.get(inn); });
     setItems(arr); 
   };
   useEffect(()=>{ void load(); },[]);
@@ -180,7 +229,7 @@ function SalesPanel({ showToast, role }: { showToast: (m: string, k?: any) => vo
                 <td className="px-2 py-1">{(s.createdAtRw||s.createdAt)?new Date(s.createdAtRw||s.createdAt).toLocaleString('ru-RU',{timeZone:'Europe/Moscow'}):'—'}</td>
                 <td className="px-2 py-1">{s.orderId}</td>
                 <td className="px-2 py-1">{s.taskId}</td>
-                <td className="px-2 py-1">{s.orgInn || '—'}</td>
+                <td className="px-2 py-1">{s.orgInn ? (s.__orgName ? `${s.orgInn} — ${s.__orgName}` : s.orgInn) : '—'}</td>
                 <td className="px-2 py-1">{s.clientEmail || '—'}</td>
                 <td className="px-2 py-1">{typeof s.amountGrossRub==='number'?s.amountGrossRub.toFixed(2):'-'}</td>
                 <td className="px-2 py-1">{typeof s.isAgent === 'boolean' ? (s.isAgent ? 'агентская' : 'прямая') : '—'}</td>
