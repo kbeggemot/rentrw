@@ -42,7 +42,8 @@ export default async function TokenPage(props: { params: Promise<{ fp: string }>
                     <input type="hidden" name="fingerprint" defaultValue={item.token.fingerprint} />
                     <input type="hidden" name="userId" defaultValue={u} />
                     <input type="hidden" name="back" defaultValue={`/admin/tokens/${encodeURIComponent(String(item.token.fingerprint))}`} />
-                    <button className="text-red-600 underline" type="submit">Отвязать</button>
+                    <label className="ml-2 text-xs inline-flex items-center gap-1"><input type="checkbox" name="confirm" value="yes" required /> <span>подтверждаю</span></label>
+                    <button className="text-red-600 underline ml-2" type="submit">Отвязать</button>
                   </form>
                 </li>
               ))}

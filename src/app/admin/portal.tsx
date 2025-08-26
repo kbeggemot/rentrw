@@ -202,19 +202,42 @@ function TokensPanel() {
   const [items, setItems] = useState<Array<{ fingerprint: string; inn: string; orgName: string | null; users: string[]; createdAt: string; updatedAt: string }>>([]);
   const [q, setQ] = useState('');
   const [page, setPage] = useState(1);
+  const [orgFilter, setOrgFilter] = useState('');
+  const [userFilter, setUserFilter] = useState('');
   const load = async () => { const r = await fetch('/api/admin/data/tokens', { cache: 'no-store' }); const d = await r.json(); setItems(Array.isArray(d?.items)?d.items:[]); };
   useEffect(()=>{ void load(); },[]);
+  const filtered = useMemo(()=>{
+    const v = q.trim().toLowerCase();
+    return items.filter((t)=>{
+      if (orgFilter && String(t.inn) !== String(orgFilter)) return false;
+      if (userFilter && !(t.users||[]).includes(userFilter)) return false;
+      if (!v) return true;
+      const hay=[t.fingerprint,t.inn,t.orgName,(t.users||[]).join(' ')].join(' ').toLowerCase();
+      return hay.includes(v);
+    });
+  }, [items, q, orgFilter, userFilter]);
+  const pageItems = filtered.slice((page-1)*100, page*100);
+  const uniqueOrgs = useMemo(()=>Array.from(new Map(items.map(i=>[i.inn,{inn:i.inn,name:i.orgName||''}])).values()),[items]);
+  const uniqueUsers = useMemo(()=>Array.from(new Set(items.flatMap(i=>i.users||[]))),[items]);
   return (
     <div className="space-y-3">
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 flex-wrap">
         <Button variant="secondary" onClick={load}>Обновить</Button>
+        <select className="border rounded px-2 h-9 text-sm" value={orgFilter} onChange={e=>{ setOrgFilter(e.target.value); setPage(1); }}>
+          <option value="">Все организации</option>
+          {uniqueOrgs.map(o=> (<option key={o.inn} value={o.inn}>{o.inn}{o.name?` — ${o.name}`:''}</option>))}
+        </select>
+        <select className="border rounded px-2 h-9 text-sm" value={userFilter} onChange={e=>{ setUserFilter(e.target.value); setPage(1); }}>
+          <option value="">Все пользователи</option>
+          {uniqueUsers.map(u=> (<option key={u} value={u}>{u}</option>))}
+        </select>
         <input className="border rounded px-2 h-9 text-sm ml-auto" placeholder="Фильтр..." value={q} onChange={(e)=>{ setQ(e.target.value); setPage(1); }} />
       </div>
       <div className="border rounded overflow-x-auto">
         <table className="min-w-full text-sm">
           <thead><tr><th className="text-left px-2 py-1">fingerprint</th><th className="text-left px-2 py-1">org</th><th className="text-left px-2 py-1">users</th><th className="text-left px-2 py-1">created</th><th className="text-left px-2 py-1">updated</th></tr></thead>
           <tbody>
-            {items.filter((t)=>{ const v=q.trim().toLowerCase(); if(!v) return true; const hay=[t.fingerprint,t.inn,t.orgName,(t.users||[]).join(' ')].join(' ').toLowerCase(); return hay.includes(v); }).slice((page-1)*100, page*100).map((t)=> (
+            {pageItems.map((t)=> (
               <tr key={t.fingerprint+':'+t.inn} className="border-t">
                 <td className="px-2 py-1"><a className="text-blue-600" href={`/admin/tokens/${encodeURIComponent(String(t.fingerprint))}`}>{t.fingerprint}</a></td>
                 <td className="px-2 py-1">{t.inn}{t.orgName?` — ${t.orgName}`:''}</td>
@@ -226,7 +249,7 @@ function TokensPanel() {
           </tbody>
         </table>
       </div>
-      <Pager total={items.filter((t)=>{ const v=q.trim().toLowerCase(); if(!v) return true; const hay=[t.fingerprint,t.inn,t.orgName,(t.users||[]).join(' ')].join(' ').toLowerCase(); return hay.includes(v); }).length} page={page} setPage={setPage} />
+      <Pager total={filtered.length} page={page} setPage={setPage} />
     </div>
   );
 }

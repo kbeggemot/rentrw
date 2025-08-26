@@ -11,24 +11,32 @@ function authed(req: Request): boolean {
 export async function POST(req: Request) {
   if (!authed(req)) return NextResponse.json({ error: 'UNAUTHORIZED' }, { status: 401 });
   const ct = req.headers.get('content-type') || '';
-  let inn='', fp='', userId='', back='';
+  let inn='', fp='', userId='', back='', confirm='';
   if (ct.includes('application/json')) {
     const b = await req.json().catch(()=>({} as any));
     inn = String((b as any)?.inn || '').trim();
     fp = String((b as any)?.fingerprint || '').trim();
     userId = String((b as any)?.userId || '').trim();
     back = String((b as any)?.back || '').trim();
+    confirm = String((b as any)?.confirm || '').trim();
   } else {
     const fd = await req.formData();
     inn = String(fd.get('inn') || '').trim();
     fp = String(fd.get('fingerprint') || '').trim();
     userId = String(fd.get('userId') || '').trim();
     back = String(fd.get('back') || '').trim();
+    confirm = String(fd.get('confirm') || '').trim();
   }
   if (!inn || !fp || !userId) {
     if (ct.includes('application/json')) return NextResponse.json({ error: 'MISSING' }, { status: 400 });
     const r = NextResponse.redirect(makeBackUrl(req, back || '/admin?tab=tokens'), 303);
     r.cookies.set('flash', JSON.stringify({ kind: 'error', msg: 'Не хватает полей (inn, fingerprint, userId)' }), { path: '/' });
+    return r;
+  }
+  if (confirm !== 'yes') {
+    if (ct.includes('application/json')) return NextResponse.json({ error: 'CONFIRM_REQUIRED' }, { status: 400 });
+    const r = NextResponse.redirect(makeBackUrl(req, back || '/admin?tab=tokens'), 303);
+    r.cookies.set('flash', JSON.stringify({ kind: 'error', msg: 'Нужно подтверждение удаления' }), { path: '/' });
     return r;
   }
   const ok = await removeUserFromOrgToken(inn, fp, userId);
