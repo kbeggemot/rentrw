@@ -67,9 +67,19 @@ export async function POST(req: Request) {
   next.updatedAt = new Date().toISOString();
   arr[idx] = next;
   await writeStore({ ...(s as any), sales: arr });
-  const back = new URL(`/admin/sales/${encodeURIComponent(uid)}/${encodeURIComponent(String(taskId))}`, req.url);
-  // Simple and robust redirect from POST to GET
-  return NextResponse.redirect(back, 303);
+  // Build redirect using public origin from forwarded headers to avoid localhost in Location
+  const path = `/admin/sales/${encodeURIComponent(uid)}/${encodeURIComponent(String(taskId))}`;
+  const xfProto = req.headers.get('x-forwarded-proto');
+  const xfHost = req.headers.get('x-forwarded-host');
+  const host = req.headers.get('host');
+  if (xfProto && (xfHost || host)) {
+    const proto = xfProto.split(',')[0].trim();
+    const h = (xfHost || host)!.split(',')[0].trim();
+    const abs = new URL(path, `${proto}://${h}`);
+    return NextResponse.redirect(abs, 303);
+  }
+  // Fallback: relative redirect (proxy will resolve)
+  return NextResponse.redirect(path, 303);
 }
 
 
