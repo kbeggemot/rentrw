@@ -13,9 +13,9 @@ async function getItem(code: string) {
   } catch { return null; }
 }
 
-export default async function AdminLinkEditor({ params }: { params: { code: string } }) {
-  const p = params;
-  const item = await getItem(p?.code || '');
+export default async function AdminLinkEditor(props: { params: Promise<{ code: string }> }) {
+  const p = await props.params;
+  const item = await getItem(p.code);
   return (
     <div className="max-w-3xl mx-auto p-4">
       <FlashToast />
