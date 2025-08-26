@@ -58,6 +58,8 @@ function AdminLogin({ onLogged }: { onLogged: () => void }) {
   );
 }
 
+// Deprecated: moved to LkUsersPanel as LkUserOptions
+
 function AdminDashboard({ showToast, role }: { showToast: (m: string, k?: any) => void; role: 'superadmin' | 'admin' | null }) {
   const [tab, setTab] = useState<'users' | 'sales' | 'links' | 'partners' | 'orgs' | 'logs' | 'files' | 'lk_users'>(() => {
     try { const u = new URL(window.location.href); const t = (u.searchParams.get('tab')||'') as any; if (t) return t; } catch {}
@@ -148,7 +150,7 @@ function LkUsersPanel() {
       </div>
       <div className="border rounded overflow-x-auto">
         <table className="min-w-full text-sm">
-          <thead><tr><th className="text-left px-2 py-1">id</th><th className="text-left px-2 py-1">phone</th><th className="text-left px-2 py-1">email</th><th className="text-left px-2 py-1">orgInn</th><th className="text-left px-2 py-1">Организации</th></tr></thead>
+          <thead><tr><th className="text-left px-2 py-1">id</th><th className="text-left px-2 py-1">phone</th><th className="text-left px-2 py-1">email</th><th className="text-left px-2 py-1">orgInn</th><th className="text-left px-2 py-1">Организации</th><th className="text-left px-2 py-1">Опции</th></tr></thead>
           <tbody>
             {items.filter((u)=>{ const v=q.trim().toLowerCase(); if(!v) return true; const hay=[u.id,u.phone,u.email,u.orgInn,(u.orgs||[]).map((o:any)=>o.inn+' '+(o.name||'')).join(' ')].join(' ').toLowerCase(); return hay.includes(v); }).slice((page-1)*100, page*100).map((u)=> (
               <tr key={u.id} className="border-t">
@@ -163,6 +165,7 @@ function LkUsersPanel() {
                     </div>
                   )}
                 </td>
+                <td className="px-2 py-1"><LkUserOptions userId={u.id} /></td>
               </tr>
             ))}
           </tbody>
@@ -222,14 +225,15 @@ function SalesPanel({ showToast, role }: { showToast: (m: string, k?: any) => vo
       </div>
       <div className="border rounded overflow-x-auto">
         <table className="min-w-full text-sm">
-          <thead><tr><th className="text-left px-2 py-1">createdAt</th><th className="text-left px-2 py-1">orderId</th><th className="text-left px-2 py-1">taskId</th><th className="text-left px-2 py-1">orgInn</th><th className="text-left px-2 py-1">email</th><th className="text-left px-2 py-1">amount</th><th className="text-left px-2 py-1">тип</th><th className="text-left px-2 py-1">endDate</th><th className="text-left px-2 py-1">status</th><th className="text-left px-2 py-1">ofdUrl</th><th className="text-left px-2 py-1">ofdFullUrl</th><th className="text-left px-2 py-1">Действия</th></tr></thead>
+          <thead><tr><th className="text-left px-2 py-1">createdAt</th><th className="text-left px-2 py-1">orderId</th><th className="text-left px-2 py-1">taskId</th><th className="text-left px-2 py-1">orgInn</th><th className="text-left px-2 py-1">orgName</th><th className="text-left px-2 py-1">email</th><th className="text-left px-2 py-1">amount</th><th className="text-left px-2 py-1">тип</th><th className="text-left px-2 py-1">endDate</th><th className="text-left px-2 py-1">status</th><th className="text-left px-2 py-1">ofdUrl</th><th className="text-left px-2 py-1">ofdFullUrl</th><th className="text-left px-2 py-1">npd</th><th className="text-left px-2 py-1">Действия</th></tr></thead>
           <tbody>
-            {items.filter((s)=>{ const v=q.trim().toLowerCase(); if(!v) return true; const hay=[s.orderId,s.taskId,s.orgInn,s.clientEmail,s.status,s.serviceEndDate,(s.createdAtRw||s.createdAt)].join(' ').toLowerCase(); return hay.includes(v); }).slice((page-1)*100, page*100).map((s)=> (
+            {items.filter((s)=>{ const v=q.trim().toLowerCase(); if(!v) return true; const hay=[s.orderId,s.taskId,s.orgInn,(s.__orgName||''),s.clientEmail,s.status,s.serviceEndDate,(s.createdAtRw||s.createdAt)].join(' ').toLowerCase(); return hay.includes(v); }).slice((page-1)*100, page*100).map((s)=> (
               <tr key={String(s.taskId)} className="border-t">
                 <td className="px-2 py-1">{(s.createdAtRw||s.createdAt)?new Date(s.createdAtRw||s.createdAt).toLocaleString('ru-RU',{timeZone:'Europe/Moscow'}):'—'}</td>
                 <td className="px-2 py-1">{s.orderId}</td>
                 <td className="px-2 py-1">{s.taskId}</td>
-                <td className="px-2 py-1">{s.orgInn ? (s.__orgName ? `${s.orgInn} — ${s.__orgName}` : s.orgInn) : '—'}</td>
+                <td className="px-2 py-1">{s.orgInn || '—'}</td>
+                <td className="px-2 py-1">{s.__orgName || '—'}</td>
                 <td className="px-2 py-1">{s.clientEmail || '—'}</td>
                 <td className="px-2 py-1">{typeof s.amountGrossRub==='number'?s.amountGrossRub.toFixed(2):'-'}</td>
                 <td className="px-2 py-1">{typeof s.isAgent === 'boolean' ? (s.isAgent ? 'агентская' : 'прямая') : '—'}</td>
@@ -237,6 +241,7 @@ function SalesPanel({ showToast, role }: { showToast: (m: string, k?: any) => vo
                 <td className="px-2 py-1">{s.status || '—'}</td>
                 <td className="px-2 py-1">{s.ofdUrl ? <a className="text-blue-600" href={s.ofdUrl} target="_blank">чек</a> : '—'}</td>
                 <td className="px-2 py-1">{s.ofdFullUrl ? <a className="text-blue-600" href={s.ofdFullUrl} target="_blank">чек</a> : '—'}</td>
+                <td className="px-2 py-1">{s.npdReceiptUri ? <a className="text-blue-600" href={s.npdReceiptUri} target="_blank">чек</a> : '—'}</td>
                 <td className="px-2 py-1">
                   <a className="inline-block px-2 py-1" href={`/admin/sales/${encodeURIComponent(String(s.userId||'default'))}/${encodeURIComponent(String(s.taskId))}`}>Открыть</a>
                 </td>

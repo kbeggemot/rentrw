@@ -261,6 +261,13 @@ export async function listAllSales(): Promise<SaleRecord[]> {
   return arr.sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
 }
 
+export async function listAllSalesForOrg(orgInn: string): Promise<SaleRecord[]> {
+  const store = await readTasks();
+  const inn = (orgInn || '').replace(/\D/g, '');
+  const arr = (store.sales ?? []).filter((s) => (s.orgInn || '') === inn);
+  return arr.sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
+}
+
 export async function findSaleByTaskId(userId: string, taskId: number | string): Promise<SaleRecord | null> {
   const store = await readTasks();
   const arr = (store.sales ?? []).filter((s) => s.userId === userId && s.taskId == taskId);

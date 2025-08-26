@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { listSales, listSalesForOrg, updateSaleFromStatus, updateSaleOfdUrlsByOrderId, setSaleCreatedAtRw, setSaleHidden } from '@/server/taskStore';
+import { listSales, listSalesForOrg, updateSaleFromStatus, updateSaleOfdUrlsByOrderId, setSaleCreatedAtRw, setSaleHidden, listAllSalesForOrg } from '@/server/taskStore';
 import { getSelectedOrgInn } from '@/server/orgContext';
 import type { RocketworkTask } from '@/types/rocketwork';
 import { getDecryptedApiToken } from '@/server/secureStore';
@@ -213,7 +213,9 @@ export async function GET(req: Request) {
       }
     }
     const inn = getSelectedOrgInn(req);
-    const allSales = await listSales(userId);
+    const { getShowAllDataFlag } = await import('@/server/userStore');
+    const showAll = await getShowAllDataFlag(userId);
+    const allSales = showAll && inn ? await listAllSalesForOrg(inn) : await listSales(userId);
     const sales = inn ? allSales.filter((s: any) => String((s as any).orgInn || 'неизвестно') === inn || (s as any).orgInn == null || String((s as any).orgInn) === 'неизвестно') : allSales;
     return NextResponse.json({ sales });
   } catch (error) {

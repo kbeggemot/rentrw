@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createPaymentLink, listPaymentLinks, listPaymentLinksForOrg } from '@/server/paymentLinkStore';
+import { createPaymentLink, listPaymentLinks, listPaymentLinksForOrg, listAllPaymentLinksForOrg } from '@/server/paymentLinkStore';
 import { resolveRwTokenWithFingerprint } from '@/server/rwToken';
 import { getSelectedOrgInn } from '@/server/orgContext';
 import { partnerExists, upsertPartnerFromValidation } from '@/server/partnerStore';
@@ -19,7 +19,9 @@ export async function GET(req: Request) {
     const userId = getUserId(req);
     if (!userId) return NextResponse.json({ error: 'NO_USER' }, { status: 401 });
     const inn = getSelectedOrgInn(req);
-    const items = inn ? await listPaymentLinksForOrg(userId, inn) : await listPaymentLinks(userId);
+    const { getShowAllDataFlag } = await import('@/server/userStore');
+    const showAll = await getShowAllDataFlag(userId);
+    const items = inn ? (showAll ? await listAllPaymentLinksForOrg(inn) : await listPaymentLinksForOrg(userId, inn)) : await listPaymentLinks(userId);
     return NextResponse.json({ items });
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'Server error';

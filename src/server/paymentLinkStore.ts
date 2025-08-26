@@ -88,6 +88,12 @@ export async function listPaymentLinksForOrg(userId: string, orgInn: string): Pr
   return store.items.filter((i) => i.userId === userId && (i.orgInn || '') === inn).sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
 }
 
+export async function listAllPaymentLinksForOrg(orgInn: string): Promise<PaymentLink[]> {
+  const store = await readStore();
+  const inn = (orgInn || '').replace(/\D/g, '');
+  return store.items.filter((i) => (i.orgInn || '') === inn).sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
+}
+
 export async function findLinkByCode(code: string): Promise<PaymentLink | null> {
   const store = await readStore();
   const found = store.items.find((i) => i.code === code) || null;

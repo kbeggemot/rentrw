@@ -54,6 +54,18 @@ export async function listPartnersForOrg(userId: string, orgInn: string): Promis
   return arr.filter((p) => !p.hidden && (p.orgInn || '') === inn);
 }
 
+export async function listAllPartnersForOrg(orgInn: string): Promise<PartnerRecord[]> {
+  const store = await readStore();
+  const inn = (orgInn || '').replace(/\D/g, '');
+  const out: PartnerRecord[] = [];
+  for (const arr of Object.values(store.users)) {
+    for (const p of (arr || [])) {
+      if (!p.hidden && (p.orgInn || '') === inn) out.push(p);
+    }
+  }
+  return out;
+}
+
 export async function upsertPartner(userId: string, partner: PartnerRecord): Promise<void> {
   const store = await readStore();
   const arr = Array.isArray(store.users[userId]) ? store.users[userId] : [];

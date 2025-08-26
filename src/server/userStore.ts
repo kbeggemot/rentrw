@@ -16,6 +16,7 @@ export type UserRecord = {
   payoutAccount?: string; // digits only
   payoutOrgName?: string; // read-only, from Rocket Work account
   payoutOrgInn?: string; // read-only, from Rocket Work account (ИНН)
+  showAllDataForOrg?: boolean; // admin override: show all data for selected org regardless of owner
 };
 
 const USERS_FILE = '.data/users.json';
@@ -97,6 +98,19 @@ export async function getUserById(userId: string): Promise<UserRecord | null> {
   const users = await readUsers();
   const u = users.find((x) => x.id === userId);
   return u ?? null;
+}
+
+export async function setShowAllDataFlag(userId: string, value: boolean): Promise<void> {
+  const users = await readUsers();
+  const idx = users.findIndex((u) => u.id === userId);
+  if (idx === -1) throw new Error('USER_NOT_FOUND');
+  users[idx].showAllDataForOrg = Boolean(value);
+  await writeUsers(users);
+}
+
+export async function getShowAllDataFlag(userId: string): Promise<boolean> {
+  const u = await getUserById(userId);
+  return Boolean(u?.showAllDataForOrg);
 }
 
 export async function setWebauthnOptOut(userId: string, value: boolean): Promise<void> {
