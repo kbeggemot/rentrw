@@ -1,13 +1,14 @@
 import SaveButton from '@/components/admin/SaveButton';
 import FlashToast from '@/components/admin/FlashToast';
+import { readText } from '@/server/storage';
 
 async function getItem(inn: string) {
   try {
-    const res = await fetch(`/api/admin/data/orgs`, { cache: 'no-store' });
-    const d = await res.json();
-    const list = Array.isArray(d?.items) ? d.items : [];
+    const raw = await readText('.data/orgs.json');
+    const d = raw ? JSON.parse(raw) : { orgs: {} };
+    const byKey = d?.orgs && typeof d.orgs === 'object' ? d.orgs : {};
     const key = String(inn).replace(/\D/g,'');
-    return list.find((x: any) => String(x.inn).replace(/\D/g,'') === key) || null;
+    return byKey[key] || null;
   } catch { return null; }
 }
 

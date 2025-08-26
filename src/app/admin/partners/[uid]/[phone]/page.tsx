@@ -1,11 +1,12 @@
 import SaveButton from '@/components/admin/SaveButton';
+import { readText } from '@/server/storage';
 import FlashToast from '@/components/admin/FlashToast';
 
 async function getItem(uid: string, phone: string) {
   try {
-    const res = await fetch(`/api/admin/data/partners`, { cache: 'no-store' });
-    const d = await res.json();
-    const list = Array.isArray(d?.items) ? d.items : [];
+    const raw = await readText('.data/partners.json');
+    const d = raw ? JSON.parse(raw) : { users: {} };
+    const list = Array.isArray(d?.users?.[uid]) ? d.users[uid] : [];
     const norm = (x: string) => x.replace(/\D/g, '');
     return list.find((x: any) => String(x.userId) === uid && norm(String(x.phone||'')) === norm(phone)) || null;
   } catch { return null; }

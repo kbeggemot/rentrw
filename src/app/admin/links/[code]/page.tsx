@@ -1,10 +1,11 @@
 import SaveButton from '@/components/admin/SaveButton';
+import { readText } from '@/server/storage';
 import FlashToast from '@/components/admin/FlashToast';
 
 async function getItem(code: string) {
   try {
-    const res = await fetch(`/api/admin/data/links`, { cache: 'no-store' });
-    const d = await res.json();
+    const raw = await readText('.data/payment_links.json');
+    const d = raw ? JSON.parse(raw) : { items: [] };
     const list = Array.isArray(d?.items) ? d.items : [];
     return list.find((x: any) => String(x.code) === code) || null;
   } catch { return null; }
