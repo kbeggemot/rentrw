@@ -25,6 +25,16 @@ async function readOrgs(): Promise<OrgsFile> {
   try { return JSON.parse(raw) as OrgsFile; } catch { return { orgs: {} as any }; }
 }
 
+function makeBackUrl(req: Request, path: string): string {
+  try {
+    const proto = req.headers.get('x-forwarded-proto') || req.headers.get('x-forwarded-protocol') || 'https';
+    const host = req.headers.get('x-forwarded-host') || req.headers.get('host') || '';
+    if (!host) return path; // relative fallback
+    const rel = path.startsWith('/') ? path : '/' + path;
+    return `${proto}://${host}${rel}`;
+  } catch { return path; }
+}
+
 export async function GET(req: Request) {
   if (!authed(req)) return NextResponse.json({ error: 'UNAUTHORIZED' }, { status: 401 });
   const [usersFile, orgsFile] = await Promise.all([readUsers(), readOrgs()]);
@@ -59,7 +69,7 @@ export async function POST(req: Request) {
       if (emailVerified !== null) await setUserEmailVerified(id, String(emailVerified) === 'true');
       if (typeof email === 'string' && email) await updateUserEmail(id, String(email));
       if (typeof phone === 'string' && phone) await updateUserPhone(id, String(phone));
-      const r = NextResponse.redirect(new URL('/admin?tab=lk_users', req.url), 303);
+      const r = NextResponse.redirect(makeBackUrl(req, '/admin?tab=lk_users'), 303);
       r.cookies.set('flash', JSON.stringify({ kind: 'success', msg: 'Пользователь обновлён' }), { path: '/' });
       return r;
     }
@@ -67,7 +77,7 @@ export async function POST(req: Request) {
       const id = String(fd.get('id') || '').trim();
       if (!id) return NextResponse.json({ error: 'MISSING' }, { status: 400 });
       const count = await revokeAllCredentialsForUser(id);
-      const r = NextResponse.redirect(new URL('/admin?tab=lk_users', req.url), 303);
+      const r = NextResponse.redirect(makeBackUrl(req, '/admin?tab=lk_users'), 303);
       r.cookies.set('flash', JSON.stringify({ kind: 'success', msg: `Отозваны биометрические токены: ${count}` }), { path: '/' });
       return r;
     }
@@ -82,7 +92,9 @@ export async function POST(req: Request) {
       const list = Array.isArray(u.users) ? u.users : [];
       const next = list.filter((x) => x.id !== id);
       await writeText('.data/users.json', JSON.stringify({ users: next }, null, 2));
-      return NextResponse.redirect(new URL('/admin?tab=lk_users', req.url), 303);
+      const r = NextResponse.redirect(makeBackUrl(req, '/admin?tab=lk_users'), 303);
+      r.cookies.set('flash', JSON.stringify({ kind: 'success', msg: 'Пользователь удалён' }), { path: '/' });
+      return r;
     }
   }
   return NextResponse.json({ error: 'UNSUPPORTED' }, { status: 400 });
