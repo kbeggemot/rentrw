@@ -8,6 +8,7 @@ export type WithdrawalRecord = {
   createdAt: string; // ISO
   updatedAt: string; // ISO
   paidAt?: string | null; // ISO
+  orgInn?: string | null; // организация, для которой создан вывод
 };
 
 type Store = { items: WithdrawalRecord[] };
@@ -25,11 +26,11 @@ async function writeStore(store: Store): Promise<void> {
   await writeText(FILE, JSON.stringify(store, null, 2));
 }
 
-export async function recordWithdrawalCreate(userId: string, taskId: string | number, amountRub: number): Promise<void> {
+export async function recordWithdrawalCreate(userId: string, taskId: string | number, amountRub: number, orgInn?: string | null): Promise<void> {
   const store = await readStore();
   const now = new Date().toISOString();
   const existingIdx = store.items.findIndex((x) => x.userId === userId && x.taskId == taskId);
-  const rec: WithdrawalRecord = { userId, taskId, amountRub, status: 'pending', createdAt: now, updatedAt: now };
+  const rec: WithdrawalRecord = { userId, taskId, amountRub, status: 'pending', createdAt: now, updatedAt: now, orgInn: orgInn ?? null };
   if (existingIdx !== -1) store.items[existingIdx] = { ...store.items[existingIdx], ...rec };
   else store.items.push(rec);
   await writeStore(store);
@@ -49,9 +50,13 @@ export async function updateWithdrawal(userId: string, taskId: string | number, 
   await appendWithdrawalLog(userId, taskId, `update ${note}`, src);
 }
 
-export async function listWithdrawals(userId: string): Promise<WithdrawalRecord[]> {
+export async function listWithdrawals(userId: string, orgInn?: string | null): Promise<WithdrawalRecord[]> {
   const store = await readStore();
-  const arr = store.items.filter((x) => x.userId === userId);
+  let arr = store.items.filter((x) => x.userId === userId);
+  if (orgInn) {
+    const key = String(orgInn).replace(/\D/g, '');
+    arr = arr.filter((x) => (x.orgInn ? String(x.orgInn) === key : false));
+  }
   return arr.sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
 }
 
@@ -69,6 +74,7 @@ export async function upsertWithdrawal(userId: string, payload: Partial<Withdraw
       createdAt: payload.createdAt || now,
       updatedAt: now,
       paidAt: payload.paidAt,
+      orgInn: payload.orgInn ?? null,
     };
     store.items.push(rec);
     await appendWithdrawalLog(userId, payload.taskId, `upsert(create) ${JSON.stringify({ status: rec.status })}`, 'backfill');
@@ -81,6 +87,7 @@ export async function upsertWithdrawal(userId: string, payload: Partial<Withdraw
       createdAt: payload.createdAt || cur.createdAt,
       paidAt: typeof payload.paidAt !== 'undefined' ? payload.paidAt : cur.paidAt,
       updatedAt: now,
+      orgInn: typeof payload.orgInn !== 'undefined' ? payload.orgInn : cur.orgInn,
     };
     await appendWithdrawalLog(userId, payload.taskId, `upsert(update) ${JSON.stringify({ status: store.items[idx].status })}`, 'backfill');
   }
@@ -90,7 +97,9 @@ export async function upsertWithdrawal(userId: string, payload: Partial<Withdraw
 // ---------- Logs ----------
 export async function appendWithdrawalLog(userId: string, taskId: string | number, message: string, source: 'webhook' | 'manual' | 'backfill' | 'system' | 'unknown' = 'unknown'): Promise<void> {
   const line = JSON.stringify({ ts: new Date().toISOString(), userId, taskId, source, message }) + '\n';
-  await writeText(`.data/withdrawal_${userId}_${String(taskId)}.log`, line, { append: true } as any);
+  const key = `.data/withdrawal_${userId}_${String(taskId)}.log`;
+  const prev = await readText(key);
+  await writeText(key, (prev || '') + line);
 }
 
 export async function readWithdrawalLog(userId: string, taskId: string | number): Promise<string> {

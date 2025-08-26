@@ -96,7 +96,7 @@ export async function POST(req: Request) {
       }
       const taskId = (data?.task?.id ?? data?.id ?? data?.task_id) as string | number | undefined;
       if (taskId !== undefined) {
-        try { await recordWithdrawalCreate(userId, taskId, amountRub); } catch {}
+        try { await recordWithdrawalCreate(userId, taskId, amountRub, inn || null); } catch {}
       }
       return NextResponse.json({ ok: true, task_id: taskId, data }, { status: 201 });
     }
