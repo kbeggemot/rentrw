@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { readText } from '@/server/storage';
+import { readText, writeText } from '@/server/storage';
 
 export const runtime = 'nodejs';
 
