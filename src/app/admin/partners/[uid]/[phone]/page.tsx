@@ -10,7 +10,33 @@ async function getItem(uid: string, phone: string) {
     const d = raw ? JSON.parse(raw) : { users: {} };
     const list = Array.isArray(d?.users?.[uid]) ? d.users[uid] : [];
     const norm = (x: string) => x.replace(/\D/g, '');
-    return list.find((x: any) => norm(String(x.phone||'')) === norm(phone)) || null;
+    const item = list.find((x: any) => norm(String(x.phone||'')) === norm(phone)) || null;
+    if (!item) return null;
+    // gather organizations by orgInn and user org memberships
+    let orgs: Array<{ inn: string; name: string | null }> = [];
+    try {
+      const rawOrgs = await readText('.data/orgs.json');
+      const orgStore = rawOrgs ? JSON.parse(rawOrgs) : { orgs: {} };
+      const map = (orgStore?.orgs && typeof orgStore.orgs === 'object') ? (orgStore.orgs as Record<string, any>) : {};
+      const addOrg = (inn: string | undefined | null) => {
+        const key = String(inn||'').replace(/\D/g,'');
+        if (!key) return;
+        const rec = map[key];
+        orgs.push({ inn: key, name: rec?.name ?? null });
+      };
+      addOrg((item as any).orgInn);
+      // include all orgs where this user is a member (uid)
+      for (const [inn, rec] of Object.entries(map)) {
+        if (Array.isArray((rec as any)?.members) && (rec as any).members.includes(uid)) {
+          const key = String(inn).replace(/\D/g,'');
+          if (!orgs.some(o => o.inn === key)) orgs.push({ inn: key, name: (rec as any)?.name ?? null });
+        }
+      }
+    } catch {}
+    orgs = orgs.filter(Boolean);
+    // list users linked to this partner (same uid) – in this dataset partner belongs to account uid
+    const users: Array<{ id: string; phone: string }> = [{ id: uid, phone }];
+    return { ...item, __orgs: orgs, __users: users };
   } catch { return null; }
 }
 
@@ -54,6 +80,29 @@ export default async function AdminPartnerEditor(props: { params: Promise<{ uid:
             <a className="px-3 py-2 border rounded" href="/admin?tab=partners">Назад</a>
           </div>
         </form>
+        {/* Related lists */}
+        <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div>
+            <h3 className="font-semibold mb-2">Организации</h3>
+            {Array.isArray((item as any).__orgs) && (item as any).__orgs.length > 0 ? (
+              <ul className="list-disc pl-5 text-sm">
+                {(item as any).__orgs.map((o: any)=> (
+                  <li key={o.inn}><a className="text-blue-600" href={`/admin/orgs/${encodeURIComponent(String(o.inn))}`}>{o.inn}{o.name?` — ${o.name}`:''}</a></li>
+                ))}
+              </ul>
+            ) : (<div className="text-sm text-gray-500">Нет данных</div>)}
+          </div>
+          <div>
+            <h3 className="font-semibold mb-2">Пользователи</h3>
+            {Array.isArray((item as any).__users) && (item as any).__users.length > 0 ? (
+              <ul className="list-disc pl-5 text-sm">
+                {(item as any).__users.map((u: any)=> (
+                  <li key={u.id}><a className="text-blue-600" href={`/admin/lk-users/${encodeURIComponent(String(u.id))}`}>{u.id}</a> — {u.phone}</li>
+                ))}
+              </ul>
+            ) : (<div className="text-sm text-gray-500">Нет данных</div>)}
+          </div>
+        </div>
         <div className="mt-6">
             <h2 className="text-lg font-semibold mb-2">Действия</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
