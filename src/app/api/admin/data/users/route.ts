@@ -35,9 +35,29 @@ export async function GET(req: Request) {
         accessible.push({ inn: org.inn, name: org.name ?? null });
       }
     }
-    return { id: u.id, phone: u.phone, email: u.email ?? null, orgInn: u.payoutOrgInn ?? null, orgs: accessible };
+    return { id: u.id, phone: u.phone, email: u.email ?? null, orgInn: u.payoutOrgInn ?? null, orgs: accessible, showAll: (u as any).showAllDataForOrg ? true : false };
   });
   return NextResponse.json({ items });
+}
+
+export async function POST(req: Request) {
+  if (!authed(req)) return NextResponse.json({ error: 'UNAUTHORIZED' }, { status: 401 });
+  // Support DELETE via form method override
+  const ct = req.headers.get('content-type') || '';
+  if (ct.includes('application/x-www-form-urlencoded') || ct.includes('multipart/form-data')) {
+    const fd = await req.formData();
+    const method = String(fd.get('_method') || '').toUpperCase();
+    if (method === 'DELETE') {
+      const id = String(fd.get('id') || '').trim();
+      if (!id) return NextResponse.json({ error: 'MISSING' }, { status: 400 });
+      const u = await readUsers();
+      const list = Array.isArray(u.users) ? u.users : [];
+      const next = list.filter((x) => x.id !== id);
+      await writeText('.data/users.json', JSON.stringify({ users: next }, null, 2));
+      return NextResponse.redirect(new URL('/admin?tab=lk_users', req.url), 303);
+    }
+  }
+  return NextResponse.json({ error: 'UNSUPPORTED' }, { status: 400 });
 }
 
 

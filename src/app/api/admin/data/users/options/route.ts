@@ -30,11 +30,29 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   if (!authed(req)) return NextResponse.json({ error: 'UNAUTHORIZED' }, { status: 401 });
   if (!(await isSuperAdmin(req))) return NextResponse.json({ error: 'FORBIDDEN' }, { status: 403 });
-  const body = await req.json().catch(()=>({} as any));
-  const id = String(body?.id || '').trim();
-  const showAll = Boolean(body?.showAll);
+  // Support both JSON and form POSTs
+  let id = '';
+  let showAll = false;
+  try {
+    const ct = req.headers.get('content-type') || '';
+    if (ct.includes('application/json')) {
+      const body = await req.json().catch(()=>({} as any));
+      id = String((body as any)?.id || '').trim();
+      showAll = Boolean((body as any)?.showAll);
+    } else {
+      const fd = await req.formData();
+      id = String(fd.get('id') || '').trim();
+      const v = String(fd.get('showAll') || '');
+      showAll = v === 'true' || v === '1' || v === 'on';
+    }
+  } catch {}
   if (!id) return NextResponse.json({ error: 'MISSING' }, { status: 400 });
   try { await setShowAllDataFlag(id, showAll); } catch {}
+  // If called from form — redirect back to details page
+  const accept = req.headers.get('accept') || '';
+  if (!accept.includes('application/json')) {
+    return NextResponse.redirect(new URL(`/admin/lk-users/${encodeURIComponent(id)}`, req.url), 303);
+  }
   return NextResponse.json({ ok: true, showAll });
 }
 
