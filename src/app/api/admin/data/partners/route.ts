@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { readText, writeText } from '@/server/storage';
+import { appendAdminEntityLog } from '@/server/adminAudit';
 import { getAdminByUsername } from '@/server/adminStore';
 
 type PartnerRecord = any;
@@ -68,6 +69,7 @@ export async function PATCH(req: Request) {
   if (!s.users) s.users = {} as any;
   (s.users as any)[userId] = arr;
   await writeStore(s);
+  try { await appendAdminEntityLog('partner', [String(userId), normalize(phone)], { source: 'manual', message: 'admin patch', data: { patch } }); } catch {}
   return NextResponse.json({ ok: true, item: next });
 }
 

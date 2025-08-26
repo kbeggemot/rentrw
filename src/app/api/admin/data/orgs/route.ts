@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { readText, writeText } from '@/server/storage';
+import { appendAdminEntityLog } from '@/server/adminAudit';
 import { getAdminByUsername } from '@/server/adminStore';
 
 type OrgStore = { orgs?: Record<string, any> };
@@ -58,6 +59,7 @@ export async function PATCH(req: Request) {
   next.updatedAt = new Date().toISOString();
   (s.orgs as any)[inn] = next;
   await writeStore(s);
+  try { await appendAdminEntityLog('org', [String(inn)], { source: 'manual', message: 'admin patch', data: { patch } }); } catch {}
   return NextResponse.json({ ok: true, item: next });
 }
 

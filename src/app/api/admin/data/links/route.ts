@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { readText, writeText } from '@/server/storage';
+import { appendAdminEntityLog } from '@/server/adminAudit';
 import { getAdminByUsername } from '@/server/adminStore';
 
 type Store = { items?: any[] };
@@ -59,6 +60,7 @@ export async function PATCH(req: Request) {
   for (const [k,v] of Object.entries(patch)) if (allowed.has(k)) (next as any)[k] = v as any;
   arr[idx] = next;
   await writeStore({ items: arr });
+  try { await appendAdminEntityLog('link', [String(code)], { source: 'manual', message: 'admin patch', data: { patch } }); } catch {}
   return NextResponse.json({ ok: true, item: next });
 }
 

@@ -1,5 +1,6 @@
 import SaveButton from '@/components/admin/SaveButton';
 import { readText } from '@/server/storage';
+import { readAdminEntityLog } from '@/server/adminAudit';
 
 export const runtime = 'nodejs';
 import FlashToast from '@/components/admin/FlashToast';
@@ -16,6 +17,7 @@ async function getItem(code: string) {
 export default async function AdminLinkEditor(props: { params: Promise<{ code: string }> }) {
   const p = await props.params;
   const item = await getItem(p.code);
+  const log = await readAdminEntityLog('link', [String(p.code)]);
   return (
     <div className="max-w-3xl mx-auto p-4">
       <FlashToast />
@@ -85,6 +87,12 @@ export default async function AdminLinkEditor(props: { params: Promise<{ code: s
           </div>
         </form>
       )}
+      {item ? (
+        <div className="mt-6">
+          <h2 className="text-lg font-semibold mb-2">Логи</h2>
+          <pre className="w-full border rounded p-2 text-xs whitespace-pre-wrap bg-gray-50 dark:bg-gray-950">{log || 'Пока нет событий'}</pre>
+        </div>
+      ) : null}
     </div>
   );
 }

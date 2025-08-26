@@ -1,5 +1,6 @@
 import SaveButton from '@/components/admin/SaveButton';
 import { readText } from '@/server/storage';
+import { readAdminEntityLog } from '@/server/adminAudit';
 
 export const runtime = 'nodejs';
 import FlashToast from '@/components/admin/FlashToast';
@@ -43,6 +44,7 @@ async function getItem(uid: string, phone: string) {
 export default async function AdminPartnerEditor(props: { params: Promise<{ uid: string; phone: string }> }) {
   const p = await props.params;
   const item = await getItem(p.uid, p.phone);
+  const log = await readAdminEntityLog('partner', [String(p.uid), String(p.phone).replace(/\D/g,'')]);
   return (
     <div className="max-w-3xl mx-auto p-4">
       <FlashToast />
@@ -118,6 +120,10 @@ export default async function AdminPartnerEditor(props: { params: Promise<{ uid:
                 <div className="text-xs text-gray-600 mt-1">Запрос статуса партнёра в Rocketwork и обновление ФИО/ИНН/статуса.</div>
               </div>
             </div>
+          </div>
+          <div className="mt-6">
+            <h2 className="text-lg font-semibold mb-2">Логи</h2>
+            <pre className="w-full border rounded p-2 text-xs whitespace-pre-wrap bg-gray-50 dark:bg-gray-950">{log || 'Пока нет событий'}</pre>
           </div>
         </>
       )}

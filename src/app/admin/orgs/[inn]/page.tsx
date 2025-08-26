@@ -1,6 +1,7 @@
 import SaveButton from '@/components/admin/SaveButton';
 import FlashToast from '@/components/admin/FlashToast';
 import { readText } from '@/server/storage';
+import { readAdminEntityLog } from '@/server/adminAudit';
 
 export const runtime = 'nodejs';
 
@@ -30,6 +31,7 @@ export default async function AdminOrgEditor(props: { params: Promise<{ inn: str
   const item = await getItem(p.inn);
   const users = await getUsersForOrg((item as any)?.members as string[] | undefined);
   const hasPayout = Boolean((item as any)?.payoutBik || (item as any)?.payoutAccount);
+  const log = await readAdminEntityLog('org', [String(p.inn).replace(/\D/g,'')]);
   return (
     <div className="max-w-3xl mx-auto p-4">
       <FlashToast />
@@ -84,6 +86,10 @@ export default async function AdminOrgEditor(props: { params: Promise<{ inn: str
                 ))}
               </ul>
             )}
+          </div>
+          <div className="mt-6">
+            <h2 className="text-lg font-semibold mb-2">Логи</h2>
+            <pre className="w-full border rounded p-2 text-xs whitespace-pre-wrap bg-gray-50 dark:bg-gray-950">{log || 'Пока нет событий'}</pre>
           </div>
         </>
       )}

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { readText, writeText } from '@/server/storage';
 import { getAdminByUsername } from '@/server/adminStore';
+import { appendAdminEntityLog } from '@/server/adminAudit';
 
 type SaleRecord = any;
 type Store = { tasks?: Array<{ id: number|string; orderId: number; createdAt: string }>; sales?: SaleRecord[] };
@@ -73,6 +74,12 @@ export async function PATCH(req: Request) {
   next.updatedAt = new Date().toISOString();
   arr[idx] = next;
   await writeStore({ ...(s as any), sales: arr });
+  try {
+    const cookie = req.headers.get('cookie') || '';
+    const mm = /(?:^|;\s*)admin_user=([^;]+)/.exec(cookie);
+    const actor = mm ? decodeURIComponent(mm[1]) : null;
+    await appendAdminEntityLog('sale', [String(userId), String(taskId)], { actor, source: 'manual', message: 'admin patch', data: { patch } });
+  } catch {}
   return NextResponse.json({ ok: true, item: next });
 }
 

@@ -1,6 +1,7 @@
 import SaveButton from '@/components/admin/SaveButton';
 import FlashToast from '@/components/admin/FlashToast';
 import { readText } from '@/server/storage';
+import { readAdminEntityLog } from '@/server/adminAudit';
 import { findOrgByFingerprint } from '@/server/orgStore';
 
 async function getItem(uid: string, task: string) {
@@ -19,6 +20,7 @@ async function getItem(uid: string, task: string) {
 export default async function AdminSaleEditor(props: { params: Promise<{ uid: string; task: string }> }) {
   const p = await props.params;
   const item = await getItem(p.uid, p.task);
+  const log = await readAdminEntityLog('sale', [String(p.uid), String(p.task)]);
   let suggestedInn: string | null = null;
   try {
     const fp = (item as any)?.rwTokenFp;
@@ -149,6 +151,10 @@ export default async function AdminSaleEditor(props: { params: Promise<{ uid: st
                 <div className="text-xs text-gray-600 mt-1">Синхронизация по ReceiptId полного расчёта: обновляет URL и статус полного чека.</div>
               </div>
             </div>
+          </div>
+          <div className="mt-6">
+            <h2 className="text-lg font-semibold mb-2">Логи</h2>
+            <pre className="w-full border rounded p-2 text-xs whitespace-pre-wrap bg-gray-50 dark:bg-gray-950">{log || 'Пока нет событий'}</pre>
           </div>
         </div>
       )}
