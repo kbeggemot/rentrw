@@ -9,18 +9,20 @@ async function getUser(id: string) {
     const d = raw ? JSON.parse(raw) : { users: [] };
     const arr: any[] = Array.isArray(d?.users) ? d.users : [];
     const u = arr.find((x) => String(x.id) === String(id));
-    // Build list of organizations from membership and payoutOrgInn
+    // Build list of organizations by scanning orgs.json for membership (org.members includes userId)
     const orgs: Array<{ inn: string; name: string | null }> = [];
     try {
       const rawOrgs = await readText('.data/orgs.json');
       const orgStore = rawOrgs ? JSON.parse(rawOrgs) : { orgs: {} };
-      const map = (orgStore?.orgs && typeof orgStore.orgs === 'object') ? orgStore.orgs : {};
-      const members: string[] = Array.isArray((u as any)?.memberships) ? (u as any).memberships : [];
-      for (const inn of members) {
-        const key = String(inn).replace(/\D/g, '');
-        const rec = map[key];
-        if (key) orgs.push({ inn: key, name: rec?.name ?? null });
+      const map = (orgStore?.orgs && typeof orgStore.orgs === 'object') ? (orgStore.orgs as Record<string, any>) : {};
+      const userId = String(u.id);
+      for (const [inn, rec] of Object.entries(map)) {
+        if (Array.isArray(rec?.members) && rec.members.includes(userId)) {
+          const key = String(inn).replace(/\D/g, '');
+          orgs.push({ inn: key, name: rec?.name ?? null });
+        }
       }
+      // Also include payoutOrgInn if present
       const payoutInn = (u as any)?.payoutOrgInn ? String((u as any).payoutOrgInn).replace(/\D/g, '') : null;
       if (payoutInn && !orgs.some((o) => o.inn === payoutInn)) {
         const rec = map[payoutInn];
