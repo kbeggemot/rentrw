@@ -266,7 +266,20 @@ function WithdrawalsPanel() {
   const [items, setItems] = useState<Array<{ userId: string; taskId: string | number; amountRub: number; status?: string | null; createdAt: string; updatedAt: string; paidAt?: string | null }>>([]);
   const [q, setQ] = useState('');
   const [page, setPage] = useState(1);
-  const load = async () => { const r = await fetch('/api/admin/data/withdrawals', { cache: 'no-store' }); const d = await r.json(); setItems(Array.isArray(d?.items)?d.items:[]); };
+  const load = async () => {
+    const r = await fetch('/api/admin/data/withdrawals', { cache: 'no-store' });
+    const d = await r.json();
+    const arr: Array<{ userId: string; taskId: string | number; amountRub: number; status?: string | null; createdAt: string; updatedAt: string; paidAt?: string | null }> = Array.isArray(d?.items) ? d.items : [];
+    arr.sort((a: any, b: any) => {
+      const at = Date.parse((a?.createdAt || a?.updatedAt || 0) as any);
+      const bt = Date.parse((b?.createdAt || b?.updatedAt || 0) as any);
+      if (Number.isNaN(at) && Number.isNaN(bt)) return 0;
+      if (Number.isNaN(at)) return 1;
+      if (Number.isNaN(bt)) return -1;
+      return bt - at; // newest first
+    });
+    setItems(arr);
+  };
   useEffect(()=>{ void load(); },[]);
   return (
     <div className="space-y-3">

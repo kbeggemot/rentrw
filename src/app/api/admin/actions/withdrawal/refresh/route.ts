@@ -31,7 +31,7 @@ export async function POST(req: Request) {
   const base = `${proto}://${host}`;
   const url = `${base}/api/rocketwork/withdrawal-status/${encodeURIComponent(taskId)}`;
   try {
-    const r = await fetch(url, { cache: 'no-store', headers: { cookie: req.headers.get('cookie') || '' } });
+    const r = await fetch(url, { cache: 'no-store', headers: { cookie: req.headers.get('cookie') || '', 'x-user-id': userId } });
     const d = await r.json().catch(()=>({}));
     await appendWithdrawalLog(userId, taskId, `manual refresh -> ${JSON.stringify(d)}`, 'manual');
   } catch {}
