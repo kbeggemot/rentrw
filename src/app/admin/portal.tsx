@@ -235,15 +235,17 @@ function TokensPanel() {
       </div>
       <div className="border rounded overflow-x-auto">
         <table className="min-w-full text-sm">
-          <thead><tr><th className="text-left px-2 py-1">fingerprint</th><th className="text-left px-2 py-1">org</th><th className="text-left px-2 py-1">users</th><th className="text-left px-2 py-1">created</th><th className="text-left px-2 py-1">updated</th></tr></thead>
+          <thead><tr><th className="text-left px-2 py-1">fingerprint</th><th className="text-left px-2 py-1">inn</th><th className="text-left px-2 py-1">org</th><th className="text-left px-2 py-1">users</th><th className="text-left px-2 py-1">created</th><th className="text-left px-2 py-1">updated</th><th className="text-left px-2 py-1">Действия</th></tr></thead>
           <tbody>
             {pageItems.map((t)=> (
               <tr key={t.fingerprint+':'+t.inn} className="border-t">
-                <td className="px-2 py-1"><a className="text-blue-600" href={`/admin/tokens/${encodeURIComponent(String(t.fingerprint))}`}>{t.fingerprint}</a></td>
-                <td className="px-2 py-1">{t.inn}{t.orgName?` — ${t.orgName}`:''}</td>
+                <td className="px-2 py-1">{t.fingerprint}</td>
+                <td className="px-2 py-1 whitespace-nowrap">{t.inn}</td>
+                <td className="px-2 py-1">{t.orgName || '—'}</td>
                 <td className="px-2 py-1">{(t.users||[]).length===0?'—':(t.users||[]).map((u)=> (<a key={u} className="text-blue-600 mr-1" href={`/admin/lk-users/${encodeURIComponent(String(u))}`}>{u}</a>))}</td>
                 <td className="px-2 py-1">{t.createdAt?new Date(t.createdAt).toLocaleString('ru-RU',{timeZone:'Europe/Moscow'}):'—'}</td>
                 <td className="px-2 py-1">{t.updatedAt?new Date(t.updatedAt).toLocaleString('ru-RU',{timeZone:'Europe/Moscow'}):'—'}</td>
+                <td className="px-2 py-1"><a className="inline-block px-2 py-1" href={`/admin/tokens/${encodeURIComponent(String(t.fingerprint))}`}>Открыть</a></td>
               </tr>
             ))}
           </tbody>
@@ -341,7 +343,19 @@ function LinksPanel({ showToast, role }: { showToast: (m: string, k?: any) => vo
   const [items, setItems] = useState<any[]>([]);
   const [q, setQ] = useState('');
   const [page, setPage] = useState(1);
-  const load = async () => { const r = await fetch('/api/admin/data/links', { cache: 'no-store' }); const d = await r.json(); setItems(Array.isArray(d?.items)?d.items:[]); };
+  const load = async () => {
+    const [rLinks, rOrgs] = await Promise.all([
+      fetch('/api/admin/data/links', { cache: 'no-store' }),
+      fetch('/api/admin/data/orgs', { cache: 'no-store' }),
+    ]);
+    const d = await rLinks.json();
+    const orgs = await rOrgs.json().catch(()=>({items:[]}));
+    const orgMap = new Map<string, string>();
+    (Array.isArray(orgs?.items)?orgs.items:[]).forEach((o:any)=>{ if(o?.inn) orgMap.set(String(o.inn), o?.name||''); });
+    const arr: any[] = Array.isArray(d?.items)?d.items:[];
+    arr.forEach((x:any)=>{ const inn=String(x.orgInn||''); if(inn && orgMap.has(inn)) (x as any).__orgName = orgMap.get(inn); });
+    setItems(arr);
+  };
   useEffect(()=>{ void load(); },[]);
   const commitLink = async (row: any, field: string, value: any) => {
     if (role !== 'superadmin') return;
@@ -356,13 +370,14 @@ function LinksPanel({ showToast, role }: { showToast: (m: string, k?: any) => vo
       </div>
       <div className="border rounded overflow-x-auto">
         <table className="min-w-full text-sm">
-          <thead><tr><th className="text-left px-2 py-1">createdAt</th><th className="text-left px-2 py-1">code</th><th className="text-left px-2 py-1">orgInn</th><th className="text-left px-2 py-1">amount</th><th className="text-left px-2 py-1">vat</th><th className="text-left px-2 py-1">method</th><th className="text-left px-2 py-1">Действия</th></tr></thead>
+          <thead><tr><th className="text-left px-2 py-1">createdAt</th><th className="text-left px-2 py-1">code</th><th className="text-left px-2 py-1">orgInn</th><th className="text-left px-2 py-1">org</th><th className="text-left px-2 py-1">amount</th><th className="text-left px-2 py-1">vat</th><th className="text-left px-2 py-1">method</th><th className="text-left px-2 py-1">Действия</th></tr></thead>
           <tbody>
-            {items.filter((x)=>{ const v=q.trim().toLowerCase(); if(!v) return true; const hay=[x.code,x.orgInn,x.vatRate,x.method,x.amountRub,x.title,x.description].join(' ').toLowerCase(); return hay.includes(v); }).slice((page-1)*100, page*100).map((x)=> (
+            {items.filter((x)=>{ const v=q.trim().toLowerCase(); if(!v) return true; const hay=[x.code,x.orgInn,(x.__orgName||''),x.vatRate,x.method,x.amountRub,x.title,x.description].join(' ').toLowerCase(); return hay.includes(v); }).slice((page-1)*100, page*100).map((x)=> (
               <tr key={x.code} className="border-t">
                 <td className="px-2 py-1">{x.createdAt?new Date(x.createdAt).toLocaleString('ru-RU',{timeZone:'Europe/Moscow'}):'—'}</td>
                 <td className="px-2 py-1">{x.code}</td>
                 <td className="px-2 py-1">{x.orgInn||'—'}</td>
+                <td className="px-2 py-1">{x.__orgName||'—'}</td>
                 <td className="px-2 py-1">{typeof x.amountRub==='number'?x.amountRub.toFixed(2):'-'}</td>
                 <td className="px-2 py-1">{x.vatRate||'—'}</td>
                 <td className="px-2 py-1">{x.method||'—'}</td>
@@ -372,7 +387,7 @@ function LinksPanel({ showToast, role }: { showToast: (m: string, k?: any) => vo
           </tbody>
         </table>
       </div>
-      <Pager total={items.filter((x)=>{ const v=q.trim().toLowerCase(); if(!v) return true; const hay=[x.code,x.orgInn,x.vatRate,x.method,x.amountRub,x.title,x.description].join(' ').toLowerCase(); return hay.includes(v); }).length} page={page} setPage={setPage} />
+      <Pager total={items.filter((x)=>{ const v=q.trim().toLowerCase(); if(!v) return true; const hay=[x.code,x.orgInn,(x.__orgName||''),x.vatRate,x.method,x.amountRub,x.title,x.description].join(' ').toLowerCase(); return hay.includes(v); }).length} page={page} setPage={setPage} />
     </div>
   );
 }

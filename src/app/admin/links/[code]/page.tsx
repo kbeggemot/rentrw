@@ -72,6 +72,10 @@ export default async function AdminLinkEditor(props: { params: Promise<{ code: s
               </select>
             </label>
           </div>
+          <div className="border rounded p-3 text-sm">
+            <div className="mb-1 text-gray-700">Создано пользователем</div>
+            <a className="text-blue-600" href={`/admin/lk-users/${encodeURIComponent(String(item.userId))}`}>{item.userId}</a>
+          </div>
           <div className="flex gap-2">
             <SaveButton label="Сохранить" />
             <a className="px-3 py-2 border rounded" href="/admin?tab=links">Назад</a>
