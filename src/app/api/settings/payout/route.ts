@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
 import { getUserOrgInn } from '@/server/userStore';
-import { getDecryptedApiToken } from '@/server/secureStore';
 import { writeText } from '@/server/storage';
 import { findOrgByInn, getOrgPayoutRequisites, updateOrgPayoutRequisites } from '@/server/orgStore';
 import { getSelectedOrgInn } from '@/server/orgContext';
+import { resolveRwToken } from '@/server/rwToken';
 
 export const runtime = 'nodejs';
 
@@ -53,8 +53,8 @@ export async function POST(req: Request) {
     await updateOrgPayoutRequisites(innSelected, { bik, account });
     // Create/update executor in RW after saving requisites and wait for confirmation
     try {
-      const inn = innSelected || (await getUserOrgInn(userId));
-      const token = await getDecryptedApiToken(userId);
+      const inn = innSelected;
+      const { token, orgInn } = await resolveRwToken(req as any, userId);
       if (inn && token) {
         const base = process.env.ROCKETWORK_API_BASE_URL || 'https://app.rocketwork.ru/api/';
         const url = new URL('executors', base.endsWith('/') ? base : base + '/').toString();
@@ -63,7 +63,7 @@ export async function POST(req: Request) {
         const rw = await fetch(url, { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify(payload), cache: 'no-store' });
         const txt = await rw.text();
         try {
-          await writeText('.data/rw_executors_last.json', JSON.stringify({ ts: new Date().toISOString(), attempt: 1, userId, url, payload, status: rw.status, text: txt }, null, 2));
+          await writeText('.data/rw_executors_last.json', JSON.stringify({ ts: new Date().toISOString(), attempt: 1, userId, url, payload, selectedInn: innSelected, tokenOrgInn: orgInn || null, status: rw.status, text: txt }, null, 2));
         } catch {}
         if (!rw.ok) {
           // Try fallback shape if first attempt failed
@@ -73,7 +73,7 @@ export async function POST(req: Request) {
             if (!rw2.ok) {
               const txt2 = await rw2.text();
               try {
-                await writeText('.data/rw_executors_last.json', JSON.stringify({ ts: new Date().toISOString(), attempt: 2, userId, url, payload: payload2, status: rw2.status, text: txt2 }, null, 2));
+                await writeText('.data/rw_executors_last.json', JSON.stringify({ ts: new Date().toISOString(), attempt: 2, userId, url, payload: payload2, selectedInn: innSelected, tokenOrgInn: orgInn || null, status: rw2.status, text: txt2 }, null, 2));
               } catch {}
               let err2: any = null; try { err2 = txt2 ? JSON.parse(txt2) : null; } catch {}
               const message2 = (err2?.error as string | undefined) || txt2 || 'EXECUTOR_CREATE_FAILED';
@@ -81,7 +81,7 @@ export async function POST(req: Request) {
             }
             // success on attempt 2
             try {
-              await writeText('.data/rw_executors_last.json', JSON.stringify({ ts: new Date().toISOString(), attempt: 2, userId, url, payload: payload2, status: rw2.status, text: 'OK' }, null, 2));
+              await writeText('.data/rw_executors_last.json', JSON.stringify({ ts: new Date().toISOString(), attempt: 2, userId, url, payload: payload2, selectedInn: innSelected, tokenOrgInn: orgInn || null, status: rw2.status, text: 'OK' }, null, 2));
             } catch {}
           } catch {
             let err: any = null; try { err = txt ? JSON.parse(txt) : null; } catch {}
@@ -91,7 +91,7 @@ export async function POST(req: Request) {
         }
         // success on attempt 1
         try {
-          await writeText('.data/rw_executors_last.json', JSON.stringify({ ts: new Date().toISOString(), attempt: 1, userId, url, payload, status: rw.status, text: 'OK' }, null, 2));
+          await writeText('.data/rw_executors_last.json', JSON.stringify({ ts: new Date().toISOString(), attempt: 1, userId, url, payload, selectedInn: innSelected, tokenOrgInn: orgInn || null, status: rw.status, text: 'OK' }, null, 2));
         } catch {}
       }
     } catch {

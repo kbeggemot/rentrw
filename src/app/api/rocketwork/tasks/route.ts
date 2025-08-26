@@ -8,7 +8,7 @@ import { getNextOrderId } from '@/server/orderStore';
 import { saveTaskId, recordSaleOnCreate } from '@/server/taskStore';
 import { getUserAgentSettings } from '@/server/userStore';
 import type { RocketworkTask } from '@/types/rocketwork';
-import { getUserPayoutRequisites, getUserOrgInn } from '@/server/userStore';
+import { getOrgPayoutRequisites } from '@/server/orgStore';
 import { createResumeToken } from '@/server/payResumeStore';
 // Removed immediate OFD creation on task creation; receipts are created on paid/transfered via postbacks
 import { buildFermaReceiptPayload, PAYMENT_METHOD_PREPAY_FULL, PAYMENT_METHOD_FULL_PAYMENT } from '@/app/api/ofd/ferma/build-payload';
@@ -40,20 +40,20 @@ export async function POST(req: Request) {
     const mc = /(?:^|;\s*)session_user=([^;]+)/.exec(cookie);
     const userId = (mc ? decodeURIComponent(mc[1]) : undefined) || req.headers.get('x-user-id') || 'default';
     const { token, orgInn, fingerprint } = await resolveRwToken(req, userId);
-    if (!token) return NextResponse.json({ error: 'API токен не задан' }, { status: 400 });
+    if (!token) return NextResponse.json({ error: 'NO_TOKEN' }, { status: 400 });
 
     const body = (await req.json()) as BodyIn | any;
     // Withdrawal support
     if (body?.type === 'Withdrawal') {
       // Forced balance refresh skipped here; endpoint creates withdrawal task
-      const inn = await getUserOrgInn(userId);
-      const { bik, account } = await getUserPayoutRequisites(userId);
-      const amountRub = Number(body?.amountRub || 0); // RW expects RUB, not cents
+      const inn = orgInn && String(orgInn).replace(/\D/g, '');
       if (!inn) return NextResponse.json({ error: 'NO_INN' }, { status: 400 });
+      const { bik, account } = await getOrgPayoutRequisites(inn);
+      const amountRub = Number(body?.amountRub || 0); // RW expects RUB, not cents
       if (!bik || !account) return NextResponse.json({ error: 'NO_PAYOUT_REQUISITES' }, { status: 400 });
       // Prevent concurrent withdrawals: allow only if no active (non-final) withdrawal exists
       try {
-        const history = await listWithdrawals(userId);
+        const history = await listWithdrawals(userId, inn);
         const isFinal = (s: any) => {
           const st = String(s || '').toLowerCase();
           return st === 'paid' || st === 'error' || st === 'canceled' || st === 'cancelled' || st === 'failed' || st === 'refunded';
