@@ -1,5 +1,7 @@
 import SaveButton from '@/components/admin/SaveButton';
 import { readText } from '@/server/storage';
+
+export const runtime = 'nodejs';
 import FlashToast from '@/components/admin/FlashToast';
 
 async function getItem(code: string) {

@@ -2,6 +2,8 @@ import SaveButton from '@/components/admin/SaveButton';
 import FlashToast from '@/components/admin/FlashToast';
 import { readText } from '@/server/storage';
 
+export const runtime = 'nodejs';
+
 async function getItem(inn: string) {
   try {
     const raw = await readText('.data/orgs.json');
