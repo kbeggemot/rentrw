@@ -1,5 +1,6 @@
 // Server-rendered page; use plain HTML button to avoid client component imports here
 import { readText } from '@/server/storage';
+import FlashToast from '@/components/admin/FlashToast';
 
 export const runtime = 'nodejs';
 
@@ -46,6 +47,7 @@ export default async function AdminLkUserPage(props: { params: Promise<{ id: str
   const item = await getUser(p.id);
   return (
     <div className="max-w-3xl mx-auto p-4">
+      <FlashToast />
       <div className="flex items-center justify-between mb-3">
         <h1 className="text-xl font-bold">Пользователь ЛК</h1>
         <a className="inline-flex items-center justify-center w-8 h-8 border rounded" href="/admin?tab=lk_users" aria-label="Закрыть">×</a>
