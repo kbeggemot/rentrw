@@ -70,11 +70,11 @@ function AdminDashboard({ showToast, role }: { showToast: (m: string, k?: any) =
   return (
     <div>
       <div className="flex items-center gap-3 mb-4">
-        <Button variant={tab==='lk_users'?'secondary':'ghost'} onClick={() => setTab('lk_users')}>Пользователи ЛК</Button>
         <Button variant={tab==='sales'?'secondary':'ghost'} onClick={() => setTab('sales')}>Продажи</Button>
         <Button variant={tab==='partners'?'secondary':'ghost'} onClick={() => setTab('partners')}>Партнёры</Button>
         <Button variant={tab==='links'?'secondary':'ghost'} onClick={() => setTab('links')}>Ссылки</Button>
         <Button variant={tab==='orgs'?'secondary':'ghost'} onClick={() => setTab('orgs')}>Организации</Button>
+        <Button variant={tab==='lk_users'?'secondary':'ghost'} onClick={() => setTab('lk_users')}>Пользователи ЛК</Button>
         <Button variant={tab==='logs'?'secondary':'ghost'} onClick={() => setTab('logs')}>Логи</Button>
         <Button variant={tab==='files'?'secondary':'ghost'} onClick={() => setTab('files')}>Файлы</Button>
         <div className="ml-auto" />
