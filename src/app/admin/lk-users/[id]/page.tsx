@@ -1,11 +1,13 @@
 import SaveButton from '@/components/admin/SaveButton';
+import { readText } from '@/server/storage';
 
 async function getUser(id: string) {
   try {
-    const r = await fetch(`/api/admin/data/users`, { cache: 'no-store' });
-    const d = await r.json();
-    const arr: any[] = Array.isArray(d?.items) ? d.items : [];
-    return arr.find((u) => String(u.id) === id) || null;
+    const raw = await readText('.data/users.json');
+    const d = raw ? JSON.parse(raw) : { users: [] };
+    const arr: any[] = Array.isArray(d?.users) ? d.users : [];
+    const u = arr.find((x) => String(x.id) === String(id));
+    return u ? { id: u.id, phone: u.phone, email: u.email ?? null, orgInn: u.payoutOrgInn ?? null, showAll: !!u.showAllDataForOrg } : null;
   } catch { return null; }
 }
 
