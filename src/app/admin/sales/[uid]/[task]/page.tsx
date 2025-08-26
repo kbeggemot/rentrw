@@ -1,5 +1,6 @@
 import SaveButton from '@/components/admin/SaveButton';
 import { readText } from '@/server/storage';
+import { findOrgByFingerprint } from '@/server/orgStore';
 
 async function getItem(uid: string, task: string) {
   try {
@@ -17,6 +18,16 @@ async function getItem(uid: string, task: string) {
 export default async function AdminSaleEditor(props: { params: Promise<{ uid: string; task: string }> }) {
   const p = await props.params;
   const item = await getItem(p.uid, p.task);
+  let suggestedInn: string | null = null;
+  try {
+    const fp = (item as any)?.rwTokenFp;
+    if (fp) {
+      const org = await findOrgByFingerprint(fp);
+      suggestedInn = org?.inn ?? null;
+    }
+  } catch {}
+  const orgInnDefault = ((item as any)?.orgInn && String((item as any).orgInn) !== 'неизвестно') ? (item as any).orgInn : (suggestedInn || '');
+  const usedSuggested = (!((item as any)?.orgInn) || String((item as any).orgInn) === 'неизвестно') && !!suggestedInn;
   return (
     <div className="max-w-3xl mx-auto p-4">
       <h1 className="text-xl font-bold mb-3">Редактирование продажи</h1>
@@ -28,7 +39,7 @@ export default async function AdminSaleEditor(props: { params: Promise<{ uid: st
             <input type="hidden" name="uid" defaultValue={p.uid} />
             <input type="hidden" name="taskId" defaultValue={p.task} />
             <div className="grid grid-cols-2 gap-3">
-              <label className="block text-sm">orgInn<input name="orgInn" defaultValue={item.orgInn||''} className="w-full border rounded px-2 py-1" /></label>
+              <label className="block text-sm">orgInn<input name="orgInn" defaultValue={orgInnDefault} className="w-full border rounded px-2 py-1" />{usedSuggested ? (<div className="text-xs text-gray-500 mt-1">Подставлено по rwTokenFp</div>) : null}</label>
               <label className="block text-sm">clientEmail<input name="clientEmail" defaultValue={item.clientEmail||''} className="w-full border rounded px-2 py-1" /></label>
               <label className="block text-sm col-span-2">description<input name="description" defaultValue={item.description||''} className="w-full border rounded px-2 py-1" /></label>
               <label className="block text-sm">amountGrossRub<input name="amountGrossRub" defaultValue={String(item.amountGrossRub||'')} className="w-full border rounded px-2 py-1" /></label>

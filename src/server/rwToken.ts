@@ -1,5 +1,5 @@
 import { getSelectedOrgInn } from './orgContext';
-import { getTokenForOrg, getTokenByFingerprint, listActiveTokensForOrg } from './orgStore';
+import { getTokenForOrg, getTokenByFingerprint, listActiveTokensForOrg, findOrgByFingerprint } from './orgStore';
 import { getDecryptedApiToken } from './secureStore';
 import { createHash } from 'crypto';
 
@@ -31,7 +31,14 @@ export async function resolveRwToken(req: Request, userId: string): Promise<RwTo
 
 // Advanced resolver: try specific fingerprint first, then fallback to other active tokens within org
 export async function resolveRwTokenWithFingerprint(req: Request, userId: string, orgInn: string | null | undefined, rwTokenFp: string | null | undefined): Promise<RwTokenResolution> {
-  const inn = orgInn ? orgInn.replace(/\D/g, '') : (getSelectedOrgInn(req) || null);
+  let inn = orgInn ? orgInn.replace(/\D/g, '') : (getSelectedOrgInn(req) || null);
+  // If org is not selected but we have a fingerprint, try to infer org by fingerprint
+  if (!inn && rwTokenFp) {
+    try {
+      const org = await findOrgByFingerprint(rwTokenFp);
+      if (org) inn = org.inn;
+    } catch {}
+  }
   if (inn) {
     if (rwTokenFp) {
       try {

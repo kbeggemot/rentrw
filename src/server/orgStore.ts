@@ -243,6 +243,17 @@ export async function getTokenByFingerprint(inn: string, fingerprint: string): P
   return { token, active };
 }
 
+// Find organization by token fingerprint across all orgs
+export async function findOrgByFingerprint(fingerprint: string): Promise<OrganizationRecord | null> {
+  const store = await readStore();
+  const fp = String(fingerprint || '').trim();
+  if (!fp) return null;
+  for (const org of Object.values(store.orgs)) {
+    if (org.tokens.some((t) => t.fingerprint === fp)) return org;
+  }
+  return null;
+}
+
 export async function listActiveTokensForOrg(inn: string, preferredUserId?: string): Promise<string[]> {
   const store = await readStore();
   const key = onlyDigits(inn);

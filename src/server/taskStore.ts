@@ -83,6 +83,16 @@ export async function recordSaleOnCreate(params: {
   vatRate?: string;
 }): Promise<void> {
   const { userId, taskId, orderId, orgInn, rwTokenFp, clientEmail, description, amountGrossRub, isAgent, commissionType, commissionValue, serviceEndDate, vatRate } = params;
+  // Try infer orgInn from fingerprint if missing or unknown
+  let resolvedInn: string | null | undefined = orgInn;
+  try {
+    const current = (orgInn && orgInn.trim().length > 0) ? orgInn.replace(/\D/g, '') : null;
+    if ((!current || current === 'неизвестно') && rwTokenFp) {
+      const { findOrgByFingerprint } = await import('./orgStore');
+      const org = await findOrgByFingerprint(rwTokenFp);
+      if (org?.inn) resolvedInn = org.inn;
+    }
+  } catch {}
   let retained = 0;
   if (isAgent && commissionValue !== undefined) {
     if (commissionType === 'percent') retained = (amountGrossRub * commissionValue) / 100;
@@ -115,7 +125,7 @@ export async function recordSaleOnCreate(params: {
     taskId,
     orderId,
     userId,
-    orgInn: (orgInn && orgInn.trim().length > 0) ? orgInn.replace(/\D/g, '') : 'неизвестно',
+    orgInn: (resolvedInn && String(resolvedInn).trim().length > 0) ? String(resolvedInn).replace(/\D/g, '') : 'неизвестно',
     clientEmail: (clientEmail ?? null),
     description: description ?? null,
     amountGrossRub,
@@ -152,6 +162,15 @@ export async function updateSaleFromStatus(userId: string, taskId: number | stri
   if (idx !== -1) {
     const current = store.sales[idx];
     const next = { ...current } as SaleRecord;
+    // If orgInn is unknown and we have rwTokenFp, try to resolve it in background
+    try {
+      const curInn = (next.orgInn && String(next.orgInn).trim().length > 0) ? String(next.orgInn) : null;
+      if ((!curInn || curInn === 'неизвестно') && next.rwTokenFp) {
+        const { findOrgByFingerprint } = await import('./orgStore');
+        const org = await findOrgByFingerprint(next.rwTokenFp);
+        if (org?.inn) next.orgInn = org.inn;
+      }
+    } catch {}
     if (typeof update.status !== 'undefined' && update.status !== null) next.status = update.status;
     // Try to infer root status from textual payloads when available in update (duck-typing)
     try {
