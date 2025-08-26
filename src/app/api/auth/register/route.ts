@@ -22,6 +22,8 @@ export async function POST(req: Request) {
       const user = await createUser(phone, password, email);
       const res = NextResponse.json({ ok: true, user: { id: user.id, phone: user.phone, email: user.email } });
       res.headers.set('Set-Cookie', `session_user=${user.id}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${60 * 60 * 24 * 7}`);
+      // Новый пользователь — сбросить выбранную организацию, чтобы не было предзаполнения
+      res.headers.append('Set-Cookie', `org_inn=; Path=/; Max-Age=0; SameSite=Lax`);
       return res;
     }
 
