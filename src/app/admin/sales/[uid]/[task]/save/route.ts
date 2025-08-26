@@ -61,15 +61,8 @@ export async function POST(req: Request) {
   const invoiceIdOffset = nz(val('invoiceIdOffset')); if (invoiceIdOffset !== undefined) next.invoiceIdOffset = invoiceIdOffset;
   const invoiceIdFull = nz(val('invoiceIdFull')); if (invoiceIdFull !== undefined) next.invoiceIdFull = invoiceIdFull;
   const rwTokenFp = nz(val('rwTokenFp')); if (rwTokenFp !== undefined) next.rwTokenFp = rwTokenFp;
-  // If orgInn still empty/unknown and rwTokenFp present, infer org in background
-  try {
-    const curInn = (next.orgInn && String(next.orgInn).trim().length > 0) ? String(next.orgInn) : null;
-    if ((!curInn || curInn === 'неизвестно') && next.rwTokenFp) {
-      const { findOrgByFingerprint } = await import('@/server/orgStore');
-      const org = await findOrgByFingerprint(next.rwTokenFp);
-      if (org?.inn) next.orgInn = org.inn;
-    }
-  } catch {}
+  // Do not perform organization lookup here to keep save fast and non-blocking.
+  // Background inference happens elsewhere when statuses update.
   const rwOrderId = nz(val('rwOrderId')); if (rwOrderId !== undefined) next.rwOrderId = rwOrderId;
   next.updatedAt = new Date().toISOString();
   arr[idx] = next;
