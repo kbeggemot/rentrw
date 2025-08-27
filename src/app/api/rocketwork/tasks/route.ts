@@ -14,6 +14,7 @@ import { createResumeToken } from '@/server/payResumeStore';
 import { buildFermaReceiptPayload, PAYMENT_METHOD_PREPAY_FULL, PAYMENT_METHOD_FULL_PAYMENT } from '@/app/api/ofd/ferma/build-payload';
 import { updateSaleOfdUrlsByOrderId } from '@/server/taskStore';
 import { headers as nextHeaders } from 'next/headers';
+import { readText } from '@/server/storage';
 import { listWithdrawals, startWithdrawalPoller } from '@/server/withdrawalStore';
 import { recordWithdrawalCreate } from '@/server/withdrawalStore';
 
@@ -390,12 +391,10 @@ export async function POST(req: Request) {
         const isPublicHost = !/localhost|127\.0\.0\.1|(^10\.)|(^192\.168\.)/.test(cbBaseHost || '');
         const cbBaseProto = (rawProto === 'http' && isPublicHost) ? 'https' : rawProto;
         const callbackBase = `${cbBaseProto}://${cbBaseHost}`;
-        // Читаем наш прошлый кэш ensure, если он был сохранён
+        // Читаем наш прошлый кэш ensure напрямую из стора (без админ-эндпоинта)
         let hasTasks = false, hasExecutors = false;
         try {
-          const cacheUrl = new URL(`/api/admin/files?name=${encodeURIComponent(`postback_cache_${userId}.json`)}`, callbackBase).toString();
-          const res = await fetch(cacheUrl, { method: 'GET', headers: { cookie: `admin_user=admin` }, cache: 'no-store' });
-          const txt = await res.text();
+          const txt = await readText(`.data/postback_cache_${userId}.json`);
           const d = txt ? JSON.parse(txt) : {};
           const arr = Array.isArray(d?.subscriptions) ? d.subscriptions : [];
           const cb = new URL(`/api/rocketwork/postbacks/${encodeURIComponent(userId)}`, callbackBase).toString();
