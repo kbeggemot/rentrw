@@ -236,10 +236,14 @@ export async function updateSaleOfdUrlsByOrderId(userId: string, orderId: number
     const current = store.sales[idx];
     const next = { ...current } as SaleRecord;
     const before: any = process.env.OFD_AUDIT === '1' ? { ofdUrl: next.ofdUrl ?? null, ofdFullUrl: next.ofdFullUrl ?? null, ofdPrepayId: (next as any).ofdPrepayId ?? null, ofdFullId: (next as any).ofdFullId ?? null } : null;
-    if (typeof patch.ofdUrl !== 'undefined') next.ofdUrl = patch.ofdUrl ?? null;
-    if (typeof patch.ofdFullUrl !== 'undefined') next.ofdFullUrl = patch.ofdFullUrl ?? null;
-    if (typeof patch.ofdPrepayId !== 'undefined') next.ofdPrepayId = patch.ofdPrepayId ?? null;
-    if (typeof patch.ofdFullId !== 'undefined') next.ofdFullId = patch.ofdFullId ?? null;
+    let changed = false;
+    if (typeof patch.ofdUrl !== 'undefined' && (next.ofdUrl ?? null) !== (patch.ofdUrl ?? null)) { next.ofdUrl = patch.ofdUrl ?? null; changed = true; }
+    if (typeof patch.ofdFullUrl !== 'undefined' && (next.ofdFullUrl ?? null) !== (patch.ofdFullUrl ?? null)) { next.ofdFullUrl = patch.ofdFullUrl ?? null; changed = true; }
+    if (typeof patch.ofdPrepayId !== 'undefined' && ((next as any).ofdPrepayId ?? null) !== (patch.ofdPrepayId ?? null)) { (next as any).ofdPrepayId = patch.ofdPrepayId ?? null; changed = true; }
+    if (typeof patch.ofdFullId !== 'undefined' && ((next as any).ofdFullId ?? null) !== (patch.ofdFullId ?? null)) { (next as any).ofdFullId = patch.ofdFullId ?? null; changed = true; }
+    if (!changed) {
+      return; // no-op update, avoid extra writes/logs
+    }
     next.updatedAt = new Date().toISOString();
     store.sales[idx] = next;
     await writeTasks(store);
