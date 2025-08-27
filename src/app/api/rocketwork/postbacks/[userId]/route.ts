@@ -59,9 +59,9 @@ export async function POST(req: Request) {
     // Derive subscription stream robustly: RW often omits 'subscription'
     let subscription: string = String(body?.subscription || '').toLowerCase();
     if (!subscription) {
-      if (/^task\./.test(event)) subscription = 'tasks';
+      const hasAo = data && typeof data === 'object' && (('acquiring_order' in data) || ('task' in data));
+      if (/^task\./.test(event) || hasAo) subscription = 'tasks';
       else if (/^executor\./.test(event)) subscription = 'executors';
-      else if (data && (typeof data === 'object') && ('executor' in data)) subscription = 'executors';
       else subscription = 'tasks';
     }
 
