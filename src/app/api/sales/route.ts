@@ -42,9 +42,9 @@ export async function GET(req: Request) {
         }
         // Decide which sales to refresh — строго по правилам дат и агентским требованиям
         const toRefresh = current.filter((s) => {
-          // Если корневой статус задачи = error — не трогаем её в массовых опросах
+          // Если корневой статус задачи финально неуспешен — не трогаем её в массовых опросах
           const root = String(((s as any).rootStatus || '') as string).toLowerCase();
-          if (root === 'error') return false;
+          if (root === 'error' || root === 'canceled' || root === 'cancelled') return false;
           const st = String(s.status || '').toLowerCase();
           const isEarly = st === 'pending' || st === 'paying';
           const createdAt = (s.createdAtRw || s.createdAt) as string | null;
