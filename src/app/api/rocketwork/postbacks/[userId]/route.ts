@@ -2,8 +2,6 @@ import { NextResponse } from 'next/server';
 import { listPartners, upsertPartner } from '@/server/partnerStore';
 import { updateSaleFromStatus, findSaleByTaskId, updateSaleOfdUrlsByOrderId, updateSaleOfdUrls } from '@/server/taskStore';
 import { appendAdminEntityLog } from '@/server/adminAudit';
-import { promises as fs } from 'fs';
-import path from 'path';
 import { updateWithdrawal } from '@/server/withdrawalStore';
 import { getDecryptedApiToken } from '@/server/secureStore';
 import { fermaGetAuthTokenCached, fermaCreateReceipt } from '@/server/ofdFerma';
@@ -49,12 +47,11 @@ export async function POST(req: Request) {
     let body: any = null;
     try { body = raw ? JSON.parse(raw) : {}; } catch { body = {}; }
 
-    // Debug: append incoming postback to file
+    // Debug: append incoming postback to file (S3‑compatible)
     try {
-      const dataDir = path.join(process.cwd(), '.data');
-      await fs.mkdir(dataDir, { recursive: true });
       const line = JSON.stringify({ ts: new Date().toISOString(), userId, body }, null, 2) + '\n';
-      await fs.appendFile(path.join(dataDir, 'postbacks.log'), line, 'utf8');
+      const prev = (await readText('.data/postbacks.log')) || '';
+      await writeText('.data/postbacks.log', prev + line);
     } catch {}
 
     const subscription: string = String(body?.subscription || '').toLowerCase();
@@ -131,9 +128,7 @@ export async function POST(req: Request) {
       try {
         const fin = String((status || aoStatusRaw || '') as string).toLowerCase();
         if (fin === 'paid' || fin === 'transfered' || fin === 'transferred') {
-          const dataDir = path.join(process.cwd(), '.data');
-          await fs.mkdir(dataDir, { recursive: true });
-          await fs.writeFile(path.join(dataDir, `task_paid_${userId}_${String(taskId)}.json`), JSON.stringify({ userId, taskId, status: fin, ts: new Date().toISOString() }), 'utf8');
+          await writeText(`.data/task_paid_${userId}_${String(taskId)}.json`, JSON.stringify({ userId, taskId, status: fin, ts: new Date().toISOString() }));
         }
       } catch {}
       // If this is a Withdrawal and it became paid, write a marker file for UI
@@ -146,9 +141,7 @@ export async function POST(req: Request) {
           try { await updateWithdrawal(userId, taskId, { status: (rootStatusRaw || status || null) }); } catch {}
         }
         if (kind === 'withdrawal' && (status === 'paid' || rootStatus === 'paid')) {
-          const dataDir = path.join(process.cwd(), '.data');
-          await fs.mkdir(dataDir, { recursive: true });
-          await fs.writeFile(path.join(dataDir, `withdrawal_${userId}_${String(taskId)}.json`), JSON.stringify({ userId, taskId, paidAt: new Date().toISOString() }), 'utf8');
+          await writeText(`.data/withdrawal_${userId}_${String(taskId)}.json`, JSON.stringify({ userId, taskId, paidAt: new Date().toISOString() }));
           try { await updateWithdrawal(userId, taskId, { status: 'paid', paidAt: new Date().toISOString() }); } catch {}
         }
       } catch {}
