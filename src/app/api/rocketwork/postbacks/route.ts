@@ -12,11 +12,17 @@ function getUserId(req: Request): string | null {
   return hdr && hdr.trim().length > 0 ? hdr.trim() : null;
 }
 
+async function getRwToken(req: Request, userId: string): Promise<string | null> {
+  const hdr = req.headers.get('x-rw-token');
+  if (hdr && hdr.trim().length > 0) return hdr.trim();
+  return await getDecryptedApiToken(userId);
+}
+
 export async function GET(req: Request) {
   try {
     const userId = getUserId(req);
     if (!userId) return NextResponse.json({ error: 'NO_USER' }, { status: 401 });
-    const token = await getDecryptedApiToken(userId);
+    const token = await getRwToken(req, userId);
     if (!token) return NextResponse.json({ error: 'NO_TOKEN' }, { status: 400 });
 
     const base = process.env.ROCKETWORK_API_BASE_URL || 'https://app.rocketwork.ru/api/';
@@ -25,7 +31,7 @@ export async function GET(req: Request) {
     if (ensure) {
       // Perform upsert just like POST, then list
       try {
-        const cbProto = req.headers.get('x-forwarded-proto') || 'http';
+        const cbProto = (urlObj.protocol && urlObj.protocol.replace(/:$/, '')) || req.headers.get('x-forwarded-proto') || 'http';
         const cbHost = req.headers.get('x-forwarded-host') || req.headers.get('host') || 'localhost:3000';
         const callbackBase = `${cbProto}://${cbHost}`;
         const callbackUrl = new URL(`/api/rocketwork/postbacks/${encodeURIComponent(userId)}`, callbackBase).toString();
@@ -47,6 +53,35 @@ export async function GET(req: Request) {
             try { await writeText('.data/postback_ensure_last.json', JSON.stringify({ ts: new Date().toISOString(), ensure, userId, attempt: a, status: res.status, text: tx }, null, 2)); } catch {}
           } catch {}
         }
+        // Additionally, try to update existing subscriptions that have empty or foreign URI
+        try {
+          const listUrl = new URL('postback_subscriptions', base.endsWith('/') ? base : base + '/').toString();
+          const res = await fetch(listUrl, { method: 'GET', headers, cache: 'no-store' });
+          const txt = await res.text();
+          let data: any = null; try { data = txt ? JSON.parse(txt) : null; } catch { data = txt; }
+          const arr = Array.isArray(data?.subscriptions) ? data.subscriptions : [];
+          for (const it of arr) {
+            const id = it?.id;
+            if (!id) continue;
+            const uriNow = String(it?.callback_url ?? it?.uri ?? '');
+            const subs = Array.isArray(it?.subscribed_on) ? it.subscribed_on.map((x: any) => String(x)) : [];
+            const needsUpdate = !uriNow || !uriNow.includes(cbHost);
+            if (!needsUpdate) continue;
+            for (const method of ['PUT','PATCH','POST']) {
+              for (const f of [
+                { callback_url: callbackUrl, subscribed_on: subs },
+                { uri: callbackUrl, subscribed_on: subs },
+              ]) {
+                try {
+                  const updUrl = new URL(`postback_subscriptions/${encodeURIComponent(String(id))}`, base.endsWith('/') ? base : base + '/').toString();
+                  const r2 = await fetch(updUrl, { method, headers, body: JSON.stringify(f), cache: 'no-store' });
+                  const tx2 = await r2.text();
+                  try { await writeText('.data/postback_ensure_last.json', JSON.stringify({ ts: new Date().toISOString(), ensure, userId, update: { id, method, payload: f }, status: r2.status, text: tx2 }, null, 2)); } catch {}
+                } catch {}
+              }
+            }
+          }
+        } catch {}
       } catch {}
     }
     async function list(urlPath: string) {
@@ -75,11 +110,12 @@ export async function POST(req: Request) {
   try {
     const userId = getUserId(req);
     if (!userId) return NextResponse.json({ error: 'NO_USER' }, { status: 401 });
-    const token = await getDecryptedApiToken(userId);
+    const token = await getRwToken(req, userId);
     if (!token) return NextResponse.json({ error: 'NO_TOKEN' }, { status: 400 });
 
     const base = process.env.ROCKETWORK_API_BASE_URL || 'https://app.rocketwork.ru/api/';
-    const cbBaseProto = req.headers.get('x-forwarded-proto') || 'http';
+    const urlObj = new URL(req.url);
+    const cbBaseProto = (urlObj.protocol && urlObj.protocol.replace(/:$/, '')) || req.headers.get('x-forwarded-proto') || 'http';
     const cbBaseHost = req.headers.get('x-forwarded-host') || req.headers.get('host') || 'localhost:3000';
     const callbackBase = `${cbBaseProto}://${cbBaseHost}`;
     const callbackUrl = new URL(`/api/rocketwork/postbacks/${encodeURIComponent(userId)}`, callbackBase).toString();

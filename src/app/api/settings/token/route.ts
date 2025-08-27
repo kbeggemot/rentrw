@@ -151,7 +151,7 @@ export async function POST(req: Request) {
         const ensureHost = req.headers.get('x-forwarded-host') || req.headers.get('host') || 'localhost:3000';
         const ensureBase = `${ensureProto}://${ensureHost}`;
         const ensureUrl = new URL('/api/rocketwork/postbacks?ensure=1', ensureBase).toString();
-        await fetch(ensureUrl, { method: 'GET', headers: { cookie: `session_user=${encodeURIComponent(userId)}` }, cache: 'no-store' });
+        await fetch(ensureUrl, { method: 'GET', headers: { cookie: `session_user=${encodeURIComponent(userId)}`, 'x-user-id': userId }, cache: 'no-store' });
       } catch {}
     } catch {}
 
