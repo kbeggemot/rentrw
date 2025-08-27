@@ -31,8 +31,10 @@ export async function GET(req: Request) {
     if (ensure) {
       // Perform upsert just like POST, then list
       try {
-        const cbProto = (urlObj.protocol && urlObj.protocol.replace(/:$/, '')) || req.headers.get('x-forwarded-proto') || 'http';
+        const rawProto = (urlObj.protocol && urlObj.protocol.replace(/:$/, '')) || req.headers.get('x-forwarded-proto') || 'http';
         const cbHost = req.headers.get('x-forwarded-host') || req.headers.get('host') || 'localhost:3000';
+        const isPublicHost = !/localhost|127\.0\.0\.1|(^10\.)|(^192\.168\.)/.test(cbHost);
+        const cbProto = (rawProto === 'http' && isPublicHost) ? 'https' : rawProto;
         const callbackBase = `${cbProto}://${cbHost}`;
         const callbackUrl = new URL(`/api/rocketwork/postbacks/${encodeURIComponent(userId)}`, callbackBase).toString();
         const headers = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', Accept: 'application/json' } as Record<string, string>;
@@ -110,8 +112,10 @@ export async function POST(req: Request) {
 
     const base = process.env.ROCKETWORK_API_BASE_URL || 'https://app.rocketwork.ru/api/';
     const urlObj = new URL(req.url);
-    const cbBaseProto = (urlObj.protocol && urlObj.protocol.replace(/:$/, '')) || req.headers.get('x-forwarded-proto') || 'http';
+    const rawProto = (urlObj.protocol && urlObj.protocol.replace(/:$/, '')) || req.headers.get('x-forwarded-proto') || 'http';
     const cbBaseHost = req.headers.get('x-forwarded-host') || req.headers.get('host') || 'localhost:3000';
+    const isPublicHost = !/localhost|127\.0\.0\.1|(^10\.)|(^192\.168\.)/.test(cbBaseHost);
+    const cbBaseProto = (rawProto === 'http' && isPublicHost) ? 'https' : rawProto;
     const callbackBase = `${cbBaseProto}://${cbBaseHost}`;
     const callbackUrl = new URL(`/api/rocketwork/postbacks/${encodeURIComponent(userId)}`, callbackBase).toString();
     const headers = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', Accept: 'application/json' } as Record<string, string>;
