@@ -14,7 +14,7 @@ import { createResumeToken } from '@/server/payResumeStore';
 import { buildFermaReceiptPayload, PAYMENT_METHOD_PREPAY_FULL, PAYMENT_METHOD_FULL_PAYMENT } from '@/app/api/ofd/ferma/build-payload';
 import { updateSaleOfdUrlsByOrderId } from '@/server/taskStore';
 import { headers as nextHeaders } from 'next/headers';
-import { listWithdrawals } from '@/server/withdrawalStore';
+import { listWithdrawals, startWithdrawalPoller } from '@/server/withdrawalStore';
 import { recordWithdrawalCreate } from '@/server/withdrawalStore';
 
 export const runtime = 'nodejs';
@@ -96,7 +96,7 @@ export async function POST(req: Request) {
       }
       const taskId = (data?.task?.id ?? data?.id ?? data?.task_id) as string | number | undefined;
       if (taskId !== undefined) {
-        try { await recordWithdrawalCreate(userId, taskId, amountRub, inn || null); } catch {}
+        try { await recordWithdrawalCreate(userId, taskId, amountRub, inn || null); startWithdrawalPoller(userId, taskId); } catch {}
       }
       return NextResponse.json({ ok: true, task_id: taskId, data }, { status: 201 });
     }

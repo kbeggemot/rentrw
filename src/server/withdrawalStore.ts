@@ -107,4 +107,50 @@ export async function readWithdrawalLog(userId: string, taskId: string | number)
   return raw || '';
 }
 
+// -------- Background poller (best-effort, in-process) --------
+type PollKey = string;
+type GlobalBag = typeof globalThis & { __rentrw_withdraw_polls?: Map<PollKey, { nextDelayMs: number; startedAt: number }> };
+const gb = globalThis as GlobalBag;
+if (!gb.__rentrw_withdraw_polls) gb.__rentrw_withdraw_polls = new Map();
+
+function isFinalStatus(s: unknown): boolean {
+  const v = String(s || '').toLowerCase();
+  return v === 'paid' || v === 'error' || v === 'canceled' || v === 'cancelled' || v === 'failed' || v === 'refunded';
+}
+
+export function startWithdrawalPoller(userId: string, taskId: string | number): void {
+  try {
+    const key = `${userId}:${String(taskId)}`;
+    const bag = gb.__rentrw_withdraw_polls!;
+    if (bag.has(key)) return; // already polling
+    bag.set(key, { nextDelayMs: 2000, startedAt: Date.now() });
+    const tick = async () => {
+      const cur = bag.get(key);
+      if (!cur) return;
+      // stop after 15 minutes
+      if (Date.now() - cur.startedAt > 15 * 60 * 1000) { bag.delete(key); return; }
+      try {
+        const base = process.env.ROCKETWORK_API_BASE_URL || 'https://app.rocketwork.ru/api/';
+        const url = new URL(`tasks/${encodeURIComponent(String(taskId))}`, base.endsWith('/') ? base : base + '/').toString();
+        // We rely on x-user-id header routing in our own API to resolve token; call our status endpoint instead
+        const host = process.env.PUBLIC_BASE_URL || '';
+        const local = host ? new URL(`/api/rocketwork/withdrawal-status/${encodeURIComponent(String(taskId))}`, host).toString() : '';
+        if (local) {
+          const r = await fetch(local, { headers: { 'x-user-id': userId }, cache: 'no-store' });
+          const d = await r.json().catch(()=>({} as any));
+          if (d?.status && isFinalStatus(d.status)) { bag.delete(key); return; }
+        } else {
+          // fallback: call RW directly requires token on server — skipped
+          bag.delete(key); return;
+        }
+      } catch {}
+      // reschedule with backoff up to 60s
+      const next = Math.min(60000, Math.round((cur.nextDelayMs || 2000) * 1.5));
+      bag.set(key, { nextDelayMs: next, startedAt: cur.startedAt });
+      setTimeout(tick, next);
+    };
+    setTimeout(tick, 2000);
+  } catch {}
+}
+
 

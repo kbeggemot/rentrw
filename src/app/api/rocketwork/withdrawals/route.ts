@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { listWithdrawals, upsertWithdrawal } from '@/server/withdrawalStore';
+import { listWithdrawals, upsertWithdrawal, startWithdrawalPoller } from '@/server/withdrawalStore';
 import { resolveRwTokenWithFingerprint } from '@/server/rwToken';
 import { getSelectedOrgInn } from '@/server/orgContext';
 
@@ -42,6 +42,12 @@ export async function GET(req: Request) {
             await upsertWithdrawal(userId, { taskId: id, amountRub: typeof amountRub === 'number' ? amountRub : undefined as any, status: status ?? null, createdAt, orgInn: inn || null });
           }
           items = await listWithdrawals(userId, inn || undefined);
+          // Arm pollers for any active withdrawals to keep status fresh even without UI
+          try {
+            for (const it of items) {
+              if (String(it?.status || '').toLowerCase() !== 'paid') startWithdrawalPoller(userId, it.taskId);
+            }
+          } catch {}
         }
       } catch {}
     }

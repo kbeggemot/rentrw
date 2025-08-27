@@ -1,6 +1,7 @@
 import { readText, writeText } from './storage';
 import { getHub } from './eventBus';
 import path from 'path';
+import { appendAdminEntityLog } from './adminAudit';
 
 // IMPORTANT: keep relative paths here so that S3 storage keys are correct
 const DATA_DIR = '.data';
@@ -153,6 +154,20 @@ export async function recordSaleOnCreate(params: {
   });
   await writeTasks(store);
   try { getHub().publish(userId, 'sales:update'); } catch {}
+  try {
+    await appendAdminEntityLog('sale', [String(userId), String(taskId)], {
+      source: 'system',
+      message: 'create(ui)',
+      data: {
+        orderId,
+        orgInn: (resolvedInn && String(resolvedInn).trim().length > 0) ? String(resolvedInn).replace(/\D/g, '') : 'неизвестно',
+        amountGrossRub,
+        isAgent,
+        serviceEndDate: serviceEndDate ?? null,
+        vatRate: vatRate ?? null,
+      },
+    });
+  } catch {}
 }
 
 export async function updateSaleFromStatus(userId: string, taskId: number | string, update: Partial<Pick<SaleRecord, 'status' | 'ofdUrl' | 'ofdFullUrl' | 'additionalCommissionOfdUrl' | 'npdReceiptUri'>>): Promise<void> {
@@ -190,6 +205,9 @@ export async function updateSaleFromStatus(userId: string, taskId: number | stri
     store.sales[idx] = next;
     await writeTasks(store);
     try { getHub().publish(userId, 'sales:update'); } catch {}
+    try {
+      await appendAdminEntityLog('sale', [String(userId), String(taskId)], { source: 'system', message: 'status/update', data: update });
+    } catch {}
   }
 }
 
@@ -206,6 +224,7 @@ export async function updateSaleOfdUrls(userId: string, taskId: number | string,
     store.sales[idx] = next;
     await writeTasks(store);
     try { getHub().publish(userId, 'sales:update'); } catch {}
+    try { await appendAdminEntityLog('sale', [String(userId), String(taskId)], { source: 'system', message: 'ofd/update', data: patch }); } catch {}
   }
 }
 
@@ -231,6 +250,7 @@ export async function updateSaleOfdUrlsByOrderId(userId: string, orderId: number
         await appendOfdAudit({ ts: new Date().toISOString(), source: (global as any).__OFD_SOURCE__ || 'unknown', userId, orderId, taskId: current.taskId, action: 'update_ofd_urls', patch, before, after: { ofdUrl: next.ofdUrl ?? null, ofdFullUrl: next.ofdFullUrl ?? null, ofdPrepayId: (next as any).ofdPrepayId ?? null, ofdFullId: (next as any).ofdFullId ?? null } });
       }
     } catch {}
+    try { await appendAdminEntityLog('sale', [String(userId), String(current.taskId)], { source: 'system', message: 'ofd/updateByOrder', data: { patch } }); } catch {}
   }
 }
 
@@ -348,6 +368,7 @@ export async function ensureSaleFromTask(params: {
   store.tasks.push({ id: taskId, orderId: resolvedOrderId!, createdAt: now });
   await writeTasks(store);
   try { getHub().publish(userId, 'sales:update'); } catch {}
+  try { await appendAdminEntityLog('sale', [String(userId), String(taskId)], { source: 'system', message: 'ensure(external)', data: { status, ofd: ofd || null, createdAtRw: task?.created_at || null } }); } catch {}
 }
 
 export async function updateSaleRwOrderId(userId: string, taskId: number | string, rwOrderId: number | null): Promise<void> {

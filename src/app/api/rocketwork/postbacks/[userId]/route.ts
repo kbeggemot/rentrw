@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { listPartners, upsertPartner } from '@/server/partnerStore';
 import { updateSaleFromStatus, findSaleByTaskId, updateSaleOfdUrlsByOrderId, updateSaleOfdUrls } from '@/server/taskStore';
+import { appendAdminEntityLog } from '@/server/adminAudit';
 import { promises as fs } from 'fs';
 import path from 'path';
 import { updateWithdrawal } from '@/server/withdrawalStore';
@@ -77,19 +78,13 @@ export async function POST(req: Request) {
       else if (/task\.pending/.test(event)) status = 'pending';
 
       // Extract known URLs from payload when present (try multiple shapes)
-      const ofdUrl = pick<string>(data, 'acquiring_order.ofd_url')
-        ?? pick<string>(data, 'task.acquiring_order.ofd_url')
-        ?? pick<string>(data, 'ofd_url')
-        ?? pick<string>(data, 'acquiring_order.ofd_receipt_url')
+      const ofdUrl = pick<string>(data, 'ofd_url')
         ?? pick<string>(data, 'ofd_receipt_url');
-      const additionalCommissionOfdUrl = pick<string>(data, 'additional_commission_ofd_url')
-        ?? pick<string>(data, 'task.additional_commission_ofd_url');
-      const npdReceiptUri = pick<string>(data, 'receipt_uri')
-        ?? pick<string>(data, 'task.receipt_uri');
+      const additionalCommissionOfdUrl = pick<string>(data, 'additional_commission_ofd_url');
+      const npdReceiptUri = pick<string>(data, 'receipt_uri');
 
       // Fallback statuses from payload when event name is generic
-      const aoStatusRaw = pick<string>(data, 'acquiring_order.status')
-        ?? pick<string>(data, 'task.acquiring_order.status');
+      const aoStatusRaw = undefined as unknown as string | undefined; // acquiring_order.status не применяем для withdrawal
       const rootStatusRaw = pick<string>(data, 'status')
         ?? pick<string>(data, 'task.status');
 
@@ -101,6 +96,7 @@ export async function POST(req: Request) {
         // pass root status through duck-typed property so taskStore can persist it
         rootStatus: rootStatusRaw,
       } as any);
+      try { await appendAdminEntityLog('sale', [String(userId), String(taskId)], { source: 'system', message: 'postback', data: { event, status: status || null, rootStatusRaw: rootStatusRaw || null } }); } catch {}
       // Background pay trigger with unchanged conditions (agent, transfered, completed, has full receipt)
       try {
         const sale = await findSaleByTaskId(userId, taskId);
@@ -135,10 +131,10 @@ export async function POST(req: Request) {
         const aoStatus = String(aoStatusRaw || '').toLowerCase();
         const rootStatus = String(rootStatusRaw || '').toLowerCase();
         if (kind === 'withdrawal') {
-          // Persist store for history
-          try { await updateWithdrawal(userId, taskId, { status: (rootStatusRaw || status || aoStatus) }); } catch {}
+          // Persist store for history — только корневой статус задачи
+          try { await updateWithdrawal(userId, taskId, { status: (rootStatusRaw || status || null) }); } catch {}
         }
-        if (kind === 'withdrawal' && (status === 'paid' || aoStatus === 'paid' || rootStatus === 'paid')) {
+        if (kind === 'withdrawal' && (status === 'paid' || rootStatus === 'paid')) {
           const dataDir = path.join(process.cwd(), '.data');
           await fs.mkdir(dataDir, { recursive: true });
           await fs.writeFile(path.join(dataDir, `withdrawal_${userId}_${String(taskId)}.json`), JSON.stringify({ userId, taskId, paidAt: new Date().toISOString() }), 'utf8');

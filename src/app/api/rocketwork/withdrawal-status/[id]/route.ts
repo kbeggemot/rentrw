@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getDecryptedApiToken } from '@/server/secureStore';
-import { updateWithdrawal } from '@/server/withdrawalStore';
+import { updateWithdrawal, startWithdrawalPoller } from '@/server/withdrawalStore';
 import { promises as fs } from 'fs';
 import path from 'path';
 
@@ -56,6 +56,7 @@ export async function GET(req: Request) {
       } catch {}
     }
     try { await updateWithdrawal(userId, taskId, { status: currentStatus, paidAt: done ? new Date().toISOString() : undefined, __source: 'manual' } as any); } catch {}
+    if (!done) { try { startWithdrawalPoller(userId, taskId); } catch {} }
     return NextResponse.json({ done, status: currentStatus, type: obj?.type ?? null });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Server error';
