@@ -15,7 +15,7 @@ export async function POST(req: Request) {
 
     const base = process.env.ROCKETWORK_API_BASE_URL || 'https://app.rocketwork.ru/api/';
     const all = await listAllSales();
-    const mine = all.filter((s) => s.userId === userId);
+    const mine = all.filter((s) => s.userId === userId && String(((s as any).rootStatus || '') as string).toLowerCase() !== 'error');
 
     for (const s of mine) {
       try {

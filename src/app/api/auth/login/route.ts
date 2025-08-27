@@ -39,6 +39,19 @@ export async function POST(req: Request) {
     } catch {
       // на случай ошибки не ломаем логин
     }
+
+    // Одноразовый фоновый рефреш всех продаж по всем организациям пользователя после логина
+    try {
+      const orgs = await listUserOrganizations(user.id);
+      const proto = req.headers.get('x-forwarded-proto') || 'http';
+      const host = req.headers.get('x-forwarded-host') || req.headers.get('host') || 'localhost:3000';
+      const isPublic = !/localhost|127\.0\.0\.1|(^10\.)|(^192\.168\.)/.test(host);
+      const scheme = (proto === 'http' && isPublic) ? 'https' : proto;
+      const url = `${scheme}://${host}/api/sales?refresh=1`;
+      for (const o of orgs) {
+        fetch(url, { method: 'GET', cache: 'no-store', headers: { cookie: `session_user=${encodeURIComponent(user.id)}; org_inn=${encodeURIComponent(o.inn)}` } }).catch(() => {});
+      }
+    } catch {}
     return res;
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Server error';
