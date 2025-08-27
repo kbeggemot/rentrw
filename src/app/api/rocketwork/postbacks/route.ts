@@ -38,17 +38,20 @@ export async function GET(req: Request) {
         const callbackBase = `${cbProto}://${cbHost}`;
         const callbackUrl = new URL(`/api/rocketwork/postbacks/${encodeURIComponent(userId)}`, callbackBase).toString();
         const headers = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', Accept: 'application/json' } as Record<string, string>;
-        const attempts: Array<{ path: string; payload: Record<string, unknown> }> = [];
-        for (const stream of ['tasks','executors']) {
-          attempts.push({ path: 'postback_subscriptions', payload: { http_method: 'post', uri: callbackUrl, subscribed_on: [stream] } });
+        const attempts: Array<{ stream: 'tasks' | 'executors'; path: string; payload: Record<string, unknown> }> = [];
+        for (const stream of ['tasks','executors'] as const) {
+          attempts.push({ stream, path: 'postback_subscriptions', payload: { http_method: 'post', uri: callbackUrl, subscribed_on: [stream] } });
         }
+        const ensureLogs: any[] = [];
         for (const a of attempts) {
           try {
             const createUrl = new URL(a.path, base.endsWith('/') ? base : base + '/').toString();
             const res = await fetch(createUrl, { method: 'POST', headers, body: JSON.stringify(a.payload), cache: 'no-store' });
             const tx = await res.text();
-            try { await writeText('.data/postback_ensure_last.json', JSON.stringify({ ts: new Date().toISOString(), ensure, userId, attempt: a, status: res.status, text: tx }, null, 2)); } catch {}
-          } catch {}
+            ensureLogs.push({ kind: 'create', stream: a.stream, request: { path: a.path, payload: a.payload }, response: { status: res.status, text: tx } });
+          } catch (e) {
+            ensureLogs.push({ kind: 'create', stream: a.stream, request: { path: a.path, payload: a.payload }, error: String((e as Error)?.message || e) });
+          }
         }
         // Additionally, try to update existing subscriptions that have empty or foreign URI
         try {
@@ -73,12 +76,13 @@ export async function GET(req: Request) {
                   const updUrl = new URL(`postback_subscriptions/${encodeURIComponent(String(id))}`, base.endsWith('/') ? base : base + '/').toString();
                   const r2 = await fetch(updUrl, { method, headers, body: JSON.stringify(f), cache: 'no-store' });
                   const tx2 = await r2.text();
-                  try { await writeText('.data/postback_ensure_last.json', JSON.stringify({ ts: new Date().toISOString(), ensure, userId, update: { id, method, payload: f }, status: r2.status, text: tx2 }, null, 2)); } catch {}
+                  ensureLogs.push({ kind: 'update', id, request: { method, payload: f }, response: { status: r2.status, text: tx2 } });
                 } catch {}
               }
             }
           }
         } catch {}
+        try { await writeText('.data/postback_ensure_last.json', JSON.stringify({ ts: new Date().toISOString(), ensure, userId, callbackUrl, attempts: ensureLogs }, null, 2)); } catch {}
       } catch {}
     }
     async function list(urlPath: string) {
