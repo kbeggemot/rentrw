@@ -382,6 +382,14 @@ export async function POST(req: Request) {
       });
 
       // Removed: prepayment receipt creation and offset scheduling at creation time
+      // Ensure postback subscription is present for this user (auto-upsert)
+      try {
+        const cbBaseProto = (await nextHeaders()).get('x-forwarded-proto') || 'http';
+        const cbBaseHost = (await nextHeaders()).get('x-forwarded-host') || (await nextHeaders()).get('host') || 'localhost:3000';
+        const callbackBase = `${cbBaseProto}://${cbBaseHost}`;
+        const upsertUrl = new URL('/api/rocketwork/postbacks', callbackBase).toString();
+        await fetch(upsertUrl, { method: 'POST', headers: { 'x-user-id': userId, Accept: 'application/json' }, cache: 'no-store' });
+      } catch {}
     }
 
     return NextResponse.json({ ok: true, order_id: orderId, task_id: taskId, data }, { status: 201 });
