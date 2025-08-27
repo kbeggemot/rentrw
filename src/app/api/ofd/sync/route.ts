@@ -16,6 +16,7 @@ export async function GET(req: Request) {
     if (!userId) return NextResponse.json({ error: 'NO_USER' }, { status: 401 });
     const url = new URL(req.url);
     const onlyOrder = url.searchParams.get('order');
+    const force = url.searchParams.get('force') === '1';
     const salesAll = await listSales(userId);
     const sales = onlyOrder ? salesAll.filter((s) => String(s.orderId) === String(onlyOrder)) : salesAll;
     const baseUrl = process.env.FERMA_BASE_URL || 'https://ferma.ofd.ru/';
@@ -23,6 +24,17 @@ export async function GET(req: Request) {
     let updated = 0;
     for (const s of sales) {
       try {
+        // Решаем, требуется ли опрос по правилам дат и агентских чеков
+        if (!force) {
+          const createdAt = (s.createdAtRw || s.createdAt) as string | null;
+          const createdDate = createdAt ? String(createdAt).slice(0, 10) : null;
+          const endStr = (s.serviceEndDate || '') as string;
+          const isSameDay = Boolean(createdDate && endStr && String(endStr).slice(0, 10) === createdDate);
+          const needReceipts = isSameDay ? (!s.ofdFullUrl) : (!s.ofdUrl || !s.ofdFullUrl);
+          const needAgentExtras = s.isAgent && (!s.additionalCommissionOfdUrl || !s.npdReceiptUri);
+          if (!needReceipts && !needAgentExtras) continue;
+        }
+
         // Use stored mapping rules based on assigned InvoiceIds only
         const ids: Array<{ inv?: string | null; target: 'prepay' | 'full' }>= [
           { inv: s.invoiceIdPrepay || null, target: 'prepay' },

@@ -72,17 +72,38 @@ export async function GET(_: Request) {
     // Ensure a local sale record exists for this task (creates if missing)
     try { const currentInn = getSelectedOrgInn(_); await ensureSaleFromTask({ userId, taskId, task: normalized as any, orgInn: currentInn || null }); } catch {}
 
-    // Attempt short polling for receipts if already paid/transferred and receipts missing
+    // Attempt short polling for receipts: если force=1 — опрашиваем без условий; иначе по строгим правилам
     let tries = 0;
-    const hasAnyReceipt = (obj: RocketworkTask): boolean => {
-      const purchase = (obj?.ofd_url || obj?.acquiring_order?.ofd_url) ?? undefined;
-      const addComm = obj?.additional_commission_ofd_url ?? undefined;
-      if (obj?.additional_commission_value) {
-        return Boolean(purchase) && Boolean(addComm);
-      }
-      return Boolean(purchase);
+    const force = new URL(_.url).searchParams.get('force') === '1';
+    const needMore = async (obj: RocketworkTask): Promise<boolean> => {
+      if (force) return true;
+      const ao = String(obj?.acquiring_order?.status || '').toLowerCase();
+      const isFinal = ao === 'paid' || ao === 'transferred' || ao === 'transfered';
+      if (!isFinal) return false;
+      const createdAt = (obj as any)?.created_at as string | undefined;
+      const createdDate = createdAt ? String(createdAt).slice(0, 10) : null;
+      // Для строгой проверки даты услуги нужен sale.serviceEndDate из стора; если нет — допускаем оба варианта
+      let isSameDay: boolean | null = null;
+      try {
+        const { findSaleByTaskId } = await import('@/server/taskStore');
+        const s = await findSaleByTaskId(userId, taskId);
+        const endStr = (s as any)?.serviceEndDate ? String((s as any).serviceEndDate).slice(0, 10) : null;
+        isSameDay = Boolean(createdDate && endStr && createdDate === endStr);
+        const needFull = isSameDay === true;
+        const needPrepayAndFull = isSameDay === false;
+        const hasFull = Boolean((s as any)?.ofdFullUrl);
+        const hasPrepay = Boolean((s as any)?.ofdUrl);
+        const agentMissing = Boolean((s as any)?.isAgent) && (!((s as any)?.additionalCommissionOfdUrl) || !((s as any)?.npdReceiptUri));
+        if (needFull) return !hasFull || agentMissing;
+        if (needPrepayAndFull) return !(hasPrepay && hasFull) || agentMissing;
+      } catch {}
+      // Fallback, если не смогли определить serviceEndDate — требуем хотя бы одну ссылку, а для агента ещё add_comm
+      const purchase = obj?.ofd_url || obj?.acquiring_order?.ofd_url;
+      const addComm = obj?.additional_commission_ofd_url;
+      const must = obj?.additional_commission_value ? !(purchase && addComm) : !purchase;
+      return must;
     };
-    while (['paid', 'transferred', 'transfered'].includes(String(normalized?.acquiring_order?.status || '').toLowerCase()) && tries < 5 && !hasAnyReceipt(normalized)) {
+    while (tries < 5 && (await needMore(normalized))) {
       await new Promise((r) => setTimeout(r, 1200));
       res = await fetch(url, { method: 'GET', headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }, cache: 'no-store' });
       text = await res.text();

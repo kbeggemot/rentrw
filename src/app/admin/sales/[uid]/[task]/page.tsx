@@ -115,11 +115,11 @@ export default async function AdminSaleEditor(props: { params: Promise<{ uid: st
             <h2 className="text-lg font-semibold mb-2">Действия</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               <div>
-                <a className="px-3 py-2 border rounded inline-block" href={`/api/rocketwork/tasks/${encodeURIComponent(String(item.taskId))}`} target="_blank">Sync RW</a>
+                <a className="px-3 py-2 border rounded inline-block" href={`/api/rocketwork/tasks/${encodeURIComponent(String(item.taskId))}?force=1`} target="_blank">Sync RW</a>
                 <div className="text-xs text-gray-600 mt-1">Запросить статус задачи и наличные чеки (ОФД/НПД) из RW; обновляет продажу локально.</div>
               </div>
               <div>
-                <a className="px-3 py-2 border rounded inline-block" href={`/api/ofd/sync?order=${encodeURIComponent(String(item.orderId))}`} target="_blank">Sync OFD</a>
+                <a className="px-3 py-2 border rounded inline-block" href={`/api/ofd/sync?order=${encodeURIComponent(String(item.orderId))}&force=1`} target="_blank">Sync OFD</a>
                 <div className="text-xs text-gray-600 mt-1">Опрос OFD по orderId: пытается найти чеки по присвоенным InvoiceId, подтягивает ReceiptId/URL (предоплата и полный), обновляет запись.</div>
               </div>
               <div>

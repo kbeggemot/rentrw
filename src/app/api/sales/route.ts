@@ -40,17 +40,21 @@ export async function GET(req: Request) {
           const set = new Set(onlyOrders.map((n) => Number(n)));
           current = current.filter((s) => set.has(Number(s.orderId)));
         }
-        // Decide which sales to refresh
+        // Decide which sales to refresh — строго по правилам дат и агентским требованиям
         const toRefresh = current.filter((s) => {
-          const st = (s.status || '').toLowerCase();
-          // a) always refresh pending, paying, paid
-          const needA = st === 'pending' || st === 'paying' || st === 'paid';
-          // b) refresh transferred/transfered if any required receipt/link is missing
-          const missingReceipts = (!s.ofdUrl || !s.ofdFullUrl || (s as any).ofdFullId) || (s.isAgent && (!s.additionalCommissionOfdUrl || !s.npdReceiptUri));
-          const needB = (st === 'transferred' || st === 'transfered') && missingReceipts;
-          // c) also refresh any sale that lacks createdAtRw to retrieve RW creation time
-          const needC = !s.createdAtRw;
-          return needA || needB || needC;
+          const st = String(s.status || '').toLowerCase();
+          const isEarly = st === 'pending' || st === 'paying';
+          const createdAt = (s.createdAtRw || s.createdAt) as string | null;
+          const createdDate = createdAt ? String(createdAt).slice(0, 10) : null;
+          const endStr = (s.serviceEndDate || '') as string;
+          const endDate = endStr ? String(endStr).slice(0, 10) : null;
+          const isSameDay = Boolean(createdDate && endDate && createdDate === endDate);
+          const agentExtrasMissing = s.isAgent && (!s.additionalCommissionOfdUrl || !s.npdReceiptUri);
+          const receiptsMissing = isSameDay ? (!s.ofdFullUrl) : (!s.ofdUrl || !s.ofdFullUrl);
+          const needReceipts = receiptsMissing || agentExtrasMissing;
+          const needCreatedAt = !s.createdAtRw;
+          // Рефрешим если задача ранняя, либо не хватает требуемых полей, либо нет createdAtRw
+          return isEarly || needReceipts || needCreatedAt;
         });
         for (const s of toRefresh) {
           try {
