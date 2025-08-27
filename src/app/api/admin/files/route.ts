@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { readText } from '@/server/storage';
+import { readText, list } from '@/server/storage';
 import { promises as fs } from 'fs';
 import path from 'path';
 
@@ -16,14 +16,13 @@ export async function GET(req: Request) {
   const raw = url.searchParams.get('name') || '';
   const name = raw.replace(/\.+/g, '').replace(/[^a-zA-Z0-9_\-\.]/g, '');
   if (!name) {
-    // List files from local .data directory (S3 listing not supported here)
-    const dir = path.join(process.cwd(), '.data');
-    let entries: string[] = [];
-    try {
-      const all = await fs.readdir(dir);
-      entries = all.filter((f) => f.endsWith('.log') || f.endsWith('.json'));
-    } catch {}
-    // Add friendly known file if present in S3 or FS consumers
+    // List files from storage (supports S3)
+    let files: string[] = [];
+    try { files = await list('.data'); } catch {}
+    const entries = files
+      .filter((f) => f.endsWith('.log') || f.endsWith('.json'))
+      .map((f) => f.replace(/^\.?data\/?/, ''))
+      .map((f) => f.replace(/^\.data\//, ''));
     const set = Array.from(new Set([...entries, 'postbacks.log']));
     return NextResponse.json({ files: set });
   }
