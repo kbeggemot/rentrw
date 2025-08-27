@@ -145,6 +145,14 @@ export async function POST(req: Request) {
         try { await setUserOrgName(userId, orgName ?? null); } catch {}
         try { await setUserOrgInn(userId, orgInn ?? null); } catch {}
       } catch {}
+      // trigger ensure endpoint to log subscription attempts and current list
+      try {
+        const ensureProto = req.headers.get('x-forwarded-proto') || 'http';
+        const ensureHost = req.headers.get('x-forwarded-host') || req.headers.get('host') || 'localhost:3000';
+        const ensureBase = `${ensureProto}://${ensureHost}`;
+        const ensureUrl = new URL('/api/rocketwork/postbacks?ensure=1', ensureBase).toString();
+        await fetch(ensureUrl, { method: 'GET', headers: { cookie: `session_user=${encodeURIComponent(userId)}` }, cache: 'no-store' });
+      } catch {}
     } catch {}
 
     // 3) Fire-and-forget background assurance for a week if initial creation failed
