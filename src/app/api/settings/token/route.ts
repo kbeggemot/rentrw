@@ -102,8 +102,10 @@ export async function POST(req: Request) {
     // After saving token, ensure Rocket Work webhook subscriptions are created
     try {
       const base = process.env.ROCKETWORK_API_BASE_URL || 'https://app.rocketwork.ru/api/';
-      const cbBaseProto = req.headers.get('x-forwarded-proto') || 'http';
+      const rawProto = req.headers.get('x-forwarded-proto') || 'http';
       const cbBaseHost = req.headers.get('x-forwarded-host') || req.headers.get('host') || 'localhost:3000';
+      const isPublicHost = !/localhost|127\.0\.0\.1|(^10\.)|(^192\.168\.)/.test(cbBaseHost);
+      const cbBaseProto = (rawProto === 'http' && isPublicHost) ? 'https' : rawProto;
       const callbackBase = `${cbBaseProto}://${cbBaseHost}`;
       const callbackUrl = new URL(`/api/rocketwork/postbacks/${encodeURIComponent(userId)}`, callbackBase).toString();
 
@@ -125,12 +127,21 @@ export async function POST(req: Request) {
           });
           if (exists) return;
         } catch {}
-        // create
-        try {
-          const createUrl = new URL('postback_subscriptions', base.endsWith('/') ? base : base + '/').toString();
-          const payload = { http_method: 'post', uri: callbackUrl, subscribed_on: [stream] } as any;
-          await fetch(createUrl, { method: 'POST', headers, body: JSON.stringify(payload) });
-        } catch {}
+        // create with several payload variants and endpoints
+        const attempts: Array<{ path: string; payload: Record<string, unknown> }> = [];
+        for (const path of ['postback_subscriptions', 'postbacks']) {
+          attempts.push({ path, payload: { http_method: 'post', uri: callbackUrl, subscribed_on: [stream] } });
+          attempts.push({ path, payload: { http_method: 'post', callback_url: callbackUrl, subscribed_on: [stream] } });
+          attempts.push({ path, payload: { method: 'post', uri: callbackUrl, subscribed_on: [stream] } });
+          attempts.push({ path, payload: { method: 'post', callback_url: callbackUrl, subscribed_on: [stream] } });
+        }
+        for (const a of attempts) {
+          try {
+            const createUrl = new URL(a.path, base.endsWith('/') ? base : base + '/').toString();
+            const res = await fetch(createUrl, { method: 'POST', headers, body: JSON.stringify(a.payload), cache: 'no-store' });
+            if (res.ok) return;
+          } catch {}
+        }
       }
       await upsert('tasks');
       await upsert('executors');
