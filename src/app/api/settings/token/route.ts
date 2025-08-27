@@ -127,21 +127,13 @@ export async function POST(req: Request) {
           });
           if (exists) return;
         } catch {}
-        // create with several payload variants and endpoints
-        const attempts: Array<{ path: string; payload: Record<string, unknown> }> = [];
-        for (const path of ['postback_subscriptions', 'postbacks']) {
-          attempts.push({ path, payload: { http_method: 'post', uri: callbackUrl, subscribed_on: [stream] } });
-          attempts.push({ path, payload: { http_method: 'post', callback_url: callbackUrl, subscribed_on: [stream] } });
-          attempts.push({ path, payload: { method: 'post', uri: callbackUrl, subscribed_on: [stream] } });
-          attempts.push({ path, payload: { method: 'post', callback_url: callbackUrl, subscribed_on: [stream] } });
-        }
-        for (const a of attempts) {
-          try {
-            const createUrl = new URL(a.path, base.endsWith('/') ? base : base + '/').toString();
-            const res = await fetch(createUrl, { method: 'POST', headers, body: JSON.stringify(a.payload), cache: 'no-store' });
-            if (res.ok) return;
-          } catch {}
-        }
+        // create (Rocketwork v2: postback_subscriptions with 'uri')
+        try {
+          const createUrl = new URL('postback_subscriptions', base.endsWith('/') ? base : base + '/').toString();
+          const payload = { http_method: 'post', uri: callbackUrl, subscribed_on: [stream] } as any;
+          const res = await fetch(createUrl, { method: 'POST', headers, body: JSON.stringify(payload), cache: 'no-store' });
+          if (res.ok) return;
+        } catch {}
       }
       await upsert('tasks');
       await upsert('executors');

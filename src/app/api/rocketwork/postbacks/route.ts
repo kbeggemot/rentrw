@@ -38,12 +38,7 @@ export async function GET(req: Request) {
         const headers = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', Accept: 'application/json' } as Record<string, string>;
         const attempts: Array<{ path: string; payload: Record<string, unknown> }> = [];
         for (const stream of ['tasks','executors']) {
-          for (const path of ['postback_subscriptions', 'postbacks']) {
-            attempts.push({ path, payload: { http_method: 'post', uri: callbackUrl, subscribed_on: [stream] } });
-            attempts.push({ path, payload: { http_method: 'post', callback_url: callbackUrl, subscribed_on: [stream] } });
-            attempts.push({ path, payload: { method: 'post', callback_url: callbackUrl, subscribed_on: [stream] } });
-            attempts.push({ path, payload: { method: 'post', uri: callbackUrl, subscribed_on: [stream] } });
-          }
+          attempts.push({ path: 'postback_subscriptions', payload: { http_method: 'post', uri: callbackUrl, subscribed_on: [stream] } });
         }
         for (const a of attempts) {
           try {
@@ -122,35 +117,28 @@ export async function POST(req: Request) {
     const headers = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', Accept: 'application/json' } as Record<string, string>;
 
     async function upsert(stream: 'tasks' | 'executors') {
-      // list existing (try both endpoints)
+      // list existing
       let exists = false;
       try {
-        for (const path of ['postback_subscriptions', 'postbacks']) {
-          try {
-            const listUrl = new URL(path, base.endsWith('/') ? base : base + '/').toString();
-            const res = await fetch(listUrl, { method: 'GET', headers, cache: 'no-store' });
-            const txt = await res.text();
-            const d = txt ? JSON.parse(txt) : {};
-            const arr = Array.isArray(d?.subscriptions) ? d.subscriptions : (Array.isArray(d?.postbacks) ? d.postbacks : []);
-            exists = Array.isArray(arr) && arr.some((p: any) => {
-              const subs = Array.isArray(p?.subscribed_on) ? p.subscribed_on.map((x: any) => String(x)) : [];
-              const uri = String(p?.callback_url ?? p?.uri ?? '');
-              return subs.includes(stream) && uri === callbackUrl;
-            });
-            if (exists) break;
-          } catch {}
-        }
+        const listUrl = new URL('postback_subscriptions', base.endsWith('/') ? base : base + '/').toString();
+        const res = await fetch(listUrl, { method: 'GET', headers, cache: 'no-store' });
+        const txt = await res.text();
+        const d = txt ? JSON.parse(txt) : {};
+        const arr = Array.isArray(d?.subscriptions) ? d.subscriptions : [];
+        exists = Array.isArray(arr) && arr.some((p: any) => {
+          const subs = Array.isArray(p?.subscribed_on) ? p.subscribed_on.map((x: any) => String(x)) : [];
+          const uri = String(p?.callback_url ?? p?.uri ?? '');
+          return subs.includes(stream) && uri === callbackUrl;
+        });
       } catch {}
       if (exists) return;
-      // create (first try canonical, then fallback)
-      for (const path of ['postback_subscriptions', 'postbacks']) {
-        try {
-          const createUrl = new URL(path, base.endsWith('/') ? base : base + '/').toString();
-          const payload = { http_method: 'post', uri: callbackUrl, subscribed_on: [stream] } as any;
-          const res = await fetch(createUrl, { method: 'POST', headers, body: JSON.stringify(payload) });
-          if (res.ok) return;
-        } catch {}
-      }
+      // create (canonical endpoint only)
+      try {
+        const createUrl = new URL('postback_subscriptions', base.endsWith('/') ? base : base + '/').toString();
+        const payload = { http_method: 'post', uri: callbackUrl, subscribed_on: [stream] } as any;
+        const res = await fetch(createUrl, { method: 'POST', headers, body: JSON.stringify(payload) });
+        if (res.ok) return;
+      } catch {}
     }
 
     await upsert('tasks');
