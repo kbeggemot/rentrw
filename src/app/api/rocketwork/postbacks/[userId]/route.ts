@@ -194,16 +194,36 @@ export async function POST(req: Request) {
                     const invoiceIdFull = sale.invoiceIdFull || null;
                     if (invoiceIdFull) {
                       const partnerName = (taskObj?.executor && [taskObj?.executor?.last_name, taskObj?.executor?.first_name, taskObj?.executor?.second_name].filter(Boolean).join(' ').trim()) || undefined;
+                      try {
+                        const prev = (await readText('.data/ofd_create_attempts.log')) || '';
+                        const line = JSON.stringify({ ts: new Date().toISOString(), src: 'postback', stage: 'create_attempt', party: 'partner', userId, taskId, orderId: sale.orderId, invoiceId: invoiceIdFull, callbackUrl });
+                        await writeText('.data/ofd_create_attempts.log', prev + line + '\n');
+                      } catch {}
                       const payload = buildFermaReceiptPayload({ party: 'partner', partyInn: partnerInn, description: itemLabel, amountRub: amountNet, vatRate: usedVat, methodCode: PAYMENT_METHOD_FULL_PAYMENT, orderId: sale.orderId, docType: 'Income', buyerEmail: sale.clientEmail || defaultEmail, invoiceId: invoiceIdFull, callbackUrl, paymentAgentInfo: { AgentType: 'AGENT', SupplierInn: partnerInn, SupplierName: partnerName || 'Исполнитель' } });
                       const created = await fermaCreateReceipt(payload, { baseUrl, authToken: tokenOfd });
+                      try {
+                        const prev2 = (await readText('.data/ofd_create_attempts.log')) || '';
+                        const line2 = JSON.stringify({ ts: new Date().toISOString(), src: 'postback', stage: 'create_result', party: 'partner', userId, taskId, orderId: sale.orderId, invoiceId: invoiceIdFull, id: created.id, rawStatus: created.rawStatus, statusText: created.status });
+                        await writeText('.data/ofd_create_attempts.log', prev2 + line2 + '\n');
+                      } catch {}
                       await updateSaleOfdUrlsByOrderId(userId, sale.orderId, { ofdFullId: created.id || null });
                     }
                   } else {
                     const invoiceIdPrepay = sale.invoiceIdPrepay || null;
                     if (invoiceIdPrepay) {
                       const partnerName2 = (taskObj?.executor && [taskObj?.executor?.last_name, taskObj?.executor?.first_name, taskObj?.executor?.second_name].filter(Boolean).join(' ').trim()) || undefined;
+                      try {
+                        const prev = (await readText('.data/ofd_create_attempts.log')) || '';
+                        const line = JSON.stringify({ ts: new Date().toISOString(), src: 'postback', stage: 'create_attempt', party: 'partner', userId, taskId, orderId: sale.orderId, invoiceId: invoiceIdPrepay, callbackUrl });
+                        await writeText('.data/ofd_create_attempts.log', prev + line + '\n');
+                      } catch {}
                       const payload = buildFermaReceiptPayload({ party: 'partner', partyInn: partnerInn, description: itemLabel, amountRub: amountNet, vatRate: usedVat, methodCode: PAYMENT_METHOD_PREPAY_FULL, orderId: sale.orderId, docType: 'IncomePrepayment', buyerEmail: sale.clientEmail || defaultEmail, invoiceId: invoiceIdPrepay, callbackUrl, withPrepaymentItem: true, paymentAgentInfo: { AgentType: 'AGENT', SupplierInn: partnerInn, SupplierName: partnerName2 || 'Исполнитель' } });
                       const created = await fermaCreateReceipt(payload, { baseUrl, authToken: tokenOfd });
+                      try {
+                        const prev2 = (await readText('.data/ofd_create_attempts.log')) || '';
+                        const line2 = JSON.stringify({ ts: new Date().toISOString(), src: 'postback', stage: 'create_result', party: 'partner', userId, taskId, orderId: sale.orderId, invoiceId: invoiceIdPrepay, id: created.id, rawStatus: created.rawStatus, statusText: created.status });
+                        await writeText('.data/ofd_create_attempts.log', prev2 + line2 + '\n');
+                      } catch {}
                       await updateSaleOfdUrlsByOrderId(userId, sale.orderId, { ofdPrepayId: created.id || null });
                       // schedule offset at 12:00 MSK
                       if (sale.serviceEndDate) {
@@ -226,15 +246,35 @@ export async function POST(req: Request) {
                 if (isToday) {
                   const invoiceIdFull = sale.invoiceIdFull || null;
                   if (invoiceIdFull) {
+                    try {
+                      const prev = (await readText('.data/ofd_create_attempts.log')) || '';
+                      const line = JSON.stringify({ ts: new Date().toISOString(), src: 'postback', stage: 'create_attempt', party: 'org', userId, taskId, orderId: sale.orderId, invoiceId: invoiceIdFull, callbackUrl, orgInn });
+                      await writeText('.data/ofd_create_attempts.log', prev + line + '\n');
+                    } catch {}
                     const payload = buildFermaReceiptPayload({ party: 'org', partyInn: orgInn, description: itemLabelOrg, amountRub: amountRub, vatRate: usedVat, methodCode: PAYMENT_METHOD_FULL_PAYMENT, orderId: sale.orderId, docType: 'Income', buyerEmail: sale.clientEmail || defaultEmail, invoiceId: invoiceIdFull, callbackUrl, paymentAgentInfo: { AgentType: 'AGENT', SupplierInn: orgInn, SupplierName: 'Организация' } });
                     const created = await fermaCreateReceipt(payload, { baseUrl, authToken: tokenOfd });
+                    try {
+                      const prev2 = (await readText('.data/ofd_create_attempts.log')) || '';
+                      const line2 = JSON.stringify({ ts: new Date().toISOString(), src: 'postback', stage: 'create_result', party: 'org', userId, taskId, orderId: sale.orderId, invoiceId: invoiceIdFull, id: created.id, rawStatus: created.rawStatus, statusText: created.status });
+                      await writeText('.data/ofd_create_attempts.log', prev2 + line2 + '\n');
+                    } catch {}
                     await updateSaleOfdUrlsByOrderId(userId, sale.orderId, { ofdFullId: created.id || null });
                   }
                 } else {
                   const invoiceIdPrepay = sale.invoiceIdPrepay || null;
                   if (invoiceIdPrepay) {
+                    try {
+                      const prev = (await readText('.data/ofd_create_attempts.log')) || '';
+                      const line = JSON.stringify({ ts: new Date().toISOString(), src: 'postback', stage: 'create_attempt', party: 'org', userId, taskId, orderId: sale.orderId, invoiceId: invoiceIdPrepay, callbackUrl, orgInn });
+                      await writeText('.data/ofd_create_attempts.log', prev + line + '\n');
+                    } catch {}
                     const payload = buildFermaReceiptPayload({ party: 'org', partyInn: orgInn, description: itemLabelOrg, amountRub: amountRub, vatRate: usedVat, methodCode: PAYMENT_METHOD_PREPAY_FULL, orderId: sale.orderId, docType: 'IncomePrepayment', buyerEmail: sale.clientEmail || defaultEmail, invoiceId: invoiceIdPrepay, callbackUrl, withPrepaymentItem: true, paymentAgentInfo: { AgentType: 'AGENT', SupplierInn: orgInn, SupplierName: 'Организация' } });
                     const created = await fermaCreateReceipt(payload, { baseUrl, authToken: tokenOfd });
+                    try {
+                      const prev2 = (await readText('.data/ofd_create_attempts.log')) || '';
+                      const line2 = JSON.stringify({ ts: new Date().toISOString(), src: 'postback', stage: 'create_result', party: 'org', userId, taskId, orderId: sale.orderId, invoiceId: invoiceIdPrepay, id: created.id, rawStatus: created.rawStatus, statusText: created.status });
+                      await writeText('.data/ofd_create_attempts.log', prev2 + line2 + '\n');
+                    } catch {}
                     await updateSaleOfdUrlsByOrderId(userId, sale.orderId, { ofdPrepayId: created.id || null });
                     if (sale.serviceEndDate) {
                       startOfdScheduleWorker();
