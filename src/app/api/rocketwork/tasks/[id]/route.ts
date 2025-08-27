@@ -82,24 +82,27 @@ export async function GET(_: Request) {
       if (!isFinal) return false;
       const createdAt = (obj as any)?.created_at as string | undefined;
       const createdDate = createdAt ? String(createdAt).slice(0, 10) : null;
-      // Для строгой проверки даты услуги нужен sale.serviceEndDate из стора; если нет — допускаем оба варианта
-      let isSameDay: boolean | null = null;
       try {
         const { findSaleByTaskId } = await import('@/server/taskStore');
         const s = await findSaleByTaskId(userId, taskId);
         const endStr = (s as any)?.serviceEndDate ? String((s as any).serviceEndDate).slice(0, 10) : null;
-        isSameDay = Boolean(createdDate && endStr && createdDate === endStr);
-        const needFull = isSameDay === true;
-        const needPrepayAndFull = isSameDay === false;
-        const hasFull = Boolean((s as any)?.ofdFullUrl);
-        const hasPrepay = Boolean((s as any)?.ofdUrl);
-        const agentMissing = Boolean((s as any)?.isAgent) && (!((s as any)?.additionalCommissionOfdUrl) || !((s as any)?.npdReceiptUri));
-        if (needFull) return !hasFull || agentMissing;
-        if (needPrepayAndFull) return !(hasPrepay && hasFull) || agentMissing;
+        // Если serviceEndDate не задан — трактуем как «день‑в‑день» (см. recordSaleOnCreate)
+        const sameDayAssumption = endStr ? (createdDate && endStr && createdDate === endStr) : true;
+        const hasFull = Boolean((s as any)?.ofdFullUrl || (s as any)?.ofdFullId);
+        const hasPrepay = Boolean((s as any)?.ofdUrl || (s as any)?.ofdPrepayId);
+        const isAgent = Boolean((s as any)?.isAgent);
+        const hasAgentCommission = Boolean((s as any)?.additionalCommissionOfdUrl);
+        const hasNpd = Boolean((s as any)?.npdReceiptUri);
+        if (sameDayAssumption) {
+          // Нужен полный чек; для агентской дополнительно ждём чек комиссии И НПД
+          return !hasFull || (isAgent && (!hasAgentCommission || !hasNpd));
+        }
+        // Отложенный расчёт: ждём предоплату; для агентской — ещё чек комиссии. Полный чек появится после pay — не ждём его здесь
+        return !hasPrepay || (isAgent && !hasAgentCommission);
       } catch {}
-      // Fallback, если не смогли определить serviceEndDate — требуем хотя бы одну ссылку, а для агента ещё add_comm
+      // Fallback на случай отсутствия записи — используем RW поля (обычно пусто, т.к. with_ofd_receipt=false)
       const purchase = obj?.ofd_url || obj?.acquiring_order?.ofd_url;
-      const addComm = obj?.additional_commission_ofd_url;
+      const addComm = (obj as any)?.additional_commission_ofd_url as string | undefined;
       const must = obj?.additional_commission_value ? !(purchase && addComm) : !purchase;
       return must;
     };

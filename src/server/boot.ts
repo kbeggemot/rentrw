@@ -3,10 +3,12 @@
 // was called yet (imported via eventBus -> taskStore usage across app)
 import { startOfdScheduleWorker } from './ofdScheduleWorker';
 import { startOfdRepairWorker } from './ofdRepairWorker';
+import { startSalesRefreshWorker } from './salesRefreshWorker';
 
 try {
   startOfdScheduleWorker();
   startOfdRepairWorker();
+  startSalesRefreshWorker();
 } catch {
   // ignore — environment may not support intervals, we'll try again on-demand
 }
