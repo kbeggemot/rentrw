@@ -11,6 +11,7 @@ import { buildFermaReceiptPayload, PAYMENT_METHOD_PREPAY_FULL, PAYMENT_METHOD_FU
 import { getUserOrgInn, getUserPayoutRequisites } from '@/server/userStore';
 import { enqueueOffsetJob, startOfdScheduleWorker } from '@/server/ofdScheduleWorker';
 import { appendOfdAudit } from '@/server/audit';
+import { readText, writeText } from '@/server/storage';
 // duplicated import removed
 
 export const runtime = 'nodejs';
@@ -99,6 +100,13 @@ export async function POST(req: Request) {
         // pass root status through duck-typed property so taskStore can persist it
         rootStatus: rootStatusRaw,
       } as any);
+      try {
+        const { findSaleByTaskId } = await import('@/server/taskStore');
+        const sale = await findSaleByTaskId(userId, taskId);
+        const line = JSON.stringify({ ts: new Date().toISOString(), src: 'postback', stage: 'event', userId, taskId, event, status, aoStatusRaw, rootStatusRaw, sale: sale ? { orderId: sale.orderId, orgInn: sale.orgInn, ofdUrl: sale.ofdUrl, ofdFullUrl: sale.ofdFullUrl, invoiceA: (sale as any).invoiceIdPrepay, invoiceC: (sale as any).invoiceIdFull } : null });
+        const prev = (await readText('.data/ofd_create_attempts.log')) || '';
+        await writeText('.data/ofd_create_attempts.log', prev + line + '\n');
+      } catch {}
       try { await appendAdminEntityLog('sale', [String(userId), String(taskId)], { source: 'system', message: 'postback', data: { event, status: status || null, rootStatusRaw: rootStatusRaw || null } }); } catch {}
       // Background pay trigger with unchanged conditions (agent, transfered, completed, has full receipt)
       try {
