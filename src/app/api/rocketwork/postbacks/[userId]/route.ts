@@ -84,7 +84,10 @@ export async function POST(req: Request) {
       const npdReceiptUri = pick<string>(data, 'receipt_uri');
 
       // Fallback statuses from payload when event name is generic
-      const aoStatusRaw = undefined as unknown as string | undefined; // acquiring_order.status не применяем для withdrawal
+      const kindRaw = String(pick<string>(data, 'type') || pick<string>(data, 'task.type') || '').toLowerCase();
+      const aoStatusRaw = kindRaw === 'withdrawal'
+        ? undefined
+        : (pick<string>(data, 'acquiring_order.status') || pick<string>(data, 'task.acquiring_order.status'));
       const rootStatusRaw = pick<string>(data, 'status')
         ?? pick<string>(data, 'task.status');
 
@@ -142,9 +145,9 @@ export async function POST(req: Request) {
         }
       } catch {}
 
-      // Create OFD receipts ourselves based on acquiring_order.status
+      // Create OFD receipts ourselves based on acquiring_order.status — сразу по событию paid/transfered
       try {
-        const fin = String((status || aoStatusRaw || '') as string).toLowerCase();
+        const fin = String(((status || aoStatusRaw || '') as string)).toLowerCase();
         if (fin === 'paid' || fin === 'transfered' || fin === 'transferred') {
           const sale = await findSaleByTaskId(userId, taskId);
           if (sale) {
