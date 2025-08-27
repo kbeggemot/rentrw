@@ -148,13 +148,14 @@ export async function POST(req: Request) {
         try { await setUserOrgName(userId, orgName ?? null); } catch {}
         try { await setUserOrgInn(userId, orgInn ?? null); } catch {}
       } catch {}
-      // trigger ensure endpoint to log subscription attempts and current list
+      // trigger ensure endpoint to log subscription attempts and current list (per-stream to avoid лишние попытки)
       try {
         const ensureProto = req.headers.get('x-forwarded-proto') || 'http';
         const ensureHost = req.headers.get('x-forwarded-host') || req.headers.get('host') || 'localhost:3000';
         const ensureBase = `${ensureProto}://${ensureHost}`;
-        const ensureUrl = new URL('/api/rocketwork/postbacks?ensure=1', ensureBase).toString();
-        await fetch(ensureUrl, { method: 'GET', headers: { cookie: `session_user=${encodeURIComponent(userId)}`, 'x-user-id': userId }, cache: 'no-store' });
+        // дергаем только те стримы, которые реально создавали выше
+        await fetch(new URL('/api/rocketwork/postbacks?ensure=1&stream=tasks', ensureBase).toString(), { method: 'GET', headers: { cookie: `session_user=${encodeURIComponent(userId)}`, 'x-user-id': userId }, cache: 'no-store' });
+        await fetch(new URL('/api/rocketwork/postbacks?ensure=1&stream=executors', ensureBase).toString(), { method: 'GET', headers: { cookie: `session_user=${encodeURIComponent(userId)}`, 'x-user-id': userId }, cache: 'no-store' });
       } catch {}
     } catch {}
 

@@ -28,6 +28,8 @@ export async function GET(req: Request) {
     const base = process.env.ROCKETWORK_API_BASE_URL || 'https://app.rocketwork.ru/api/';
     const urlObj = new URL(req.url);
     const ensure = urlObj.searchParams.get('ensure') === '1';
+    const streamParamRaw = urlObj.searchParams.get('stream');
+    const normalizedStream = streamParamRaw && /^(tasks|executors)$/i.test(streamParamRaw) ? (streamParamRaw.toLowerCase() as 'tasks' | 'executors') : null;
     if (ensure) {
       // Perform upsert just like POST, then list
       try {
@@ -39,7 +41,8 @@ export async function GET(req: Request) {
         const callbackUrl = new URL(`/api/rocketwork/postbacks/${encodeURIComponent(userId)}`, callbackBase).toString();
         const headers = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', Accept: 'application/json' } as Record<string, string>;
         const attempts: Array<{ stream: 'tasks' | 'executors'; path: string; payload: Record<string, unknown> }> = [];
-        for (const stream of ['tasks','executors'] as const) {
+        const streams: Array<'tasks' | 'executors'> = normalizedStream ? [normalizedStream] : (['tasks','executors'] as const);
+        for (const stream of streams) {
           attempts.push({ stream, path: 'postback_subscriptions', payload: { http_method: 'post', uri: callbackUrl, subscribed_on: [stream] } });
         }
         const ensureLogs: any[] = [];
@@ -100,6 +103,16 @@ export async function GET(req: Request) {
     try { await writeText('.data/postback_list_last.json', JSON.stringify({ ts: new Date().toISOString(), out }, null, 2)); } catch {}
     if (!out.ok) return NextResponse.json({ error: out.data?.error || out.text || 'External API error' }, { status: out.status });
     const arr = Array.isArray(out.data?.subscriptions) ? out.data.subscriptions : (Array.isArray(out.data?.postbacks) ? out.data.postbacks : out.data);
+    // Persist per-user cache for local existence checks (to avoid redundant ensures on task creation)
+    try {
+      const rawProto = (urlObj.protocol && urlObj.protocol.replace(/:$/, '')) || req.headers.get('x-forwarded-proto') || 'http';
+      const cbHost = req.headers.get('x-forwarded-host') || req.headers.get('host') || 'localhost:3000';
+      const isPublicHost = !/localhost|127\.0\.0\.1|(^10\.)|(^192\.168\.)/.test(cbHost);
+      const cbProto = (rawProto === 'http' && isPublicHost) ? 'https' : rawProto;
+      const callbackBase = `${cbProto}://${cbHost}`;
+      const callbackUrl = new URL(`/api/rocketwork/postbacks/${encodeURIComponent(userId)}`, callbackBase).toString();
+      await writeText(`.data/postback_cache_${userId}.json`, JSON.stringify({ ts: new Date().toISOString(), callbackUrl, subscriptions: arr }, null, 2));
+    } catch {}
     return NextResponse.json({ subscriptions: arr });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Server error';

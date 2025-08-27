@@ -382,15 +382,37 @@ export async function POST(req: Request) {
       });
 
       // Removed: prepayment receipt creation and offset scheduling at creation time
-      // Ensure postback subscription is present for this user (auto-upsert)
+      // Ensure subscription only if not found locally (без запроса к RW — только сверяем наш кэш из GET /postbacks)
       try {
         const hdrs = await nextHeaders();
-        const cbBaseProto = hdrs.get('x-forwarded-proto') || 'http';
+        const rawProto = hdrs.get('x-forwarded-proto') || 'http';
         const cbBaseHost = hdrs.get('x-forwarded-host') || hdrs.get('host') || 'localhost:3000';
+        const isPublicHost = !/localhost|127\.0\.0\.1|(^10\.)|(^192\.168\.)/.test(cbBaseHost || '');
+        const cbBaseProto = (rawProto === 'http' && isPublicHost) ? 'https' : rawProto;
         const callbackBase = `${cbBaseProto}://${cbBaseHost}`;
-        const upsertUrl = new URL('/api/rocketwork/postbacks?ensure=1', callbackBase).toString();
-        // Use session_user cookie to pass user id for GET handler
-        await fetch(upsertUrl, { method: 'GET', headers: { cookie: `session_user=${encodeURIComponent(userId)}` }, cache: 'no-store' });
+        // Читаем наш прошлый кэш ensure, если он был сохранён
+        let hasTasks = false, hasExecutors = false;
+        try {
+          const cacheUrl = new URL(`/api/admin/files?name=${encodeURIComponent(`postback_cache_${userId}.json`)}`, callbackBase).toString();
+          const res = await fetch(cacheUrl, { method: 'GET', headers: { cookie: `admin_user=admin` }, cache: 'no-store' });
+          const txt = await res.text();
+          const d = txt ? JSON.parse(txt) : {};
+          const arr = Array.isArray(d?.subscriptions) ? d.subscriptions : [];
+          const cb = new URL(`/api/rocketwork/postbacks/${encodeURIComponent(userId)}`, callbackBase).toString();
+          for (const s of arr) {
+            const subs = Array.isArray(s?.subscribed_on) ? s.subscribed_on.map((x: any)=>String(x)) : [];
+            const uri = String(s?.callback_url ?? s?.uri ?? '');
+            if (uri === cb) {
+              if (subs.includes('tasks')) hasTasks = true;
+              if (subs.includes('executors')) hasExecutors = true;
+            }
+          }
+        } catch {}
+        if (!hasTasks || !hasExecutors) {
+          const query = !hasTasks && !hasExecutors ? '' : (!hasTasks ? '&stream=tasks' : '&stream=executors');
+          const upsertUrl = new URL(`/api/rocketwork/postbacks?ensure=1${query}`, callbackBase).toString();
+          await fetch(upsertUrl, { method: 'GET', headers: { cookie: `session_user=${encodeURIComponent(userId)}` }, cache: 'no-store' });
+        }
       } catch {}
     }
 
