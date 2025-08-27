@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { writeText } from '@/server/storage';
 import { getDecryptedApiToken } from '@/server/secureStore';
 
 export const runtime = 'nodejs';
@@ -29,11 +30,21 @@ export async function GET(req: Request) {
         const callbackBase = `${cbProto}://${cbHost}`;
         const callbackUrl = new URL(`/api/rocketwork/postbacks/${encodeURIComponent(userId)}`, callbackBase).toString();
         const headers = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', Accept: 'application/json' } as Record<string, string>;
-        for (const path of ['postback_subscriptions', 'postbacks']) {
+        const attempts: Array<{ path: string; payload: Record<string, unknown> }> = [];
+        for (const stream of ['tasks','executors']) {
+          for (const path of ['postback_subscriptions', 'postbacks']) {
+            attempts.push({ path, payload: { http_method: 'post', uri: callbackUrl, subscribed_on: [stream] } });
+            attempts.push({ path, payload: { http_method: 'post', callback_url: callbackUrl, subscribed_on: [stream] } });
+            attempts.push({ path, payload: { method: 'post', callback_url: callbackUrl, subscribed_on: [stream] } });
+            attempts.push({ path, payload: { method: 'post', uri: callbackUrl, subscribed_on: [stream] } });
+          }
+        }
+        for (const a of attempts) {
           try {
-            const createUrl = new URL(path, base.endsWith('/') ? base : base + '/').toString();
-            const payload = { http_method: 'post', uri: callbackUrl, subscribed_on: ['tasks', 'executors'] } as any;
-            await fetch(createUrl, { method: 'POST', headers, body: JSON.stringify(payload), cache: 'no-store' });
+            const createUrl = new URL(a.path, base.endsWith('/') ? base : base + '/').toString();
+            const res = await fetch(createUrl, { method: 'POST', headers, body: JSON.stringify(a.payload), cache: 'no-store' });
+            const tx = await res.text();
+            try { await writeText('.data/postback_ensure_last.json', JSON.stringify({ ts: new Date().toISOString(), ensure, userId, attempt: a, status: res.status, text: tx }, null, 2)); } catch {}
           } catch {}
         }
       } catch {}
@@ -50,6 +61,7 @@ export async function GET(req: Request) {
       const alt = await list('postbacks');
       if (alt.ok) out = alt;
     }
+    try { await writeText('.data/postback_list_last.json', JSON.stringify({ ts: new Date().toISOString(), out }, null, 2)); } catch {}
     if (!out.ok) return NextResponse.json({ error: out.data?.error || out.text || 'External API error' }, { status: out.status });
     const arr = Array.isArray(out.data?.subscriptions) ? out.data.subscriptions : (Array.isArray(out.data?.postbacks) ? out.data.postbacks : out.data);
     return NextResponse.json({ subscriptions: arr });
