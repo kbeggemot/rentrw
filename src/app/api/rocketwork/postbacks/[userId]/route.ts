@@ -54,11 +54,16 @@ export async function POST(req: Request) {
       await writeText('.data/postbacks.log', prev + line);
     } catch {}
 
-    const subscription: string = String(body?.subscription || '').toLowerCase();
     const event: string = String(body?.event || '').toLowerCase();
     const data: any = body?.data ?? body;
-
-    if (!subscription) return NextResponse.json({ ok: true });
+    // Derive subscription stream robustly: RW often omits 'subscription'
+    let subscription: string = String(body?.subscription || '').toLowerCase();
+    if (!subscription) {
+      if (/^task\./.test(event)) subscription = 'tasks';
+      else if (/^executor\./.test(event)) subscription = 'executors';
+      else if (data && (typeof data === 'object') && ('executor' in data)) subscription = 'executors';
+      else subscription = 'tasks';
+    }
 
     if (subscription === 'tasks') {
       // Attempt to extract task id and details
