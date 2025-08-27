@@ -59,26 +59,7 @@ export async function POST(req: Request) {
       const directUrl: string | undefined = body?.Data?.Device?.OfdReceiptUrl || body?.Device?.OfdReceiptUrl;
       if (typeof directUrl === 'string' && directUrl.length > 0) receiptUrl = directUrl;
     }
-    // If callback does not include Fn/Fd/Fp — fetch receipt status from Ferma to build link (with short retries)
-    if (!receiptUrl && receiptId) {
-      const baseUrl = process.env.FERMA_BASE_URL || 'https://ferma.ofd.ru/';
-      try {
-        const token = await fermaGetAuthTokenCached(process.env.FERMA_LOGIN || '', process.env.FERMA_PASSWORD || '', { baseUrl });
-        let tries = 0;
-        while (!receiptUrl && tries < 20) {
-          try {
-            const st = await fermaGetReceiptStatus(receiptId, { baseUrl, authToken: token });
-            const obj = st.rawText ? JSON.parse(st.rawText) : {};
-            const fn2 = obj?.Data?.Fn || obj?.Fn;
-            const fd2 = obj?.Data?.Fd || obj?.Fd;
-            const fp2 = obj?.Data?.Fp || obj?.Fp;
-            if (fn2 && fd2 != null && fp2 != null) { receiptUrl = buildReceiptViewUrl(fn2, fd2, fp2); break; }
-          } catch {}
-          tries += 1;
-          await new Promise((r) => setTimeout(r, 1000));
-        }
-      } catch {}
-    }
+    // Не блокируем webhook длительным ожиданием: дальнейшее дополучение URL вынесем в фон ниже
     if (receiptId) {
       await upsertOfdReceipt({ userId, receiptId, fn: fn ?? null, fd: fd ?? null, fp: fp ?? null, url: receiptUrl ?? null, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), payload: body });
     }
@@ -96,6 +77,7 @@ export async function POST(req: Request) {
       const orderNum = Number(orderId);
       // Prefer mapping by stored InvoiceId variants
       let mappedByInvoice = false;
+      let targetForUrl: 'prepay' | 'full' | null = null;
       try {
         const sales = await listSales(userId);
         const sale = sales.find((s) => s.orderId === orderNum);
@@ -105,10 +87,12 @@ export async function POST(req: Request) {
             if (receiptUrl) patch.ofdUrl = receiptUrl;
             if (receiptId) patch.ofdPrepayId = receiptId;
             mappedByInvoice = true;
+            targetForUrl = 'prepay';
           } else if ((sale.invoiceIdOffset && invStr === String(sale.invoiceIdOffset)) || (sale.invoiceIdFull && invStr === String(sale.invoiceIdFull))) {
             if (receiptUrl) patch.ofdFullUrl = receiptUrl;
             if (receiptId) patch.ofdFullId = receiptId;
             mappedByInvoice = true;
+            targetForUrl = 'full';
           }
         }
       } catch {}
@@ -126,6 +110,7 @@ export async function POST(req: Request) {
         if (receiptId) {
           if (classify === 'prepay') patch.ofdPrepayId = receiptId; else patch.ofdFullId = receiptId;
         }
+        targetForUrl = classify;
       }
       // Запишем лог самого обращения к OFD (даже если данных не изменили)
       try {
@@ -133,6 +118,39 @@ export async function POST(req: Request) {
         (global as any).__OFD_SOURCE__ = 'ofd_callback';
         // Ноль‑изменений тоже фиксируем отдельным сообщением через update с пустым эффектом
         await updateSaleOfdUrlsByOrderId(userId, orderNum, patch);
+      } catch {}
+
+      // Фоновое дополучение Fn/Fd/Fp для построения viewer‑ссылки, если её нет в колбэке
+      try {
+        if (!receiptUrl && receiptId && targetForUrl) {
+          (async () => {
+            try {
+              const baseUrl = process.env.FERMA_BASE_URL || 'https://ferma.ofd.ru/';
+              const token = await fermaGetAuthTokenCached(process.env.FERMA_LOGIN || '', process.env.FERMA_PASSWORD || '', { baseUrl });
+              let built: string | undefined;
+              let tries = 0;
+              while (!built && tries < 12) {
+                try {
+                  const st = await fermaGetReceiptStatus(receiptId, { baseUrl, authToken: token });
+                  const obj = st.rawText ? JSON.parse(st.rawText) : {};
+                  const fn2 = obj?.Data?.Fn || obj?.Fn;
+                  const fd2 = obj?.Data?.Fd || obj?.Fd;
+                  const fp2 = obj?.Data?.Fp || obj?.Fp;
+                  const direct = obj?.Data?.Device?.OfdReceiptUrl as string | undefined;
+                  if (typeof direct === 'string' && direct.length > 0) { built = direct; break; }
+                  if (fn2 && fd2 != null && fp2 != null) { built = buildReceiptViewUrl(fn2, fd2, fp2); break; }
+                } catch {}
+                tries += 1;
+                await new Promise((r) => setTimeout(r, 400));
+              }
+              if (built) {
+                try { (global as any).__OFD_SOURCE__ = 'ofd_callback'; } catch {}
+                const p2: any = targetForUrl === 'prepay' ? { ofdUrl: built } : { ofdFullUrl: built };
+                await updateSaleOfdUrlsByOrderId(userId, orderNum, p2);
+              }
+            } catch {}
+          })();
+        }
       } catch {}
     }
     // Debug logs (prod-safe; secret redacted)
