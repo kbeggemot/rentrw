@@ -127,10 +127,13 @@ export async function POST(req: Request) {
           if (classify === 'prepay') patch.ofdPrepayId = receiptId; else patch.ofdFullId = receiptId;
         }
       }
-      if (Object.keys(patch).length > 0) {
-        try { (global as any).__OFD_SOURCE__ = 'ofd_callback'; } catch {}
-        try { await updateSaleOfdUrlsByOrderId(userId, orderNum, patch); } catch {}
-      }
+      // Запишем лог самого обращения к OFD (даже если данных не изменили)
+      try {
+        const msg = { reason: 'ofd_callback', patchKeys: Object.keys(patch) } as any;
+        (global as any).__OFD_SOURCE__ = 'ofd_callback';
+        // Ноль‑изменений тоже фиксируем отдельным сообщением через update с пустым эффектом
+        await updateSaleOfdUrlsByOrderId(userId, orderNum, patch);
+      } catch {}
     }
     // Debug logs (prod-safe; secret redacted)
     try {

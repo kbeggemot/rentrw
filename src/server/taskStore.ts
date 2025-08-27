@@ -242,7 +242,15 @@ export async function updateSaleOfdUrlsByOrderId(userId: string, orderId: number
     if (typeof patch.ofdPrepayId !== 'undefined' && ((next as any).ofdPrepayId ?? null) !== (patch.ofdPrepayId ?? null)) { (next as any).ofdPrepayId = patch.ofdPrepayId ?? null; changed = true; }
     if (typeof patch.ofdFullId !== 'undefined' && ((next as any).ofdFullId ?? null) !== (patch.ofdFullId ?? null)) { (next as any).ofdFullId = patch.ofdFullId ?? null; changed = true; }
     if (!changed) {
-      return; // no-op update, avoid extra writes/logs
+      // Если источник OFD-обращение известен — логируем сам факт нулевого обновления
+      try {
+        if ((global as any).__OFD_SOURCE__) {
+          const src = (global as any).__OFD_SOURCE__ || 'unknown';
+          const { appendOfdAudit } = await import('./audit');
+          await appendOfdAudit({ ts: new Date().toISOString(), source: String(src), userId, orderId, taskId: current.taskId, action: 'update_ofd_urls', patch: { ...patch, noop: true }, before, after: before });
+        }
+      } catch {}
+      return; // no-op update, avoid extra writes/logs to store
     }
     next.updatedAt = new Date().toISOString();
     store.sales[idx] = next;
