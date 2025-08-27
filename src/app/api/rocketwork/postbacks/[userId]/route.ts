@@ -142,12 +142,12 @@ export async function POST(req: Request) {
         }
       } catch {}
 
-      // Create OFD receipts ourselves based on acquiring_order.status, for UI-initiated sales
+      // Create OFD receipts ourselves based on acquiring_order.status
       try {
         const fin = String((status || aoStatusRaw || '') as string).toLowerCase();
         if (fin === 'paid' || fin === 'transfered' || fin === 'transferred') {
           const sale = await findSaleByTaskId(userId, taskId);
-          if (sale && sale.source !== 'external') {
+          if (sale) {
             const createdAt = sale.createdAtRw || sale.createdAt;
             const createdDate = createdAt ? String(createdAt).slice(0, 10) : null;
             const endDate = sale.serviceEndDate || null;
@@ -206,22 +206,23 @@ export async function POST(req: Request) {
                 }
               } catch {}
             } else {
-              const orgInn = await getUserOrgInn(userId);
-              const orgData = await getUserPayoutRequisites(userId);
+              const orgInn = (sale?.orgInn && String(sale.orgInn).trim().length > 0 && String(sale.orgInn) !== 'неизвестно') ? String(sale.orgInn).replace(/\D/g, '') : null;
+              const { getOrgPayoutRequisites } = await import('@/server/orgStore');
+              const orgData = orgInn ? await getOrgPayoutRequisites(orgInn) : { bik: null, account: null } as any;
               if (orgInn) {
                 const defaultEmail = process.env.OFD_DEFAULT_EMAIL || process.env.DEFAULT_RECEIPT_EMAIL || 'ofd@rockethumans.com';
                 const itemLabelOrg = (sale.description && sale.description.trim().length > 0) ? sale.description.trim() : 'Оплата услуги';
                 if (isToday) {
                   const invoiceIdFull = sale.invoiceIdFull || null;
                   if (invoiceIdFull) {
-                    const payload = buildFermaReceiptPayload({ party: 'org', partyInn: orgInn, description: itemLabelOrg, amountRub: amountRub, vatRate: usedVat, methodCode: PAYMENT_METHOD_FULL_PAYMENT, orderId: sale.orderId, docType: 'Income', buyerEmail: sale.clientEmail || defaultEmail, invoiceId: invoiceIdFull, callbackUrl, paymentAgentInfo: { AgentType: 'AGENT', SupplierInn: orgInn, SupplierName: orgData.orgName || 'Организация' } });
+                    const payload = buildFermaReceiptPayload({ party: 'org', partyInn: orgInn, description: itemLabelOrg, amountRub: amountRub, vatRate: usedVat, methodCode: PAYMENT_METHOD_FULL_PAYMENT, orderId: sale.orderId, docType: 'Income', buyerEmail: sale.clientEmail || defaultEmail, invoiceId: invoiceIdFull, callbackUrl, paymentAgentInfo: { AgentType: 'AGENT', SupplierInn: orgInn, SupplierName: 'Организация' } });
                     const created = await fermaCreateReceipt(payload, { baseUrl, authToken: tokenOfd });
                     await updateSaleOfdUrlsByOrderId(userId, sale.orderId, { ofdFullId: created.id || null });
                   }
                 } else {
                   const invoiceIdPrepay = sale.invoiceIdPrepay || null;
                   if (invoiceIdPrepay) {
-                    const payload = buildFermaReceiptPayload({ party: 'org', partyInn: orgInn, description: itemLabelOrg, amountRub: amountRub, vatRate: usedVat, methodCode: PAYMENT_METHOD_PREPAY_FULL, orderId: sale.orderId, docType: 'IncomePrepayment', buyerEmail: sale.clientEmail || defaultEmail, invoiceId: invoiceIdPrepay, callbackUrl, withPrepaymentItem: true, paymentAgentInfo: { AgentType: 'AGENT', SupplierInn: orgInn, SupplierName: orgData.orgName || 'Организация' } });
+                    const payload = buildFermaReceiptPayload({ party: 'org', partyInn: orgInn, description: itemLabelOrg, amountRub: amountRub, vatRate: usedVat, methodCode: PAYMENT_METHOD_PREPAY_FULL, orderId: sale.orderId, docType: 'IncomePrepayment', buyerEmail: sale.clientEmail || defaultEmail, invoiceId: invoiceIdPrepay, callbackUrl, withPrepaymentItem: true, paymentAgentInfo: { AgentType: 'AGENT', SupplierInn: orgInn, SupplierName: 'Организация' } });
                     const created = await fermaCreateReceipt(payload, { baseUrl, authToken: tokenOfd });
                     await updateSaleOfdUrlsByOrderId(userId, sale.orderId, { ofdPrepayId: created.id || null });
                     if (sale.serviceEndDate) {
