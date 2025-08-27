@@ -91,10 +91,9 @@ export async function repairUserSales(userId: string): Promise<void> {
             try { (global as any).__OFD_SOURCE__ = 'repair_worker'; } catch {}
             await updateSaleOfdUrlsByOrderId(userId, s.orderId, { ofdFullId: created.id || null });
           } else {
-            const orgInn = await getUserOrgInn(userId);
-            const orgData = await getUserPayoutRequisites(userId);
+            const orgInn = (s.orgInn && String(s.orgInn).trim().length > 0 && String(s.orgInn) !== 'неизвестно') ? String(s.orgInn).replace(/\D/g, '') : null;
             if (!orgInn) continue;
-            const payload = buildFermaReceiptPayload({ party: 'org', partyInn: orgInn, description: s.description || 'Оплата услуги', amountRub: s.amountGrossRub, vatRate: (s.vatRate as any) || 'none', methodCode: PAYMENT_METHOD_FULL_PAYMENT, orderId: s.orderId, docType: 'Income', buyerEmail: s.clientEmail || defaultEmail, invoiceId: s.invoiceIdFull, callbackUrl: undefined, paymentAgentInfo: { AgentType: 'AGENT', SupplierInn: orgInn, SupplierName: orgData.orgName || 'Организация' } });
+            const payload = buildFermaReceiptPayload({ party: 'org', partyInn: orgInn, description: s.description || 'Оплата услуги', amountRub: s.amountGrossRub, vatRate: (s.vatRate as any) || 'none', methodCode: PAYMENT_METHOD_FULL_PAYMENT, orderId: s.orderId, docType: 'Income', buyerEmail: s.clientEmail || defaultEmail, invoiceId: s.invoiceIdFull, callbackUrl: undefined, paymentAgentInfo: { AgentType: 'AGENT', SupplierInn: orgInn, SupplierName: 'Организация' } });
             const created = await fermaCreateReceipt(payload, { baseUrl, authToken: ofdToken });
             try { (global as any).__OFD_SOURCE__ = 'repair_worker'; } catch {}
             await updateSaleOfdUrlsByOrderId(userId, s.orderId, { ofdFullId: created.id || null });
@@ -140,10 +139,9 @@ export async function repairUserSales(userId: string): Promise<void> {
           try { (global as any).__OFD_SOURCE__ = 'repair_worker'; } catch {}
           await updateSaleOfdUrlsByOrderId(userId, s.orderId, { ofdPrepayId: created.id || null });
         } else {
-          const orgInn = await getUserOrgInn(userId);
-          const orgData = await getUserPayoutRequisites(userId);
+          const orgInn = (s.orgInn && String(s.orgInn).trim().length > 0 && String(s.orgInn) !== 'неизвестно') ? String(s.orgInn).replace(/\D/g, '') : null;
           if (!orgInn) continue;
-          const payload = buildFermaReceiptPayload({ party: 'org', partyInn: orgInn, description: s.description || 'Оплата услуги', amountRub: s.amountGrossRub, vatRate: (s.vatRate as any) || 'none', methodCode: PAYMENT_METHOD_PREPAY_FULL, orderId: s.orderId, docType: 'IncomePrepayment', buyerEmail: s.clientEmail || defaultEmail, invoiceId: s.invoiceIdPrepay, callbackUrl: undefined, withPrepaymentItem: true, paymentAgentInfo: { AgentType: 'AGENT', SupplierInn: orgInn, SupplierName: orgData.orgName || 'Организация' } });
+          const payload = buildFermaReceiptPayload({ party: 'org', partyInn: orgInn, description: s.description || 'Оплата услуги', amountRub: s.amountGrossRub, vatRate: (s.vatRate as any) || 'none', methodCode: PAYMENT_METHOD_PREPAY_FULL, orderId: s.orderId, docType: 'IncomePrepayment', buyerEmail: s.clientEmail || defaultEmail, invoiceId: s.invoiceIdPrepay, callbackUrl: undefined, withPrepaymentItem: true, paymentAgentInfo: { AgentType: 'AGENT', SupplierInn: orgInn, SupplierName: 'Организация' } });
           const created = await fermaCreateReceipt(payload, { baseUrl, authToken: ofdToken });
           try { (global as any).__OFD_SOURCE__ = 'repair_worker'; } catch {}
           await updateSaleOfdUrlsByOrderId(userId, s.orderId, { ofdPrepayId: created.id || null });
