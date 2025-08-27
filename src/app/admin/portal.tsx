@@ -61,7 +61,7 @@ function AdminLogin({ onLogged }: { onLogged: () => void }) {
 // Deprecated: moved to LkUsersPanel as LkUserOptions
 
 function AdminDashboard({ showToast, role }: { showToast: (m: string, k?: any) => void; role: 'superadmin' | 'admin' | null }) {
-  const [tab, setTab] = useState<'users' | 'sales' | 'links' | 'partners' | 'orgs' | 'logs' | 'files' | 'lk_users' | 'tokens' | 'withdrawals'>(() => {
+  const [tab, setTab] = useState<'users' | 'sales' | 'links' | 'partners' | 'orgs' | 'files' | 'lk_users' | 'tokens' | 'withdrawals'>(() => {
     try { const u = new URL(window.location.href); const t = (u.searchParams.get('tab')||'') as any; if (t) return t; } catch {}
     return 'sales';
   });
@@ -77,7 +77,6 @@ function AdminDashboard({ showToast, role }: { showToast: (m: string, k?: any) =
         <Button variant={tab==='lk_users'?'secondary':'ghost'} onClick={() => setTab('lk_users')}>Пользователи ЛК</Button>
         <Button variant={tab==='tokens'?'secondary':'ghost'} onClick={() => setTab('tokens')}>Токены</Button>
         <Button variant={tab==='withdrawals'?'secondary':'ghost'} onClick={() => setTab('withdrawals')}>Выводы</Button>
-        <Button variant={tab==='logs'?'secondary':'ghost'} onClick={() => setTab('logs')}>Логи</Button>
         <Button variant={tab==='files'?'secondary':'ghost'} onClick={() => setTab('files')}>Файлы</Button>
         <div className="ml-auto" />
         <Button variant={tab==='users'?'secondary':'ghost'} onClick={() => setTab('users')}>Юзеры</Button>
@@ -91,7 +90,6 @@ function AdminDashboard({ showToast, role }: { showToast: (m: string, k?: any) =
       {tab === 'links' ? <LinksPanel showToast={showToast} role={role} /> : null}
       {tab === 'partners' ? <PartnersPanel showToast={showToast} role={role} /> : null}
       {tab === 'orgs' ? <OrgsPanel showToast={showToast} role={role} /> : null}
-      {tab === 'logs' ? <LogsPanel /> : null}
       {tab === 'files' ? <FilesPanel /> : null}
       {tab === 'tokens' ? <TokensPanel /> : null}
       {tab === 'withdrawals' ? <WithdrawalsPanel /> : null}
@@ -525,16 +523,7 @@ function OrgsPanel({ showToast, role }: { showToast: (m: string, k?: any) => voi
   );
 }
 
-function LogsPanel() {
-  const [entries, setEntries] = useState<string>('');
-  useEffect(()=>{ (async()=>{ try { const r = await fetch('/api/admin/logs?type=ofd', { cache: 'no-store' }); const t = await r.text(); setEntries(t || ''); } catch {} })(); },[]);
-  return (
-    <div>
-      <div className="text-sm text-gray-600 dark:text-gray-300 mb-2">OFD Audit (если включён OFD_AUDIT=1)</div>
-      <textarea className="w-full h-96 border rounded p-2 font-mono text-xs" readOnly value={entries} />
-    </div>
-  );
-}
+// LogsPanel removed per request
 
 function FilesPanel() {
   const [list, setList] = useState<string[]>([]);
