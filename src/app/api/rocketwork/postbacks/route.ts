@@ -19,6 +19,25 @@ export async function GET(req: Request) {
     if (!token) return NextResponse.json({ error: 'NO_TOKEN' }, { status: 400 });
 
     const base = process.env.ROCKETWORK_API_BASE_URL || 'https://app.rocketwork.ru/api/';
+    const urlObj = new URL(req.url);
+    const ensure = urlObj.searchParams.get('ensure') === '1';
+    if (ensure) {
+      // Perform upsert just like POST, then list
+      try {
+        const cbProto = req.headers.get('x-forwarded-proto') || 'http';
+        const cbHost = req.headers.get('x-forwarded-host') || req.headers.get('host') || 'localhost:3000';
+        const callbackBase = `${cbProto}://${cbHost}`;
+        const callbackUrl = new URL(`/api/rocketwork/postbacks/${encodeURIComponent(userId)}`, callbackBase).toString();
+        const headers = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', Accept: 'application/json' } as Record<string, string>;
+        for (const path of ['postback_subscriptions', 'postbacks']) {
+          try {
+            const createUrl = new URL(path, base.endsWith('/') ? base : base + '/').toString();
+            const payload = { http_method: 'post', uri: callbackUrl, subscribed_on: ['tasks', 'executors'] } as any;
+            await fetch(createUrl, { method: 'POST', headers, body: JSON.stringify(payload), cache: 'no-store' });
+          } catch {}
+        }
+      } catch {}
+    }
     async function list(urlPath: string) {
       const url = new URL(urlPath, base.endsWith('/') ? base : base + '/').toString();
       const res = await fetch(url, { method: 'GET', headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }, cache: 'no-store' });

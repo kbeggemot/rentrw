@@ -384,11 +384,13 @@ export async function POST(req: Request) {
       // Removed: prepayment receipt creation and offset scheduling at creation time
       // Ensure postback subscription is present for this user (auto-upsert)
       try {
-        const cbBaseProto = (await nextHeaders()).get('x-forwarded-proto') || 'http';
-        const cbBaseHost = (await nextHeaders()).get('x-forwarded-host') || (await nextHeaders()).get('host') || 'localhost:3000';
+        const hdrs = await nextHeaders();
+        const cbBaseProto = hdrs.get('x-forwarded-proto') || 'http';
+        const cbBaseHost = hdrs.get('x-forwarded-host') || hdrs.get('host') || 'localhost:3000';
         const callbackBase = `${cbBaseProto}://${cbBaseHost}`;
-        const upsertUrl = new URL('/api/rocketwork/postbacks', callbackBase).toString();
-        await fetch(upsertUrl, { method: 'POST', headers: { 'x-user-id': userId, Accept: 'application/json' }, cache: 'no-store' });
+        const upsertUrl = new URL('/api/rocketwork/postbacks?ensure=1', callbackBase).toString();
+        // Use session_user cookie to pass user id for GET handler
+        await fetch(upsertUrl, { method: 'GET', headers: { cookie: `session_user=${encodeURIComponent(userId)}` }, cache: 'no-store' });
       } catch {}
     }
 
