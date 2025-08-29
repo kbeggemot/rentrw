@@ -122,7 +122,8 @@ export async function POST(req: Request) {
             const payUrl = new URL(`tasks/${encodeURIComponent(String(taskId))}/pay`, base.endsWith('/') ? base : base + '/').toString();
             try {
               if (process.env.OFD_AUDIT === '1') {
-                await appendOfdAudit({ ts: new Date().toISOString(), source: 'postback', userId, orderId: sale.orderId, taskId, action: 'background_pay', patch: { reason: 'agent_transfered_completed_has_full', payUrl } });
+                const numOrder = Number(String(sale.orderId).match(/(\d+)/g)?.slice(-1)[0] || NaN);
+                await appendOfdAudit({ ts: new Date().toISOString(), source: 'postback', userId, orderId: numOrder, taskId, action: 'background_pay', patch: { reason: 'agent_transfered_completed_has_full', payUrl } });
               }
             } catch {}
             await fetch(payUrl, { method: 'PATCH', headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }, cache: 'no-store' });
@@ -228,12 +229,13 @@ export async function POST(req: Request) {
                         const line2 = JSON.stringify({ ts: new Date().toISOString(), src: 'postback', stage: 'create_result', party: 'partner', userId, taskId, orderId: sale.orderId, invoiceId: invoiceIdFull, id: created.id, rawStatus: created.rawStatus, statusText: created.status });
                         await writeText('.data/ofd_create_attempts.log', prev2 + line2 + '\n');
                       } catch {}
-                      await updateSaleOfdUrlsByOrderId(userId, sale.orderId, { ofdFullId: created.id || null });
+                      { const numOrder = Number(String(sale.orderId).match(/(\d+)/g)?.slice(-1)[0] || NaN); await updateSaleOfdUrlsByOrderId(userId, numOrder, { ofdFullId: created.id || null }); }
                       // try resolve URL immediately without waiting for callback
                       try {
                         const built = await tryResolveUrl(created.id || null);
                         if (built) {
-                          await updateSaleOfdUrlsByOrderId(userId, sale.orderId, { ofdFullUrl: built });
+                          const numOrder = Number(String(sale.orderId).match(/(\d+)/g)?.slice(-1)[0] || NaN);
+                          await updateSaleOfdUrlsByOrderId(userId, numOrder, { ofdFullUrl: built });
                         }
                       } catch {}
                     }
@@ -253,11 +255,12 @@ export async function POST(req: Request) {
                         const line2 = JSON.stringify({ ts: new Date().toISOString(), src: 'postback', stage: 'create_result', party: 'partner', userId, taskId, orderId: sale.orderId, invoiceId: invoiceIdPrepay, id: created.id, rawStatus: created.rawStatus, statusText: created.status });
                         await writeText('.data/ofd_create_attempts.log', prev2 + line2 + '\n');
                       } catch {}
-                      await updateSaleOfdUrlsByOrderId(userId, sale.orderId, { ofdPrepayId: created.id || null });
+                      { const numOrder = Number(String(sale.orderId).match(/(\d+)/g)?.slice(-1)[0] || NaN); await updateSaleOfdUrlsByOrderId(userId, numOrder, { ofdPrepayId: created.id || null }); }
                       try {
                         const built = await tryResolveUrl(created.id || null);
                         if (built) {
-                          await updateSaleOfdUrlsByOrderId(userId, sale.orderId, { ofdUrl: built });
+                          const numOrder = Number(String(sale.orderId).match(/(\d+)/g)?.slice(-1)[0] || NaN);
+                          await updateSaleOfdUrlsByOrderId(userId, numOrder, { ofdUrl: built });
                         }
                       } catch {}
                       // schedule offset at 12:00 MSK
@@ -265,7 +268,7 @@ export async function POST(req: Request) {
                         startOfdScheduleWorker();
                         // 12:00 MSK -> convert to UTC: MSK=UTC+3, so 09:00Z
                         const dueDate = new Date(`${sale.serviceEndDate}T09:00:00Z`);
-                        await enqueueOffsetJob({ userId, orderId: sale.orderId, dueAt: dueDate.toISOString(), party: 'partner', partnerInn, description: 'Оплата услуги', amountRub: amountNet, vatRate: usedVat, buyerEmail: sale.clientEmail || defaultEmail });
+                        { const numOrder = Number(String(sale.orderId).match(/(\d+)/g)?.slice(-1)[0] || NaN); await enqueueOffsetJob({ userId, orderId: numOrder, dueAt: dueDate.toISOString(), party: 'partner', partnerInn, description: 'Оплата услуги', amountRub: amountNet, vatRate: usedVat, buyerEmail: sale.clientEmail || defaultEmail }); }
                       }
                     }
                   }
@@ -293,11 +296,12 @@ export async function POST(req: Request) {
                       const line2 = JSON.stringify({ ts: new Date().toISOString(), src: 'postback', stage: 'create_result', party: 'org', userId, taskId, orderId: sale.orderId, invoiceId: invoiceIdFull, id: created.id, rawStatus: created.rawStatus, statusText: created.status });
                       await writeText('.data/ofd_create_attempts.log', prev2 + line2 + '\n');
                     } catch {}
-                    await updateSaleOfdUrlsByOrderId(userId, sale.orderId, { ofdFullId: created.id || null });
+                    { const numOrder = Number(String(sale.orderId).match(/(\d+)/g)?.slice(-1)[0] || NaN); await updateSaleOfdUrlsByOrderId(userId, numOrder, { ofdFullId: created.id || null }); }
                     try {
                       const built = await tryResolveUrl(created.id || null);
                       if (built) {
-                        await updateSaleOfdUrlsByOrderId(userId, sale.orderId, { ofdFullUrl: built });
+                        const numOrder = Number(String(sale.orderId).match(/(\d+)/g)?.slice(-1)[0] || NaN);
+                        await updateSaleOfdUrlsByOrderId(userId, numOrder, { ofdFullUrl: built });
                       }
                     } catch {}
                   }
@@ -316,17 +320,18 @@ export async function POST(req: Request) {
                       const line2 = JSON.stringify({ ts: new Date().toISOString(), src: 'postback', stage: 'create_result', party: 'org', userId, taskId, orderId: sale.orderId, invoiceId: invoiceIdPrepay, id: created.id, rawStatus: created.rawStatus, statusText: created.status });
                       await writeText('.data/ofd_create_attempts.log', prev2 + line2 + '\n');
                     } catch {}
-                    await updateSaleOfdUrlsByOrderId(userId, sale.orderId, { ofdPrepayId: created.id || null });
+                    { const numOrder = Number(String(sale.orderId).match(/(\d+)/g)?.slice(-1)[0] || NaN); await updateSaleOfdUrlsByOrderId(userId, numOrder, { ofdPrepayId: created.id || null }); }
                     try {
                       const built = await tryResolveUrl(created.id || null);
                       if (built) {
-                        await updateSaleOfdUrlsByOrderId(userId, sale.orderId, { ofdUrl: built });
+                        const numOrder = Number(String(sale.orderId).match(/(\d+)/g)?.slice(-1)[0] || NaN);
+                        await updateSaleOfdUrlsByOrderId(userId, numOrder, { ofdUrl: built });
                       }
                     } catch {}
                     if (sale.serviceEndDate) {
                       startOfdScheduleWorker();
                       const dueDate = new Date(`${sale.serviceEndDate}T09:00:00Z`);
-                      await enqueueOffsetJob({ userId, orderId: sale.orderId, dueAt: dueDate.toISOString(), party: 'org', description: 'Оплата услуги', amountRub, vatRate: usedVat, buyerEmail: sale.clientEmail || defaultEmail });
+                      { const numOrder = Number(String(sale.orderId).match(/(\d+)/g)?.slice(-1)[0] || NaN); await enqueueOffsetJob({ userId, orderId: numOrder, dueAt: dueDate.toISOString(), party: 'org', description: 'Оплата услуги', amountRub, vatRate: usedVat, buyerEmail: sale.clientEmail || defaultEmail }); }
                     }
                   }
                 }
