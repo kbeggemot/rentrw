@@ -309,7 +309,25 @@ export async function POST(req: Request) {
                       const line = JSON.stringify({ ts: new Date().toISOString(), src: 'postback', stage: 'create_attempt', party: 'org', userId, taskId, orderId: sale.orderId, invoiceId: invoiceIdFull, callbackUrl, orgInn });
                       await writeText('.data/ofd_create_attempts.log', prev + line + '\n');
                     } catch {}
-                    const payload = buildFermaReceiptPayload({ party: 'org', partyInn: orgInn, description: itemLabelOrg, amountRub: amountRub, vatRate: usedVat, methodCode: PAYMENT_METHOD_FULL_PAYMENT, orderId: sale.orderId, docType: 'Income', buyerEmail: sale.clientEmail || defaultEmail, invoiceId: invoiceIdFull, callbackUrl, paymentAgentInfo: { AgentType: 'AGENT', SupplierInn: orgInn, SupplierName: 'Организация' } });
+                    let supplierName: string | undefined;
+                    try {
+                      const { findOrgByInn, getTokenForOrg, updateOrganizationName } = await import('@/server/orgStore');
+                      const rec = await findOrgByInn(orgInn);
+                      supplierName = (rec?.name && rec.name.trim().length > 0) ? rec.name.trim() : undefined;
+                      if (!supplierName) {
+                        const tok = await getTokenForOrg(orgInn, userId);
+                        if (tok) {
+                          const base = process.env.ROCKETWORK_API_BASE_URL || 'https://app.rocketwork.ru/api/';
+                          const accUrl = new URL('account', base.endsWith('/') ? base : base + '/').toString();
+                          const r = await fetch(accUrl, { headers: { Authorization: `Bearer ${tok}`, Accept: 'application/json' }, cache: 'no-store' });
+                          const txt = await r.text();
+                          let d: any = null; try { d = txt ? JSON.parse(txt) : null; } catch { d = txt; }
+                          const nm = ((d?.company_name as string | undefined) ?? (d?.companyName as string | undefined) ?? '').trim();
+                          if (nm) { supplierName = nm; try { await updateOrganizationName(orgInn, nm); } catch {} }
+                        }
+                      }
+                    } catch {}
+                    const payload = buildFermaReceiptPayload({ party: 'org', partyInn: orgInn, description: itemLabelOrg, amountRub: amountRub, vatRate: usedVat, methodCode: PAYMENT_METHOD_FULL_PAYMENT, orderId: sale.orderId, docType: 'Income', buyerEmail: sale.clientEmail || defaultEmail, invoiceId: invoiceIdFull, callbackUrl, paymentAgentInfo: { AgentType: 'AGENT', SupplierInn: orgInn, SupplierName: supplierName } });
                     const created = await fermaCreateReceipt(payload, { baseUrl, authToken: tokenOfd });
                     try {
                       const prev2 = (await readText('.data/ofd_create_attempts.log')) || '';
@@ -336,7 +354,25 @@ export async function POST(req: Request) {
                       const line = JSON.stringify({ ts: new Date().toISOString(), src: 'postback', stage: 'create_attempt', party: 'org', userId, taskId, orderId: sale.orderId, invoiceId: invoiceIdPrepay, callbackUrl, orgInn });
                       await writeText('.data/ofd_create_attempts.log', prev + line + '\n');
                     } catch {}
-                    const payload = buildFermaReceiptPayload({ party: 'org', partyInn: orgInn, description: itemLabelOrg, amountRub: amountRub, vatRate: usedVat, methodCode: PAYMENT_METHOD_PREPAY_FULL, orderId: sale.orderId, docType: 'IncomePrepayment', buyerEmail: sale.clientEmail || defaultEmail, invoiceId: invoiceIdPrepay, callbackUrl, withPrepaymentItem: true, paymentAgentInfo: { AgentType: 'AGENT', SupplierInn: orgInn, SupplierName: 'Организация' } });
+                    let supplierName2: string | undefined;
+                    try {
+                      const { findOrgByInn, getTokenForOrg, updateOrganizationName } = await import('@/server/orgStore');
+                      const rec2 = await findOrgByInn(orgInn);
+                      supplierName2 = (rec2?.name && rec2.name.trim().length > 0) ? rec2.name.trim() : undefined;
+                      if (!supplierName2) {
+                        const tok2 = await getTokenForOrg(orgInn, userId);
+                        if (tok2) {
+                          const base = process.env.ROCKETWORK_API_BASE_URL || 'https://app.rocketwork.ru/api/';
+                          const accUrl = new URL('account', base.endsWith('/') ? base : base + '/').toString();
+                          const r = await fetch(accUrl, { headers: { Authorization: `Bearer ${tok2}`, Accept: 'application/json' }, cache: 'no-store' });
+                          const txt = await r.text();
+                          let d: any = null; try { d = txt ? JSON.parse(txt) : null; } catch { d = txt; }
+                          const nm = ((d?.company_name as string | undefined) ?? (d?.companyName as string | undefined) ?? '').trim();
+                          if (nm) { supplierName2 = nm; try { await updateOrganizationName(orgInn, nm); } catch {} }
+                        }
+                      }
+                    } catch {}
+                    const payload = buildFermaReceiptPayload({ party: 'org', partyInn: orgInn, description: itemLabelOrg, amountRub: amountRub, vatRate: usedVat, methodCode: PAYMENT_METHOD_PREPAY_FULL, orderId: sale.orderId, docType: 'IncomePrepayment', buyerEmail: sale.clientEmail || defaultEmail, invoiceId: invoiceIdPrepay, callbackUrl, withPrepaymentItem: true, paymentAgentInfo: { AgentType: 'AGENT', SupplierInn: orgInn, SupplierName: supplierName2 } });
                     const created = await fermaCreateReceipt(payload, { baseUrl, authToken: tokenOfd });
                     try {
                       const prev2 = (await readText('.data/ofd_create_attempts.log')) || '';
