@@ -193,7 +193,7 @@ export async function GET(_: Request) {
                 const partnerInn: string | undefined = (normalized as any)?.executor?.inn as string | undefined;
                 if (partnerInn) {
                   const { getInvoiceIdForFull } = await import('@/server/orderStore');
-                  const invoiceIdFull = await getInvoiceIdForFull(sale.orderId);
+                  const invoiceIdFull = await getInvoiceIdForFull(Number(String(sale.orderId).match(/(\d+)/g)?.slice(-1)[0] || NaN));
                   const partnerName = ((normalized as any)?.executor && [
                     (normalized as any)?.executor?.last_name,
                     (normalized as any)?.executor?.first_name,
@@ -202,18 +202,18 @@ export async function GET(_: Request) {
                   const bEmail = sale.clientEmail || (normalized as any)?.acquiring_order?.client_email || defaultEmail;
                   const payload = buildFermaReceiptPayload({ party: 'partner', partyInn: partnerInn, description: itemLabel, amountRub: amountNetRub, vatRate: usedVat, methodCode: PAYMENT_METHOD_FULL_PAYMENT, orderId: sale.orderId, docType: 'Income', buyerEmail: bEmail, invoiceId: invoiceIdFull, callbackUrl, paymentAgentInfo: { AgentType: 'AGENT', SupplierInn: partnerInn, SupplierName: partnerName || 'Исполнитель' } });
                   const created = await fermaCreateReceipt(payload, { baseUrl, authToken: tokenOfd });
-                  await updateSaleOfdUrlsByOrderId(userId, sale.orderId, { ofdFullId: created.id || null });
+                  { const numOrder = Number(String(sale.orderId).match(/(\d+)/g)?.slice(-1)[0] || NaN); await updateSaleOfdUrlsByOrderId(userId, numOrder, { ofdFullId: created.id || null }); }
                 }
               } else {
                 const orgInn = await getUserOrgInn(userId);
                 const orgDataReq = orgInn ? await getOrgPayoutRequisites(orgInn) : { bik: null, account: null };
                 if (orgInn) {
                   const { getInvoiceIdForFull } = await import('@/server/orderStore');
-                  const invoiceIdFull = await getInvoiceIdForFull(sale.orderId);
+                  const invoiceIdFull = await getInvoiceIdForFull(Number(String(sale.orderId).match(/(\d+)/g)?.slice(-1)[0] || NaN));
                   const bEmail = sale.clientEmail || (normalized as any)?.acquiring_order?.client_email || defaultEmail;
                   const payload = buildFermaReceiptPayload({ party: 'org', partyInn: orgInn, description: itemLabel, amountRub, vatRate: usedVat, methodCode: PAYMENT_METHOD_FULL_PAYMENT, orderId: sale.orderId, docType: 'Income', buyerEmail: bEmail, invoiceId: invoiceIdFull, callbackUrl, paymentAgentInfo: { AgentType: 'AGENT', SupplierInn: orgInn, SupplierName: 'Организация' } });
                   const created = await fermaCreateReceipt(payload, { baseUrl, authToken: tokenOfd });
-                  await updateSaleOfdUrlsByOrderId(userId, sale.orderId, { ofdFullId: created.id || null });
+                  { const numOrder = Number(String(sale.orderId).match(/(\d+)/g)?.slice(-1)[0] || NaN); await updateSaleOfdUrlsByOrderId(userId, numOrder, { ofdFullId: created.id || null }); }
                 }
               }
             }
@@ -224,7 +224,7 @@ export async function GET(_: Request) {
                 const partnerInn: string | undefined = (normalized as any)?.executor?.inn as string | undefined;
                 if (partnerInn) {
                   const { getInvoiceIdForPrepay } = await import('@/server/orderStore');
-                  const invoiceIdFull = await getInvoiceIdForPrepay(sale.orderId);
+                  const invoiceIdFull = await getInvoiceIdForPrepay(Number(String(sale.orderId).match(/(\d+)/g)?.slice(-1)[0] || NaN));
                   const partnerName2 = ((normalized as any)?.executor && [
                     (normalized as any)?.executor?.last_name,
                     (normalized as any)?.executor?.first_name,
@@ -233,18 +233,18 @@ export async function GET(_: Request) {
                   const bEmail = sale.clientEmail || (normalized as any)?.acquiring_order?.client_email || defaultEmail;
                   const payload = buildFermaReceiptPayload({ party: 'partner', partyInn: partnerInn, description: itemLabel, amountRub: amountNetRub, vatRate: usedVat, methodCode: PAYMENT_METHOD_PREPAY_FULL, orderId: sale.orderId, docType: 'IncomePrepayment', buyerEmail: bEmail, invoiceId: invoiceIdFull, callbackUrl, withPrepaymentItem: true, paymentAgentInfo: { AgentType: 'AGENT', SupplierInn: partnerInn, SupplierName: partnerName2 || 'Исполнитель' } });
                   const created = await fermaCreateReceipt(payload, { baseUrl, authToken: tokenOfd });
-                  await updateSaleOfdUrlsByOrderId(userId, sale.orderId, { ofdPrepayId: created.id || null });
+                  { const numOrder = Number(String(sale.orderId).match(/(\d+)/g)?.slice(-1)[0] || NaN); await updateSaleOfdUrlsByOrderId(userId, numOrder, { ofdPrepayId: created.id || null }); }
                 }
               } else {
                 const orgInn = await getUserOrgInn(userId);
                 const orgDataReq2 = orgInn ? await getOrgPayoutRequisites(orgInn) : { bik: null, account: null };
                 if (orgInn) {
                   const { getInvoiceIdForPrepay } = await import('@/server/orderStore');
-                  const invoiceIdFull = await getInvoiceIdForPrepay(sale.orderId);
+                  const invoiceIdFull = await getInvoiceIdForPrepay(Number(String(sale.orderId).match(/(\d+)/g)?.slice(-1)[0] || NaN));
                   const bEmail = sale.clientEmail || (normalized as any)?.acquiring_order?.client_email || defaultEmail;
                   const payload = buildFermaReceiptPayload({ party: 'org', partyInn: orgInn, description: itemLabel, amountRub, vatRate: usedVat, methodCode: PAYMENT_METHOD_PREPAY_FULL, orderId: sale.orderId, docType: 'IncomePrepayment', buyerEmail: bEmail, invoiceId: invoiceIdFull, callbackUrl, withPrepaymentItem: true, paymentAgentInfo: { AgentType: 'AGENT', SupplierInn: orgInn, SupplierName: 'Организация' } });
                   const created = await fermaCreateReceipt(payload, { baseUrl, authToken: tokenOfd });
-                  await updateSaleOfdUrlsByOrderId(userId, sale.orderId, { ofdPrepayId: created.id || null });
+                  { const numOrder = Number(String(sale.orderId).match(/(\d+)/g)?.slice(-1)[0] || NaN); await updateSaleOfdUrlsByOrderId(userId, numOrder, { ofdPrepayId: created.id || null }); }
                 }
               }
             }
@@ -256,7 +256,7 @@ export async function GET(_: Request) {
                 partnerInn = (normalized as any)?.executor?.inn as string | undefined;
               }
               const bEmail = sale.clientEmail || (normalized as any)?.acquiring_order?.client_email || defaultEmail;
-              await enqueueOffsetJob({ userId, orderId: sale.orderId, dueAt: dueDate.toISOString(), party: sale.isAgent ? 'partner' : 'org', partnerInn, description: 'Оплата услуги', amountRub: sale.isAgent ? amountNetRub : amountRub, vatRate: usedVat, buyerEmail: bEmail });
+              { const numOrder = Number(String(sale.orderId).match(/(\d+)/g)?.slice(-1)[0] || NaN); await enqueueOffsetJob({ userId, orderId: numOrder, dueAt: dueDate.toISOString(), party: sale.isAgent ? 'partner' : 'org', partnerInn, description: 'Оплата услуги', amountRub: sale.isAgent ? amountNetRub : amountRub, vatRate: usedVat, buyerEmail: bEmail }); }
             }
           }
         }
