@@ -62,7 +62,8 @@ export async function GET(req: Request) {
           }
           if (Object.keys(patch).length > 0) {
             try { (global as any).__OFD_SOURCE__ = 'sync'; } catch {}
-            await updateSaleOfdUrlsByOrderId(userId, s.orderId, patch);
+            const numOrder = Number(String(s.orderId).match(/(\d+)/g)?.slice(-1)[0] || NaN);
+            await updateSaleOfdUrlsByOrderId(userId, numOrder, patch);
             updated += 1;
           }
         }
