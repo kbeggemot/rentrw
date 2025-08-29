@@ -5,9 +5,9 @@ type OrderStoreData = { lastOrderId: number; prefix?: string };
 const ORDER_FILE = '.data/order.json';
 
 function withLocalPrefix(value: string): string {
-  // In local/dev environment add a human-visible prefix to distinguish ids
+  // In local/dev environment add numeric-safe prefix without dash for easier parsing
   const isLocal = process.env.NODE_ENV !== 'production';
-  return isLocal ? `local-${value}` : value;
+  return isLocal ? `0000${value}` : value;
 }
 
 const DEFAULT_PREFIX = process.env.OFD_INVOICE_PREFIX || process.env.INVOICE_PREFIX || 'fhrff351d';

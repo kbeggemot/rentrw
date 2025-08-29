@@ -53,7 +53,8 @@ function normalizeOrderId(value: string | number): number {
 }
 
 function withLocalOrderPrefix(orderId: number): string | number {
-  return process.env.NODE_ENV !== 'production' ? `local-${orderId}` : orderId;
+  // In local/dev store orderId as string with numeric-safe prefix without dash
+  return process.env.NODE_ENV !== 'production' ? `0000${orderId}` : orderId;
 }
 
 type TaskStoreData = {
@@ -242,7 +243,7 @@ export async function updateSaleOfdUrls(userId: string, taskId: number | string,
 export async function updateSaleOfdUrlsByOrderId(userId: string, orderId: number, patch: Partial<Pick<SaleRecord, 'ofdUrl' | 'ofdFullUrl' | 'ofdPrepayId' | 'ofdFullId'>>): Promise<void> {
   const store = await readTasks();
   if (!store.sales) store.sales = [];
-  const idx = store.sales.findIndex((s) => s.orderId === orderId && s.userId === userId);
+  const idx = store.sales.findIndex((s) => normalizeOrderId(s.orderId) === orderId && s.userId === userId);
   if (idx !== -1) {
     const current = store.sales[idx];
     const next = { ...current } as SaleRecord;
