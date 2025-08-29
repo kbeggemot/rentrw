@@ -339,14 +339,31 @@ function SalesPanel({ showToast, role }: { showToast: (m: string, k?: any) => vo
     <div className="space-y-3">
       <div className="flex gap-2 items-center">
         <Button variant="secondary" onClick={load}>Обновить</Button>
-        <details className="relative">
-          <summary className="list-none cursor-pointer inline-flex items-center h-9 px-3 rounded border bg-white dark:bg-gray-900 hover:bg-gray-50 dark:hover:bg-gray-800 select-none">Массовые действия</summary>
-          <div className="absolute z-50 mt-1 w-56 border rounded bg-white dark:bg-gray-950 shadow">
-            <button className="w-full text-left px-3 py-2 hover:bg-gray-50 dark:hover:bg-gray-900" onClick={async()=>{ await fetch('/api/sales?refresh=1',{cache:'no-store'}); await load(); showToast('Опрос RW запущен','info'); }}>Опросить RW</button>
+        <details className="relative" onToggle={(e)=>{ /* no-op for now */ }}>
+          <summary className="list-none cursor-pointer inline-flex items-center h-9 px-3 rounded border bg-white dark:bg-gray-900 hover:bg-gray-50 dark:hover:bg-gray-800 select-none" onClick={(e)=>{ /* prevent immediate close on button click */ e.stopPropagation(); }}>{'Массовые действия'}</summary>
+          <div className="absolute z-50 mt-1 w-64 border rounded bg-white dark:bg-gray-950 shadow" onClick={(e)=>e.stopPropagation()}>
+            <button className="w-full text-left px-3 py-2 hover:bg-gray-50 dark:hover:bg-gray-900" onClick={async(e)=>{ e.preventDefault(); e.stopPropagation(); try{ await fetch('/api/sales?refresh=1',{cache:'no-store',credentials:'include'}); await load(); showToast('Опрос RW запущен','info'); }catch{ showToast('Сеть/сервер недоступен','error'); } finally { try { const d=e.currentTarget.closest('details') as HTMLDetailsElement|null; if(d) d.open=false; } catch {} } }}>Опросить RW</button>
             {role==='superadmin' ? (
               <>
-                <button className="w-full text-left px-3 py-2 hover:bg-gray-50 dark:hover:bg-gray-900" onClick={async()=>{ await fetch('/api/admin/actions/repair',{method:'POST'}); showToast('Repair запущен','info'); }}>Repair</button>
-                <button className="w-full text-left px-3 py-2 hover:bg-gray-50 dark:hover:bg-gray-900" onClick={async()=>{ await fetch('/api/admin/actions/schedule',{method:'POST'}); showToast('Schedule запущен','info'); }}>Schedule</button>
+                <button className="w-full text-left px-3 py-2 hover:bg-gray-50 dark:hover:bg-gray-900" onClick={async(e)=>{ e.preventDefault(); e.stopPropagation();
+                  try {
+                    const r = await fetch('/api/admin/actions/repair?rebuild=1',{method:'POST', credentials:'include', cache:'no-store'});
+                    const d = await r.json().catch(()=>null);
+                    if (!r.ok) { showToast(String(d?.error||`Ошибка ${r.status}`),'error'); return; }
+                    await load();
+                    const n = typeof d?.added==='number'? d.added : undefined;
+                    showToast(`Восстановление завершено${typeof n==='number'?` (+${n})`:''}`,'success');
+                  } catch { showToast('Сеть/сервер недоступен','error'); } finally { try { const dd=e.currentTarget.closest('details') as HTMLDetailsElement|null; if(dd) dd.open=false; } catch {} }
+                }}>Восстановить продажи (из кэша постбеков)</button>
+                <button className="w-full text-left px-3 py-2 hover:bg-gray-50 dark:hover:bg-gray-900" onClick={async(e)=>{ e.preventDefault(); e.stopPropagation();
+                  try {
+                    const r = await fetch('/api/admin/actions/repair',{method:'POST', credentials:'include', cache:'no-store'});
+                    const d = await r.json().catch(()=>null);
+                    if (!r.ok) { showToast(String(d?.error||`Ошибка ${r.status}`),'error'); return; }
+                    showToast('OFD Repair запущен','success');
+                  } catch { showToast('Сеть/сервер недоступен','error'); } finally { try { const d=e.currentTarget.closest('details') as HTMLDetailsElement|null; if(d) d.open=false; } catch {} }
+                }}>Запустить OFD Repair</button>
+                <button className="w-full text-left px-3 py-2 hover:bg-gray-50 dark:hover:bg-gray-900" onClick={async(e)=>{ e.preventDefault(); e.stopPropagation(); try{ await fetch('/api/admin/actions/schedule',{method:'POST',credentials:'include',cache:'no-store'}); showToast('Schedule запущен','info'); } catch { showToast('Сеть/сервер недоступен','error'); } finally { try { const d=e.currentTarget.closest('details') as HTMLDetailsElement|null; if(d) d.open=false; } catch {} } }}>Schedule</button>
               </>
             ) : null}
           </div>
