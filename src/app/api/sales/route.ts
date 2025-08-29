@@ -172,7 +172,7 @@ export async function GET(req: Request) {
                         const partnerInn: string | undefined = (normalized as any)?.executor?.inn as string | undefined;
                         if (partnerInn) {
                           const { getInvoiceIdForFull } = await import('@/server/orderStore');
-                          const invoiceIdFull = await getInvoiceIdForFull(sale.orderId);
+                          const invoiceIdFull = await getInvoiceIdForFull(Number(String(sale.orderId).match(/(\d+)/g)?.slice(-1)[0] || NaN));
                           const partnerName = ((normalized as any)?.executor && [
                             (normalized as any)?.executor?.last_name,
                             (normalized as any)?.executor?.first_name,
@@ -182,18 +182,18 @@ export async function GET(req: Request) {
                           const payload = (await import('@/app/api/ofd/ferma/build-payload')).buildFermaReceiptPayload({ party: 'partner', partyInn: partnerInn, description: itemLabel, amountRub: amountNetRub, vatRate: usedVat, methodCode: (await import('@/app/api/ofd/ferma/build-payload')).PAYMENT_METHOD_FULL_PAYMENT, orderId: sale.orderId, docType: 'Income', buyerEmail: bEmail, invoiceId: invoiceIdFull, callbackUrl, paymentAgentInfo: { AgentType: 'AGENT', SupplierInn: partnerInn, SupplierName: partnerName || 'Исполнитель' } });
                           const created = await (await import('@/server/ofdFerma')).fermaCreateReceipt(payload, { baseUrl, authToken: tokenOfd });
                           try { (global as any).__OFD_SOURCE__ = 'refresh'; } catch {}
-                          await updateSaleOfdUrlsByOrderId(userId, sale.orderId, { ofdFullId: created.id || null });
+                          { const numOrder = Number(String(sale.orderId).match(/(\d+)/g)?.slice(-1)[0] || NaN); await updateSaleOfdUrlsByOrderId(userId, numOrder, { ofdFullId: created.id || null }); }
                         }
                       } else {
                         const orgInn = (sale.orgInn && String(sale.orgInn).trim().length > 0 && String(sale.orgInn) !== 'неизвестно') ? String(sale.orgInn).replace(/\D/g, '') : null;
                         if (orgInn) {
                           const { getInvoiceIdForFull } = await import('@/server/orderStore');
-                          const invoiceIdFull = await getInvoiceIdForFull(sale.orderId);
+                          const invoiceIdFull = await getInvoiceIdForFull(Number(String(sale.orderId).match(/(\d+)/g)?.slice(-1)[0] || NaN));
                           const bEmail = sale.clientEmail || (normalized as any)?.acquiring_order?.client_email || (process.env.OFD_DEFAULT_EMAIL || process.env.DEFAULT_RECEIPT_EMAIL || 'ofd@rockethumans.com');
                           const payload = (await import('@/app/api/ofd/ferma/build-payload')).buildFermaReceiptPayload({ party: 'org', partyInn: orgInn, description: itemLabel, amountRub, vatRate: usedVat, methodCode: (await import('@/app/api/ofd/ferma/build-payload')).PAYMENT_METHOD_FULL_PAYMENT, orderId: sale.orderId, docType: 'Income', buyerEmail: bEmail, invoiceId: invoiceIdFull, callbackUrl, paymentAgentInfo: { AgentType: 'AGENT', SupplierInn: orgInn, SupplierName: 'Организация' } });
                           const created = await (await import('@/server/ofdFerma')).fermaCreateReceipt(payload, { baseUrl, authToken: tokenOfd });
                           try { (global as any).__OFD_SOURCE__ = 'refresh'; } catch {}
-                          await updateSaleOfdUrlsByOrderId(userId, sale.orderId, { ofdFullId: created.id || null });
+                          { const numOrder = Number(String(sale.orderId).match(/(\d+)/g)?.slice(-1)[0] || NaN); await updateSaleOfdUrlsByOrderId(userId, numOrder, { ofdFullId: created.id || null }); }
                         }
                       }
                     }
@@ -203,7 +203,7 @@ export async function GET(req: Request) {
                         const partnerInn: string | undefined = (normalized as any)?.executor?.inn as string | undefined;
                         if (partnerInn) {
                           const { getInvoiceIdForPrepay } = await import('@/server/orderStore');
-                          const invoiceIdPrepay = await getInvoiceIdForPrepay(sale.orderId);
+                          const invoiceIdPrepay = await getInvoiceIdForPrepay(Number(String(sale.orderId).match(/(\d+)/g)?.slice(-1)[0] || NaN));
                           const partnerName2 = ((normalized as any)?.executor && [
                             (normalized as any)?.executor?.last_name,
                             (normalized as any)?.executor?.first_name,
@@ -213,22 +213,22 @@ export async function GET(req: Request) {
                           const payload = (await import('@/app/api/ofd/ferma/build-payload')).buildFermaReceiptPayload({ party: 'partner', partyInn: partnerInn, description: itemLabel, amountRub: amountNetRub, vatRate: usedVat, methodCode: (await import('@/app/api/ofd/ferma/build-payload')).PAYMENT_METHOD_PREPAY_FULL, orderId: sale.orderId, docType: 'IncomePrepayment', buyerEmail: bEmail, invoiceId: invoiceIdPrepay, callbackUrl, withPrepaymentItem: true, paymentAgentInfo: { AgentType: 'AGENT', SupplierInn: partnerInn, SupplierName: partnerName2 || 'Исполнитель' } });
                           const created = await (await import('@/server/ofdFerma')).fermaCreateReceipt(payload, { baseUrl, authToken: tokenOfd });
                           try { (global as any).__OFD_SOURCE__ = 'refresh'; } catch {}
-                          await updateSaleOfdUrlsByOrderId(userId, sale.orderId, { ofdPrepayId: created.id || null });
+                          { const numOrder = Number(String(sale.orderId).match(/(\d+)/g)?.slice(-1)[0] || NaN); await updateSaleOfdUrlsByOrderId(userId, numOrder, { ofdPrepayId: created.id || null }); }
                         }
                       } else {
                         const orgInn = (sale.orgInn && String(sale.orgInn).trim().length > 0 && String(sale.orgInn) !== 'неизвестно') ? String(sale.orgInn).replace(/\D/g, '') : null;
                         if (orgInn) {
                           const { getInvoiceIdForPrepay } = await import('@/server/orderStore');
-                          const invoiceIdPrepay = await getInvoiceIdForPrepay(sale.orderId);
+                          const invoiceIdPrepay = await getInvoiceIdForPrepay(Number(String(sale.orderId).match(/(\d+)/g)?.slice(-1)[0] || NaN));
                           const bEmail = sale.clientEmail || (normalized as any)?.acquiring_order?.client_email || (process.env.OFD_DEFAULT_EMAIL || process.env.DEFAULT_RECEIPT_EMAIL || 'ofd@rockethumans.com');
                           const payload = (await import('@/app/api/ofd/ferma/build-payload')).buildFermaReceiptPayload({ party: 'org', partyInn: orgInn, description: itemLabel, amountRub, vatRate: usedVat, methodCode: (await import('@/app/api/ofd/ferma/build-payload')).PAYMENT_METHOD_PREPAY_FULL, orderId: sale.orderId, docType: 'IncomePrepayment', buyerEmail: bEmail, invoiceId: invoiceIdPrepay, callbackUrl, withPrepaymentItem: true, paymentAgentInfo: { AgentType: 'AGENT', SupplierInn: orgInn, SupplierName: 'Организация' } });
                           const created = await (await import('@/server/ofdFerma')).fermaCreateReceipt(payload, { baseUrl, authToken: tokenOfd });
                           try { (global as any).__OFD_SOURCE__ = 'refresh'; } catch {}
-                          await updateSaleOfdUrlsByOrderId(userId, sale.orderId, { ofdPrepayId: created.id || null });
+                          { const numOrder = Number(String(sale.orderId).match(/(\d+)/g)?.slice(-1)[0] || NaN); await updateSaleOfdUrlsByOrderId(userId, numOrder, { ofdPrepayId: created.id || null }); }
                           if (sale.serviceEndDate) {
                             try { (await import('@/server/ofdScheduleWorker')).startOfdScheduleWorker(); } catch {}
                             const dueDate = new Date(`${sale.serviceEndDate}T09:00:00Z`);
-                            await (await import('@/server/ofdScheduleWorker')).enqueueOffsetJob({ userId, orderId: sale.orderId, dueAt: dueDate.toISOString(), party: 'org', description: 'Оплата услуги', amountRub, vatRate: usedVat, buyerEmail: bEmail });
+                            { const numOrder = Number(String(sale.orderId).match(/(\d+)/g)?.slice(-1)[0] || NaN); await (await import('@/server/ofdScheduleWorker')).enqueueOffsetJob({ userId, orderId: numOrder, dueAt: dueDate.toISOString(), party: 'org', description: 'Оплата услуги', amountRub, vatRate: usedVat, buyerEmail: bEmail }); }
                           }
                         }
                       }
