@@ -38,7 +38,8 @@ export async function POST(req: Request) {
     const patch: any = {};
     if (isPrepay) { patch.ofdPrepayId = rid || null; if (url) patch.ofdUrl = url; }
     else { patch.ofdFullId = rid || null; if (url) patch.ofdFullUrl = url; }
-    await updateSaleOfdUrlsByOrderId(userId, sale.orderId, patch);
+    const numOrder = Number(String(sale.orderId).match(/(\d+)/g)?.slice(-1)[0] || NaN);
+    await updateSaleOfdUrlsByOrderId(userId, numOrder, patch);
     return NextResponse.json({ ok: true, patch });
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'Server error';
