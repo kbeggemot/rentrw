@@ -39,7 +39,8 @@ function joinUrl(base: string, pathname: string): string {
 }
 
 function shouldLog(): boolean {
-  return process.env.OFD_FERMA_LOG_DEBUG === '1' || process.env.NODE_ENV !== 'production';
+  // Always write last request/response files to aid production debugging
+  return true;
 }
 
 // Simple in-memory rate limiter per key (endpoint) to avoid OFD 429
