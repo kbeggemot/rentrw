@@ -103,9 +103,9 @@ export async function GET(req: Request) {
                 const createdDate = createdAt ? String(createdAt).slice(0, 10) : null;
                 const endStr = (s.serviceEndDate || '') as string;
                 if (createdDate && endStr && createdDate === endStr) {
-                  await updateSaleOfdUrlsByOrderId(userId, s.orderId, { ofdFullUrl: ofdUrl });
+                  { const numOrder = Number(String(s.orderId).match(/(\d+)/g)?.slice(-1)[0] || NaN); await updateSaleOfdUrlsByOrderId(userId, numOrder, { ofdFullUrl: ofdUrl }); }
                 } else {
-                  await updateSaleOfdUrlsByOrderId(userId, s.orderId, { ofdUrl: ofdUrl });
+                  { const numOrder = Number(String(s.orderId).match(/(\d+)/g)?.slice(-1)[0] || NaN); await updateSaleOfdUrlsByOrderId(userId, numOrder, { ofdUrl: ofdUrl }); }
                 }
               } catch {}
             }
@@ -283,7 +283,8 @@ export async function GET(req: Request) {
                   } catch {}
                 }
                 if (Object.keys(patch).length > 0) {
-                  await updateSaleOfdUrlsByOrderId(userId, s.orderId, patch);
+                  const numOrder = Number(String(s.orderId).match(/(\d+)/g)?.slice(-1)[0] || NaN);
+                  await updateSaleOfdUrlsByOrderId(userId, numOrder, patch);
                 }
               }
               // Fallback: ONLY use stored InvoiceId variants when a receipt link is missing
@@ -303,7 +304,7 @@ export async function GET(req: Request) {
                       const patch2: any = {};
                       if (/\-C\-?\d+$/.test(inv) || /\-B\-?\d+$/.test(inv)) { patch2.ofdFullUrl = url; if (rid) patch2.ofdFullId = rid; }
                       else { patch2.ofdUrl = url; if (rid) patch2.ofdPrepayId = rid; }
-                      await updateSaleOfdUrlsByOrderId(userId, s.orderId, patch2);
+                      { const numOrder = Number(String(s.orderId).match(/(\d+)/g)?.slice(-1)[0] || NaN); await updateSaleOfdUrlsByOrderId(userId, numOrder, patch2); }
                       break;
                     }
                   }
