@@ -53,6 +53,89 @@ export async function readText(relPath: string): Promise<string | null> {
 }
 
 export async function writeText(relPath: string, text: string): Promise<void> {
+  // Guard and backup for critical JSON stores
+  async function guardAndBackupIfNeeded(): Promise<void> {
+    try {
+      if (relPath === '.data/tasks.json' && (process.env.TASKS_WRITE_GUARD || '1') !== '0') {
+        const prev = await readText(relPath);
+        if (prev) {
+          let prevSales = 0, nextSales = 0;
+          try { const p = JSON.parse(prev); prevSales = Array.isArray(p?.sales) ? p.sales.length : 0; } catch {}
+          try { const n = JSON.parse(text); nextSales = Array.isArray(n?.sales) ? n.sales.length : 0; } catch {}
+          // If drop > 25% and more than 3 records — block unless explicitly allowed
+          const dropMany = prevSales > 0 && nextSales < prevSales * 0.75 && (prevSales - nextSales) > 3;
+          const allow = process.env.ALLOW_TASKS_SHRINK === '1';
+          if (dropMany && !allow) {
+            // Backup previous content before blocking
+            await createTasksBackup(prev);
+            // Also write a guard file with details
+            const info = { ts: new Date().toISOString(), reason: 'BLOCKED_SHRINK', prevSales, nextSales };
+            try { await writeTextInternal('.data/tasks_guard_block.json', JSON.stringify(info, null, 2)); } catch {}
+            throw new Error('TASKS_WRITE_BLOCKED_SHRINK');
+          }
+          // Always take a backup before overwriting
+          await createTasksBackup(prev);
+        }
+      }
+    } catch (e: any) {
+      if (String((e && (e as any).message) || e) === 'TASKS_WRITE_BLOCKED_SHRINK') throw e as any;
+      // Non-fatal: continue write if backup failed
+    }
+  }
+
+  async function createTasksBackup(oldText: string): Promise<void> {
+    const ts = new Date().toISOString().replace(/[:.]/g, '-');
+    const backupPath = `.data/backups/tasks-${ts}.json`;
+    await writeTextInternal(backupPath, oldText);
+    // Rotation: keep last 30
+    try {
+      const all = await list('.data/backups').catch(() => [] as string[]);
+      const mine = all.filter((p) => /\.data\/backups\/tasks-.*\.json$/.test(p)).sort();
+      const excess = mine.length - 30;
+      if (excess > 0) {
+        for (let i = 0; i < excess; i++) {
+          await deleteFileInternal(mine[i]).catch(() => void 0);
+        }
+      }
+    } catch {}
+  }
+
+  // Internal writer that bypasses guard to avoid recursion
+  async function writeTextInternal(p: string, body: string): Promise<void> {
+    if (process.env.S3_ENABLED === '1') {
+      ensureS3();
+      if (!s3Client || !s3Bucket) return;
+      const key = (s3Prefix + p).replace(/^\/+/, '');
+      const cmd = new (s3Client as any)._Put({ Bucket: s3Bucket, Key: key, Body: body, ContentType: 'application/json; charset=utf-8' });
+      await s3Client.send(cmd);
+      return;
+    }
+    const abs = path.join(process.cwd(), p);
+    await fs.mkdir(path.dirname(abs), { recursive: true });
+    const tmp = abs + '.tmp';
+    await fs.writeFile(tmp, body, 'utf8');
+    await fs.rename(tmp, abs);
+  }
+
+  // Internal deleter
+  async function deleteFileInternal(p: string): Promise<void> {
+    if (process.env.S3_ENABLED === '1') {
+      ensureS3();
+      if (!s3Client || !s3Bucket) return;
+      try {
+        const { DeleteObjectCommand } = require('@aws-sdk/client-s3');
+        const key = (s3Prefix + p).replace(/^\/+/, '');
+        const cmd = new DeleteObjectCommand({ Bucket: s3Bucket, Key: key });
+        await s3Client.send(cmd);
+      } catch {}
+      return;
+    }
+    try { await fs.unlink(path.join(process.cwd(), p)); } catch {}
+  }
+
+  // Pre-write guard/backup when relevant
+  await guardAndBackupIfNeeded();
+
   if (process.env.S3_ENABLED === '1') {
     ensureS3();
     if (!s3Client || !s3Bucket) return;
@@ -63,7 +146,9 @@ export async function writeText(relPath: string, text: string): Promise<void> {
   }
   const abs = path.join(process.cwd(), relPath);
   await fs.mkdir(path.dirname(abs), { recursive: true });
-  await fs.writeFile(abs, text, 'utf8');
+  const tmp = abs + '.tmp';
+  await fs.writeFile(tmp, text, 'utf8');
+  await fs.rename(tmp, abs);
 }
 
 
