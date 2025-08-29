@@ -6,6 +6,7 @@ import { updateWithdrawal } from '@/server/withdrawalStore';
 import { getDecryptedApiToken } from '@/server/secureStore';
 import { fermaGetAuthTokenCached, fermaCreateReceipt, fermaGetReceiptStatus, buildReceiptViewUrl } from '@/server/ofdFerma';
 import { buildFermaReceiptPayload, PAYMENT_METHOD_PREPAY_FULL, PAYMENT_METHOD_FULL_PAYMENT } from '@/app/api/ofd/ferma/build-payload';
+import { getInvoiceIdForFull, getInvoiceIdForPrepay } from '@/server/orderStore';
 import { getUserOrgInn, getUserPayoutRequisites } from '@/server/userStore';
 import { enqueueOffsetJob, startOfdScheduleWorker } from '@/server/ofdScheduleWorker';
 import { appendOfdAudit } from '@/server/audit';
@@ -158,7 +159,7 @@ export async function POST(req: Request) {
         if (fin === 'paid' || fin === 'transfered' || fin === 'transferred') {
           const sale = await findSaleByTaskId(userId, taskId);
           if (sale) {
-            const createdAt = sale.createdAtRw || sale.createdAt;
+            const createdAt = (sale as any).createdAtRw || (sale as any).createdAt;
             const createdDate = createdAt ? String(createdAt).slice(0, 10) : null;
             const endDate = sale.serviceEndDate || null;
             const isToday = Boolean(createdDate && endDate && createdDate === endDate);
@@ -224,7 +225,10 @@ export async function POST(req: Request) {
                   const itemLabel = (sale.description && sale.description.trim().length > 0) ? sale.description.trim() : 'Оплата услуги';
                   const amountNet = Math.max(0, Number(sale.amountGrossRub || 0) - Number(sale.retainedCommissionRub || 0));
                   if (isToday) {
-                    const invoiceIdFull = sale.invoiceIdFull || null;
+                    let invoiceIdFull = (sale as any).invoiceIdFull || null;
+                    if (!invoiceIdFull) {
+                      try { const num = Number(String(sale.orderId).match(/(\d+)/g)?.slice(-1)[0] || NaN); invoiceIdFull = await getInvoiceIdForFull(num); } catch {}
+                    }
                     if (invoiceIdFull) {
                       const partnerName = (taskObj?.executor && [taskObj?.executor?.last_name, taskObj?.executor?.first_name, taskObj?.executor?.second_name].filter(Boolean).join(' ').trim()) || undefined;
                       try {
@@ -250,7 +254,10 @@ export async function POST(req: Request) {
                       } catch {}
                     }
                   } else {
-                    const invoiceIdPrepay = sale.invoiceIdPrepay || null;
+                    let invoiceIdPrepay = (sale as any).invoiceIdPrepay || null;
+                    if (!invoiceIdPrepay) {
+                      try { const num = Number(String(sale.orderId).match(/(\d+)/g)?.slice(-1)[0] || NaN); invoiceIdPrepay = await getInvoiceIdForPrepay(num); } catch {}
+                    }
                     if (invoiceIdPrepay) {
                       const partnerName2 = (taskObj?.executor && [taskObj?.executor?.last_name, taskObj?.executor?.first_name, taskObj?.executor?.second_name].filter(Boolean).join(' ').trim()) || undefined;
                       try {
@@ -292,7 +299,10 @@ export async function POST(req: Request) {
                 const defaultEmail = process.env.OFD_DEFAULT_EMAIL || process.env.DEFAULT_RECEIPT_EMAIL || 'ofd@rockethumans.com';
                 const itemLabelOrg = (sale.description && sale.description.trim().length > 0) ? sale.description.trim() : 'Оплата услуги';
                 if (isToday) {
-                  const invoiceIdFull = sale.invoiceIdFull || null;
+                  let invoiceIdFull = (sale as any).invoiceIdFull || null;
+                  if (!invoiceIdFull) {
+                    try { const num = Number(String(sale.orderId).match(/(\d+)/g)?.slice(-1)[0] || NaN); invoiceIdFull = await getInvoiceIdForFull(num); } catch {}
+                  }
                   if (invoiceIdFull) {
                     try {
                       const prev = (await readText('.data/ofd_create_attempts.log')) || '';
@@ -316,7 +326,10 @@ export async function POST(req: Request) {
                     } catch {}
                   }
                 } else {
-                  const invoiceIdPrepay = sale.invoiceIdPrepay || null;
+                  let invoiceIdPrepay = (sale as any).invoiceIdPrepay || null;
+                  if (!invoiceIdPrepay) {
+                    try { const num = Number(String(sale.orderId).match(/(\d+)/g)?.slice(-1)[0] || NaN); invoiceIdPrepay = await getInvoiceIdForPrepay(num); } catch {}
+                  }
                   if (invoiceIdPrepay) {
                     try {
                       const prev = (await readText('.data/ofd_create_attempts.log')) || '';
