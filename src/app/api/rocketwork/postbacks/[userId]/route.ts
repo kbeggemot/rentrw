@@ -4,7 +4,7 @@ import { updateSaleFromStatus, findSaleByTaskId, updateSaleOfdUrlsByOrderId, upd
 import { appendAdminEntityLog } from '@/server/adminAudit';
 import { updateWithdrawal } from '@/server/withdrawalStore';
 import { getDecryptedApiToken } from '@/server/secureStore';
-import { fermaGetAuthTokenCached, fermaCreateReceipt } from '@/server/ofdFerma';
+import { fermaGetAuthTokenCached, fermaCreateReceipt, fermaGetReceiptStatus, buildReceiptViewUrl } from '@/server/ofdFerma';
 import { buildFermaReceiptPayload, PAYMENT_METHOD_PREPAY_FULL, PAYMENT_METHOD_FULL_PAYMENT } from '@/app/api/ofd/ferma/build-payload';
 import { getUserOrgInn, getUserPayoutRequisites } from '@/server/userStore';
 import { enqueueOffsetJob, startOfdScheduleWorker } from '@/server/ofdScheduleWorker';
@@ -173,6 +173,30 @@ export async function POST(req: Request) {
             const secret = process.env.OFD_CALLBACK_SECRET || '';
             const callbackUrl = `${protoHdr}://${hostHdr}/api/ofd/ferma/callback${secret ? `?secret=${encodeURIComponent(secret)}&` : '?'}uid=${encodeURIComponent(userId)}`;
 
+            // Helper: resolve receipt URL by id with short polling
+            const tryResolveUrl = async (id: string | undefined | null): Promise<string | undefined> => {
+              if (!id) return undefined;
+              try {
+                let url: string | undefined;
+                let tries = 0;
+                while (!url && tries < 20) {
+                  try {
+                    const st = await fermaGetReceiptStatus(String(id), { baseUrl, authToken: tokenOfd });
+                    const obj = st.rawText ? JSON.parse(st.rawText) : {};
+                    const direct = obj?.Data?.Device?.OfdReceiptUrl as string | undefined;
+                    const fn = obj?.Data?.Fn || obj?.Fn;
+                    const fd = obj?.Data?.Fd || obj?.Fd;
+                    const fp = obj?.Data?.Fp || obj?.Fp;
+                    if (typeof direct === 'string' && direct.length > 0) { url = direct; break; }
+                    if (fn && fd != null && fp != null) { url = buildReceiptViewUrl(fn, fd, fp); break; }
+                  } catch {}
+                  tries += 1;
+                  await new Promise((r) => setTimeout(r, 400));
+                }
+                return url;
+              } catch { return undefined; }
+            };
+
             if (sale.isAgent) {
               // Try to resolve partner INN through RW task
               try {
@@ -205,6 +229,13 @@ export async function POST(req: Request) {
                         await writeText('.data/ofd_create_attempts.log', prev2 + line2 + '\n');
                       } catch {}
                       await updateSaleOfdUrlsByOrderId(userId, sale.orderId, { ofdFullId: created.id || null });
+                      // try resolve URL immediately without waiting for callback
+                      try {
+                        const built = await tryResolveUrl(created.id || null);
+                        if (built) {
+                          await updateSaleOfdUrlsByOrderId(userId, sale.orderId, { ofdFullUrl: built });
+                        }
+                      } catch {}
                     }
                   } else {
                     const invoiceIdPrepay = sale.invoiceIdPrepay || null;
@@ -223,6 +254,12 @@ export async function POST(req: Request) {
                         await writeText('.data/ofd_create_attempts.log', prev2 + line2 + '\n');
                       } catch {}
                       await updateSaleOfdUrlsByOrderId(userId, sale.orderId, { ofdPrepayId: created.id || null });
+                      try {
+                        const built = await tryResolveUrl(created.id || null);
+                        if (built) {
+                          await updateSaleOfdUrlsByOrderId(userId, sale.orderId, { ofdUrl: built });
+                        }
+                      } catch {}
                       // schedule offset at 12:00 MSK
                       if (sale.serviceEndDate) {
                         startOfdScheduleWorker();
@@ -257,6 +294,12 @@ export async function POST(req: Request) {
                       await writeText('.data/ofd_create_attempts.log', prev2 + line2 + '\n');
                     } catch {}
                     await updateSaleOfdUrlsByOrderId(userId, sale.orderId, { ofdFullId: created.id || null });
+                    try {
+                      const built = await tryResolveUrl(created.id || null);
+                      if (built) {
+                        await updateSaleOfdUrlsByOrderId(userId, sale.orderId, { ofdFullUrl: built });
+                      }
+                    } catch {}
                   }
                 } else {
                   const invoiceIdPrepay = sale.invoiceIdPrepay || null;
@@ -274,6 +317,12 @@ export async function POST(req: Request) {
                       await writeText('.data/ofd_create_attempts.log', prev2 + line2 + '\n');
                     } catch {}
                     await updateSaleOfdUrlsByOrderId(userId, sale.orderId, { ofdPrepayId: created.id || null });
+                    try {
+                      const built = await tryResolveUrl(created.id || null);
+                      if (built) {
+                        await updateSaleOfdUrlsByOrderId(userId, sale.orderId, { ofdUrl: built });
+                      }
+                    } catch {}
                     if (sale.serviceEndDate) {
                       startOfdScheduleWorker();
                       const dueDate = new Date(`${sale.serviceEndDate}T09:00:00Z`);

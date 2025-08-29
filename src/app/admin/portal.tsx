@@ -364,7 +364,7 @@ function SalesPanel({ showToast, role }: { showToast: (m: string, k?: any) => vo
                 <td className="px-2 py-1 leading-tight">
                   {(() => { const dt = (s.createdAtRw||s.createdAt) ? new Date(s.createdAtRw||s.createdAt) : null; return dt ? (<><div>{dt.toLocaleDateString('ru-RU',{ timeZone:'Europe/Moscow' })}</div><div className="text-[11px] text-gray-500">{dt.toLocaleTimeString('ru-RU',{ timeZone:'Europe/Moscow', hour:'2-digit', minute:'2-digit' })}</div></>) : '—'; })()}
                 </td>
-                <td className="px-2 py-1">{s.orderId}</td>
+                <td className="px-2 py-1">{String(s.orderId)}</td>
                 <td className="px-2 py-1">{s.taskId}</td>
                 <td className="px-2 py-1 whitespace-nowrap">{s.orgInn || '—'}</td>
                 <td className="px-2 py-1 leading-tight">{s.__orgName || '—'}</td>

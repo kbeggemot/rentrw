@@ -4,6 +4,12 @@ type OrderStoreData = { lastOrderId: number; prefix?: string };
 
 const ORDER_FILE = '.data/order.json';
 
+function withLocalPrefix(value: string): string {
+  // In local/dev environment add a human-visible prefix to distinguish ids
+  const isLocal = process.env.NODE_ENV !== 'production';
+  return isLocal ? `local-${value}` : value;
+}
+
 const DEFAULT_PREFIX = process.env.OFD_INVOICE_PREFIX || process.env.INVOICE_PREFIX || 'fhrff351d';
 
 async function readOrder(): Promise<OrderStoreData> {
@@ -32,7 +38,7 @@ export async function getNextOrderId(): Promise<number> {
 export async function getInvoiceIdString(orderId: number): Promise<string> {
   const cur = await readOrder();
   const prefix = cur.prefix || DEFAULT_PREFIX;
-  return `${prefix}-${orderId}`;
+  return withLocalPrefix(`${prefix}-${orderId}`);
 }
 
 export type InvoiceKind = 'A' | 'B' | 'C';
@@ -40,7 +46,7 @@ export type InvoiceKind = 'A' | 'B' | 'C';
 export async function getInvoiceIdStringForType(orderId: number, kind: InvoiceKind): Promise<string> {
   const cur = await readOrder();
   const prefix = cur.prefix || DEFAULT_PREFIX; // e.g. fhrff351d
-  return `${prefix}-${kind}-${orderId}`;
+  return withLocalPrefix(`${prefix}-${kind}-${orderId}`);
 }
 
 export async function getInvoiceIdForPrepay(orderId: number): Promise<string> {

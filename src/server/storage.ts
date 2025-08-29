@@ -67,6 +67,21 @@ export async function writeText(relPath: string, text: string): Promise<void> {
 }
 
 
+export async function writeBinary(relPath: string, data: Buffer | Uint8Array, contentType: string): Promise<void> {
+  if (process.env.S3_ENABLED === '1') {
+    ensureS3();
+    if (!s3Client || !s3Bucket) return;
+    const key = (s3Prefix + relPath).replace(/^\/+/, '');
+    const cmd = new (s3Client as any)._Put({ Bucket: s3Bucket, Key: key, Body: data, ContentType: contentType });
+    await s3Client.send(cmd);
+    return;
+  }
+  const abs = path.join(process.cwd(), relPath);
+  await fs.mkdir(path.dirname(abs), { recursive: true });
+  await fs.writeFile(abs, data as any);
+}
+
+
 export async function statFile(relPath: string): Promise<{ size: number; modified?: string | null } | null> {
   if (process.env.S3_ENABLED === '1') {
     ensureS3();

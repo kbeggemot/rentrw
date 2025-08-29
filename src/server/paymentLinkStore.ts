@@ -14,6 +14,8 @@ export type PaymentLink = {
   commissionValue?: number | null;
   partnerPhone?: string | null;
   method?: 'any' | 'qr' | 'card';
+  cartItems?: Array<{ id?: string | null; title: string; price: number; qty: number }> | null;
+  allowCartAdjust?: boolean;
   createdAt: string;
   hits?: number;
   lastAccessAt?: string | null;
@@ -42,12 +44,17 @@ function genCode(len = 4): string {
   return out;
 }
 
-export async function createPaymentLink(userId: string, data: Omit<PaymentLink, 'code' | 'userId' | 'createdAt'>): Promise<PaymentLink> {
+export async function isCodeTaken(code: string): Promise<boolean> {
+  const store = await readStore();
+  return store.items.some((i) => i.code === code);
+}
+
+export async function createPaymentLink(userId: string, data: Omit<PaymentLink, 'code' | 'userId' | 'createdAt'> & { preferredCode?: string | null }): Promise<PaymentLink> {
   const store = await readStore();
   const exists = new Set(store.items.map((i) => i.code));
   let len = 4;
   let attempts = 0;
-  let code = genCode(len);
+  let code = (data as any)?.preferredCode && String((data as any).preferredCode).trim().length > 0 ? String((data as any).preferredCode).trim() : genCode(len);
   while (exists.has(code)) {
     attempts += 1;
     if (attempts > 2000) { len += 1; attempts = 0; }
@@ -68,6 +75,13 @@ export async function createPaymentLink(userId: string, data: Omit<PaymentLink, 
     commissionValue: typeof data.commissionValue === 'number' ? data.commissionValue : null,
     partnerPhone: data.partnerPhone ?? null,
     method: data.method || 'any',
+    cartItems: Array.isArray((data as any).cartItems) ? ((data as any).cartItems as any[]).map((ci) => ({
+      id: ci?.id ?? null,
+      title: String(ci?.title || ''),
+      price: Number(ci?.price || 0),
+      qty: Number(ci?.qty || 1),
+    })) : null,
+    allowCartAdjust: Boolean((data as any)?.allowCartAdjust),
     createdAt: now,
     hits: 0,
     lastAccessAt: null,

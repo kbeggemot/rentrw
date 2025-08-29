@@ -25,7 +25,7 @@ export async function GET(req: Request) {
     if (!Number.isFinite(orderId)) return NextResponse.json({ error: 'BAD_ORDER' }, { status: 400 });
     const inn = getSelectedOrgInn(req);
     const sales = inn ? await listSalesForOrg(userId, inn) : await listSales(userId);
-    const sale = sales.find((s) => s.orderId === orderId) || null;
+    const sale = sales.find((s) => Number(String(s.orderId).match(/(\d+)/g)?.slice(-1)[0] || NaN) === orderId) || null;
     if (sale) {
       const baseUrl = process.env.FERMA_BASE_URL || 'https://ferma.ofd.ru/';
       const token = await fermaGetAuthTokenCached(process.env.FERMA_LOGIN || '', process.env.FERMA_PASSWORD || '', { baseUrl });
@@ -77,8 +77,8 @@ export async function GET(req: Request) {
       }
     }
     if (!sale) return NextResponse.json({ error: 'NOT_FOUND' }, { status: 404 });
-    let pageCode: string | null = null; try { pageCode = await getOrCreateSalePageCode(userId, sale.orderId); } catch {}
-    return NextResponse.json({ sale, pageCode, successUrl: pageCode ? `/link/s/${encodeURIComponent(pageCode)}?order=${encodeURIComponent(String(sale.orderId))}` : null }, { status: 200 });
+    let pageCode: string | null = null; try { pageCode = await getOrCreateSalePageCode(userId, Number(idStr)); } catch {}
+    return NextResponse.json({ sale, pageCode, successUrl: pageCode ? `/link/s/${encodeURIComponent(pageCode)}?order=${encodeURIComponent(String(idStr))}` : null }, { status: 200 });
   } catch (error) {
     const msg = error instanceof Error ? error.message : 'Server error';
     return NextResponse.json({ error: msg }, { status: 500 });

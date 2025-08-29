@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createPaymentLink, listPaymentLinks, listPaymentLinksForOrg, listAllPaymentLinksForOrg } from '@/server/paymentLinkStore';
+import { createPaymentLink, listPaymentLinks, listPaymentLinksForOrg, listAllPaymentLinksForOrg, isCodeTaken } from '@/server/paymentLinkStore';
 import { resolveRwTokenWithFingerprint } from '@/server/rwToken';
 import { getSelectedOrgInn } from '@/server/orgContext';
 import { partnerExists, upsertPartnerFromValidation } from '@/server/partnerStore';
@@ -18,6 +18,17 @@ export async function GET(req: Request) {
   try {
     const userId = getUserId(req);
     if (!userId) return NextResponse.json({ error: 'NO_USER' }, { status: 401 });
+    // optional: live uniqueness check for vanity code
+    const url = new URL(req.url);
+    const check = url.searchParams.get('check');
+    if (check) {
+      const candidate = String(check).trim().toLowerCase();
+      const taken = await (await import('@/server/paymentLinkStore')).isCodeTaken(candidate);
+      // Reserved sub-routes under /link
+      const reserved = new Set(['new', 'success', 's']);
+      const isReserved = reserved.has(candidate);
+      return NextResponse.json({ code: candidate, taken: taken || isReserved, reserved: isReserved });
+    }
     const inn = getSelectedOrgInn(req);
     const { getShowAllDataFlag } = await import('@/server/userStore');
     const showAll = await getShowAllDataFlag(userId);
@@ -41,12 +52,48 @@ export async function POST(req: Request) {
     const amountRub = sumMode === 'fixed' ? Number(body?.amountRub || 0) : null;
     const vatRate = (['none','0','10','20'].includes(String(body?.vatRate)) ? String(body?.vatRate) : 'none') as 'none'|'0'|'10'|'20';
     const isAgent = !!body?.isAgent;
+    // Vanity code (optional)
+    const preferredRaw: string = typeof body?.preferredCode === 'string' ? body.preferredCode : '';
+    let preferredCode: string | null = preferredRaw ? preferredRaw.trim() : null;
+    if (preferredCode && preferredCode.length > 0) {
+      // normalize: spaces->dash, transliterate basic Cyrillic, lowercase
+      const trMap: Record<string, string> = { 'ё':'yo','й':'y','ц':'ts','у':'u','к':'k','е':'e','н':'n','г':'g','ш':'sh','щ':'sch','з':'z','х':'h','ъ':'','ф':'f','ы':'y','в':'v','а':'a','п':'p','р':'r','о':'o','л':'l','д':'d','ж':'zh','э':'e','я':'ya','ч':'ch','с':'s','м':'m','и':'i','т':'t','ь':'','б':'b','ю':'yu' };
+      const normalize = (s: string) => s.toLowerCase().replace(/\s+/g, '-').replace(/[а-яё]/g, (ch) => trMap[ch] ?? ch).replace(/[^a-z0-9-]/g, '');
+      preferredCode = normalize(preferredCode);
+      if (!/^[a-z0-9-]+$/.test(preferredCode)) return NextResponse.json({ error: 'VANITY_INVALID' }, { status: 400 });
+      if (preferredCode.length < 3) return NextResponse.json({ error: 'VANITY_TOO_SHORT' }, { status: 400 });
+      if (preferredCode.length > 30) return NextResponse.json({ error: 'VANITY_TOO_LONG' }, { status: 400 });
+      // blacklist simple set (sexual/obscene); merge with optional ENV VANITY_BLACKLIST (comma-separated)
+      const blacklistBase = [
+        'bad','fuck','shit','pizda','huy','blyad','whore','suka','deb','лох','mudak','govno',
+        // sexual explicit (ru/en + translit)
+        'sex','seks','porno','porn','porr','xxx','intim','bdsm','fetish','fetishy','swing',
+        'anal','oral','minet','kunilingus','kuni','erotic','ero',
+        'секс','порно','порево','эротик','эротика','интим','минет','кунилингус','анал','оральн',
+        'проститут','шлюх','шлюха','бордель','стриптиз',
+        // lgbt-related terms (ru/en + translit)
+        'lgbt','lgbtq','lgbtqia','gay','gey','gei','lesbian','lez','lezb','queer','trans','transgender','transex','nonbinary','non-binary','nb','pride','rainbow',
+        'гей','геи','гей','лесби','лесбиян','квир','транс','трансгендер','транссексу','небинар','прайд','радуга'
+      ];
+      const envExtra = (process.env.VANITY_BLACKLIST || '')
+        .split(',')
+        .map((s) => s.trim().toLowerCase())
+        .filter((s) => s.length > 0);
+      const blacklist = [...new Set([...blacklistBase, ...envExtra])];
+      if (blacklist.some((w) => preferredCode!.includes(w))) return NextResponse.json({ error: 'VANITY_FORBIDDEN' }, { status: 400 });
+      // reserved routes under /link
+      const reserved = new Set(['new', 'success', 's']);
+      if (reserved.has(preferredCode)) return NextResponse.json({ error: 'VANITY_TAKEN' }, { status: 409 });
+      if (await isCodeTaken(preferredCode)) return NextResponse.json({ error: 'VANITY_TAKEN' }, { status: 409 });
+    }
     const commissionType = isAgent && (body?.commissionType === 'fixed' || body?.commissionType === 'percent') ? body?.commissionType : null;
     const commissionValue = isAgent && typeof body?.commissionValue === 'number' ? Number(body?.commissionValue) : null;
     const partnerPhone = isAgent ? (String(body?.partnerPhone || '').trim() || null) : null;
     const method = (body?.method === 'qr' || body?.method === 'card') ? body?.method : 'any';
     if (!title) return NextResponse.json({ error: 'TITLE_REQUIRED' }, { status: 400 });
-    if (!description) return NextResponse.json({ error: 'DESCRIPTION_REQUIRED' }, { status: 400 });
+    // description is required only for "free service" mode; when cartItems present, it's optional
+    const cartItems = Array.isArray(body?.cartItems) ? body.cartItems : null;
+    if (!cartItems && !description) return NextResponse.json({ error: 'DESCRIPTION_REQUIRED' }, { status: 400 });
     if (sumMode === 'fixed' && (!Number.isFinite(amountRub) || Number(amountRub) <= 0)) return NextResponse.json({ error: 'INVALID_AMOUNT' }, { status: 400 });
     // Validate agent fields and partner in RW when isAgent
     if (isAgent) {
@@ -87,7 +134,7 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: msg }, { status: 400 });
       }
     }
-    const item = await createPaymentLink(userId, { title, description, sumMode, amountRub: amountRub ?? undefined, vatRate, isAgent, commissionType: commissionType as any, commissionValue: commissionValue ?? undefined, partnerPhone, method, orgInn: inn ?? undefined } as any);
+    const item = await createPaymentLink(userId, { title, description, sumMode, amountRub: amountRub ?? undefined, vatRate, isAgent, commissionType: commissionType as any, commissionValue: commissionValue ?? undefined, partnerPhone, method, orgInn: inn ?? undefined, preferredCode: preferredCode ?? undefined, cartItems: cartItems ?? undefined, allowCartAdjust: Boolean(body?.allowCartAdjust) } as any);
     const hostHdr = req.headers.get('x-forwarded-host') || req.headers.get('host') || 'localhost:3000';
     const protoHdr = req.headers.get('x-forwarded-proto') || (hostHdr.startsWith('localhost') ? 'http' : 'https');
     const url = `${protoHdr}://${hostHdr}/link/${encodeURIComponent(item.code)}`;

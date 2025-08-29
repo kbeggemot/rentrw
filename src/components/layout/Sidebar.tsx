@@ -104,21 +104,20 @@ export function Sidebar() {
 }
 
 function OrgSelectorWrapper() {
-  try {
-    const m = /(?:^|;\s*)org_inn=([^;]+)/.exec(typeof document !== 'undefined' ? (document.cookie || '') : '');
-    const cookieInn = m ? decodeURIComponent(m[1]) : null;
-    try {
-      const raw = localStorage.getItem('orgs_cache_v1');
-      const arr = raw ? JSON.parse(raw) : null;
-      const orgs = Array.isArray(arr) ? arr : [];
-      const hide = !cookieInn && orgs.length === 0;
-      return hide ? null : <OrgSelector />;
-    } catch {
-      return cookieInn ? <OrgSelector /> : null;
-    }
-  } catch {
-    return null;
+  // Чтобы избежать расхождения SSR/CSR, до монтирования показываем стабильный плейсхолдер
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
+  if (!mounted) {
+    return (
+      <div className="mb-2">
+        <label className="block text-xs text-gray-500 mb-1">Организация</label>
+        <select className="w-full px-2 h-9 rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-950 text-sm" disabled>
+          <option>Загрузка…</option>
+        </select>
+      </div>
+    );
   }
+  return <OrgSelector />;
 }
 
 function OrgSelector() {

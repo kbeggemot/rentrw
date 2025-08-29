@@ -34,8 +34,11 @@ async function runRepairTick(): Promise<void> {
 }
 
 // Helper that performs repair for a single user
-export async function repairUserSales(userId: string): Promise<void> {
-  const sales = await listSales(userId);
+export async function repairUserSales(userId: string, onlyOrderId?: number): Promise<void> {
+  const salesAll = await listSales(userId);
+  const sales = typeof onlyOrderId === 'number' && Number.isFinite(onlyOrderId)
+    ? salesAll.filter((s) => Number(String(s.orderId).match(/(\d+)/g)?.slice(-1)[0] || NaN) === onlyOrderId)
+    : salesAll;
   if (sales.length === 0) return;
   const baseUrl = process.env.FERMA_BASE_URL || 'https://ferma.ofd.ru/';
   const ofdToken = await fermaGetAuthTokenCached(process.env.FERMA_LOGIN || '', process.env.FERMA_PASSWORD || '', { baseUrl });
@@ -45,6 +48,36 @@ export async function repairUserSales(userId: string): Promise<void> {
   try { rwToken = await getDecryptedApiToken(userId); } catch { rwToken = null; }
   const defaultEmail = process.env.OFD_DEFAULT_EMAIL || process.env.DEFAULT_RECEIPT_EMAIL || 'ofd@rockethumans.com';
   for (const s of sales) {
+    // First: if we already have ReceiptId but no URL — try to resolve quickly
+    try {
+      const patchDirect: any = {};
+      if (!s.ofdUrl && (s as any).ofdPrepayId) {
+        try {
+          const st = await fermaGetReceiptStatus(String((s as any).ofdPrepayId), { baseUrl, authToken: ofdToken });
+          const obj = st.rawText ? JSON.parse(st.rawText) : {};
+          const direct = obj?.Data?.Device?.OfdReceiptUrl as string | undefined;
+          const fn = obj?.Data?.Fn || obj?.Fn; const fd = obj?.Data?.Fd || obj?.Fd; const fp = obj?.Data?.Fp || obj?.Fp;
+          if (typeof direct === 'string' && direct.length > 0) patchDirect.ofdUrl = direct;
+          else if (fn && fd != null && fp != null) patchDirect.ofdUrl = buildReceiptViewUrl(fn, fd, fp);
+        } catch {}
+      }
+      if (!s.ofdFullUrl && (s as any).ofdFullId) {
+        try {
+          const st = await fermaGetReceiptStatus(String((s as any).ofdFullId), { baseUrl, authToken: ofdToken });
+          const obj = st.rawText ? JSON.parse(st.rawText) : {};
+          const direct = obj?.Data?.Device?.OfdReceiptUrl as string | undefined;
+          const fn = obj?.Data?.Fn || obj?.Fn; const fd = obj?.Data?.Fd || obj?.Fd; const fp = obj?.Data?.Fp || obj?.Fp;
+          if (typeof direct === 'string' && direct.length > 0) patchDirect.ofdFullUrl = direct;
+          else if (fn && fd != null && fp != null) patchDirect.ofdFullUrl = buildReceiptViewUrl(fn, fd, fp);
+        } catch {}
+      }
+      if (Object.keys(patchDirect).length > 0) {
+        try { (global as any).__OFD_SOURCE__ = 'repair_worker'; } catch {}
+        const numOrder = Number(String(s.orderId).match(/(\d+)/g)?.slice(-1)[0] || NaN);
+        await updateSaleOfdUrlsByOrderId(userId, numOrder, patchDirect);
+      }
+    } catch {}
+
     const status = String(s.status || '').toLowerCase();
     const final = status === 'paid' || status === 'transfered' || status === 'transferred';
     if (!final) continue;
@@ -68,7 +101,8 @@ export async function repairUserSales(userId: string): Promise<void> {
             if ((fn && fd != null && fp != null) || rid) {
               const url = fn && fd != null && fp != null ? buildReceiptViewUrl(fn, fd, fp) : undefined;
               try { (global as any).__OFD_SOURCE__ = 'repair_worker'; } catch {}
-              await updateSaleOfdUrlsByOrderId(userId, s.orderId, { ofdFullId: rid || null, ofdFullUrl: url || null });
+              const numOrder = Number(String(s.orderId).match(/(\d+)/g)?.slice(-1)[0] || NaN);
+              await updateSaleOfdUrlsByOrderId(userId, numOrder, { ofdFullId: rid || null, ofdFullUrl: url || null });
               continue; // already exists -> skip creation
             }
           } catch {}
@@ -89,14 +123,60 @@ export async function repairUserSales(userId: string): Promise<void> {
             const payload = buildFermaReceiptPayload({ party: 'partner', partyInn: partnerInn, description: s.description || 'Оплата услуги', amountRub: s.isAgent ? Math.max(0, s.amountGrossRub - s.retainedCommissionRub) : s.amountGrossRub, vatRate: (s.vatRate as any) || 'none', methodCode: PAYMENT_METHOD_FULL_PAYMENT, orderId: s.orderId, docType: 'Income', buyerEmail: s.clientEmail || defaultEmail, invoiceId: s.invoiceIdFull, callbackUrl: undefined, paymentAgentInfo: { AgentType: 'AGENT', SupplierInn: partnerInn, SupplierName: partnerName || 'Исполнитель' } });
             const created = await fermaCreateReceipt(payload, { baseUrl, authToken: ofdToken });
             try { (global as any).__OFD_SOURCE__ = 'repair_worker'; } catch {}
-            await updateSaleOfdUrlsByOrderId(userId, s.orderId, { ofdFullId: created.id || null });
+            { const numOrder = Number(String(s.orderId).match(/(\d+)/g)?.slice(-1)[0] || NaN); await updateSaleOfdUrlsByOrderId(userId, numOrder, { ofdFullId: created.id || null }); }
+            // Try to resolve URL right away without waiting for callback
+            try {
+              let url: string | undefined;
+              let tries = 0;
+              while (!url && tries < 20 && created.id) {
+                try {
+                  const st = await fermaGetReceiptStatus(String(created.id), { baseUrl, authToken: ofdToken });
+                  const obj = st.rawText ? JSON.parse(st.rawText) : {};
+                  const fn = obj?.Data?.Fn || obj?.Fn;
+                  const fd = obj?.Data?.Fd || obj?.Fd;
+                  const fp = obj?.Data?.Fp || obj?.Fp;
+                  const direct = obj?.Data?.Device?.OfdReceiptUrl as string | undefined;
+                  if (direct && direct.length > 0) { url = direct; break; }
+                  if (fn && fd != null && fp != null) { url = buildReceiptViewUrl(fn, fd, fp); break; }
+                } catch {}
+                tries += 1;
+                await new Promise((r) => setTimeout(r, 400));
+              }
+              if (url) {
+                try { (global as any).__OFD_SOURCE__ = 'repair_worker'; } catch {}
+                { const numOrder = Number(String(s.orderId).match(/(\d+)/g)?.slice(-1)[0] || NaN); await updateSaleOfdUrlsByOrderId(userId, numOrder, { ofdFullUrl: url }); }
+              }
+            } catch {}
           } else {
             const orgInn = (s.orgInn && String(s.orgInn).trim().length > 0 && String(s.orgInn) !== 'неизвестно') ? String(s.orgInn).replace(/\D/g, '') : null;
             if (!orgInn) continue;
             const payload = buildFermaReceiptPayload({ party: 'org', partyInn: orgInn, description: s.description || 'Оплата услуги', amountRub: s.amountGrossRub, vatRate: (s.vatRate as any) || 'none', methodCode: PAYMENT_METHOD_FULL_PAYMENT, orderId: s.orderId, docType: 'Income', buyerEmail: s.clientEmail || defaultEmail, invoiceId: s.invoiceIdFull, callbackUrl: undefined, paymentAgentInfo: { AgentType: 'AGENT', SupplierInn: orgInn, SupplierName: 'Организация' } });
             const created = await fermaCreateReceipt(payload, { baseUrl, authToken: ofdToken });
             try { (global as any).__OFD_SOURCE__ = 'repair_worker'; } catch {}
-            await updateSaleOfdUrlsByOrderId(userId, s.orderId, { ofdFullId: created.id || null });
+            { const numOrder = Number(String(s.orderId).match(/(\d+)/g)?.slice(-1)[0] || NaN); await updateSaleOfdUrlsByOrderId(userId, numOrder, { ofdFullId: created.id || null }); }
+            // Try to resolve URL right away without waiting for callback
+            try {
+              let url: string | undefined;
+              let tries = 0;
+              while (!url && tries < 20 && created.id) {
+                try {
+                  const st = await fermaGetReceiptStatus(String(created.id), { baseUrl, authToken: ofdToken });
+                  const obj = st.rawText ? JSON.parse(st.rawText) : {};
+                  const fn = obj?.Data?.Fn || obj?.Fn;
+                  const fd = obj?.Data?.Fd || obj?.Fd;
+                  const fp = obj?.Data?.Fp || obj?.Fp;
+                  const direct = obj?.Data?.Device?.OfdReceiptUrl as string | undefined;
+                  if (direct && direct.length > 0) { url = direct; break; }
+                  if (fn && fd != null && fp != null) { url = buildReceiptViewUrl(fn, fd, fp); break; }
+                } catch {}
+                tries += 1;
+                await new Promise((r) => setTimeout(r, 400));
+              }
+              if (url) {
+                try { (global as any).__OFD_SOURCE__ = 'repair_worker'; } catch {}
+                { const numOrder = Number(String(s.orderId).match(/(\d+)/g)?.slice(-1)[0] || NaN); await updateSaleOfdUrlsByOrderId(userId, numOrder, { ofdFullUrl: url }); }
+              }
+            } catch {}
           }
         } catch {}
       }
@@ -117,7 +197,7 @@ export async function repairUserSales(userId: string): Promise<void> {
           if ((fn && fd != null && fp != null) || rid) {
             const url = fn && fd != null && fp != null ? buildReceiptViewUrl(fn, fd, fp) : undefined;
             try { (global as any).__OFD_SOURCE__ = 'repair_worker'; } catch {}
-            await updateSaleOfdUrlsByOrderId(userId, s.orderId, { ofdPrepayId: rid || null, ofdUrl: url || null });
+            { const numOrder = Number(String(s.orderId).match(/(\d+)/g)?.slice(-1)[0] || NaN); await updateSaleOfdUrlsByOrderId(userId, numOrder, { ofdPrepayId: rid || null, ofdUrl: url || null }); }
             continue;
           }
         } catch {}
@@ -137,14 +217,14 @@ export async function repairUserSales(userId: string): Promise<void> {
           const payload = buildFermaReceiptPayload({ party: 'partner', partyInn: partnerInn, description: s.description || 'Оплата услуги', amountRub: Math.max(0, s.amountGrossRub - s.retainedCommissionRub), vatRate: (s.vatRate as any) || 'none', methodCode: PAYMENT_METHOD_PREPAY_FULL, orderId: s.orderId, docType: 'IncomePrepayment', buyerEmail: s.clientEmail || defaultEmail, invoiceId: s.invoiceIdPrepay, callbackUrl: undefined, withPrepaymentItem: true, paymentAgentInfo: { AgentType: 'AGENT', SupplierInn: partnerInn, SupplierName: partnerName || 'Исполнитель' } });
           const created = await fermaCreateReceipt(payload, { baseUrl, authToken: ofdToken });
           try { (global as any).__OFD_SOURCE__ = 'repair_worker'; } catch {}
-          await updateSaleOfdUrlsByOrderId(userId, s.orderId, { ofdPrepayId: created.id || null });
+          { const numOrder = Number(String(s.orderId).match(/(\d+)/g)?.slice(-1)[0] || NaN); await updateSaleOfdUrlsByOrderId(userId, numOrder, { ofdPrepayId: created.id || null }); }
         } else {
           const orgInn = (s.orgInn && String(s.orgInn).trim().length > 0 && String(s.orgInn) !== 'неизвестно') ? String(s.orgInn).replace(/\D/g, '') : null;
           if (!orgInn) continue;
           const payload = buildFermaReceiptPayload({ party: 'org', partyInn: orgInn, description: s.description || 'Оплата услуги', amountRub: s.amountGrossRub, vatRate: (s.vatRate as any) || 'none', methodCode: PAYMENT_METHOD_PREPAY_FULL, orderId: s.orderId, docType: 'IncomePrepayment', buyerEmail: s.clientEmail || defaultEmail, invoiceId: s.invoiceIdPrepay, callbackUrl: undefined, withPrepaymentItem: true, paymentAgentInfo: { AgentType: 'AGENT', SupplierInn: orgInn, SupplierName: 'Организация' } });
           const created = await fermaCreateReceipt(payload, { baseUrl, authToken: ofdToken });
           try { (global as any).__OFD_SOURCE__ = 'repair_worker'; } catch {}
-          await updateSaleOfdUrlsByOrderId(userId, s.orderId, { ofdPrepayId: created.id || null });
+          { const numOrder = Number(String(s.orderId).match(/(\d+)/g)?.slice(-1)[0] || NaN); await updateSaleOfdUrlsByOrderId(userId, numOrder, { ofdPrepayId: created.id || null }); }
         }
       } catch {}
     }
@@ -163,7 +243,8 @@ export async function repairUserSales(userId: string): Promise<void> {
           const payUrl = new URL(`tasks/${encodeURIComponent(String(s.taskId))}/pay`, rwBase.endsWith('/') ? rwBase : rwBase + '/').toString();
           try {
             if (process.env.OFD_AUDIT === '1') {
-              await appendOfdAudit({ ts: new Date().toISOString(), source: 'repair_worker', userId, orderId: s.orderId, taskId: s.taskId, action: 'background_pay', patch: { reason: 'agent_transfered_completed_has_full', payUrl } });
+              const numOrder = Number(String(s.orderId).match(/(\d+)/g)?.slice(-1)[0] || NaN);
+              await appendOfdAudit({ ts: new Date().toISOString(), source: 'repair_worker', userId, orderId: numOrder, taskId: s.taskId, action: 'background_pay', patch: { reason: 'agent_transfered_completed_has_full', payUrl } });
             }
           } catch {}
           await fetch(payUrl, { method: 'PATCH', headers: { Authorization: `Bearer ${rwToken}`, Accept: 'application/json' }, cache: 'no-store' });

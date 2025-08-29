@@ -246,7 +246,7 @@ export async function POST(req: Request) {
         vat: 'VatNo',
         // мы сами формируем чеки в ОФД (и для "сегодня", и для отложенных)
         with_ofd_receipt: false,
-        order: String(orderId),
+        order: (process.env.NODE_ENV !== 'production') ? `local-${String(orderId)}` : String(orderId),
       },
     };
 

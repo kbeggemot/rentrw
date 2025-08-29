@@ -123,6 +123,12 @@ export default async function AdminSaleEditor(props: { params: Promise<{ uid: st
                 <div className="text-xs text-gray-600 mt-1">Опрос OFD по orderId: пытается найти чеки по присвоенным InvoiceId, подтягивает ReceiptId/URL (предоплата и полный), обновляет запись.</div>
               </div>
               <div>
+                <form action={`/api/admin/actions/ofd/repair-one?user=${encodeURIComponent(p.uid)}&order=${encodeURIComponent(String(item.orderId).match(/(\d+)/g)?.slice(-1)[0] || String(item.orderId))}`} method="post">
+                  <button className="px-3 py-2 border rounded inline-block" type="submit">Repair OFD (этот заказ)</button>
+                </form>
+                <div className="text-xs text-gray-600 mt-1">Принудительный repair только для этой продажи: достроит ссылки по имеющимся ReceiptId и создаст чек при необходимости.</div>
+              </div>
+              <div>
                 <a className="px-3 py-2 border rounded inline-block" href={`/api/debug/force-ofd/${encodeURIComponent(String(item.taskId))}?mode=prepay`} target="_blank">Создать предоплату</a>
                 <div className="text-xs text-gray-600 mt-1">Принудительно создаёт чек предоплаты с использованием сохранённого InvoiceId A (invoiceIdPrepay). Результат сохраняется в ofdPrepayId/ofdUrl.</div>
               </div>

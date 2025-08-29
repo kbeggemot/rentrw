@@ -15,7 +15,7 @@ export type StoredTask = {
 
 export type SaleRecord = {
   taskId: number | string;
-  orderId: number;
+  orderId: number | string;
   userId: string;
   orgInn?: string | null; // digits-only INN; 'неизвестно' if unknown
   clientEmail?: string | null;
@@ -45,6 +45,16 @@ export type SaleRecord = {
   invoiceIdOffset?: string | null;
   invoiceIdFull?: string | null;
 };
+
+function normalizeOrderId(value: string | number): number {
+  if (typeof value === 'number') return value;
+  const m = String(value).match(/(\d+)/g);
+  return m && m.length > 0 ? Number(m[m.length - 1]) : NaN;
+}
+
+function withLocalOrderPrefix(orderId: number): string | number {
+  return process.env.NODE_ENV !== 'production' ? `local-${orderId}` : orderId;
+}
 
 type TaskStoreData = {
   tasks: StoredTask[];
@@ -122,9 +132,10 @@ export async function recordSaleOnCreate(params: {
       invoiceIdFull = await getInvoiceIdForFull(orderId);
     }
   } catch {}
+  const storedOrderId: string | number = withLocalOrderPrefix(orderId);
   store.sales.push({
     taskId,
-    orderId,
+    orderId: storedOrderId,
     userId,
     orgInn: (resolvedInn && String(resolvedInn).trim().length > 0) ? String(resolvedInn).replace(/\D/g, '') : 'неизвестно',
     clientEmail: (clientEmail ?? null),
