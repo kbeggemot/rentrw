@@ -54,10 +54,10 @@ export async function GET(req: Request) {
           } catch {}
         }
         if (!partnerInn) continue; // без ИНН партнёра чек сформировать нельзя
-        await enqueueOffsetJob({ userId, orderId: s.orderId, dueAt: new Date(Date.now() - 1000).toISOString(), party: 'partner', partnerInn, partnerName, description, amountRub, vatRate, buyerEmail: null });
+        await enqueueOffsetJob({ userId, orderId: Number(String(s.orderId).match(/(\d+)/g)?.slice(-1)[0] || NaN), dueAt: new Date(Date.now() - 1000).toISOString(), party: 'partner', partnerInn, partnerName, description, amountRub, vatRate, buyerEmail: null });
         created += 1;
       } else {
-        await enqueueOffsetJob({ userId, orderId: s.orderId, dueAt: new Date(Date.now() - 1000).toISOString(), party: 'org', description, amountRub, vatRate, buyerEmail: null });
+        await enqueueOffsetJob({ userId, orderId: Number(String(s.orderId).match(/(\d+)/g)?.slice(-1)[0] || NaN), dueAt: new Date(Date.now() - 1000).toISOString(), party: 'org', description, amountRub, vatRate, buyerEmail: null });
         created += 1;
       }
     }
