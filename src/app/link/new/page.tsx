@@ -23,9 +23,14 @@ export default function NewLinkStandalonePage() {
   const [linkCommType, setLinkCommType] = useState<'percent' | 'fixed'>('percent');
   const [linkCommVal, setLinkCommVal] = useState('');
   const [linkPartner, setLinkPartner] = useState('');
+  const [partners, setPartners] = useState<Array<{ phone: string; fio: string | null }>>([]);
+  const [partnersOpen, setPartnersOpen] = useState(false);
+  const [partnerLoading, setPartnerLoading] = useState(false);
   const [linkMethod, setLinkMethod] = useState<'any' | 'qr' | 'card'>('any');
   const [vanity, setVanity] = useState('');
   const [vanityTaken, setVanityTaken] = useState<boolean | null>(null);
+  const [cartDisplay, setCartDisplay] = useState<'grid' | 'list'>('list');
+
   const translitMap: Record<string, string> = { 'ё':'yo','й':'y','ц':'ts','у':'u','к':'k','е':'e','н':'n','г':'g','ш':'sh','щ':'sch','з':'z','х':'h','ъ':'','ф':'f','ы':'y','в':'v','а':'a','п':'p','р':'r','о':'o','л':'l','д':'d','ж':'zh','э':'e','я':'ya','ч':'ch','с':'s','м':'m','и':'i','т':'t','ь':'','б':'b','ю':'yu' };
   const normalizeVanity = (s: string) => s
     .toLowerCase()
@@ -56,6 +61,15 @@ export default function NewLinkStandalonePage() {
         const d = await r.json();
         const items = Array.isArray(d?.items) ? d.items : [];
         setOrgProducts(items.map((p: any) => ({ id: p.id, title: p.title, price: Number(p.price || 0) })));
+      } catch {}
+    })();
+    // preload partners for agent selector
+    (async () => {
+      try {
+        const r = await fetch('/api/partners', { cache: 'no-store' });
+        const d = await r.json();
+        const arr = Array.isArray(d?.partners) ? d.partners : [];
+        setPartners(arr.map((p: any) => ({ phone: String(p.phone || ''), fio: p.fio ?? null })));
       } catch {}
     })();
     const id = setTimeout(async () => {
@@ -143,6 +157,10 @@ export default function NewLinkStandalonePage() {
         if (normalized.length === 0) { showToast('Добавьте хотя бы одну позицию в корзину', 'error'); return; }
         payload.cartItems = normalized;
         payload.allowCartAdjust = allowCartAdjust;
+        payload.cartDisplay = cartDisplay;
+        // Укажем исходную сумму для сервера (нормализуем в число с точкой)
+        const total = normalized.reduce((sum, r) => sum + (r.price * r.qty), 0);
+        payload.amountRub = Number.isFinite(total) ? total : undefined;
       }
       const r = await fetch('/api/links', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
       const d = await r.json();
@@ -168,7 +186,16 @@ export default function NewLinkStandalonePage() {
         else showToast('Не удалось создать ссылку', 'error');
         return;
       }
-      try { await navigator.clipboard.writeText(new URL(`/link/${encodeURIComponent(d?.item?.code)}`, window.location.origin).toString()); showToast('Ссылка создана и скопирована', 'success'); } catch { showToast('Ссылка создана', 'success'); }
+      let copied = false;
+      try {
+        await navigator.clipboard.writeText(new URL(`/link/${encodeURIComponent(d?.item?.code)}`, window.location.origin).toString());
+        copied = true;
+      } catch {}
+      // Перенаправляем в общий раздел и показываем тост об успехе
+      try {
+        sessionStorage.setItem('flash', copied ? 'COPIED' : 'OK');
+      } catch {}
+      window.location.href = '/link';
     } catch {
       showToast('Не удалось создать ссылку', 'error');
     }
@@ -177,7 +204,7 @@ export default function NewLinkStandalonePage() {
   return (
     <div className="max-w-3xl mx-auto p-4">
       <header className="mb-4">
-        <h1 className="text-2xl font-bold">Новая платёжная ссылка</h1>
+        <h1 className="text-2xl font-bold">Новая платёжная страница</h1>
         <p className="text-sm text-gray-600 dark:text-gray-400">Создайте постоянную ссылку для оплаты или собственный интернет-магазин</p>
       </header>
 
@@ -210,7 +237,7 @@ export default function NewLinkStandalonePage() {
           </div>
           {/* Что продаете? */}
           <div className="md:col-span-2">
-            <label className="block text-sm text-gray-700 dark:text-gray-300 mb-2">Что продаете?</label>
+            <div className="text-base font-semibold mb-2">Что продаете?</div>
             <div className="flex gap-2 mb-3">
               <button type="button" className={`px-3 h-9 rounded border ${mode==='service'?'bg-black text-white':'bg-white'}`} onClick={() => setMode('service')}>Свободная услуга</button>
               <button type="button" className={`px-3 h-9 rounded border ${mode==='cart'?'bg-black text-white':'bg-white'}`} onClick={() => setMode('cart')}>Собрать корзину</button>
@@ -227,7 +254,22 @@ export default function NewLinkStandalonePage() {
                       <option value="fixed">Точная</option>
                     </select>
                     {linkSumMode === 'fixed' ? (
-                      <input className="block mt-2 w-44 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-950 px-2 h-9 text-sm" value={linkAmount} onChange={(e) => setLinkAmount(e.target.value)} placeholder="0.00" />
+                      <div className="mt-2 w-44">
+                        <input
+                          className="block w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-950 pl-2 h-9 text-sm"
+                          value={linkAmount.replace('.', ',')}
+                          onChange={(e) => {
+                            // Нормализуем ввод: точка -> запятая в UI, но в стейте храним с точкой для вычислений
+                            const raw = e.target.value.replace(/[^0-9,\.]/g, '');
+                            const withComma = raw.replace(/\./g, ',');
+                            // для внутреннего состояния заменим запятую на точку
+                            const normalized = withComma.replace(/,/g, '.');
+                            setLinkAmount(normalized);
+                          }}
+                          placeholder="0,00"
+                          inputMode="decimal"
+                        />
+                      </div>
                     ) : null}
                   </div>
                   <div className="md:flex-shrink-0">
@@ -243,14 +285,14 @@ export default function NewLinkStandalonePage() {
               </div>
             ) : (
               <div className="space-y-2">
-                <div className="text-xs text-gray-600 dark:text-gray-400">Выберите нужные позиции на витрине</div>
+                <label className="block text-sm text-gray-700 dark:text-gray-300 mb-1">Выберите нужные позиции на витрине</label>
                 <div className="space-y-2">
                   {cart.map((row, idx) => (
                     <div key={idx} className="flex items-start gap-2">
-                      <div className="relative">
-                        <div className="text-xs text-gray-500 mb-1">Наименование</div>
+                      <div className="relative flex-1 min-w-[8rem] sm:min-w-[14rem]">
+                        {idx===0 ? (<div className="text-xs text-gray-500 mb-1">Наименование</div>) : null}
                         <input
-                          className="min-w-[14rem] rounded border px-2 h-9 text-sm"
+                          className="w-full rounded border px-2 h-9 text-sm"
                           placeholder="Начните вводить название"
                           list={`products-list-${idx}`}
                           value={row.title}
@@ -275,15 +317,15 @@ export default function NewLinkStandalonePage() {
                         </datalist>
                       </div>
                       <div>
-                        <div className="text-xs text-gray-500 mb-1">Количество</div>
-                        <input className="w-20 rounded border px-2 h-9 text-sm" placeholder="Кол-во" value={row.qty} onChange={(e)=> setCart((prev)=> prev.map((r,i)=> i===idx ? { ...r, qty: e.target.value } : r))} />
+                        {idx===0 ? (<div className="text-xs text-gray-500 mb-1">Количество</div>) : null}
+                        <input className="w-16 sm:w-20 rounded border px-2 h-9 text-sm" placeholder="Кол-во" value={row.qty} onChange={(e)=> setCart((prev)=> prev.map((r,i)=> i===idx ? { ...r, qty: e.target.value } : r))} />
                       </div>
                       <div>
-                        <div className="text-xs text-gray-500 mb-1">Цена, р</div>
-                        <input className="w-28 rounded border px-2 h-9 text-sm" placeholder="Цена" value={row.price} onChange={(e)=> setCart((prev)=> prev.map((r,i)=> i===idx ? { ...r, price: e.target.value } : r))} />
+                        {idx===0 ? (<div className="text-xs text-gray-500 mb-1">Цена, ₽</div>) : null}
+                        <input className="w-24 sm:w-28 rounded border px-2 h-9 text-sm" placeholder="Цена" value={String(row.price||'').replace('.', ',')} onChange={(e)=> setCart((prev)=> prev.map((r,i)=> i===idx ? { ...r, price: e.target.value.replace(',', '.') } : r))} />
                       </div>
                       <div className="flex flex-col">
-                        <div className="text-xs mb-1 invisible">label</div>
+                        {idx===0 ? (<div className="text-xs mb-1 invisible">label</div>) : null}
                         <button type="button" className="px-2 h-9 rounded border" onClick={()=> setCart((prev)=> prev.filter((_,i)=> i!==idx))}>Удалить</button>
                       </div>
                     </div>
@@ -291,18 +333,55 @@ export default function NewLinkStandalonePage() {
                   <button type="button" className="px-3 h-9 rounded border" onClick={()=> setCart((prev)=> [...prev, { id:'', title:'', price:'', qty:'1' }])}>+ Добавить</button>
                 </div>
                 <div className="text-xs text-gray-600 dark:text-gray-400">Нет нужной позиции? <a className="underline" href="/products/new" target="_blank" onClick={()=> showToast('Откроем создание позиции в новом окне', 'info')}>Создать новую позицию на витрине</a></div>
-                <label className="inline-flex items-center gap-2 text-sm mt-2">
-                  <input type="checkbox" checked={allowCartAdjust} onChange={(e)=> setAllowCartAdjust(e.target.checked)} />
-                  <span>Разрешить покупателю изменять набор и количество позиций</span>
-                </label>
+                {/* Итоговая сумма по корзине */}
+                {(() => {
+                  const toNum = (v: string) => Number(String(v || '0').replace(',', '.'));
+                  const total = cart.reduce((sum, r) => {
+                    const price = toNum(r.price);
+                    const qty = toNum(r.qty || '1');
+                    if (!Number.isFinite(price) || !Number.isFinite(qty)) return sum;
+                    return sum + price * qty;
+                  }, 0);
+                  const formatted = Number.isFinite(total) ? total.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '';
+                  return (
+                    <div className="mt-2">
+                      <label className="block text-sm text-gray-700 dark:text-gray-300 mb-1">Сумма, ₽</label>
+                      <div className="w-44">
+                        <input className="w-full rounded border pl-2 h-9 text-sm bg-gray-100 dark:bg-gray-900 dark:border-gray-700" value={formatted} readOnly disabled />
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
             )}
           </div>
+          {/* Настройка отображения корзины (перенесено выше чекбокса) */}
+          {mode === 'cart' ? (
+            <div className="md:col-span-2">
+              <label className="block text-sm text-gray-700 dark:text-gray-300 mb-1">Отображение витрины</label>
+              <div className="flex flex-wrap gap-2 text-sm">
+                <label className={`flex items-center justify-center px-3 h-9 rounded border cursor-pointer text-center ${cartDisplay==='list'?'bg-black text-white':'bg-white'}`} style={{ lineHeight: 1.1 }}>
+                  <input type="radio" name="cart_display" className="hidden" checked={cartDisplay==='list'} onChange={() => setCartDisplay('list')} />
+                  Показывать строками, маленькие превью
+                </label>
+                <label className={`flex items-center justify-center px-3 h-9 rounded border cursor-pointer text-center ${cartDisplay==='grid'?'bg-black text-white':'bg-white'}`} style={{ lineHeight: 1.1 }}>
+                  <input type="radio" name="cart_display" className="hidden" checked={cartDisplay==='grid'} onChange={() => setCartDisplay('grid')} />
+                  Показавать сеткой, большие превью
+                </label>
+              </div>
+              <label className="inline-flex items-center gap-2 text-sm mt-3">
+                <input type="checkbox" checked={allowCartAdjust} onChange={(e)=> setAllowCartAdjust(e.target.checked)} />
+                <span>Разрешить покупателю изменять набор и количество позиций</span>
+              </label>
+            </div>
+          ) : null}
           <div className="md:col-span-2">
+            <div className="text-base font-semibold mb-1">Принимаете оплату как Агент?</div>
             <label className="inline-flex items-center gap-2 text-sm">
               <input type="checkbox" checked={linkAgent} onChange={(e) => setLinkAgent(e.target.checked)} />
               <span>Агентская продажа</span>
             </label>
+            <div className="text-xs text-gray-500 mt-1">Разделите оплату между вами и самозанятым партнёром. Описание ваших услуг — в <a href="/settings" className="underline">настройках</a>.</div>
             {linkAgent ? (
               <div className="mt-2 flex flex-wrap items-end gap-3">
                 <select className="rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-950 px-2 h-9 text-sm" value={linkCommType} onChange={(e) => setLinkCommType(e.target.value as any)}>
@@ -310,7 +389,94 @@ export default function NewLinkStandalonePage() {
                   <option value="fixed">₽</option>
                 </select>
                 <input className="w-32 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-950 px-2 h-9 text-sm" placeholder="Комиссия" value={linkCommVal} onChange={(e) => setLinkCommVal(e.target.value)} />
-                <input className="w-56 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-950 px-2 h-9 text-sm" placeholder="Телефон партнёра" value={linkPartner} onChange={(e) => setLinkPartner(e.target.value)} />
+                <div className="relative">
+                  <input
+                    className="w-56 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-950 px-2 h-9 text-sm"
+                    placeholder="Телефон партнёра"
+                    value={linkPartner}
+                    onChange={(e) => { setLinkPartner(e.target.value); setPartnersOpen(true); }}
+                    onFocus={() => setPartnersOpen(true)}
+                    onBlur={() => setTimeout(() => setPartnersOpen(false), 150)}
+                  />
+                  {/* FIO at the right of phone on ≥sm, inside container */}
+                  {linkPartner ? (
+                    <div className="hidden sm:block text-xs text-gray-600 truncate max-w-[14rem]">
+                      {partnerLoading ? (
+                        <svg className="inline-block animate-spin h-4 w-4 text-gray-500 align-middle" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path></svg>
+                      ) : (
+                        (() => {
+                          const digits = linkPartner.replace(/\D/g, '');
+                          const found = partners.find((p) => p.phone.replace(/\D/g, '') === digits);
+                          return found?.fio || '';
+                        })()
+                      )}
+                    </div>
+                  ) : null}
+                  {partnersOpen ? (
+                    <div className="absolute left-0 top-full mt-1 w-[22rem] max-h-56 overflow-auto rounded border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 shadow">
+                      {(() => {
+                        const q = linkPartner.toLowerCase();
+                        const qDigits = q.replace(/\D/g, '');
+                        const items = partners.filter((p) => {
+                          const phoneOk = p.phone.replace(/\D/g, '').includes(qDigits);
+                          const fioOk = (p.fio || '').toLowerCase().includes(q);
+                          return qDigits ? phoneOk : fioOk || phoneOk;
+                        });
+                        return items.length === 0 ? (
+                          <div className="px-2 py-2 text-xs">
+                            <button type="button" className="px-2 py-1 text-sm rounded border hover:bg-gray-50 dark:hover:bg-gray-900" onClick={async () => {
+                              const phoneDigits = linkPartner.replace(/\D/g, '');
+                              if (!phoneDigits) return;
+                              setPartnerLoading(true);
+                              try {
+                                const res = await fetch('/api/partners', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ phone: phoneDigits }) });
+                                const d = await res.json();
+                                if (!res.ok) {
+                                  const msg = d?.error || 'Не удалось добавить партнёра';
+                                  showToast(msg, 'error');
+                                } else {
+                                  const p = d?.partner || {};
+                                  const fio = p?.fio || null;
+                                  setPartners((prev) => {
+                                    const exists = prev.some((x) => x.phone.replace(/\D/g, '') === phoneDigits);
+                                    return exists ? prev.map((x) => (x.phone.replace(/\D/g, '') === phoneDigits ? { phone: phoneDigits, fio } : x)) : [...prev, { phone: phoneDigits, fio }];
+                                  });
+                                  // keep typed phone, just close list
+                                  setPartnersOpen(false);
+                                }
+                              } catch {
+                                showToast('Не удалось добавить партнёра', 'error');
+                              } finally {
+                                setPartnerLoading(false);
+                              }
+                            }}>Добавить</button>
+                          </div>
+                        ) : (
+                          items.map((p, i) => (
+                            <button key={i} type="button" className="w-full text-left px-2 py-1 text-sm hover:bg-gray-50 dark:hover:bg-gray-900" onClick={() => { setLinkPartner(p.phone); setPartnersOpen(false); }}>
+                              <span className="font-medium">{p.fio || 'Без имени'}</span>
+                              <span className="text-gray-500"> — {p.phone}</span>
+                            </button>
+                          ))
+                        );
+                      })()}
+                    </div>
+                  ) : null}
+                </div>
+                {/* FIO below on mobile */}
+                {linkPartner ? (
+                  <div className="sm:hidden col-span-3 mt-1 text-xs text-gray-600">
+                    {partnerLoading ? (
+                      <svg className="animate-spin h-4 w-4 text-gray-500" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path></svg>
+                    ) : (
+                      (() => {
+                        const digits = linkPartner.replace(/\D/g, '');
+                        const found = partners.find((p) => p.phone.replace(/\D/g, '') === digits);
+                        return found?.fio || '';
+                      })()
+                    )}
+                  </div>
+                ) : null}
               </div>
             ) : null}
           </div>

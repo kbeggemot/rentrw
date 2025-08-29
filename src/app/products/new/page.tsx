@@ -81,7 +81,7 @@ export default function NewProductPage() {
           </div>
         </div>
         <Input label="Наименование" value={title} onChange={(e) => setTitle(e.target.value)} required />
-        <Input label="Цена" type="number" step="0.01" inputMode="decimal" value={price} onChange={(e) => setPrice(e.target.value)} required />
+        <Input label="Цена" type="text" inputMode="decimal" value={price.replace('.', ',')} onChange={(e) => setPrice(e.target.value.replace(',', '.'))} required />
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="block text-sm text-gray-700 dark:text-gray-300 mb-1">Единица измерения</label>

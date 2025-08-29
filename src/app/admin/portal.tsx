@@ -293,7 +293,7 @@ function WithdrawalsPanel() {
               <tr key={w.userId+':'+w.taskId} className="border-t">
                 <td className="px-2 py-1">{w.taskId}</td>
                 <td className="px-2 py-1">{w.userId}</td>
-                <td className="px-2 py-1">{typeof w.amountRub==='number'?w.amountRub.toFixed(2):'-'}</td>
+                <td className="px-2 py-1">{typeof w.amountRub==='number'? new Intl.NumberFormat('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(w.amountRub) : '-'}</td>
                 <td className="px-2 py-1">{w.status||'—'}</td>
                 <td className="px-2 py-1">{w.createdAt?new Date(w.createdAt).toLocaleString('ru-RU',{timeZone:'Europe/Moscow'}):'—'}</td>
                 <td className="px-2 py-1">{w.paidAt?new Date(w.paidAt).toLocaleString('ru-RU',{timeZone:'Europe/Moscow'}):'—'}</td>
@@ -388,7 +388,7 @@ function SalesPanel({ showToast, role }: { showToast: (m: string, k?: any) => vo
                 <td className="px-2 py-1 whitespace-nowrap">{s.orgInn || '—'}</td>
                 <td className="px-2 py-1 leading-tight">{s.__orgName || '—'}</td>
                 <td className="px-2 py-1"><div className="max-w-[260px] break-all">{s.clientEmail || '—'}</div></td>
-                <td className="px-2 py-1 whitespace-nowrap">{typeof s.amountGrossRub==='number'?s.amountGrossRub.toFixed(2):'-'}</td>
+                <td className="px-2 py-1 whitespace-nowrap">{typeof s.amountGrossRub==='number'? new Intl.NumberFormat('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(s.amountGrossRub) : '-'}</td>
                 <td className="px-2 py-1 whitespace-nowrap">{typeof s.isAgent === 'boolean' ? (s.isAgent ? 'агентская' : 'прямая') : '—'}</td>
                 <td className="px-2 py-1 leading-tight">
                   {s.serviceEndDate ? (<><div>{new Date(`${s.serviceEndDate}T00:00:00Z`).toLocaleDateString('ru-RU',{ timeZone:'Europe/Moscow' })}</div></>) : '—'}
@@ -450,7 +450,7 @@ function LinksPanel({ showToast, role }: { showToast: (m: string, k?: any) => vo
                 <td className="px-2 py-1">{x.code}</td>
                 <td className="px-2 py-1">{x.orgInn||'—'}</td>
                 <td className="px-2 py-1">{x.__orgName||'—'}</td>
-                <td className="px-2 py-1">{typeof x.amountRub==='number'?x.amountRub.toFixed(2):'-'}</td>
+                <td className="px-2 py-1">{typeof x.amountRub==='number'? new Intl.NumberFormat('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(x.amountRub) : '-'}</td>
                 <td className="px-2 py-1">{x.vatRate||'—'}</td>
                 <td className="px-2 py-1">{x.method||'—'}</td>
                 <td className="px-2 py-1"><a className="inline-block px-2 py-1" href={`/admin/links/${encodeURIComponent(String(x.code))}`}>Открыть</a></td>

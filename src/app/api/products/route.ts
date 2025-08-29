@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getCurrentUserId, getSelectedOrgInn } from '@/server/orgContext';
-import { createProduct, deleteProduct, listCategoriesForOrg, listProductsForOrg } from '@/server/productsStore';
+import { createProduct, deleteProduct, listCategoriesForOrg, listProductsForOrg, findProductById, updateProduct } from '@/server/productsStore';
 
 export const runtime = 'nodejs';
 
@@ -46,6 +46,34 @@ export async function POST(req: Request) {
       photos: Array.isArray(body?.photos) ? body.photos.slice(0, 5) : [],
     });
     return NextResponse.json({ item });
+  } catch (e) {
+    return NextResponse.json({ error: 'INTERNAL' }, { status: 500 });
+  }
+}
+
+export async function PUT(req: Request) {
+  try {
+    const userId = getCurrentUserId(req);
+    const orgInn = getSelectedOrgInn(req);
+    if (!userId) return NextResponse.json({ error: 'NO_USER' }, { status: 401 });
+    if (!orgInn) return NextResponse.json({ error: 'NO_ORG' }, { status: 400 });
+    const url = new URL(req.url);
+    const id = url.searchParams.get('id') || '';
+    if (!id) return NextResponse.json({ error: 'NO_ID' }, { status: 400 });
+    const body = await req.json();
+    const updated = await updateProduct(userId, orgInn, id, {
+      kind: (body?.kind === 'service' ? 'service' : body?.kind === 'goods' ? 'goods' : undefined) as any,
+      title: typeof body?.title === 'string' ? String(body.title).trim() : undefined,
+      category: typeof body?.category !== 'undefined' ? (body?.category ?? null) : undefined,
+      price: typeof body?.price === 'number' ? Number(body.price) : undefined,
+      unit: body?.unit,
+      vat: body?.vat,
+      sku: typeof body?.sku !== 'undefined' ? (body?.sku ?? null) : undefined,
+      description: typeof body?.description !== 'undefined' ? (body?.description ?? null) : undefined,
+      photos: Array.isArray(body?.photos) ? body.photos.slice(0, 5) : undefined,
+    } as any);
+    if (!updated) return NextResponse.json({ error: 'NOT_FOUND' }, { status: 404 });
+    return NextResponse.json({ item: updated });
   } catch (e) {
     return NextResponse.json({ error: 'INTERNAL' }, { status: 500 });
   }

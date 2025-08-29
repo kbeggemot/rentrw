@@ -598,9 +598,9 @@ function AcceptPaymentContent() {
         <Input
           label="Сумма, ₽"
           type="text"
-          placeholder="0.00"
-          value={amount}
-          onChange={(e) => setAmount(e.target.value)}
+          placeholder="0,00"
+          value={amount.replace('.', ',')}
+          onChange={(e) => setAmount(e.target.value.replace(',', '.'))}
           onBlur={validateMinNet}
           required
         />
@@ -702,9 +702,9 @@ function AcceptPaymentContent() {
               <Input
                 label={commissionType === 'percent' ? 'Комиссия агента, %' : 'Комиссия агента, ₽'}
                 type="text"
-                placeholder={commissionType === 'percent' ? '0' : '0.00'}
-                value={commission}
-                onChange={(e) => setCommission(e.target.value)}
+                placeholder={commissionType === 'percent' ? '0' : '0,00'}
+                value={commission.replace('.', ',')}
+                onChange={(e) => setCommission(e.target.value.replace(',', '.'))}
                 onBlur={validateMinNet}
                 required
                 hint={commissionType === 'percent' ? 'Укажите дробное значение при необходимости, например 2.5' : 'Укажите фиксированную сумму в рублях'}

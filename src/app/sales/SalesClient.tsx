@@ -315,8 +315,8 @@ export default function SalesClient({ initial, hasTokenInitial }: { initial: Sal
       const rows = filtered.map((s) => [
         String(s.taskId ?? ''),
         s.isAgent ? 'Агентская' : 'Прямая',
-        typeof s.amountGrossRub === 'number' ? s.amountGrossRub.toFixed(2) : '',
-        s.isAgent && typeof s.retainedCommissionRub === 'number' ? s.retainedCommissionRub.toFixed(2) : '',
+        typeof s.amountGrossRub === 'number' ? new Intl.NumberFormat('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(s.amountGrossRub) : '',
+        s.isAgent && typeof s.retainedCommissionRub === 'number' ? new Intl.NumberFormat('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(s.retainedCommissionRub) : '',
         s.status ?? '',
         (s as any).rootStatus ?? '',
         s.ofdUrl ?? '',

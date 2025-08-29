@@ -49,8 +49,8 @@ export default async function AdminSaleEditor(props: { params: Promise<{ uid: st
               <label className="block text-sm">orgInn<input name="orgInn" defaultValue={orgInnDefault} className="w-full border rounded px-2 py-1" />{usedSuggested ? (<div className="text-xs text-gray-500 mt-1">Подставлено по rwTokenFp</div>) : null}</label>
               <label className="block text-sm">clientEmail<input name="clientEmail" defaultValue={item.clientEmail||''} className="w-full border rounded px-2 py-1" /></label>
               <label className="block text-sm col-span-2">description<input name="description" defaultValue={item.description||''} className="w-full border rounded px-2 py-1" /></label>
-              <label className="block text-sm">amountGrossRub<input name="amountGrossRub" defaultValue={String(item.amountGrossRub||'')} className="w-full border rounded px-2 py-1" /></label>
-              <label className="block text-sm">retainedCommissionRub<input name="retainedCommissionRub" defaultValue={String(item.retainedCommissionRub||'')} className="w-full border rounded px-2 py-1" /></label>
+              <label className="block text-sm">amountGrossRub<input name="amountGrossRub" defaultValue={String(item.amountGrossRub||'').replace('.', ',')} className="w-full border rounded px-2 py-1" /></label>
+              <label className="block text-sm">retainedCommissionRub<input name="retainedCommissionRub" defaultValue={String(item.retainedCommissionRub||'').replace('.', ',')} className="w-full border rounded px-2 py-1" /></label>
               <label className="block text-sm">status
                 <select name="status" defaultValue={item.status||''} className="w-full border rounded px-2 py-1">
                   {[item.status||''].filter(Boolean).map(v=>String(v)).map(v=>(<option key={'cur-'+v} value={v}>{v}</option>))}

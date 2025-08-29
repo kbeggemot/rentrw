@@ -49,7 +49,14 @@ export async function POST(req: Request) {
     const title = String(body?.title || '').trim();
     const description = String(body?.description || '').trim();
     const sumMode = (body?.sumMode === 'fixed' ? 'fixed' : 'custom') as 'custom' | 'fixed';
-    const amountRub = sumMode === 'fixed' ? Number(body?.amountRub || 0) : null;
+    // Normalize amount from UI: accept both comma and dot, then coerce to number
+    let amountRub: number | null = null;
+    if (sumMode === 'fixed') {
+      const raw = String(body?.amountRub ?? '').trim();
+      const normalized = raw.replace(/\s+/g, '').replace(/,/g, '.');
+      const n = Number(normalized);
+      amountRub = Number.isFinite(n) ? n : NaN;
+    }
     const vatRate = (['none','0','10','20'].includes(String(body?.vatRate)) ? String(body?.vatRate) : 'none') as 'none'|'0'|'10'|'20';
     const isAgent = !!body?.isAgent;
     // Vanity code (optional)
@@ -134,7 +141,7 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: msg }, { status: 400 });
       }
     }
-    const item = await createPaymentLink(userId, { title, description, sumMode, amountRub: amountRub ?? undefined, vatRate, isAgent, commissionType: commissionType as any, commissionValue: commissionValue ?? undefined, partnerPhone, method, orgInn: inn ?? undefined, preferredCode: preferredCode ?? undefined, cartItems: cartItems ?? undefined, allowCartAdjust: Boolean(body?.allowCartAdjust) } as any);
+    const item = await createPaymentLink(userId, { title, description, sumMode, amountRub: amountRub ?? undefined, vatRate, isAgent, commissionType: commissionType as any, commissionValue: commissionValue ?? undefined, partnerPhone, method, orgInn: inn ?? undefined, preferredCode: preferredCode ?? undefined, cartItems: cartItems ?? undefined, allowCartAdjust: Boolean(body?.allowCartAdjust), cartDisplay: (body?.cartDisplay === 'list' ? 'list' : (body?.cartDisplay === 'grid' ? 'grid' : undefined)) } as any);
     const hostHdr = req.headers.get('x-forwarded-host') || req.headers.get('host') || 'localhost:3000';
     const protoHdr = req.headers.get('x-forwarded-proto') || (hostHdr.startsWith('localhost') ? 'http' : 'https');
     const url = `${protoHdr}://${hostHdr}/link/${encodeURIComponent(item.code)}`;

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { deletePaymentLink, findLinkByCode, markLinkAccessed } from '@/server/paymentLinkStore';
+import { deletePaymentLink, findLinkByCode, markLinkAccessed, updatePaymentLink } from '@/server/paymentLinkStore';
 import { getUserPayoutRequisites } from '@/server/userStore';
 
 export const runtime = 'nodejs';
@@ -22,8 +22,39 @@ export async function GET(req: Request) {
     try { await markLinkAccessed(code); } catch {}
     const { userId, title, description, sumMode, amountRub, vatRate, isAgent, commissionType, commissionValue, partnerPhone, method } = item;
     let orgName: string | null = null;
-    try { const reqs = await getUserPayoutRequisites(userId); orgName = reqs.orgName || null; } catch {}
-    return NextResponse.json({ code, userId, title, description, sumMode, amountRub, vatRate, isAgent, commissionType, commissionValue, partnerPhone, method, orgName, orgInn: item.orgInn || null }, { status: 200 });
+    // 1) Try org name from org store by link's orgInn
+    try {
+      const innRaw = (item.orgInn || '').toString();
+      const inn = innRaw.replace(/\D/g, '');
+      if (inn) {
+        const { findOrgByInn, getTokenForOrg, updateOrganizationName } = await import('@/server/orgStore');
+        const org = await findOrgByInn(inn);
+        orgName = (org?.name ?? null) as any;
+        // 2) If missing, try to fetch from RW /account using any active token for this org
+        if (!orgName) {
+          const token = await getTokenForOrg(inn, userId);
+          if (token) {
+            try {
+              const base = process.env.ROCKETWORK_API_BASE_URL || 'https://app.rocketwork.ru/api/';
+              const url = new URL('account', base.endsWith('/') ? base : base + '/').toString();
+              const res = await fetch(url, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }, cache: 'no-store' });
+              const txt = await res.text();
+              let data: any = null; try { data = txt ? JSON.parse(txt) : null; } catch { data = txt; }
+              if (res.ok && data) {
+                const name = data?.account?.company_name || data?.company_name || null;
+                if (name && typeof name === 'string' && name.trim().length > 0) {
+                  orgName = name.trim();
+                  try { await updateOrganizationName(inn, orgName); } catch {}
+                }
+              }
+            } catch {}
+          }
+        }
+      }
+    } catch {}
+    // 3) Legacy fallback (selected org in cookie)
+    try { if (!orgName) { const reqs = await getUserPayoutRequisites(userId); orgName = reqs.orgName || null; } } catch {}
+    return NextResponse.json({ code, userId, title, description, sumMode, amountRub, vatRate, isAgent, commissionType, commissionValue, partnerPhone, method, orgName: orgName || null, orgInn: item.orgInn || null, cartItems: item.cartItems || null, allowCartAdjust: !!item.allowCartAdjust }, { status: 200 });
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'Server error';
     return NextResponse.json({ error: msg }, { status: 500 });
@@ -39,6 +70,79 @@ export async function DELETE(req: Request) {
     if (!code) return NextResponse.json({ error: 'NO_CODE' }, { status: 400 });
     const ok = await deletePaymentLink(userId, code);
     return NextResponse.json({ ok });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : 'Server error';
+    return NextResponse.json({ error: msg }, { status: 500 });
+  }
+}
+
+export async function PUT(req: Request) {
+  try {
+    const url = new URL(req.url);
+    const code = decodeURIComponent(url.pathname.split('/').pop() || '');
+    if (!code) return NextResponse.json({ error: 'NO_CODE' }, { status: 400 });
+    const userId = getUserId(req);
+    if (!userId) return NextResponse.json({ error: 'NO_USER' }, { status: 401 });
+    const current = await findLinkByCode(code);
+    if (!current) return NextResponse.json({ error: 'NOT_FOUND' }, { status: 404 });
+    if (current.userId !== userId) return NextResponse.json({ error: 'FORBIDDEN' }, { status: 403 });
+
+    const body = await req.json().catch(() => null);
+    const isCart = Array.isArray(current.cartItems) && current.cartItems.length > 0;
+
+    // Common editable fields
+    const title = String(body?.title || '').trim();
+    if (!title) return NextResponse.json({ error: 'TITLE_REQUIRED' }, { status: 400 });
+    const method = (body?.method === 'qr' || body?.method === 'card') ? body?.method : 'any';
+    const isAgent = !!body?.isAgent;
+    let commissionType: 'percent' | 'fixed' | null = null;
+    let commissionValue: number | null = null;
+    let partnerPhone: string | null = null;
+    if (isAgent) {
+      commissionType = (body?.commissionType === 'fixed' || body?.commissionType === 'percent') ? body?.commissionType : null;
+      commissionValue = typeof body?.commissionValue === 'number' ? Number(body?.commissionValue) : null;
+      partnerPhone = String(body?.partnerPhone || '').trim() || null;
+      if (!commissionType) return NextResponse.json({ error: 'COMMISSION_TYPE_REQUIRED' }, { status: 400 });
+      if (commissionValue == null || !Number.isFinite(commissionValue)) return NextResponse.json({ error: 'COMMISSION_VALUE_REQUIRED' }, { status: 400 });
+      if (commissionType === 'percent' && (commissionValue < 0 || commissionValue > 100)) return NextResponse.json({ error: 'COMMISSION_PERCENT_RANGE' }, { status: 400 });
+      if (commissionType === 'fixed' && commissionValue <= 0) return NextResponse.json({ error: 'COMMISSION_FIXED_POSITIVE' }, { status: 400 });
+      if (!partnerPhone) return NextResponse.json({ error: 'PARTNER_PHONE_REQUIRED' }, { status: 400 });
+    }
+
+    if (!isCart) {
+      // service mode
+      const description = String(body?.description || '').trim();
+      if (!description) return NextResponse.json({ error: 'DESCRIPTION_REQUIRED' }, { status: 400 });
+      const sumMode = (body?.sumMode === 'fixed' ? 'fixed' : 'custom') as 'custom' | 'fixed';
+      let amountRub: number | null = null;
+      if (sumMode === 'fixed') {
+        const raw = String(body?.amountRub ?? '').trim();
+        const normalized = raw.replace(/\s+/g, '').replace(/,/g, '.');
+        const n = Number(normalized);
+        amountRub = Number.isFinite(n) ? n : NaN;
+        if (!Number.isFinite(amountRub) || Number(amountRub) <= 0) return NextResponse.json({ error: 'INVALID_AMOUNT' }, { status: 400 });
+      }
+      const vatRate = (['none','0','10','20'].includes(String(body?.vatRate)) ? String(body?.vatRate) : 'none') as 'none'|'0'|'10'|'20';
+      const updated = await updatePaymentLink(userId, code, { title, description, sumMode, amountRub: amountRub ?? undefined, vatRate, method, isAgent, commissionType: commissionType as any, commissionValue: commissionValue ?? undefined, partnerPhone });
+      if (!updated) return NextResponse.json({ error: 'NOT_FOUND' }, { status: 404 });
+      return NextResponse.json({ ok: true, item: updated });
+    } else {
+      // cart mode
+      const cartItems = Array.isArray(body?.cartItems) ? body.cartItems : [];
+      if (!Array.isArray(cartItems) || cartItems.length === 0) return NextResponse.json({ error: 'CART_EMPTY' }, { status: 400 });
+      const normalized = cartItems.map((c: any) => ({
+        id: c?.id ?? null,
+        title: String(c?.title || ''),
+        price: Number(String(c?.price ?? '0').toString().replace(/,/g, '.')),
+        qty: Number(String(c?.qty ?? '1').toString().replace(/,/g, '.')),
+      })).filter((c: any) => Number.isFinite(c.price) && Number.isFinite(c.qty) && c.price > 0 && c.qty > 0);
+      if (normalized.length === 0) return NextResponse.json({ error: 'CART_EMPTY' }, { status: 400 });
+      const allowCartAdjust = !!body?.allowCartAdjust;
+      const total = normalized.reduce((s: number, r: any) => s + r.price * r.qty, 0);
+      const updated = await updatePaymentLink(userId, code, { title, cartItems: normalized as any, allowCartAdjust, amountRub: total, method, isAgent, commissionType: commissionType as any, commissionValue: commissionValue ?? undefined, partnerPhone });
+      if (!updated) return NextResponse.json({ error: 'NOT_FOUND' }, { status: 404 });
+      return NextResponse.json({ ok: true, item: updated });
+    }
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'Server error';
     return NextResponse.json({ error: msg }, { status: 500 });

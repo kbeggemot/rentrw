@@ -32,7 +32,7 @@ export default async function AdminWithdrawalPage(props: { params: Promise<{ id:
           <div className="space-y-2 text-sm">
             <div>taskId: <b>{String(data.rec.taskId)}</b></div>
             <div>userId: <b>{data.rec.userId}</b></div>
-            <div>amount: <b>{typeof data.rec.amountRub==='number'?data.rec.amountRub.toFixed(2):'—'}</b></div>
+            <div>amount: <b>{typeof data.rec.amountRub==='number'? new Intl.NumberFormat('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(data.rec.amountRub) :'—'}</b></div>
             <div>status: <b>{data.rec.status || '—'}</b></div>
             <div>createdAt: <b>{data.rec.createdAt?new Date(data.rec.createdAt).toLocaleString('ru-RU',{timeZone:'Europe/Moscow'}):'—'}</b></div>
             <div>paidAt: <b>{data.rec.paidAt?new Date(data.rec.paidAt).toLocaleString('ru-RU',{timeZone:'Europe/Moscow'}):'—'}</b></div>

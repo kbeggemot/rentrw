@@ -85,4 +85,39 @@ export async function deleteProduct(id: string, orgInn: string): Promise<boolean
   return true;
 }
 
+export async function findProductById(id: string, orgInn: string): Promise<ProductRecord | null> {
+  const inn = (orgInn || '').replace(/\D/g, '');
+  const store = await readStore();
+  const item = store.items.find(i => i.id === id && i.orgInn === inn) || null;
+  return item ?? null;
+}
+
+export async function updateProduct(
+  userId: string,
+  orgInn: string,
+  id: string,
+  data: Partial<Omit<ProductRecord, 'id' | 'userId' | 'orgInn' | 'createdAt' | 'updatedAt'>>
+): Promise<ProductRecord | null> {
+  const inn = (orgInn || '').replace(/\D/g, '');
+  const store = await readStore();
+  const idx = store.items.findIndex(i => i.id === id && i.orgInn === inn);
+  if (idx === -1) return null;
+  const current = store.items[idx];
+  const next: ProductRecord = { ...current };
+  if (data.kind === 'goods' || data.kind === 'service') next.kind = data.kind;
+  if (typeof data.title === 'string') next.title = data.title;
+  if (typeof data.category !== 'undefined') next.category = data.category ?? null;
+  if (typeof data.price === 'number' && Number.isFinite(data.price)) next.price = Math.max(0, Math.round(Number(data.price) * 100) / 100);
+  if (data.unit && ['усл','шт','упак','гр','кг','м'].includes(data.unit as any)) next.unit = data.unit as any;
+  if (data.vat && ['none','0','10','20'].includes(data.vat as any)) next.vat = data.vat as any;
+  if (typeof data.sku !== 'undefined') next.sku = data.sku ?? null;
+  if (typeof data.description !== 'undefined') next.description = data.description ?? null;
+  if (Array.isArray(data.photos)) next.photos = data.photos.slice(0, 5);
+  next.userId = current.userId || userId;
+  next.updatedAt = new Date().toISOString();
+  store.items[idx] = next;
+  await writeStore(store);
+  return next;
+}
+
 

@@ -566,7 +566,7 @@ export default function SettingsClient({ initial, userId }: { initial: SettingsP
                   <span>₽</span>
                 </label>
               </div>
-              <Input type="number" step="0.01" placeholder={agentType === 'percent' ? '0' : '0.00'} value={agentValue} onChange={(e) => setAgentValue(e.target.value)} className="w-32" />
+              <Input type="text" placeholder={agentType === 'percent' ? '0' : '0,00'} value={agentValue.replace('.', ',')} onChange={(e) => setAgentValue(e.target.value.replace(',', '.'))} className="w-32" />
               <Button
                 type="button"
                 variant="secondary"

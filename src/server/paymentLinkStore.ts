@@ -16,6 +16,7 @@ export type PaymentLink = {
   method?: 'any' | 'qr' | 'card';
   cartItems?: Array<{ id?: string | null; title: string; price: number; qty: number }> | null;
   allowCartAdjust?: boolean;
+  cartDisplay?: 'grid' | 'list' | null;
   createdAt: string;
   hits?: number;
   lastAccessAt?: string | null;
@@ -82,6 +83,7 @@ export async function createPaymentLink(userId: string, data: Omit<PaymentLink, 
       qty: Number(ci?.qty || 1),
     })) : null,
     allowCartAdjust: Boolean((data as any)?.allowCartAdjust),
+    cartDisplay: (data as any)?.cartDisplay === 'list' ? 'list' : ((data as any)?.cartDisplay === 'grid' ? 'grid' : null),
     createdAt: now,
     hits: 0,
     lastAccessAt: null,
@@ -133,6 +135,51 @@ export async function markLinkAccessed(code: string): Promise<void> {
   next.lastAccessAt = new Date().toISOString();
   store.items[idx] = next;
   await writeStore(store);
+}
+
+export async function updatePaymentLink(userId: string, code: string, updates: Partial<PaymentLink>): Promise<PaymentLink | null> {
+  const store = await readStore();
+  const idx = store.items.findIndex((i) => i.code === code && i.userId === userId);
+  if (idx === -1) return null;
+  const current = store.items[idx];
+  const isCart = Array.isArray(current.cartItems) && (current.cartItems as any[]).length > 0;
+
+  const next: PaymentLink = { ...current };
+  if (typeof updates.title === 'string') next.title = updates.title;
+  if (!isCart) {
+    if (typeof updates.description === 'string') next.description = updates.description;
+    if (updates.sumMode === 'custom' || updates.sumMode === 'fixed') next.sumMode = updates.sumMode;
+    if (typeof updates.amountRub === 'number' && Number.isFinite(updates.amountRub)) next.amountRub = updates.amountRub;
+    if (updates.vatRate === 'none' || updates.vatRate === '0' || updates.vatRate === '10' || updates.vatRate === '20') next.vatRate = updates.vatRate;
+    next.cartItems = null;
+    next.allowCartAdjust = false;
+  } else {
+    if (Array.isArray(updates.cartItems)) {
+      next.cartItems = updates.cartItems.map((ci: any) => ({
+        id: ci?.id ?? null,
+        title: String(ci?.title || ''),
+        price: Number(ci?.price || 0),
+        qty: Number(ci?.qty || 1),
+      }));
+    }
+    if (typeof updates.allowCartAdjust === 'boolean') next.allowCartAdjust = updates.allowCartAdjust;
+    if (typeof updates.amountRub === 'number' && Number.isFinite(updates.amountRub)) next.amountRub = updates.amountRub;
+  }
+  if (typeof updates.method === 'string' && (updates.method === 'any' || updates.method === 'qr' || updates.method === 'card')) next.method = updates.method;
+  if (typeof updates.isAgent === 'boolean') next.isAgent = updates.isAgent;
+  if (next.isAgent) {
+    if (updates.commissionType === 'percent' || updates.commissionType === 'fixed') next.commissionType = updates.commissionType;
+    if (typeof updates.commissionValue === 'number' && Number.isFinite(updates.commissionValue)) next.commissionValue = updates.commissionValue;
+    if (typeof updates.partnerPhone === 'string') next.partnerPhone = updates.partnerPhone;
+  } else {
+    next.commissionType = null;
+    next.commissionValue = null;
+    next.partnerPhone = null;
+  }
+
+  store.items[idx] = next;
+  await writeStore(store);
+  return next;
 }
 
 

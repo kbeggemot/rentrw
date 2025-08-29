@@ -16,6 +16,9 @@ type LinkData = {
   commissionValue?: number | null;
   partnerPhone?: string | null;
   method?: 'any' | 'qr' | 'card';
+  cartItems?: Array<{ id?: string | null; title: string; price: number; qty: number }> | null;
+  allowCartAdjust?: boolean;
+  cartDisplay?: 'list' | 'grid';
 };
 
 export default function PublicPayPage(props: { params: Promise<{ code?: string }> }) {
@@ -32,6 +35,34 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
   const [loading, setLoading] = useState(false);
   const [started, setStarted] = useState(false);
   const [payLocked, setPayLocked] = useState(false);
+  const [cart, setCart] = useState<Array<{ id?: string | null; title: string; price: number; qty: number }>>([]);
+  const [addQuery, setAddQuery] = useState('');
+  const [viewer, setViewer] = useState<{ open: boolean; photos: string[]; index: number }>({ open: false, photos: [], index: 0 });
+  const [fadeIn, setFadeIn] = useState(true);
+  const [touchStartX, setTouchStartX] = useState<number | null>(null);
+  const [touchDeltaX, setTouchDeltaX] = useState(0);
+
+  const showPrev = () => {
+    setFadeIn(false);
+    setTimeout(() => setFadeIn(true), 20);
+    setViewer((v) => ({ ...v, index: (v.index - 1 + v.photos.length) % v.photos.length }));
+  };
+  const showNext = () => {
+    setFadeIn(false);
+    setTimeout(() => setFadeIn(true), 20);
+    setViewer((v) => ({ ...v, index: (v.index + 1) % v.photos.length }));
+  };
+
+  useEffect(() => {
+    if (!viewer.open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowLeft') { e.preventDefault(); showPrev(); }
+      else if (e.key === 'ArrowRight') { e.preventDefault(); showNext(); }
+      else if (e.key === 'Escape') { e.preventDefault(); setViewer({ open: false, photos: [], index: 0 }); }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [viewer.open]);
 
   // Flow state
   const [taskId, setTaskId] = useState<string | number | null>(null);
@@ -92,9 +123,17 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
             if (lr.ok) {
               const ld = await lr.json();
               if (!cancelled) {
+                if (!ld?.orgName) {
+                  setData(null);
+                  setMsg('Ссылка не найдена');
+                } else {
                 setData((prev) => ({ ...(prev || {} as any), ...(ld || {} as any) } as any));
                 if (ld?.sumMode === 'fixed' && typeof ld?.amountRub === 'number') setAmount(String(ld.amountRub));
                 if (ld?.method === 'card') setMethod('card'); else setMethod('qr');
+                  if (Array.isArray(ld?.cartItems) && ld?.allowCartAdjust) {
+                    try { setCart((ld.cartItems as any[]).map((c: any) => ({ id: c?.id ?? null, title: String(c?.title || ''), price: Number(c?.price || 0), qty: Number(c?.qty || 1) }))); } catch {}
+                  }
+                }
               }
             }
           } catch {}
@@ -114,7 +153,12 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
           const d = await res.json();
           if (!res.ok) throw new Error(d?.error || 'NOT_FOUND');
           if (cancelled) return;
+          if (!d?.orgName) {
+            setData(null);
+            setMsg('Ссылка не найдена');
+          } else {
           setData(d);
+          }
           // Проверяем наличие токена и для режима оплаты по ссылке, если есть владелец
           try {
             if (d?.userId) {
@@ -128,6 +172,9 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
           } catch {}
           if (d?.sumMode === 'fixed' && typeof d?.amountRub === 'number') setAmount(String(d.amountRub));
           if (d?.method === 'card') setMethod('card'); else setMethod('qr');
+          if (Array.isArray(d?.cartItems) && d?.allowCartAdjust) {
+            try { setCart((d.cartItems as any[]).map((c: any) => ({ id: c?.id ?? null, title: String(c?.title || ''), price: Number(c?.price || 0), qty: Number(c?.qty || 1) }))); } catch {}
+          }
         } catch (e) { if (!cancelled) setMsg('Ссылка не найдена'); }
       }
     })();
@@ -173,15 +220,21 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
   const mskToday = () => new Date().toLocaleDateString('ru-RU', { timeZone: 'Europe/Moscow' }).split('.').reverse().join('-');
   const isValidEmail = (s: string) => /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/.test(s.trim());
 
+  const cartTotal = useMemo(() => {
+    if (!(data?.allowCartAdjust && Array.isArray(cart) && cart.length > 0)) return null;
+    const total = cart.reduce((s, r) => s + (Number(r.price || 0) * Number(r.qty || 0)), 0);
+    return Number.isFinite(total) ? total : 0;
+  }, [cart, data?.allowCartAdjust]);
+
   const canPay = useMemo(() => {
     if (!data) return false;
-    const n = Number((data.sumMode === 'fixed' ? (data.amountRub ?? 0) : Number(amount.replace(',', '.'))));
+    const n = data.allowCartAdjust && cartTotal != null ? Number(cartTotal) : Number((data.sumMode === 'fixed' ? (data.amountRub ?? 0) : Number(amount.replace(',', '.'))));
     if (!Number.isFinite(n) || n <= 0) return false;
     const minOk = data.isAgent
       ? (n - (data.commissionType === 'percent' ? n * (Number(data.commissionValue || 0) / 100) : Number(data.commissionValue || 0))) >= 10
       : n >= 10;
     return minOk && isValidEmail(email);
-  }, [data, amount, email]);
+  }, [data, amount, email, cartTotal]);
 
   const startPoll = (uid: string | number) => {
     if (pollRef.current) return;
@@ -335,7 +388,7 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
         }
       }
       
-      const amountNum = data.sumMode === 'fixed' ? (data.amountRub || 0) : Number(amount.replace(',', '.'));
+      const amountNum = data.allowCartAdjust && cartTotal != null ? Number(cartTotal) : (data.sumMode === 'fixed' ? (data.amountRub || 0) : Number(amount.replace(',', '.')));
       const body: any = {
         amountRub: amountNum,
         description: data.description,
@@ -390,10 +443,97 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
   return (
     <div className="max-w-xl mx-auto p-4">
       <h1 className="text-xl font-semibold mb-1">{data.title}</h1>
-      <div className="text-sm text-gray-600 mb-4">Оплата в пользу {data.orgName || 'Организация'}</div>
+      {data.orgName ? (
+        <div className="text-sm text-gray-600 mb-4">Оплата в пользу {data.orgName}</div>
+      ) : null}
       <div className="bg-white dark:bg-gray-950 border border-gray-200 dark:border-gray-800 rounded-lg p-4">
         {payLocked ? (
-          <div className="text-sm text-gray-700">Оплата временно недоступна. Пожалуйста, уточните детали у продавца.</div>
+          <div className="text-sm text-gray-700">{msg || 'Оплата временно недоступна. Пожалуйста, уточните детали у продавца.'}</div>
+        ) : (
+        <>
+        {data.allowCartAdjust && Array.isArray(cart) && cart.length > 0 ? (
+          <div className="mb-3">
+            <div className="text-sm text-gray-600 mb-2">Соберите свою корзину</div>
+            {data.cartDisplay === 'list' ? (
+              <div className="flex flex-col gap-2">
+                {cart.map((item, idx) => (
+                  <div key={idx} className="rounded border p-2 flex items-center gap-3">
+                    <img
+                      src={(() => { try { const id = item.id || null; const fromLink = Array.isArray(data.cartItems) ? (data.cartItems as any[]).find((x: any) => (x?.id ?? null) === (id ?? null) || x?.title === item.title) : null; const ph = Array.isArray(fromLink?.photos) ? fromLink.photos[0] : null; return ph || '/window.svg'; } catch { return '/window.svg'; } })()}
+                      alt="preview"
+                      className="h-9 w-9 rounded border object-cover cursor-pointer"
+                      onClick={() => { try { const id = item.id || null; const fromLink = Array.isArray(data.cartItems) ? (data.cartItems as any[]).find((x: any) => (x?.id ?? null) === (id ?? null) || x?.title === item.title) : null; const arr = Array.isArray(fromLink?.photos) ? fromLink.photos : []; setViewer({ open: true, photos: arr.length ? arr : ['/window.svg'], index: 0 }); } catch { setViewer({ open: true, photos: ['/window.svg'], index: 0 }); } }}
+                    />
+                    <div className="flex-1">
+                      <div className="text-sm font-medium">{item.title}</div>
+                      <div className="text-xs text-gray-600">Цена: {Number(item.price || 0).toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₽</div>
+                    </div>
+                    <input type="number" min={1} step={1} className="w-20 rounded border px-2 h-9 text-sm" value={String(item.qty)} onChange={(e) => { const q = Math.max(1, Number(e.target.value || 1)); setCart((prev) => prev.map((it, i) => i === idx ? { ...it, qty: q } : it)); }} />
+                    <button type="button" className="px-3 h-9 rounded border text-sm text-gray-700" onClick={() => setCart((prev) => prev.filter((_, i) => i !== idx))}>Удалить</button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-3">
+                {cart.map((item, idx) => (
+                  <div key={idx} className="rounded border p-2">
+                    <div className="relative w-full rounded overflow-hidden bg-white mb-2" style={{ aspectRatio: '1 / 1' }}>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={(() => { try { const id = item.id || null; const fromLink = Array.isArray(data.cartItems) ? (data.cartItems as any[]).find((x: any) => (x?.id ?? null) === (id ?? null) || x?.title === item.title) : null; const ph = Array.isArray(fromLink?.photos) ? fromLink.photos[0] : null; return ph || '/window.svg'; } catch { return '/window.svg'; } })()}
+                        alt="item"
+                        className="w-full h-full object-cover"
+                      />
+                      {(() => { try { const id = item.id || null; const fromLink = Array.isArray(data.cartItems) ? (data.cartItems as any[]).find((x: any) => (x?.id ?? null) === (id ?? null) || x?.title === item.title) : null; const count = Array.isArray(fromLink?.photos) ? fromLink.photos.length : 0; if (count > 1) { return (<></>); } } catch {} return null; })()}
+                    </div>
+                    <div className="text-sm font-medium">{item.title}</div>
+                    <div className="text-xs text-gray-600">Цена: {Number(item.price || 0).toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₽</div>
+                    <div className="mt-2 flex items-center gap-2">
+                      <input type="number" min={1} step={1} className="w-20 rounded border px-2 h-9 text-sm" value={String(item.qty)} onChange={(e) => { const q = Math.max(1, Number(e.target.value || 1)); setCart((prev) => prev.map((it, i) => i === idx ? { ...it, qty: q } : it)); }} />
+                      <button type="button" className="px-3 h-9 rounded border text-sm text-gray-700" onClick={() => setCart((prev) => prev.filter((_, i) => i !== idx))}>Удалить</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+            <div className="flex items-center gap-2 relative mt-3">
+              <input className="flex-1 rounded border px-2 h-9 text-sm" placeholder={(() => { const catalog = Array.isArray(data.cartItems) ? (data.cartItems as any[]) : []; const remaining = catalog.filter((p: any) => !cart.some((c) => c.title === p.title)); return remaining.length === 0 ? 'больше ничего нет(' : 'Поиск по позициям'; })()} value={addQuery} onChange={(e) => setAddQuery(e.target.value)} />
+              <button type="button" className="rounded border px-3 h-9 text-sm" onClick={() => { const q = addQuery.trim().toLowerCase(); if (!q) return; const catalog = Array.isArray(data.cartItems) ? data.cartItems : []; const found = (catalog as any[]).find((p: any) => String(p?.title || '').toLowerCase().includes(q)); if (found) { const id = found?.id ?? null; setCart((prev) => { const i = prev.findIndex((x) => (x.id || null) === (id || null) && x.title === found.title); if (i >= 0) return prev.map((x, j) => (j === i ? { ...x, qty: Number(x.qty || 0) + 1 } : x)); return [...prev, { id, title: String(found.title || ''), price: Number(found.price || 0), qty: 1 }]; }); setAddQuery(''); } }}>Добавить</button>
+            </div>
+            <div className="mt-2">
+              <label className="block text-sm text-gray-600 mb-1">Итоговая сумма, ₽</label>
+              <input className="w-40 rounded-lg border px-2 h-9 text-sm bg-gray-100" value={(cartTotal || 0).toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} readOnly />
+            </div>
+            {/* Фуллскрин просмотрщик */}
+            {viewer.open ? (
+              <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center" onClick={() => setViewer({ open: false, photos: [], index: 0 })}>
+                <div className="relative max-w-[90vw] max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={viewer.photos[viewer.index] || '/window.svg'}
+                    alt="photo"
+                    className={`max-w-full max-h-[90vh] object-contain transition-opacity duration-300 ${fadeIn ? 'opacity-100' : 'opacity-0'}`}
+                    style={{ transform: `translateX(${touchDeltaX}px)` }}
+                    onTouchStart={(e) => { setTouchStartX(e.touches[0].clientX); setTouchDeltaX(0); }}
+                    onTouchMove={(e) => { if (touchStartX != null) setTouchDeltaX(e.touches[0].clientX - touchStartX); }}
+                    onTouchEnd={() => {
+                      const threshold = 50;
+                      if (touchDeltaX > threshold) showPrev();
+                      else if (touchDeltaX < -threshold) showNext();
+                      setTouchStartX(null);
+                      setTouchDeltaX(0);
+                    }}
+                  />
+                  {viewer.photos.length > 1 ? (
+                    <>
+                      <button className="absolute left-2 top-1/2 -translate-y-1/2 bg-white/70 rounded px-2 py-1" onClick={showPrev}>‹</button>
+                      <button className="absolute right-2 top-1/2 -translate-y-1/2 bg-white/70 rounded px-2 py-1" onClick={showNext}>›</button>
+                    </>
+                  ) : null}
+                </div>
+              </div>
+            ) : null}
+          </div>
         ) : (
         <>
         <div className="mb-3">
@@ -403,14 +543,16 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
         <div className="mb-3">
           <label className="block text-sm text-gray-600 mb-1">Сумма, ₽</label>
           {data.sumMode === 'fixed' ? (
-            <input className="w-40 rounded-lg border px-2 h-9 text-sm" value={String(data.amountRub ?? '')} readOnly />
+                <input className="w-40 rounded-lg border px-2 h-9 text-sm" value={(() => { const v = data.amountRub as number | null | undefined; if (typeof v === 'number' && Number.isFinite(v)) { return v.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); } const s = String(v ?? ''); return s.replace('.', ','); })()} readOnly />
           ) : (
-            <input className="w-40 rounded-lg border px-2 h-9 text-sm" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0.00" />
+                <input className="w-40 rounded-lg border px-2 h-9 text-sm" value={amount.replace('.', ',')} onChange={(e) => setAmount(e.target.value.replace(',', '.'))} placeholder="0,00" />
           )}
           {data.sumMode === 'custom' ? (
             <div className="text-xs text-gray-500 mt-1">Минимальная сумма {data.isAgent ? 'за вычетом комиссии' : ''} — 10 ₽</div>
           ) : null}
         </div>
+          </>
+        )}
         <div className="mb-3">
           <label className="block text-sm text-gray-600 mb-1">Ваш email</label>
           <input className="w-full sm:w-80 rounded-lg border px-2 h-9 text-sm" type="email" inputMode="email" pattern="^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="name@example.com" />

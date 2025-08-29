@@ -319,7 +319,7 @@ export default function DashboardClient({ hasTokenInitial }: { hasTokenInitial: 
                         <option value="fixed">Точная</option>
                       </select>
                       {linkSumMode === 'fixed' ? (
-                        <input className="w-28 sm:w-32 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-950 px-2 h-9 text-sm shrink-0" value={linkAmount} onChange={(e) => setLinkAmount(e.target.value)} placeholder="0.00" />
+                        <input className="w-28 sm:w-32 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-950 px-2 h-9 text-sm shrink-0" value={linkAmount.replace('.', ',')} onChange={(e) => setLinkAmount(e.target.value.replace(',', '.'))} placeholder="0,00" />
                       ) : null}
                     </div>
                   </div>
@@ -481,7 +481,7 @@ export default function DashboardClient({ hasTokenInitial }: { hasTokenInitial: 
                   min="0"
                   step="0.01"
                   className="w-40 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 h-9 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-foreground"
-                  placeholder="0.00"
+                  placeholder="0,00"
                   value={withdrawAmount}
                   onChange={(e) => setWithdrawAmount(e.target.value)}
                 />

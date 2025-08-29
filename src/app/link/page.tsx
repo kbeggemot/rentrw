@@ -22,24 +22,37 @@ export default function LinksStandalonePage() {
   };
 
   useEffect(() => { (async () => { await refreshLinks(); })(); }, []);
+  // Flash success after redirect from creation
+  useEffect(() => {
+    try {
+      const flag = sessionStorage.getItem('flash');
+      if (flag === 'OK') {
+        sessionStorage.removeItem('flash');
+        showToast('Ссылка создана', 'success');
+      } else if (flag === 'COPIED') {
+        sessionStorage.removeItem('flash');
+        showToast('Ссылка создана и скопирована', 'success');
+      }
+    } catch {}
+  }, []);
 
   return (
     <div className="max-w-3xl mx-auto p-4">
       <header className="mb-4">
-        <h1 className="text-2xl font-bold">Постоянные ссылки</h1>
+        <h1 className="text-2xl font-bold">Платежные страницы</h1>
         <p className="text-sm text-gray-600 dark:text-gray-400">Создание и управление платёжными ссылками</p>
       </header>
 
       <div className="bg-white dark:bg-gray-950 border border-gray-200 dark:border-gray-800 rounded-lg p-4 shadow-sm">
         <a href="/link/new">
           <Button variant="secondary" className="text-base w-full" fullWidth>
-            Создать постоянную ссылку
+            Создать платежную страницу
           </Button>
         </a>
 
         <div className="mt-4">
           <button type="button" className="w-full text-left px-3 py-2 rounded-md hover:bg-gray-50 dark:hover:bg-gray-900 border border-gray-200 dark:border-gray-800 flex items-center justify-between" onClick={async () => { const next = !linksOpen; setLinksOpen(next); if (next && links.length === 0) { await refreshLinks(); } }}>
-            <span className="text-base font-semibold">Мои постоянные ссылки</span>
+            <span className="text-base font-semibold">Мои платежные страницы</span>
             <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`${linksOpen ? 'rotate-180' : ''}`}><path d="M6 9l6 6 6-6"/></svg>
           </button>
           {linksOpen ? (
@@ -52,6 +65,14 @@ export default function LinksStandalonePage() {
                     <div key={l.code} className="flex items-center justify-between px-3 py-2">
                       <div className="text-sm"><a className="text-black dark:text-white font-semibold hover:underline" href={`/link/${encodeURIComponent(l.code)}`} target="_blank" rel="noreferrer">{l.title || l.code}</a></div>
                       <div className="flex items-center gap-2">
+                        {/* tail preview of the URL as plain text */}
+                        <div className="text-sm text-gray-600 dark:text-gray-400">/{l.code}</div>
+                        {/* edit icon styled like neighbors */}
+                        <a href={`/link/${encodeURIComponent(l.code)}/edit`} className="inline-flex items-center justify-center rounded-lg text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 p-1 h-9 w-9 bg-gray-200 text-gray-900 hover:bg-gray-300 dark:bg-gray-800 dark:text-gray-100 dark:hover:bg-gray-700 focus:ring-gray-400" aria-label="Редактировать">
+                          <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                            <path d="M3 10l7-7 3 3-7 7H3v-3z" />
+                          </svg>
+                        </a>
                         <Button variant="secondary" size="icon" aria-label="Скопировать ссылку" onClick={async () => { try { await navigator.clipboard.writeText(new URL(`/link/${encodeURIComponent(l.code)}`, window.location.origin).toString()); showToast('Ссылка скопирована', 'success'); } catch {} }}>
                           <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
                             <rect x="6" y="3" width="7" height="9" rx="1" />
