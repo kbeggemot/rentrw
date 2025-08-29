@@ -364,6 +364,8 @@ function SalesPanel({ showToast, role }: { showToast: (m: string, k?: any) => vo
                   } catch { showToast('Сеть/сервер недоступен','error'); } finally { try { const d=e.currentTarget.closest('details') as HTMLDetailsElement|null; if(d) d.open=false; } catch {} }
                 }}>Запустить OFD Repair</button>
                 <button className="w-full text-left px-3 py-2 hover:bg-gray-50 dark:hover:bg-gray-900" onClick={async(e)=>{ e.preventDefault(); e.stopPropagation(); try{ await fetch('/api/admin/actions/schedule',{method:'POST',credentials:'include',cache:'no-store'}); showToast('Schedule запущен','info'); } catch { showToast('Сеть/сервер недоступен','error'); } finally { try { const d=e.currentTarget.closest('details') as HTMLDetailsElement|null; if(d) d.open=false; } catch {} } }}>Schedule</button>
+                <div className="border-t my-1" />
+                <button className="w-full text-left px-3 py-2 hover:bg-gray-50 dark:hover:bg-gray-900" onClick={async(e)=>{ e.preventDefault(); e.stopPropagation(); try{ const r=await fetch('/api/admin/actions/ofd/rebuild-queue',{method:'POST',credentials:'include',cache:'no-store'}); const d=await r.json().catch(()=>null); if(!r.ok){ showToast(String(d?.error||`Ошибка ${r.status}`),'error'); return;} showToast(`Пересобрано: ${d?.jobs||0}`,'success'); } catch { showToast('Сеть/сервер недоступен','error'); } finally { try { const d=e.currentTarget.closest('details') as HTMLDetailsElement|null; if(d) d.open=false; } catch {} } }}>Пересобрать очередь OFD</button>
               </>
             ) : null}
           </div>
