@@ -7,6 +7,7 @@ import { updateSaleFromStatus, findSaleByTaskId, updateSaleOfdUrlsByOrderId, set
 import { ensureSaleFromTask } from '@/server/taskStore';
 import type { RocketworkTask } from '@/types/rocketwork';
 import { fermaGetAuthTokenCached, fermaCreateReceipt } from '@/server/ofdFerma';
+import { appendRwError, writeRwLastRequest } from '@/server/rwAudit';
 import { buildFermaReceiptPayload, PAYMENT_METHOD_PREPAY_FULL, PAYMENT_METHOD_FULL_PAYMENT } from '@/app/api/ofd/ferma/build-payload';
 import { getUserOrgInn } from '@/server/userStore';
 import { getOrgPayoutRequisites } from '@/server/orgStore';
@@ -43,15 +44,21 @@ export async function GET(_: Request) {
     }
     const url = new URL(`tasks/${encodeURIComponent(taskId)}`, base.endsWith('/') ? base : base + '/').toString();
 
-    let res = await fetch(url, {
-      method: 'GET',
-      headers: {
-        Authorization: `Bearer ${token}`,
-        Accept: 'application/json',
-      },
-      // disable any framework caches
-      cache: 'no-store',
-    });
+    let res: Response;
+    try {
+      await writeRwLastRequest({ ts: new Date().toISOString(), scope: 'tasks:get', method: 'GET', url, userId });
+      res = await fetch(url, {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: 'application/json',
+        },
+        cache: 'no-store',
+      });
+    } catch (e) {
+      await appendRwError({ ts: new Date().toISOString(), scope: 'tasks:get', method: 'GET', url, status: null, error: e instanceof Error ? e.message : String(e), userId });
+      throw e;
+    }
 
     let text = await res.text();
     let data: unknown = null;
@@ -108,7 +115,12 @@ export async function GET(_: Request) {
     };
     while (tries < 5 && (await needMore(normalized))) {
       await new Promise((r) => setTimeout(r, 1200));
-      res = await fetch(url, { method: 'GET', headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }, cache: 'no-store' });
+      try {
+        res = await fetch(url, { method: 'GET', headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }, cache: 'no-store' });
+      } catch (e) {
+        await appendRwError({ ts: new Date().toISOString(), scope: 'tasks:get', method: 'GET', url, status: null, error: e instanceof Error ? e.message : String(e), userId });
+        throw e;
+      }
       text = await res.text();
       try { data = text ? JSON.parse(text) : null; } catch { data = text; }
       maybeObj = typeof data === 'object' && data !== null ? (data as Record<string, unknown>) : null;

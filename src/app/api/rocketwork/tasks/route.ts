@@ -17,6 +17,7 @@ import { headers as nextHeaders } from 'next/headers';
 import { readText } from '@/server/storage';
 import { listWithdrawals, startWithdrawalPoller } from '@/server/withdrawalStore';
 import { recordWithdrawalCreate } from '@/server/withdrawalStore';
+import { appendRwError, writeRwLastRequest } from '@/server/rwAudit';
 
 export const runtime = 'nodejs';
 
@@ -309,20 +310,9 @@ export async function POST(req: Request) {
     const base = process.env.ROCKETWORK_API_BASE_URL || DEFAULT_BASE_URL;
     const url = new URL('tasks', base.endsWith('/') ? base : base + '/').toString();
 
-    // Persist last outgoing payload for debugging
+    // Persist last outgoing payload for debugging (S3-compatible)
     try {
-      const dataDir = path.join(process.cwd(), '.data');
-      await fs.mkdir(dataDir, { recursive: true });
-      await fs.writeFile(
-        path.join(dataDir, 'last_task_request.json'),
-        JSON.stringify({
-          timestamp: new Date().toISOString(),
-          url,
-          order_id: orderId,
-          payload,
-        }, null, 2),
-        'utf8'
-      );
+      await writeRwLastRequest({ ts: new Date().toISOString(), scope: 'tasks:create', method: 'POST', url, requestBody: payload, userId });
     } catch {}
 
     // Apply deferred full-settlement logic (serviceEndDate != today in Europe/Moscow)
@@ -333,16 +323,22 @@ export async function POST(req: Request) {
       (payload.acquiring_order as any).with_ofd_receipt = false;
     }
 
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json',
-        Accept: 'application/json',
-      },
-      body: JSON.stringify(payload),
-      cache: 'no-store',
-    });
+    let res: Response;
+    try {
+      res = await fetch(url, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+        },
+        body: JSON.stringify(payload),
+        cache: 'no-store',
+      });
+    } catch (e) {
+      await appendRwError({ ts: new Date().toISOString(), scope: 'tasks:create', method: 'POST', url, status: null, requestBody: payload, error: e instanceof Error ? e.message : String(e), userId });
+      throw e;
+    }
 
     const text = await res.text();
     let data: unknown = null;
@@ -353,6 +349,7 @@ export async function POST(req: Request) {
       const mo = maybeObj as Record<string, unknown> | null;
       const errorsArr = Array.isArray(mo?.errors) ? (mo?.errors as string[]) : null;
       const message = (maybeObj?.error as string | undefined) || (errorsArr ? errorsArr.join('; ') : undefined) || text || 'External API error';
+      try { await appendRwError({ ts: new Date().toISOString(), scope: 'tasks:create', method: 'POST', url, status: res.status, requestBody: payload, responseText: text, error: message, userId }); } catch {}
       return NextResponse.json({ error: message, details: maybeObj }, { status: res.status });
     }
 
