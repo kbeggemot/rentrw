@@ -27,9 +27,14 @@ export async function GET(req: Request) {
   if (!authed(req)) return NextResponse.json({ error: 'UNAUTHORIZED' }, { status: 401 });
   const s = await readStore();
   const url = new URL(req.url);
+  // Support forcing org/user context via headers for admin tools
+  const userHdr = req.headers.get('x-user-id') || undefined;
+  const orgHdr = req.headers.get('x-org-inn') || undefined;
   const uid = url.searchParams.get('uid');
   const task = url.searchParams.get('task');
-  const list = Array.isArray(s.sales) ? s.sales : [];
+  let list = Array.isArray(s.sales) ? s.sales : [];
+  if (userHdr) list = list.filter((x) => String(x.userId) === String(userHdr));
+  if (orgHdr) list = list.filter((x) => String(x.orgInn||'') === String(orgHdr));
   if (uid && task) {
     let one = list.find((x) => String(x.userId) === uid && (x.taskId == (task as any)));
     // Fallback: find by taskId only (uid might be missing/mismatched in legacy records)

@@ -205,9 +205,9 @@ export async function updateSaleFromStatus(userId: string, taskId: number | stri
       const root = typeof anyUpd.rootStatus === 'string' ? anyUpd.rootStatus : (typeof anyUpd.taskStatus === 'string' ? anyUpd.taskStatus : undefined);
       if (typeof root !== 'undefined' && root !== null) (next as any).rootStatus = root;
     } catch {}
-    // Auto-hide expired tasks
+    // Auto-hide expired tasks (prod only)
     if (next.status && String(next.status).toLowerCase() === 'expired') {
-      next.hidden = true;
+      next.hidden = process.env.NODE_ENV === 'production';
     }
     if (typeof update.ofdUrl !== 'undefined' && update.ofdUrl) next.ofdUrl = update.ofdUrl;
     if (typeof update.ofdFullUrl !== 'undefined' && update.ofdFullUrl) next.ofdFullUrl = update.ofdFullUrl;

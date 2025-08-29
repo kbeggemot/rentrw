@@ -7,6 +7,9 @@ export function getCurrentUserId(req: Request): string | null {
 }
 
 export function getSelectedOrgInn(req: Request): string | null {
+  // Prefer explicit header (admin tools), then cookie
+  const hdr = req.headers.get('x-org-inn');
+  if (hdr && hdr.trim().length > 0) return hdr.trim();
   const cookie = req.headers.get('cookie') || '';
   const m = /(?:^|;\s*)org_inn=([^;]+)/.exec(cookie);
   if (!m) return null;

@@ -66,7 +66,7 @@ export default function SalesClient({ initial, hasTokenInitial }: { initial: Sal
   const [fullReceipt, setFullReceipt] = useState<'all' | 'yes' | 'no'>('all');
   const [commissionReceipt, setCommissionReceipt] = useState<'all' | 'yes' | 'no'>('all');
   const [npdReceipt, setNpdReceipt] = useState<'all' | 'yes' | 'no'>('all');
-  const [showHidden, setShowHidden] = useState<'all' | 'yes' | 'no'>('no');
+  const [showHidden, setShowHidden] = useState<'all' | 'yes' | 'no'>(process.env.NODE_ENV !== 'production' ? 'all' : 'no');
   // Дата продажи (RW created_at если есть)
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
