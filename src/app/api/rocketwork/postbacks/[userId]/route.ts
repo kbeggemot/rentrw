@@ -165,7 +165,17 @@ export async function POST(req: Request) {
             const amountRub = Number(sale.amountGrossRub || 0);
             const usedVat = (sale.vatRate || 'none') as any;
             const baseUrl = process.env.FERMA_BASE_URL || 'https://ferma.ofd.ru/';
-            const tokenOfd = await fermaGetAuthTokenCached(process.env.FERMA_LOGIN || '', process.env.FERMA_PASSWORD || '', { baseUrl });
+            let tokenOfd: string;
+            try {
+              tokenOfd = await fermaGetAuthTokenCached(process.env.FERMA_LOGIN || '', process.env.FERMA_PASSWORD || '', { baseUrl });
+            } catch (e) {
+              try {
+                const prev = (await readText('.data/ofd_create_attempts.log')) || '';
+                const line = JSON.stringify({ ts: new Date().toISOString(), src: 'postback', stage: 'auth_error', userId, taskId, orderId: sale.orderId, error: e instanceof Error ? e.message : String(e) });
+                await writeText('.data/ofd_create_attempts.log', prev + line + '\n');
+              } catch {}
+              return NextResponse.json({ ok: true });
+            }
             // Build callback URL from current request headers
             const rawProto = req.headers.get('x-forwarded-proto') || 'http';
             const hostHdr = req.headers.get('x-forwarded-host') || req.headers.get('host') || 'localhost:3000';
