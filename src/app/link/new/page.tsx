@@ -288,45 +288,47 @@ export default function NewLinkStandalonePage() {
                 <label className="block text-sm text-gray-700 dark:text-gray-300 mb-1">Выберите нужные позиции на витрине</label>
                 <div className="space-y-2">
                   {cart.map((row, idx) => (
-                    <div key={idx} className="flex items-start gap-2">
-                      <div className="relative flex-1 min-w-[8rem] sm:min-w-[14rem]">
-                        {idx===0 ? (<div className="text-xs text-gray-500 mb-1">Наименование</div>) : null}
-                        <input
-                          className="w-full rounded border px-2 h-9 text-sm"
-                          placeholder="Начните вводить название"
-                          list={`products-list-${idx}`}
-                          value={row.title}
-                          onChange={(e)=>{
-                            const title = e.target.value;
-                            const p = orgProducts.find((x)=> x.title.toLowerCase() === title.toLowerCase());
-                            setCart((prev)=> prev.map((r,i)=> i===idx ? {
-                              id: p?.id || '',
-                              title,
-                              price: (p ? (p.price ?? 0) : (r.price || '')).toString(),
-                              qty: r.qty || '1',
-                            } : r));
-                          }}
-                          onBlur={(e)=>{
-                            const title = e.currentTarget.value;
-                            const p = orgProducts.find((x)=> x.title.toLowerCase() === title.toLowerCase());
-                            if (p) setCart((prev)=> prev.map((r,i)=> i===idx ? { ...r, id: p.id, title: p.title, price: (p.price ?? 0).toString() } : r));
-                          }}
-                        />
-                        <datalist id={`products-list-${idx}`}>
-                          {orgProducts.map((p)=> (<option key={p.id} value={p.title} />))}
-                        </datalist>
-                      </div>
-                      <div>
-                        {idx===0 ? (<div className="text-xs text-gray-500 mb-1">Количество</div>) : null}
-                        <input className="w-16 sm:w-20 rounded border px-2 h-9 text-sm" placeholder="Кол-во" value={row.qty} onChange={(e)=> setCart((prev)=> prev.map((r,i)=> i===idx ? { ...r, qty: e.target.value } : r))} />
-                      </div>
-                      <div>
-                        {idx===0 ? (<div className="text-xs text-gray-500 mb-1">Цена, ₽</div>) : null}
-                        <input className="w-24 sm:w-28 rounded border px-2 h-9 text-sm" placeholder="Цена" value={String(row.price||'').replace('.', ',')} onChange={(e)=> setCart((prev)=> prev.map((r,i)=> i===idx ? { ...r, price: e.target.value.replace(',', '.') } : r))} />
-                      </div>
-                      <div className="flex flex-col">
-                        {idx===0 ? (<div className="text-xs mb-1 invisible">label</div>) : null}
-                        <button type="button" className="px-2 h-9 rounded border" onClick={()=> setCart((prev)=> prev.filter((_,i)=> i!==idx))}>Удалить</button>
+                    <div key={idx} className="overflow-x-auto sm:overflow-visible -mx-1 px-1 touch-pan-x">
+                      <div className="flex items-start gap-2 w-max">
+                        <div className="relative flex-1 min-w-[8rem] sm:min-w-[14rem]">
+                          {idx===0 ? (<div className="text-xs text-gray-500 mb-1">Наименование</div>) : null}
+                          <input
+                            className="w-full rounded border px-2 h-9 text-sm"
+                            placeholder="Начните вводить название"
+                            list={`products-list-${idx}`}
+                            value={row.title}
+                            onChange={(e)=>{
+                              const title = e.target.value;
+                              const p = orgProducts.find((x)=> x.title.toLowerCase() === title.toLowerCase());
+                              setCart((prev)=> prev.map((r,i)=> i===idx ? {
+                                id: p?.id || '',
+                                title,
+                                price: (p ? (p.price ?? 0) : (r.price || '')).toString(),
+                                qty: r.qty || '1',
+                              } : r));
+                            }}
+                            onBlur={(e)=>{
+                              const title = e.currentTarget.value;
+                              const p = orgProducts.find((x)=> x.title.toLowerCase() === title.toLowerCase());
+                              if (p) setCart((prev)=> prev.map((r,i)=> i===idx ? { ...r, id: p.id, title: p.title, price: (p.price ?? 0).toString() } : r));
+                            }}
+                          />
+                          <datalist id={`products-list-${idx}`}>
+                            {orgProducts.map((p)=> (<option key={p.id} value={p.title} />))}
+                          </datalist>
+                        </div>
+                        <div>
+                          {idx===0 ? (<div className="text-xs text-gray-500 mb-1">Количество</div>) : null}
+                          <input className="w-16 sm:w-20 rounded border px-2 h-9 text-sm" placeholder="Кол-во" value={row.qty} onChange={(e)=> setCart((prev)=> prev.map((r,i)=> i===idx ? { ...r, qty: e.target.value } : r))} />
+                        </div>
+                        <div>
+                          {idx===0 ? (<div className="text-xs text-gray-500 mb-1">Цена, ₽</div>) : null}
+                          <input className="w-24 sm:w-28 rounded border px-2 h-9 text-sm" placeholder="Цена" value={String(row.price||'').replace('.', ',')} onChange={(e)=> setCart((prev)=> prev.map((r,i)=> i===idx ? { ...r, price: e.target.value.replace(',', '.') } : r))} />
+                        </div>
+                        <div className="flex flex-col">
+                          {idx===0 ? (<div className="text-xs mb-1 invisible">label</div>) : null}
+                          <button type="button" className="px-2 h-9 rounded border" onClick={()=> setCart((prev)=> prev.filter((_,i)=> i!==idx))}>Удалить</button>
+                        </div>
                       </div>
                     </div>
                   ))}
