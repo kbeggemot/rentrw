@@ -267,4 +267,40 @@ export async function list(prefix: string): Promise<string[]> {
   }
 }
 
+export async function readBinary(relPath: string): Promise<{ data: Buffer; contentType: string | null } | null> {
+  function guessContentType(p: string): string | null {
+    const ext = p.split('.').pop()?.toLowerCase();
+    if (ext === 'jpg' || ext === 'jpeg') return 'image/jpeg';
+    if (ext === 'png') return 'image/png';
+    if (ext === 'webp') return 'image/webp';
+    if (ext === 'svg') return 'image/svg+xml';
+    return null;
+  }
+  if (process.env.S3_ENABLED === '1') {
+    ensureS3();
+    if (!s3Client || !s3Bucket) return null;
+    try {
+      const { GetObjectCommand } = require('@aws-sdk/client-s3');
+      const key = (s3Prefix + relPath).replace(/^\/+/, '');
+      const cmd = new GetObjectCommand({ Bucket: s3Bucket, Key: key });
+      const out = await s3Client.send(cmd);
+      const chunks: Uint8Array[] = [];
+      for await (const c of out.Body as any) chunks.push(c as Uint8Array);
+      const buf = Buffer.concat(chunks);
+      const ct = (out?.ContentType as string | undefined) || guessContentType(relPath) || 'application/octet-stream';
+      return { data: buf, contentType: ct };
+    } catch {
+      return null;
+    }
+  }
+  try {
+    const abs = path.join(process.cwd(), relPath);
+    const buf = await fs.readFile(abs);
+    const ct = guessContentType(relPath) || 'application/octet-stream';
+    return { data: buf, contentType: ct };
+  } catch {
+    return null;
+  }
+}
+
 
