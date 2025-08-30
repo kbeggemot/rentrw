@@ -468,7 +468,7 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
                       <div className="text-sm font-medium">{item.title}</div>
                       <div className="text-xs text-gray-600">Цена: {Number(item.price || 0).toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₽</div>
                     </div>
-                    <input type="number" min={1} step={1} className="w-10 rounded border px-2 h-9 text-sm" value={String(item.qty)} onChange={(e) => { const q = Math.max(1, Number(e.target.value || 1)); setCart((prev) => prev.map((it, i) => i === idx ? { ...it, qty: q } : it)); }} />
+                    <input type="number" min={1} step={1} className="w-10 rounded border px-2 h-9 text-sm bg-white text-black dark:bg-gray-800 dark:text-white placeholder-gray-400 dark:placeholder-gray-400" value={String(item.qty)} onChange={(e) => { const q = Math.max(1, Number(e.target.value || 1)); setCart((prev) => prev.map((it, i) => i === idx ? { ...it, qty: q } : it)); }} />
                     <button type="button" className="px-3 h-9 rounded border text-sm text-gray-700 whitespace-nowrap" onClick={() => setCart((prev) => prev.filter((_, i) => i !== idx))}>Удалить</button>
                   </div>
                 ))}
@@ -489,7 +489,7 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
                     <div className="text-sm font-medium">{item.title}</div>
                     <div className="text-xs text-gray-600">Цена: {Number(item.price || 0).toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₽</div>
                     <div className="mt-2 flex items-center gap-2 overflow-x-auto touch-pan-x">
-                      <input type="number" min={1} step={1} className="w-10 rounded border px-2 h-9 text-sm" value={String(item.qty)} onChange={(e) => { const q = Math.max(1, Number(e.target.value || 1)); setCart((prev) => prev.map((it, i) => i === idx ? { ...it, qty: q } : it)); }} />
+                      <input type="number" min={1} step={1} className="w-10 rounded border px-2 h-9 text-sm bg-white text-black dark:bg-gray-800 dark:text-white placeholder-gray-400 dark:placeholder-gray-400" value={String(item.qty)} onChange={(e) => { const q = Math.max(1, Number(e.target.value || 1)); setCart((prev) => prev.map((it, i) => i === idx ? { ...it, qty: q } : it)); }} />
                       <button type="button" className="px-3 h-9 rounded border text-sm text-gray-700 whitespace-nowrap" onClick={() => setCart((prev) => prev.filter((_, i) => i !== idx))}>Удалить</button>
                     </div>
                   </div>
@@ -497,12 +497,12 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
               </div>
             )}
             <div className="flex items-center gap-2 relative mt-3">
-              <input className="flex-1 rounded border px-2 h-9 text-sm" placeholder={(() => { const catalog = Array.isArray(data.cartItems) ? (data.cartItems as any[]) : []; const remaining = catalog.filter((p: any) => !cart.some((c) => c.title === p.title)); return remaining.length === 0 ? 'больше ничего нет(' : 'Поиск по позициям'; })()} value={addQuery} onChange={(e) => setAddQuery(e.target.value)} />
+              <input className="flex-1 rounded border px-2 h-9 text-sm bg-white text-black dark:bg-gray-800 dark:text-white placeholder-gray-400 dark:placeholder-gray-400" placeholder={(() => { const catalog = Array.isArray(data.cartItems) ? (data.cartItems as any[]) : []; const remaining = catalog.filter((p: any) => !cart.some((c) => c.title === p.title)); return remaining.length === 0 ? 'больше ничего нет(' : 'Поиск по позициям'; })()} value={addQuery} onChange={(e) => setAddQuery(e.target.value)} />
               <button type="button" className="rounded border px-3 h-9 text-sm" onClick={() => { const q = addQuery.trim().toLowerCase(); if (!q) return; const catalog = Array.isArray(data.cartItems) ? data.cartItems : []; const found = (catalog as any[]).find((p: any) => String(p?.title || '').toLowerCase().includes(q)); if (found) { const id = found?.id ?? null; setCart((prev) => { const i = prev.findIndex((x) => (x.id || null) === (id || null) && x.title === found.title); if (i >= 0) return prev.map((x, j) => (j === i ? { ...x, qty: Number(x.qty || 0) + 1 } : x)); return [...prev, { id, title: String(found.title || ''), price: Number(found.price || 0), qty: 1 }]; }); setAddQuery(''); } }}>Добавить</button>
             </div>
             <div className="mt-2">
               <label className="block text-sm text-gray-600 mb-1">Итоговая сумма, ₽</label>
-              <input className="w-40 rounded-lg border px-2 h-9 text-sm bg-gray-100" value={(cartTotal || 0).toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} readOnly />
+              <input className="w-40 rounded-lg border px-2 h-9 text-sm bg-gray-100 text-black dark:bg-gray-800 dark:text-white" value={(cartTotal || 0).toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} readOnly />
             </div>
             {/* Фуллскрин просмотрщик */}
             {viewer.open ? (
@@ -543,9 +543,9 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
         <div className="mb-3">
           <label className="block text-sm text-gray-600 mb-1">Сумма, ₽</label>
           {data.sumMode === 'fixed' ? (
-                <input className="w-40 rounded-lg border px-2 h-9 text-sm" value={(() => { const v = data.amountRub as number | null | undefined; if (typeof v === 'number' && Number.isFinite(v)) { return v.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); } const s = String(v ?? ''); return s.replace('.', ','); })()} readOnly />
+                <input className="w-40 rounded-lg border px-2 h-9 text-sm bg-white text-black dark:bg-gray-800 dark:text-white" value={(() => { const v = data.amountRub as number | null | undefined; if (typeof v === 'number' && Number.isFinite(v)) { return v.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); } const s = String(v ?? ''); return s.replace('.', ','); })()} readOnly />
           ) : (
-                <input className="w-40 rounded-lg border px-2 h-9 text-sm" value={amount.replace('.', ',')} onChange={(e) => setAmount(e.target.value.replace(',', '.'))} placeholder="0,00" />
+                <input className="w-40 rounded-lg border px-2 h-9 text-sm bg-white text-black dark:bg-gray-800 dark:text-white placeholder-gray-400 dark:placeholder-gray-400" value={amount.replace('.', ',')} onChange={(e) => setAmount(e.target.value.replace(',', '.'))} placeholder="0,00" />
           )}
           {data.sumMode === 'custom' ? (
             <div className="text-xs text-gray-500 mt-1">Минимальная сумма {data.isAgent ? 'за вычетом комиссии' : ''} — 10 ₽</div>
@@ -555,7 +555,7 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
         )}
         <div className="mb-3">
           <label className="block text-sm text-gray-600 mb-1">Ваш email</label>
-          <input className="w-full sm:w-80 rounded-lg border px-2 h-9 text-sm" type="email" inputMode="email" pattern="^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="name@example.com" />
+          <input className="w-full sm:w-80 rounded-lg border px-2 h-9 text-sm bg-white text-black dark:bg-gray-800 dark:text-white placeholder-gray-400 dark:placeholder-gray-400" type="email" inputMode="email" pattern="^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="name@example.com" />
           <div className="text-xs text-gray-500 mt-1">Отправим чек на эту почту</div>
         </div>
         <div className="mb-4">
@@ -566,7 +566,7 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
               <option value="card">Карта</option>
             </select>
           ) : (
-            <input className="w-40 rounded-lg border px-2 h-9 text-sm" value={data.method === 'card' ? 'Карта' : 'СБП'} readOnly />
+            <input className="w-40 rounded-lg border px-2 h-9 text-sm bg-white text-black dark:bg-gray-800 dark:text-white" value={data.method === 'card' ? 'Карта' : 'СБП'} readOnly />
           )}
         </div>
         <button disabled={!canStart} onClick={goPay} className={actionBtnClasses}>
