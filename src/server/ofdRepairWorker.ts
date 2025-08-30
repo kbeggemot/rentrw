@@ -279,6 +279,133 @@ export async function repairUserSales(userId: string, onlyOrderId?: number): Pro
         }
       } catch {}
     }
+    // Offset (зачёт предоплаты) — создаём, если назначен invoiceIdOffset, дата сервиса наступила (по МСК), URL полного чека отсутствует
+    try {
+      const end = s.serviceEndDate || null;
+      const mskToday = new Date().toLocaleDateString('ru-RU', { timeZone: 'Europe/Moscow' }).split('.').reverse().join('-');
+      const due = !!end && end <= mskToday;
+      const hasOffset = !!(s as any).invoiceIdOffset;
+      const hasFullUrl = !!s.ofdFullUrl;
+      const st = String(s.status || '').toLowerCase();
+      const final = st === 'paid' || st === 'transfered' || st === 'transferred';
+      if (due && hasOffset && !hasFullUrl && final) {
+        const host = process.env.BASE_HOST || process.env.VERCEL_URL || process.env.RENDER_EXTERNAL_URL || 'localhost:3000';
+        const secret = process.env.OFD_CALLBACK_SECRET || '';
+        const callbackUrl = `https://${host}/api/ofd/ferma/callback${secret ? `?secret=${encodeURIComponent(secret)}&` : '?'}uid=${encodeURIComponent(userId)}`;
+        if (s.isAgent) {
+          // партнёр: тянем ИНН/ФИО исполнителя из RW
+          const token = await getDecryptedApiToken(userId);
+          if (token) {
+            const base = process.env.ROCKETWORK_API_BASE_URL || 'https://app.rocketwork.ru/api/';
+            const tUrl = new URL(`tasks/${encodeURIComponent(String(s.taskId))}`, base.endsWith('/') ? base : base + '/').toString();
+            const r = await fetch(tUrl, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }, cache: 'no-store' });
+            const txt = await r.text();
+            let d: any = null; try { d = txt ? JSON.parse(txt) : null; } catch { d = txt; }
+            const task = (d && typeof d === 'object' && 'task' in d) ? (d.task as any) : d;
+            const partnerInn = (task?.executor?.inn as string | undefined) ?? undefined;
+            if (partnerInn) {
+              const partnerName = (task?.executor && [task.executor.last_name, task.executor.first_name, task.executor.second_name].filter(Boolean).join(' ').trim()) || undefined;
+              const payload = buildFermaReceiptPayload({
+                party: 'partner',
+                partyInn: partnerInn,
+                description: s.description || 'Оплата услуги',
+                amountRub: Math.max(0, (s.amountGrossRub || 0) - ((s as any).retainedCommissionRub || 0)),
+                vatRate: (s.vatRate as any) || 'none',
+                methodCode: PAYMENT_METHOD_FULL_PAYMENT,
+                orderId: s.orderId,
+                docType: 'Income',
+                buyerEmail: s.clientEmail || defaultEmail,
+                invoiceId: (s as any).invoiceIdOffset,
+                callbackUrl,
+                withAdvanceOffset: true,
+                paymentAgentInfo: { AgentType: 'AGENT', SupplierInn: partnerInn, SupplierName: partnerName || 'Исполнитель' },
+              });
+              const created = await fermaCreateReceipt(payload, { baseUrl, authToken: ofdToken });
+              try { (global as any).__OFD_SOURCE__ = 'repair_worker'; } catch {}
+              { const numOrder = Number(String(s.orderId).match(/(\d+)/g)?.slice(-1)[0] || NaN); await updateSaleOfdUrlsByOrderId(userId, numOrder, { ofdFullId: created.id || null }); }
+              // try resolve URL immediately
+              try {
+                let url: string | undefined; let tries = 0;
+                while (!url && tries < 20 && created.id) {
+                  try {
+                    const stR = await fermaGetReceiptStatus(String(created.id), { baseUrl, authToken: ofdToken });
+                    const obj = stR.rawText ? JSON.parse(stR.rawText) : {};
+                    const fn = obj?.Data?.Fn || obj?.Fn;
+                    const fd = obj?.Data?.Fd || obj?.Fd;
+                    const fp = obj?.Data?.Fp || obj?.Fp;
+                    const direct = obj?.Data?.Device?.OfdReceiptUrl as string | undefined;
+                    if (direct && direct.length > 0) { url = direct; break; }
+                    if (fn && fd != null && fp != null) { url = buildReceiptViewUrl(fn, fd, fp); break; }
+                  } catch {}
+                  tries += 1; await new Promise((r2) => setTimeout(r2, 500));
+                }
+                if (url) { try { (global as any).__OFD_SOURCE__ = 'repair_worker'; } catch {} const numOrder = Number(String(s.orderId).match(/(\d+)/g)?.slice(-1)[0] || NaN); await updateSaleOfdUrlsByOrderId(userId, numOrder, { ofdFullUrl: url }); }
+              } catch {}
+            }
+          }
+        } else {
+          // организация: нужно валидное название
+          const orgInn = (s.orgInn && String(s.orgInn).trim().length > 0 && String(s.orgInn) !== 'неизвестно') ? String(s.orgInn).replace(/\D/g, '') : null;
+          if (orgInn) {
+            let supplierName: string | null = null;
+            try {
+              const { findOrgByInn, getTokenForOrg, updateOrganizationName } = await import('./orgStore');
+              const org = await findOrgByInn(orgInn);
+              if (org && org.name && String(org.name).trim().length > 0) supplierName = String(org.name).trim();
+              if (!supplierName) {
+                const token = await getTokenForOrg(orgInn, userId).catch(() => null);
+                if (token) {
+                  const base = process.env.ROCKETWORK_API_BASE_URL || 'https://app.rocketwork.ru/api/';
+                  const accUrl = new URL('account', base.endsWith('/') ? base : base + '/').toString();
+                  const rAcc = await fetch(accUrl, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }, cache: 'no-store' });
+                  const txt = await rAcc.text();
+                  let dAcc: any = null; try { dAcc = txt ? JSON.parse(txt) : null; } catch { dAcc = txt; }
+                  const nm = dAcc?.account?.company_name || dAcc?.company_name || null;
+                  if (nm && typeof nm === 'string' && nm.trim().length > 0) { supplierName = nm.trim(); try { await updateOrganizationName(orgInn, supplierName); } catch {} }
+                }
+              }
+            } catch {}
+            if (supplierName) {
+              const payload = buildFermaReceiptPayload({
+                party: 'org',
+                partyInn: orgInn,
+                description: s.description || 'Оплата услуги',
+                amountRub: s.amountGrossRub,
+                vatRate: (s.vatRate as any) || 'none',
+                methodCode: PAYMENT_METHOD_FULL_PAYMENT,
+                orderId: s.orderId,
+                docType: 'Income',
+                buyerEmail: s.clientEmail || defaultEmail,
+                invoiceId: (s as any).invoiceIdOffset,
+                callbackUrl,
+                withAdvanceOffset: true,
+                paymentAgentInfo: { AgentType: 'AGENT', SupplierInn: orgInn, SupplierName: supplierName },
+              });
+              const created = await fermaCreateReceipt(payload, { baseUrl, authToken: ofdToken });
+              try { (global as any).__OFD_SOURCE__ = 'repair_worker'; } catch {}
+              { const numOrder = Number(String(s.orderId).match(/(\d+)/g)?.slice(-1)[0] || NaN); await updateSaleOfdUrlsByOrderId(userId, numOrder, { ofdFullId: created.id || null }); }
+              try {
+                let url: string | undefined; let tries = 0;
+                while (!url && tries < 20 && created.id) {
+                  try {
+                    const stR = await fermaGetReceiptStatus(String(created.id), { baseUrl, authToken: ofdToken });
+                    const obj = stR.rawText ? JSON.parse(stR.rawText) : {};
+                    const fn = obj?.Data?.Fn || obj?.Fn;
+                    const fd = obj?.Data?.Fd || obj?.Fd;
+                    const fp = obj?.Data?.Fp || obj?.Fp;
+                    const direct = obj?.Data?.Device?.OfdReceiptUrl as string | undefined;
+                    if (direct && direct.length > 0) { url = direct; break; }
+                    if (fn && fd != null && fp != null) { url = buildReceiptViewUrl(fn, fd, fp); break; }
+                  } catch {}
+                  tries += 1; await new Promise((r2) => setTimeout(r2, 500));
+                }
+                if (url) { try { (global as any).__OFD_SOURCE__ = 'repair_worker'; } catch {} const numOrder = Number(String(s.orderId).match(/(\d+)/g)?.slice(-1)[0] || NaN); await updateSaleOfdUrlsByOrderId(userId, numOrder, { ofdFullUrl: url }); }
+              } catch {}
+            }
+          }
+        }
+      }
+    } catch {}
     // Background pay trigger (same conditions as in tasks GET handler), but in the background
     try {
       const aoStatus = String(s.status || '').toLowerCase();
