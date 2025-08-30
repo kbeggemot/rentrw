@@ -21,3 +21,5 @@ npm warn config production Use `--omit=dev` instead.
  GET /favicon.ico 200 in 1141ms
  GET /api/partners 200 in 1167ms
  GET /api/products 200 in 1170ms
+ ✓ Compiled in 1023ms (560 modules)
+ GET /link/new 200 in 151ms
