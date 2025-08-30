@@ -1,0 +1,23 @@
+npm warn config production Use `--omit=dev` instead.
+
+> rentrw@0.1.0 dev
+> next dev --port 3001
+
+   ▲ Next.js 15.4.6
+   - Local:        http://localhost:3001
+   - Network:      http://192.168.1.15:3001
+   - Environments: .env.local
+
+ ✓ Starting...
+ ✓ Ready in 1845ms
+ ○ Compiling /link/new ...
+ ✓ Compiled /link/new in 1208ms (550 modules)
+ ⚠ Fast Refresh had to perform a full reload due to a runtime error.
+ GET /link/new 200 in 1551ms
+ GET /_next/static/webpack/9cd69239a74466f7.webpack.hot-update.json 404 in 1618ms
+ GET /link/new 200 in 124ms
+ ○ Compiling /favicon.ico ...
+ ✓ Compiled /favicon.ico in 1007ms (596 modules)
+ GET /favicon.ico 200 in 1141ms
+ GET /api/partners 200 in 1167ms
+ GET /api/products 200 in 1170ms
