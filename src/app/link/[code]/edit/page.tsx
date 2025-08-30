@@ -3,8 +3,8 @@
 import { use, useEffect, useMemo, useState } from 'react';
 import { Button } from '@/components/ui/Button';
 
-export default function EditLinkPage(props: { params: Promise<{ code: string }> | { code: string } }) {
-  const { code: rawCode } = use(props.params as any);
+export default function EditLinkPage(props: { params: Promise<{ code: string }> }) {
+  const { code: rawCode } = use(props.params);
   const code = decodeURIComponent(rawCode);
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState<{ msg: string; kind: 'success' | 'error' | 'info' } | null>(null);
