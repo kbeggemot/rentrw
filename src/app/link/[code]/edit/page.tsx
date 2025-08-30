@@ -32,6 +32,7 @@ export default function EditLinkPage(props: { params: Promise<{ code: string }> 
   // Cart specific
   const [cartItems, setCartItems] = useState<Array<{ id?: string | null; title: string; price: string; qty: string }>>([]);
   const [allowCartAdjust, setAllowCartAdjust] = useState(false);
+  const [cartDisplay, setCartDisplay] = useState<'grid' | 'list'>('list');
 
   useEffect(() => {
     (async () => {
@@ -50,6 +51,7 @@ export default function EditLinkPage(props: { params: Promise<{ code: string }> 
           setMode('cart');
           setCartItems(d.cartItems.map((c: any) => ({ id: c?.id ?? null, title: String(c?.title || ''), price: String(c?.price ?? 0), qty: String(c?.qty ?? 1) })));
           setAllowCartAdjust(!!d.allowCartAdjust);
+          setCartDisplay(d.cartDisplay === 'grid' ? 'grid' : 'list');
         } else {
           setMode('service');
           setDescription(d.description || '');
@@ -111,6 +113,7 @@ export default function EditLinkPage(props: { params: Promise<{ code: string }> 
         body.cartItems = cartItems.map((c) => ({ id: c.id ?? null, title: c.title, price: Number(String(c.price).replace(',', '.')), qty: Number(String(c.qty).replace(',', '.')) }));
         body.allowCartAdjust = allowCartAdjust;
         body.amountRub = totalCart;
+        body.cartDisplay = cartDisplay;
       }
       const r = await fetch(`/api/links/${encodeURIComponent(code)}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
       const d = await r.json();
@@ -244,7 +247,21 @@ export default function EditLinkPage(props: { params: Promise<{ code: string }> 
                   </div>
                 );
               })()}
-              <label className="inline-flex items-center gap-2 text-sm mt-2">
+              {/* Showcase display type */}
+              <div className="mt-3">
+                <label className="block text-sm text-gray-700 dark:text-gray-300 mb-1">Отображение витрины</label>
+                <div className="flex flex-wrap gap-2 text-sm">
+                  <label className={`flex items-center justify-center px-3 h-9 rounded border cursor-pointer text-center ${cartDisplay==='list'?'bg-black text-white':'bg-white'}`} style={{ lineHeight: 1.1 }}>
+                    <input type="radio" name="cart_display" className="hidden" checked={cartDisplay==='list'} onChange={() => setCartDisplay('list')} />
+                    Показывать строками, маленькие превью
+                  </label>
+                  <label className={`flex items-center justify-center px-3 h-9 rounded border cursor-pointer text-center ${cartDisplay==='grid'?'bg-black text-white':'bg-white'}`} style={{ lineHeight: 1.1 }}>
+                    <input type="radio" name="cart_display" className="hidden" checked={cartDisplay==='grid'} onChange={() => setCartDisplay('grid')} />
+                    Показавать сеткой, большие превью
+                  </label>
+                </div>
+              </div>
+              <label className="inline-flex items-center gap-2 text-sm mt-3">
                 <input type="checkbox" checked={allowCartAdjust} onChange={(e) => setAllowCartAdjust(e.target.checked)} />
                 <span>Разрешить покупателю изменять набор и количество позиций</span>
               </label>

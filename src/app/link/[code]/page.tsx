@@ -457,7 +457,7 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
             {data.cartDisplay === 'list' ? (
               <div className="flex flex-col gap-2">
                 {cart.map((item, idx) => (
-                  <div key={idx} className="rounded border p-2 flex items-center gap-3">
+                  <div key={idx} className="rounded border p-2 flex items-center gap-3 overflow-x-auto touch-pan-x">
                     <img
                       src={(() => { try { const id = item.id || null; const fromLink = Array.isArray(data.cartItems) ? (data.cartItems as any[]).find((x: any) => (x?.id ?? null) === (id ?? null) || x?.title === item.title) : null; const ph = Array.isArray(fromLink?.photos) ? fromLink.photos[0] : null; return ph || '/window.svg'; } catch { return '/window.svg'; } })()}
                       alt="preview"
@@ -468,8 +468,8 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
                       <div className="text-sm font-medium">{item.title}</div>
                       <div className="text-xs text-gray-600">Цена: {Number(item.price || 0).toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₽</div>
                     </div>
-                    <input type="number" min={1} step={1} className="w-20 rounded border px-2 h-9 text-sm" value={String(item.qty)} onChange={(e) => { const q = Math.max(1, Number(e.target.value || 1)); setCart((prev) => prev.map((it, i) => i === idx ? { ...it, qty: q } : it)); }} />
-                    <button type="button" className="px-3 h-9 rounded border text-sm text-gray-700" onClick={() => setCart((prev) => prev.filter((_, i) => i !== idx))}>Удалить</button>
+                    <input type="number" min={1} step={1} className="w-10 rounded border px-2 h-9 text-sm" value={String(item.qty)} onChange={(e) => { const q = Math.max(1, Number(e.target.value || 1)); setCart((prev) => prev.map((it, i) => i === idx ? { ...it, qty: q } : it)); }} />
+                    <button type="button" className="px-3 h-9 rounded border text-sm text-gray-700 whitespace-nowrap" onClick={() => setCart((prev) => prev.filter((_, i) => i !== idx))}>Удалить</button>
                   </div>
                 ))}
               </div>
@@ -488,9 +488,9 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
                     </div>
                     <div className="text-sm font-medium">{item.title}</div>
                     <div className="text-xs text-gray-600">Цена: {Number(item.price || 0).toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₽</div>
-                    <div className="mt-2 flex items-center gap-2">
-                      <input type="number" min={1} step={1} className="w-20 rounded border px-2 h-9 text-sm" value={String(item.qty)} onChange={(e) => { const q = Math.max(1, Number(e.target.value || 1)); setCart((prev) => prev.map((it, i) => i === idx ? { ...it, qty: q } : it)); }} />
-                      <button type="button" className="px-3 h-9 rounded border text-sm text-gray-700" onClick={() => setCart((prev) => prev.filter((_, i) => i !== idx))}>Удалить</button>
+                    <div className="mt-2 flex items-center gap-2 overflow-x-auto touch-pan-x">
+                      <input type="number" min={1} step={1} className="w-10 rounded border px-2 h-9 text-sm" value={String(item.qty)} onChange={(e) => { const q = Math.max(1, Number(e.target.value || 1)); setCart((prev) => prev.map((it, i) => i === idx ? { ...it, qty: q } : it)); }} />
+                      <button type="button" className="px-3 h-9 rounded border text-sm text-gray-700 whitespace-nowrap" onClick={() => setCart((prev) => prev.filter((_, i) => i !== idx))}>Удалить</button>
                     </div>
                   </div>
                 ))}

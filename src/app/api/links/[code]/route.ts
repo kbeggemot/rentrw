@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { deletePaymentLink, findLinkByCode, markLinkAccessed, updatePaymentLink } from '@/server/paymentLinkStore';
 import { getUserPayoutRequisites } from '@/server/userStore';
+import { listProductsForOrg } from '@/server/productsStore';
 
 export const runtime = 'nodejs';
 
@@ -54,7 +55,20 @@ export async function GET(req: Request) {
     } catch {}
     // 3) Legacy fallback (selected org in cookie)
     try { if (!orgName) { const reqs = await getUserPayoutRequisites(userId); orgName = reqs.orgName || null; } } catch {}
-    return NextResponse.json({ code, userId, title, description, sumMode, amountRub, vatRate, isAgent, commissionType, commissionValue, partnerPhone, method, orgName: orgName || null, orgInn: item.orgInn || null, cartItems: item.cartItems || null, allowCartAdjust: !!item.allowCartAdjust }, { status: 200 });
+    // Enrich cart items with product photos for public page rendering
+    let cartItems = item.cartItems || null;
+    try {
+      if (Array.isArray(item.cartItems) && item.cartItems.length > 0) {
+        const innRaw = (item.orgInn || '').toString();
+        const inn = innRaw.replace(/\D/g, '');
+        const products = inn ? await listProductsForOrg(inn) : [];
+        cartItems = item.cartItems.map((c: any) => {
+          const p = products.find((x) => (x.id && c?.id && String(x.id) === String(c.id)) || (x.title && c?.title && String(x.title).toLowerCase() === String(c.title).toLowerCase())) || null;
+          return { ...c, photos: Array.isArray((p as any)?.photos) ? (p as any).photos : [] };
+        });
+      }
+    } catch {}
+    return NextResponse.json({ code, userId, title, description, sumMode, amountRub, vatRate, isAgent, commissionType, commissionValue, partnerPhone, method, orgName: orgName || null, orgInn: item.orgInn || null, cartItems, allowCartAdjust: !!item.allowCartAdjust, cartDisplay: item.cartDisplay || null }, { status: 200 });
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'Server error';
     return NextResponse.json({ error: msg }, { status: 500 });
@@ -138,8 +152,9 @@ export async function PUT(req: Request) {
       })).filter((c: any) => Number.isFinite(c.price) && Number.isFinite(c.qty) && c.price > 0 && c.qty > 0);
       if (normalized.length === 0) return NextResponse.json({ error: 'CART_EMPTY' }, { status: 400 });
       const allowCartAdjust = !!body?.allowCartAdjust;
+      const cartDisplay = body?.cartDisplay === 'list' ? 'list' : (body?.cartDisplay === 'grid' ? 'grid' : undefined);
       const total = normalized.reduce((s: number, r: any) => s + r.price * r.qty, 0);
-      const updated = await updatePaymentLink(userId, code, { title, cartItems: normalized as any, allowCartAdjust, amountRub: total, method, isAgent, commissionType: commissionType as any, commissionValue: commissionValue ?? undefined, partnerPhone });
+      const updated = await updatePaymentLink(userId, code, { title, cartItems: normalized as any, allowCartAdjust, amountRub: total, method, isAgent, commissionType: commissionType as any, commissionValue: commissionValue ?? undefined, partnerPhone, cartDisplay: cartDisplay as any });
       if (!updated) return NextResponse.json({ error: 'NOT_FOUND' }, { status: 404 });
       return NextResponse.json({ ok: true, item: updated });
     }
