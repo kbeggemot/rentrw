@@ -58,6 +58,22 @@ export async function writeText(relPath: string, text: string): Promise<void> {
     try {
       if (relPath === '.data/tasks.json' && (process.env.TASKS_WRITE_GUARD || '1') !== '0') {
         const prev = await readText(relPath);
+
+        // Backend-mismatch protection: if S3 is enabled but prev is null while a local FS copy exists and has data, block write
+        if (process.env.S3_ENABLED === '1' && !prev && (process.env.ALLOW_TASKS_BACKEND_SWITCH || '0') !== '1') {
+          try {
+            const absFs = path.join(process.cwd(), relPath);
+            const st = await fs.stat(absFs).catch(() => null as any);
+            if (st && st.size > 0) {
+              const info = { ts: new Date().toISOString(), reason: 'BLOCKED_BACKEND_MISMATCH_FS_HAS_DATA', note: 'Local FS copy of .data/tasks.json exists with data while S3 read returned null. Write blocked to avoid data loss.', s3: { bucket: process.env.S3_BUCKET || null, prefix: process.env.S3_PREFIX || '' }, fsPath: absFs };
+              try { await writeTextInternal('.data/tasks_guard_block.json', JSON.stringify(info, null, 2)); } catch {}
+              throw new Error('TASKS_WRITE_BLOCKED_BACKEND_MISMATCH');
+            }
+          } catch (e) {
+            if ((e as any)?.message === 'TASKS_WRITE_BLOCKED_BACKEND_MISMATCH') throw e;
+          }
+        }
+
         if (prev) {
           let prevSales = 0, nextSales = 0;
           try { const p = JSON.parse(prev); prevSales = Array.isArray(p?.sales) ? p.sales.length : 0; } catch {}
@@ -75,10 +91,19 @@ export async function writeText(relPath: string, text: string): Promise<void> {
           }
           // Always take a backup before overwriting
           await createTasksBackup(prev);
+
+          // Daily snapshot (idempotent per date)
+          try {
+            const day = new Date().toISOString().slice(0, 10);
+            const dailyPath = `.data/backups/daily/tasks-${day}.json`;
+            const existsDaily = await readText(dailyPath).catch(() => null);
+            if (!existsDaily) await writeTextInternal(dailyPath, prev);
+          } catch {}
         }
       }
     } catch (e: any) {
-      if (String((e && (e as any).message) || e) === 'TASKS_WRITE_BLOCKED_SHRINK') throw e as any;
+      const msg = String((e && (e as any).message) || e);
+      if (msg === 'TASKS_WRITE_BLOCKED_SHRINK' || msg === 'TASKS_WRITE_BLOCKED_BACKEND_MISMATCH') throw e as any;
       // Non-fatal: continue write if backup failed
     }
   }
@@ -140,6 +165,13 @@ export async function writeText(relPath: string, text: string): Promise<void> {
     ensureS3();
     if (!s3Client || !s3Bucket) return;
     const key = (s3Prefix + relPath).replace(/^\/+/, '');
+    // Write-Ahead Log (WAL): store snapshot before commit
+    try {
+      if (relPath === '.data/tasks.json' && (process.env.TASKS_WAL || '1') === '1') {
+        const tsWal = new Date().toISOString().replace(/[:.]/g, '-');
+        await writeTextInternal(`.data/tasks_wal/tasks-${tsWal}.json`, text);
+      }
+    } catch {}
     const cmd = new (s3Client as any)._Put({ Bucket: s3Bucket, Key: key, Body: text, ContentType: 'application/json; charset=utf-8' });
     await s3Client.send(cmd);
     return;
@@ -147,6 +179,12 @@ export async function writeText(relPath: string, text: string): Promise<void> {
   const abs = path.join(process.cwd(), relPath);
   await fs.mkdir(path.dirname(abs), { recursive: true });
   const tmp = abs + '.tmp';
+  try {
+    if (relPath === '.data/tasks.json' && (process.env.TASKS_WAL || '1') === '1') {
+      const tsWal = new Date().toISOString().replace(/[:.]/g, '-');
+      await writeTextInternal(`.data/tasks_wal/tasks-${tsWal}.json`, text);
+    }
+  } catch {}
   await fs.writeFile(tmp, text, 'utf8');
   await fs.rename(tmp, abs);
 }

@@ -18,7 +18,8 @@ export async function GET(req: Request) {
       const safe = filePath.replace(/\.+/g, '.').replace(/^\/+/, '');
       const data = await readBinary(safe);
       if (!data) return NextResponse.json({ error: 'NOT_FOUND' }, { status: 404 });
-      return new NextResponse(data.data, { headers: { 'Content-Type': data.contentType || 'application/octet-stream', 'Cache-Control': 'public, max-age=31536000, immutable' } });
+      const body = new Uint8Array(data.data); // ensure BodyInit
+      return new NextResponse(body as any, { headers: { 'Content-Type': data.contentType || 'application/octet-stream', 'Cache-Control': 'public, max-age=31536000, immutable' } });
     }
     const item = await findProductById(id, orgInn);
     if (!item) return NextResponse.json({ error: 'NOT_FOUND' }, { status: 404 });
