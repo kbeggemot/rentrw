@@ -139,12 +139,36 @@ export async function runDueOffsetJobs(): Promise<void> {
         });
       } else {
         const orgInn = await getUserOrgInn(job.userId);
-        const orgData = await getUserPayoutRequisites(job.userId);
         if (!orgInn) throw new Error('NO_ORG_INN');
         const sales = await listSales(job.userId);
         const sale = sales.find((s) => s.orderId === job.orderId);
         const invoiceIdOffset = sale?.invoiceIdOffset || null;
         if (!invoiceIdOffset) throw new Error('NO_INVOICE_ID_OFFSET');
+        // Получаем реальное имя организации из стора или с RW /account
+        let supplierName: string | undefined;
+        try {
+          const orgMod = await import('./orgStore');
+          const found = await orgMod.findOrgByInn(orgInn);
+          supplierName = (found?.name && String(found.name).trim().length > 0) ? String(found.name).trim() : undefined;
+          if (!supplierName) {
+            const { resolveRwTokenWithFingerprint } = await import('./rwToken');
+            const res = await resolveRwTokenWithFingerprint({ headers: new Headers() } as any, job.userId, orgInn, (sale as any)?.rwTokenFp || undefined);
+            const token = res.token;
+            if (token) {
+              const base = process.env.ROCKETWORK_API_BASE_URL || 'https://app.rocketwork.ru/api/';
+              const accUrl = new URL('account', base.endsWith('/') ? base : base + '/').toString();
+              const rAcc = await fetch(accUrl, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }, cache: 'no-store' });
+              const txt = await rAcc.text();
+              let d: any = null; try { d = txt ? JSON.parse(txt) : null; } catch { d = txt; }
+              const name = d?.account?.company_name || d?.company_name || null;
+              if (name && typeof name === 'string' && name.trim().length > 0) {
+                supplierName = name.trim();
+                try { await orgMod.updateOrganizationName(orgInn, supplierName); } catch {}
+              }
+            }
+          }
+        } catch {}
+        if (!supplierName) throw new Error('NO_ORG_NAME');
         payload = buildFermaReceiptPayload({
           party: 'org',
           partyInn: orgInn,
@@ -158,7 +182,7 @@ export async function runDueOffsetJobs(): Promise<void> {
           invoiceId: invoiceIdOffset,
           callbackUrl,
           withAdvanceOffset: true,
-          paymentAgentInfo: { AgentType: 'AGENT', SupplierInn: orgInn, SupplierName: orgData.orgName || 'Организация' },
+          paymentAgentInfo: { AgentType: 'AGENT', SupplierInn: orgInn, SupplierName: supplierName },
         });
       }
       const created = await fermaCreateReceipt(payload, { baseUrl, authToken: token });
