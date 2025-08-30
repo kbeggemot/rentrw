@@ -4,6 +4,7 @@ import { fermaGetAuthTokenCached, fermaCreateReceipt, fermaGetReceiptStatus, bui
 import { buildFermaReceiptPayload, PAYMENT_METHOD_FULL_PAYMENT, PAYMENT_METHOD_PREPAY_FULL } from '@/app/api/ofd/ferma/build-payload';
 import { getUserOrgInn, getUserPayoutRequisites } from './userStore';
 import { getDecryptedApiToken } from './secureStore';
+import { getInvoiceIdForOffset } from './orderStore';
 
 let started = false;
 let timer: NodeJS.Timer | null = null;
@@ -308,6 +309,9 @@ export async function repairUserSales(userId: string, onlyOrderId?: number): Pro
             const task = (d && typeof d === 'object' && 'task' in d) ? (d.task as any) : d;
             const partnerInn = (task?.executor?.inn as string | undefined) ?? undefined;
             if (partnerInn) {
+              const orderNum = Number(String(s.orderId).match(/(\d+)/g)?.slice(-1)[0] || NaN);
+              const invOffset = (s as any).invoiceIdOffset || (Number.isFinite(orderNum) ? await getInvoiceIdForOffset(orderNum) : null);
+              if (!invOffset) { /* cannot proceed without InvoiceId B */ }
               const partnerName = (task?.executor && [task.executor.last_name, task.executor.first_name, task.executor.second_name].filter(Boolean).join(' ').trim()) || undefined;
               const payload = buildFermaReceiptPayload({
                 party: 'partner',
@@ -319,7 +323,7 @@ export async function repairUserSales(userId: string, onlyOrderId?: number): Pro
                 orderId: s.orderId,
                 docType: 'Income',
                 buyerEmail: s.clientEmail || defaultEmail,
-                invoiceId: (s as any).invoiceIdOffset,
+                invoiceId: invOffset || undefined,
                 callbackUrl,
                 withAdvanceOffset: true,
                 paymentAgentInfo: { AgentType: 'AGENT', SupplierInn: partnerInn, SupplierName: partnerName || 'Исполнитель' },
@@ -370,6 +374,8 @@ export async function repairUserSales(userId: string, onlyOrderId?: number): Pro
               }
             } catch {}
             if (supplierName) {
+              const orderNum = Number(String(s.orderId).match(/(\d+)/g)?.slice(-1)[0] || NaN);
+              const invOffset = (s as any).invoiceIdOffset || (Number.isFinite(orderNum) ? await getInvoiceIdForOffset(orderNum) : null);
               const payload = buildFermaReceiptPayload({
                 party: 'org',
                 partyInn: orgInn,
@@ -380,7 +386,7 @@ export async function repairUserSales(userId: string, onlyOrderId?: number): Pro
                 orderId: s.orderId,
                 docType: 'Income',
                 buyerEmail: s.clientEmail || defaultEmail,
-                invoiceId: (s as any).invoiceIdOffset,
+                invoiceId: invOffset || undefined,
                 callbackUrl,
                 withAdvanceOffset: true,
                 paymentAgentInfo: { AgentType: 'AGENT', SupplierInn: orgInn, SupplierName: supplierName },
