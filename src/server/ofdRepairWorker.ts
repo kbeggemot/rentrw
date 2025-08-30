@@ -313,6 +313,13 @@ export async function repairUserSales(userId: string, onlyOrderId?: number): Pro
               const invOffset = (s as any).invoiceIdOffset || (Number.isFinite(orderNum) ? await getInvoiceIdForOffset(orderNum) : null);
               if (!invOffset) { /* cannot proceed without InvoiceId B */ }
               const partnerName = (task?.executor && [task.executor.last_name, task.executor.first_name, task.executor.second_name].filter(Boolean).join(' ').trim()) || undefined;
+              // debug log
+              try {
+                const { readText, writeText } = await import('./storage');
+                const prev = (await readText('.data/ofd_create_attempts.log')) || '';
+                const line = JSON.stringify({ ts: new Date().toISOString(), src: 'repair_worker', stage: 'create_attempt', party: 'partner', userId, taskId: s.taskId, orderId: s.orderId, invoiceId: invOffset, callbackUrl }) + '\n';
+                await writeText('.data/ofd_create_attempts.log', prev + line);
+              } catch {}
               const payload = buildFermaReceiptPayload({
                 party: 'partner',
                 partyInn: partnerInn,
@@ -329,6 +336,12 @@ export async function repairUserSales(userId: string, onlyOrderId?: number): Pro
                 paymentAgentInfo: { AgentType: 'AGENT', SupplierInn: partnerInn, SupplierName: partnerName || 'Исполнитель' },
               });
               const created = await fermaCreateReceipt(payload, { baseUrl, authToken: ofdToken });
+              try {
+                const { readText, writeText } = await import('./storage');
+                const prev = (await readText('.data/ofd_create_attempts.log')) || '';
+                const line = JSON.stringify({ ts: new Date().toISOString(), src: 'repair_worker', stage: 'create_result', party: 'partner', userId, taskId: s.taskId, orderId: s.orderId, invoiceId: invOffset, id: created.id, rawStatus: created.rawStatus, statusText: created.status }) + '\n';
+                await writeText('.data/ofd_create_attempts.log', prev + line);
+              } catch {}
               try { (global as any).__OFD_SOURCE__ = 'repair_worker'; } catch {}
               { const numOrder = Number(String(s.orderId).match(/(\d+)/g)?.slice(-1)[0] || NaN); await updateSaleOfdUrlsByOrderId(userId, numOrder, { ofdFullId: created.id || null }); }
               // try resolve URL immediately
@@ -376,6 +389,12 @@ export async function repairUserSales(userId: string, onlyOrderId?: number): Pro
             if (supplierName) {
               const orderNum = Number(String(s.orderId).match(/(\d+)/g)?.slice(-1)[0] || NaN);
               const invOffset = (s as any).invoiceIdOffset || (Number.isFinite(orderNum) ? await getInvoiceIdForOffset(orderNum) : null);
+              try {
+                const { readText, writeText } = await import('./storage');
+                const prev = (await readText('.data/ofd_create_attempts.log')) || '';
+                const line = JSON.stringify({ ts: new Date().toISOString(), src: 'repair_worker', stage: 'create_attempt', party: 'org', userId, taskId: s.taskId, orderId: s.orderId, invoiceId: invOffset, callbackUrl, orgInn }) + '\n';
+                await writeText('.data/ofd_create_attempts.log', prev + line);
+              } catch {}
               const payload = buildFermaReceiptPayload({
                 party: 'org',
                 partyInn: orgInn,
@@ -392,6 +411,12 @@ export async function repairUserSales(userId: string, onlyOrderId?: number): Pro
                 paymentAgentInfo: { AgentType: 'AGENT', SupplierInn: orgInn, SupplierName: supplierName },
               });
               const created = await fermaCreateReceipt(payload, { baseUrl, authToken: ofdToken });
+              try {
+                const { readText, writeText } = await import('./storage');
+                const prev = (await readText('.data/ofd_create_attempts.log')) || '';
+                const line = JSON.stringify({ ts: new Date().toISOString(), src: 'repair_worker', stage: 'create_result', party: 'org', userId, taskId: s.taskId, orderId: s.orderId, invoiceId: invOffset, id: created.id, rawStatus: created.rawStatus, statusText: created.status }) + '\n';
+                await writeText('.data/ofd_create_attempts.log', prev + line);
+              } catch {}
               try { (global as any).__OFD_SOURCE__ = 'repair_worker'; } catch {}
               { const numOrder = Number(String(s.orderId).match(/(\d+)/g)?.slice(-1)[0] || NaN); await updateSaleOfdUrlsByOrderId(userId, numOrder, { ofdFullId: created.id || null }); }
               try {
