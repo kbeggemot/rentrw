@@ -299,7 +299,16 @@ export async function repairUserSales(userId: string, onlyOrderId?: number): Pro
         const callbackUrl = `https://${host}/api/ofd/ferma/callback${secret ? `?secret=${encodeURIComponent(secret)}&` : '?'}uid=${encodeURIComponent(userId)}`;
         if (s.isAgent) {
           // партнёр: тянем ИНН/ФИО исполнителя из RW
-          const token = await getDecryptedApiToken(userId);
+          // Используем тот же механизм, что и во всех API: резолв по fingerprint/inn
+          let token: string | null = null;
+          try {
+            const { resolveRwTokenWithFingerprint } = await import('./rwToken');
+            const fp = (s as any)?.rwTokenFp || undefined;
+            const inn = (s as any)?.orgInn || undefined;
+            const res = await resolveRwTokenWithFingerprint({ headers: new Headers() } as any, userId, inn, fp);
+            token = res.token;
+          } catch {}
+          if (!token) token = await getDecryptedApiToken(userId);
           if (token) {
             const base = process.env.ROCKETWORK_API_BASE_URL || 'https://app.rocketwork.ru/api/';
             const tUrl = new URL(`tasks/${encodeURIComponent(String(s.taskId))}`, base.endsWith('/') ? base : base + '/').toString();
@@ -374,7 +383,15 @@ export async function repairUserSales(userId: string, onlyOrderId?: number): Pro
               const org = await findOrgByInn(orgInn);
               if (org && org.name && String(org.name).trim().length > 0) supplierName = String(org.name).trim();
               if (!supplierName) {
-                const token = await getTokenForOrg(orgInn, userId).catch(() => null);
+                // пробуем привязанный к пользователю токен RW
+                let token: string | null = null;
+                try {
+                  const { resolveRwTokenWithFingerprint } = await import('./rwToken');
+                  const fp = (s as any)?.rwTokenFp || undefined;
+                  const res = await resolveRwTokenWithFingerprint({ headers: new Headers() } as any, userId, orgInn, fp);
+                  token = res.token;
+                } catch {}
+                if (!token) token = await getTokenForOrg(orgInn, userId).catch(() => null);
                 if (token) {
                   const base = process.env.ROCKETWORK_API_BASE_URL || 'https://app.rocketwork.ru/api/';
                   const accUrl = new URL('account', base.endsWith('/') ? base : base + '/').toString();
