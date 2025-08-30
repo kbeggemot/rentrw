@@ -19,7 +19,7 @@ export async function POST(req: Request) {
     if (!file) return NextResponse.json({ error: 'NO_FILE' }, { status: 400 });
     const allowed = ['image/jpeg','image/png','image/webp'];
     if (!allowed.includes(file.type)) return NextResponse.json({ error: 'BAD_TYPE' }, { status: 400 });
-    const max = 3 * 1024 * 1024; // 3MB per file
+    const max = 5 * 1024 * 1024; // 5MB per file
     if (file.size > max) return NextResponse.json({ error: 'TOO_LARGE' }, { status: 400 });
     const buf = Buffer.from(await file.arrayBuffer());
     const ext = file.type === 'image/png' ? 'png' : (file.type === 'image/webp' ? 'webp' : 'jpg');

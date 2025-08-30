@@ -23,3 +23,50 @@ npm warn config production Use `--omit=dev` instead.
  GET /api/products 200 in 1170ms
  ✓ Compiled in 1023ms (560 modules)
  GET /link/new 200 in 151ms
+ ✓ Compiled in 297ms (560 modules)
+ GET /link/new 200 in 134ms
+ ⨯ [TypeError: a[d] is not a function] { digest: '4208375715' }
+[TypeError: a[d] is not a function]
+ ⨯ [TypeError: a[d] is not a function]
+ ⨯ [TypeError: a[d] is not a function] { page: '/link/new' }
+ ○ Compiling /middleware ...
+ ✓ Compiled /middleware in 552ms (982 modules)
+ ⨯ Error: Cannot find module './431.js'
+Require stack:
+- /Users/beggemot/Projects/rentrw/.next/server/webpack-runtime.js
+- /Users/beggemot/Projects/rentrw/.next/server/pages/_document.js
+- /Users/beggemot/Projects/rentrw/node_modules/next/dist/server/require.js
+- /Users/beggemot/Projects/rentrw/node_modules/next/dist/server/load-components.js
+- /Users/beggemot/Projects/rentrw/node_modules/next/dist/build/utils.js
+- /Users/beggemot/Projects/rentrw/node_modules/next/dist/build/swc/options.js
+- /Users/beggemot/Projects/rentrw/node_modules/next/dist/build/swc/index.js
+- /Users/beggemot/Projects/rentrw/node_modules/next/dist/build/analysis/parse-module.js
+- /Users/beggemot/Projects/rentrw/node_modules/next/dist/build/analysis/get-page-static-info.js
+- /Users/beggemot/Projects/rentrw/node_modules/next/dist/server/lib/router-utils/setup-dev-bundler.js
+- /Users/beggemot/Projects/rentrw/node_modules/next/dist/server/lib/router-server.js
+- /Users/beggemot/Projects/rentrw/node_modules/next/dist/server/lib/start-server.js
+    at <unknown> (.next/server/app/link/new/page.js:2:28778)
+    at Object.<anonymous> (.next/server/app/link/new/page.js:2:28829) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [Array],
+  page: '/link/new'
+}
+ GET /link/new 500 in 1484ms
+ GET /link/new 500 in 849ms
+ ○ Compiling /admin ...
+ ✓ Compiled /admin in 1057ms (982 modules)
+ ⚠ Fast Refresh had to perform a full reload. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
+ GET /admin 200 in 1543ms
+ GET /dashboard 200 in 1557ms
+ ✓ Compiled /favicon.ico in 276ms (1004 modules)
+ GET /_next/static/css/app/layout.css?v=1756570608412 404 in 1047ms
+ GET /_next/static/css/app/layout.css?v=1756570608283 404 in 1038ms
+ GET /favicon.ico 200 in 1061ms
+ GET /_next/static/chunks/main-app.js?v=1756570608283 404 in 1120ms
+ GET /_next/static/chunks/app-pages-internals.js 404 in 1116ms
+ GET /_next/static/chunks/main-app.js?v=1756570608412 404 in 1180ms
+ GET /_next/static/chunks/app-pages-internals.js 404 in 95ms
+ GET /favicon.ico 200 in 11ms
+ ✓ Compiled in 635ms (399 modules)
+ ✓ Compiled in 329ms (399 modules)
+ ✓ Compiled in 148ms (399 modules)

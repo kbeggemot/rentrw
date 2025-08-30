@@ -140,7 +140,6 @@ export default function NewProductPage() {
               <input
                 type="file"
                 accept="image/jpeg,image/png,image/webp"
-                capture="environment"
                 className="hidden"
                 onClick={(e) => { try { (e.currentTarget as HTMLInputElement).value = ''; } catch {} }}
                 disabled={uploading || photos.length >= 5}
@@ -149,7 +148,7 @@ export default function NewProductPage() {
                   if (!file) return;
                   if (photos.length >= 5) { setError('Можно загрузить не более 5 фото'); return; }
                   if (!['image/jpeg','image/png','image/webp'].includes(file.type)) { setError('Поддерживаются JPG, PNG, WEBP'); return; }
-                  if (file.size > 3 * 1024 * 1024) { setError('Максимальный размер файла 3 МБ'); return; }
+                  if (file.size > 5 * 1024 * 1024) { setError('Максимальный размер файла 5 МБ'); return; }
                   setUploading(true);
                   setError(null);
                   let objUrl: string | null = null;
@@ -180,7 +179,7 @@ export default function NewProductPage() {
               </div>
             ))}
           </div>
-          <p className="text-xs text-gray-500 mt-1">Поддерживаются JPG, PNG, WEBP. До 3 МБ на файл. Можно с камеры.</p>
+          <p className="text-xs text-gray-500 mt-1">Поддерживаются JPG, PNG, WEBP. До 5 МБ на файл. Можно с камеры.</p>
         </div>
         {error ? <div className="text-sm text-red-600">{error}</div> : null}
         <div className="flex gap-2">
