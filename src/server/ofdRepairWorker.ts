@@ -283,7 +283,11 @@ export async function repairUserSales(userId: string, onlyOrderId?: number): Pro
     try {
       const end = s.serviceEndDate || null;
       const mskToday = new Date().toLocaleDateString('ru-RU', { timeZone: 'Europe/Moscow' }).split('.').reverse().join('-');
-      const due = !!end && end <= mskToday;
+      const mskHourStr = new Date().toLocaleString('ru-RU', { timeZone: 'Europe/Moscow', hour: '2-digit', hour12: false });
+      const mskHour = Number(mskHourStr.replace(/[^0-9]/g, '') || '0');
+      const isPast = !!end && end < mskToday;
+      const isTodayMsk = !!end && end === mskToday;
+      const due = Boolean(isPast || (isTodayMsk && mskHour >= 12));
       const hasOffset = !!(s as any).invoiceIdOffset;
       const hasFullUrl = !!s.ofdFullUrl;
       const st = String(s.status || '').toLowerCase();
