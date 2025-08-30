@@ -239,8 +239,8 @@ export default function NewLinkStandalonePage() {
           <div className="md:col-span-2">
             <div className="text-base font-semibold mb-2">Что продаете?</div>
             <div className="flex gap-2 mb-3">
-              <button type="button" className={`px-3 h-9 rounded border ${mode==='service'?'bg-black text-white':'bg-white'}`} onClick={() => setMode('service')}>Свободная услуга</button>
-              <button type="button" className={`px-3 h-9 rounded border ${mode==='cart'?'bg-black text-white':'bg-white'}`} onClick={() => setMode('cart')}>Собрать корзину</button>
+              <button type="button" className={`px-3 h-9 rounded border ${mode==='service'?'bg-black text-white':'bg-white text-black dark:text-black'}`} onClick={() => setMode('service')}>Свободная услуга</button>
+              <button type="button" className={`px-3 h-9 rounded border ${mode==='cart'?'bg-black text-white':'bg-white text-black dark:text-black'}`} onClick={() => setMode('cart')}>Собрать корзину</button>
             </div>
             {mode==='service' ? (
               <div>
@@ -362,11 +362,11 @@ export default function NewLinkStandalonePage() {
             <div className="md:col-span-2">
               <label className="block text-sm text-gray-700 dark:text-gray-300 mb-1">Отображение витрины</label>
               <div className="flex flex-wrap gap-2 text-sm">
-                <label className={`flex items-center justify-center px-3 h-9 rounded border cursor-pointer text-center ${cartDisplay==='list'?'bg-black text-white':'bg-white'}`} style={{ lineHeight: 1.1 }}>
+                <label className={`flex items-center justify-center px-3 h-9 rounded border cursor-pointer text-center ${cartDisplay==='list'?'bg-black text-white':'bg-white text-black dark:text-black'}`} style={{ lineHeight: 1.1 }}>
                   <input type="radio" name="cart_display" className="hidden" checked={cartDisplay==='list'} onChange={() => setCartDisplay('list')} />
                   Показывать строками, маленькие превью
                 </label>
-                <label className={`flex items-center justify-center px-3 h-9 rounded border cursor-pointer text-center ${cartDisplay==='grid'?'bg-black text-white':'bg-white'}`} style={{ lineHeight: 1.1 }}>
+                <label className={`flex items-center justify-center px-3 h-9 rounded border cursor-pointer text-center ${cartDisplay==='grid'?'bg-black text-white':'bg-white text-black dark:text-black'}`} style={{ lineHeight: 1.1 }}>
                   <input type="radio" name="cart_display" className="hidden" checked={cartDisplay==='grid'} onChange={() => setCartDisplay('grid')} />
                   Показавать сеткой, большие превью
                 </label>
