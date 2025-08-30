@@ -92,9 +92,9 @@ export async function repairUserSales(userId: string, onlyOrderId?: number): Pro
       .reverse()
       .join('-');
     const isToday = Boolean(endDate && endDate === mskToday);
-    // Full settlement today
-    if (isToday) {
-      if (!s.ofdFullId && !s.ofdFullUrl && s.invoiceIdFull) {
+    // Full settlement «день-в-день» по InvoiceId C — только если C присвоен
+    if (isToday && s.invoiceIdFull) {
+      if (!s.ofdFullId && !s.ofdFullUrl) {
         try {
           // Idempotency pre-check: see if OFD already has receipt by stored InvoiceId (C)
           const invoiceIdFull = s.invoiceIdFull;
@@ -210,7 +210,7 @@ export async function repairUserSales(userId: string, onlyOrderId?: number): Pro
           }
         } catch {}
       }
-      continue;
+      continue; // C обработан сегодня → не пытаемся делать B
     }
     // Prepayment receipt missing
     if (!s.ofdPrepayId && !s.ofdUrl && s.invoiceIdPrepay) {
