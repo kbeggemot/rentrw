@@ -37,6 +37,8 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
   const [payLocked, setPayLocked] = useState(false);
   const [cart, setCart] = useState<Array<{ id?: string | null; title: string; price: number; qty: number }>>([]);
   const [addQuery, setAddQuery] = useState('');
+  const [addHint, setAddHint] = useState<string | null>(null);
+  const [addOpen, setAddOpen] = useState(false);
   const [viewer, setViewer] = useState<{ open: boolean; photos: string[]; index: number }>({ open: false, photos: [], index: 0 });
   const [fadeIn, setFadeIn] = useState(true);
   const [touchStartX, setTouchStartX] = useState<number | null>(null);
@@ -468,7 +470,7 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
                       <div className="text-sm font-medium">{item.title}</div>
                       <div className="text-xs text-gray-600">Цена: {Number(item.price || 0).toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₽</div>
                     </div>
-                    <input type="number" min={1} step={1} className="w-10 rounded border px-2 h-9 text-sm bg-white text-black dark:bg-gray-800 dark:text-white placeholder-gray-400 dark:placeholder-gray-400" value={String(item.qty)} onChange={(e) => { const q = Math.max(1, Number(e.target.value || 1)); setCart((prev) => prev.map((it, i) => i === idx ? { ...it, qty: q } : it)); }} />
+                    <input type="number" min={1} step={1} className="w-10 rounded border px-2 h-9 text-sm bg-white text-black dark:bg-gray-800 dark:text-white placeholder-gray-400 dark:placeholder-gray-400" value={String(item.qty)} onChange={(e) => { const raw = e.target.value; const q = raw.trim() === '' ? 0 : Math.max(0, Number(raw)); setCart((prev) => prev.map((it, i) => i === idx ? { ...it, qty: q } : it)); }} />
                     <button type="button" className="px-3 h-9 rounded border text-sm text-gray-700 whitespace-nowrap" onClick={() => setCart((prev) => prev.filter((_, i) => i !== idx))}>Удалить</button>
                   </div>
                 ))}
@@ -490,7 +492,7 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
                     <div className="text-sm font-medium">{item.title}</div>
                     <div className="text-xs text-gray-600">Цена: {Number(item.price || 0).toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₽</div>
                     <div className="mt-2 flex items-center gap-2 overflow-x-auto touch-pan-x">
-                      <input type="number" min={1} step={1} className="w-10 rounded border px-2 h-9 text-sm bg-white text-black dark:bg-gray-800 dark:text-white placeholder-gray-400 dark:placeholder-gray-400" value={String(item.qty)} onChange={(e) => { const q = Math.max(1, Number(e.target.value || 1)); setCart((prev) => prev.map((it, i) => i === idx ? { ...it, qty: q } : it)); }} />
+                      <input type="number" min={1} step={1} className="w-10 rounded border px-2 h-9 text-sm bg-white text-black dark:bg-gray-800 dark:text-white placeholder-gray-400 dark:placeholder-gray-400" value={String(item.qty)} onChange={(e) => { const raw = e.target.value; const q = raw.trim() === '' ? 0 : Math.max(0, Number(raw)); setCart((prev) => prev.map((it, i) => i === idx ? { ...it, qty: q } : it)); }} />
                       <button type="button" className="px-3 h-9 rounded border text-sm text-gray-700 whitespace-nowrap" onClick={() => setCart((prev) => prev.filter((_, i) => i !== idx))}>Удалить</button>
                     </div>
                   </div>
@@ -498,8 +500,45 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
               </div>
             )}
             <div className="flex items-center gap-2 relative mt-3">
-              <input className="flex-1 rounded border px-2 h-9 text-sm bg-white text-black dark:bg-gray-800 dark:text-white placeholder-gray-400 dark:placeholder-gray-400" placeholder={(() => { const catalog = Array.isArray(data.cartItems) ? (data.cartItems as any[]) : []; const remaining = catalog.filter((p: any) => !cart.some((c) => c.title === p.title)); return remaining.length === 0 ? 'больше ничего нет(' : 'Поиск по позициям'; })()} value={addQuery} onChange={(e) => setAddQuery(e.target.value)} />
-              <button type="button" className="rounded border px-3 h-9 text-sm" onClick={() => { const q = addQuery.trim().toLowerCase(); if (!q) return; const catalog = Array.isArray(data.cartItems) ? data.cartItems : []; const found = (catalog as any[]).find((p: any) => String(p?.title || '').toLowerCase().includes(q)); if (found) { const id = found?.id ?? null; setCart((prev) => { const i = prev.findIndex((x) => (x.id || null) === (id || null) && x.title === found.title); if (i >= 0) return prev.map((x, j) => (j === i ? { ...x, qty: Number(x.qty || 0) + 1 } : x)); return [...prev, { id, title: String(found.title || ''), price: Number(found.price || 0), qty: 1 }]; }); setAddQuery(''); } }}>Добавить</button>
+              <div className="relative flex-1">
+                <input
+                  className="w-full rounded border px-2 h-9 text-sm bg-white text-black dark:bg-gray-800 dark:text-white placeholder-gray-400 dark:placeholder-gray-400"
+                  placeholder="Найти ещё на витрине…"
+                  value={addQuery}
+                  onFocus={() => setAddOpen(true)}
+                  onChange={(e) => { setAddQuery(e.target.value); setAddHint(null); setAddOpen(true); }}
+                  onBlur={() => setTimeout(() => setAddOpen(false), 120)}
+                />
+                {addOpen ? (
+                  <div className="absolute left-0 right-0 top-full z-10 mt-1 border rounded bg-white dark:bg-gray-900 max-h-48 overflow-auto shadow">
+                    {(() => {
+                      const catalog = Array.isArray(data.cartItems) ? (data.cartItems as any[]) : [];
+                      const remaining = catalog.filter((p: any) => !cart.some((c) => c.title === p.title));
+                      if (remaining.length === 0) return (<div className="px-3 py-2 text-sm text-gray-500">больше ничего нет(</div>);
+                      const q = addQuery.trim().toLowerCase();
+                      const filtered = q ? remaining.filter((p: any) => String(p?.title || '').toLowerCase().includes(q)) : remaining.slice(0, 8);
+                      if (filtered.length === 0) return (<div className="px-3 py-2 text-sm text-gray-500">ничего не найдено</div>);
+                      return filtered.map((p: any, i: number) => (
+                        <button
+                          key={`${p.id || p.title}-${i}`}
+                          type="button"
+                          className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 dark:hover:bg-gray-800"
+                          onMouseDown={() => {
+                            const id = p?.id ?? null;
+                            setCart((prev) => {
+                              const idx = prev.findIndex((x) => (x.id || null) === (id || null) && x.title === p.title);
+                              if (idx >= 0) return prev.map((x, j) => (j === idx ? { ...x, qty: Number(x.qty || 0) + 1 } : x));
+                              return [...prev, { id, title: String(p.title || ''), price: Number(p.price || 0), qty: 1 }];
+                            });
+                            setAddQuery(''); setAddHint(null); setAddOpen(false);
+                          }}
+                        >{String(p.title || '')}</button>
+                      ));
+                    })()}
+                  </div>
+                ) : null}
+              </div>
+              <button type="button" className="rounded border px-3 h-9 text-sm" onClick={() => { const q = addQuery.trim().toLowerCase(); const catalog = Array.isArray(data.cartItems) ? data.cartItems : []; const remaining = catalog.filter((p: any) => !cart.some((c) => c.title === p.title)); if (remaining.length === 0) { setAddHint('больше ничего нет('); setAddOpen(true); return; } if (!q) { setAddOpen(true); return; } const found = (catalog as any[]).find((p: any) => String(p?.title || '').toLowerCase().includes(q)); if (found) { const id = found?.id ?? null; setCart((prev) => { const i = prev.findIndex((x) => (x.id || null) === (id || null) && x.title === found.title); if (i >= 0) return prev.map((x, j) => (j === i ? { ...x, qty: Number(x.qty || 0) + 1 } : x)); return [...prev, { id, title: String(found.title || ''), price: Number(found.price || 0), qty: 1 }]; }); setAddQuery(''); setAddHint(null); } else { setAddHint('больше ничего нет('); setAddOpen(true); } }}>Добавить</button>
             </div>
             <div className="mt-2">
               <label className="block text-sm text-gray-600 mb-1">Итоговая сумма, ₽</label>
