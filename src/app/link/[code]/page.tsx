@@ -33,6 +33,8 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
   const [email, setEmail] = useState('');
   const [msg, setMsg] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
+  const showToast = (text: string) => { setToast(text); setTimeout(() => setToast(null), 3000); };
   const [started, setStarted] = useState(false);
   const [payLocked, setPayLocked] = useState(false);
   const [cart, setCart] = useState<Array<{ id?: string | null; title: string; price: number; qty: number }>>([]);
@@ -238,6 +240,22 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
     return minOk && isValidEmail(email);
   }, [data, amount, email, cartTotal]);
 
+  // Validate before pay with detailed messages
+  const validateBeforePay = (): boolean => {
+    if (!data) return false;
+    if (data.allowCartAdjust) {
+      const badQty = Array.isArray(cart) && cart.some((i) => !Number.isFinite(Number(i.qty)) || Number(i.qty) <= 0);
+      if (badQty) { showToast('Ошибка суммы: количество должно быть больше нуля'); return false; }
+      const total = Number(cartTotal || 0);
+      if (!(total > 0)) { showToast('Ошибка суммы: итоговая сумма должна быть больше нуля'); return false; }
+    } else if (data.sumMode === 'custom') {
+      const n = Number(String(amount || '0').replace(',', '.'));
+      if (!Number.isFinite(n) || n <= 0) { showToast('Ошибка суммы: введите положительное число'); return false; }
+    }
+    if (!isValidEmail(email)) { showToast('Введите корректный email'); return false; }
+    return true;
+  };
+
   const startPoll = (uid: string | number) => {
     if (pollRef.current) return;
     const tick = async () => {
@@ -309,6 +327,7 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
 
   const goPay = async () => {
     if (!data) return;
+    if (!validateBeforePay()) return;
     try {
       setStarted(true);
       setLoading(true);
@@ -426,7 +445,7 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
       setAwaitingPay(false);
       startPoll(tId);
     } catch (e) {
-      setMsg('Не удалось сформировать платежную ссылку');
+      showToast('Не удалось сформировать платежную ссылку');
     } finally { setLoading(false); }
   };
 
@@ -449,6 +468,7 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
         <div className="text-sm text-gray-600 mb-4">Оплата в пользу {data.orgName}</div>
       ) : null}
       <div className="bg-white dark:bg-gray-950 border border-gray-200 dark:border-gray-800 rounded-lg p-4">
+        {toast ? (<div className="fixed top-3 left-1/2 -translate-x-1/2 z-50 bg-black text-white text-sm px-3 py-2 rounded shadow">{toast}</div>) : null}
         {payLocked ? (
           <div className="text-sm text-gray-700">{msg || 'Оплата временно недоступна. Пожалуйста, уточните детали у продавца.'}</div>
         ) : (
@@ -609,9 +629,16 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
             <input className="w-40 rounded-lg border px-2 h-9 text-sm bg-white text-black dark:bg-gray-800 dark:text-white" value={data.method === 'card' ? 'Карта' : 'СБП'} readOnly />
           )}
         </div>
-        <button disabled={!canStart} onClick={goPay} className={actionBtnClasses}>
-          Перейти к оплате
-        </button>
+        <div className="flex gap-2">
+          <button disabled={!canStart} onClick={goPay} className={actionBtnClasses}>
+            Перейти к оплате
+          </button>
+          {started && !loading ? (
+            <button onClick={goPay} className="inline-flex items-center justify-center rounded-lg border px-4 h-9 text-sm">
+              Повторить
+            </button>
+          ) : null}
+        </div>
 
         {/* Inline expandable panel (Sales-like) */}
         {detailsOpen ? (
