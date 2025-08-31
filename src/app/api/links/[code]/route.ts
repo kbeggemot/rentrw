@@ -64,7 +64,11 @@ export async function GET(req: Request) {
         const products = inn ? await listProductsForOrg(inn) : [];
         cartItems = item.cartItems.map((c: any) => {
           const p = products.find((x) => (x.id && c?.id && String(x.id) === String(c.id)) || (x.title && c?.title && String(x.title).toLowerCase() === String(c.title).toLowerCase())) || null;
-          return { ...c, photos: Array.isArray((p as any)?.photos) ? (p as any).photos : [] };
+          const rawPhotos: string[] = Array.isArray((p as any)?.photos) ? ((p as any).photos as string[]) : [];
+          const cooked = rawPhotos.map((ph) => (typeof ph === 'string' && ph.startsWith('.data/'))
+            ? `/api/products/${encodeURIComponent(p?.id || '')}?path=${encodeURIComponent(ph)}`
+            : ph);
+          return { ...c, photos: cooked };
         });
       }
     } catch {}
