@@ -118,7 +118,8 @@ export default function EditLinkPage(props: { params: Promise<{ code: string }> 
       const r = await fetch(`/api/links/${encodeURIComponent(code)}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
       const d = await r.json();
       if (!r.ok) throw new Error(d?.error || 'SAVE_ERROR');
-      showToast('Сохранено', 'success');
+      try { sessionStorage.setItem('flash', 'UPDATED'); } catch {}
+      window.location.href = '/link';
     } catch (e) {
       showToast('Не удалось сохранить', 'error');
     }

@@ -32,6 +32,9 @@ export default function LinksStandalonePage() {
       } else if (flag === 'COPIED') {
         sessionStorage.removeItem('flash');
         showToast('Ссылка создана и скопирована', 'success');
+      } else if (flag === 'UPDATED') {
+        sessionStorage.removeItem('flash');
+        showToast('Страница обновлена', 'success');
       }
     } catch {}
   }, []);
