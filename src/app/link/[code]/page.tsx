@@ -482,7 +482,8 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
                       <img
                         src={(() => { try { const id = item.id || null; const fromLink = Array.isArray(data.cartItems) ? (data.cartItems as any[]).find((x: any) => (x?.id ?? null) === (id ?? null) || x?.title === item.title) : null; const ph = Array.isArray(fromLink?.photos) ? fromLink.photos[0] : null; return ph || '/window.svg'; } catch { return '/window.svg'; } })()}
                         alt="item"
-                        className="w-full h-full object-cover"
+                        className="w-full h-full object-cover cursor-pointer"
+                        onClick={() => { try { const id = item.id || null; const fromLink = Array.isArray(data.cartItems) ? (data.cartItems as any[]).find((x: any) => (x?.id ?? null) === (id ?? null) || x?.title === item.title) : null; const arr = Array.isArray(fromLink?.photos) ? (fromLink.photos as string[]) : []; setViewer({ open: true, photos: arr.length ? arr : ['/window.svg'], index: 0 }); } catch { setViewer({ open: true, photos: ['/window.svg'], index: 0 }); } }}
                       />
                       {(() => { try { const id = item.id || null; const fromLink = Array.isArray(data.cartItems) ? (data.cartItems as any[]).find((x: any) => (x?.id ?? null) === (id ?? null) || x?.title === item.title) : null; const count = Array.isArray(fromLink?.photos) ? fromLink.photos.length : 0; if (count > 1) { return (<></>); } } catch {} return null; })()}
                     </div>
