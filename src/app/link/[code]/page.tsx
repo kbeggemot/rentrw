@@ -72,6 +72,7 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
   const [taskId, setTaskId] = useState<string | number | null>(null);
   const [payUrl, setPayUrl] = useState<string | null>(null);
   const [awaitingPay, setAwaitingPay] = useState(false);
+  const [payError, setPayError] = useState(false);
   const [receipts, setReceipts] = useState<{ prepay?: string | null; full?: string | null; commission?: string | null; npd?: string | null }>({});
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [isFinal, setIsFinal] = useState(false);
@@ -335,6 +336,7 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
       setPayUrl(null);
       setTaskId(null);
       setDetailsOpen(true);
+      setPayError(false);
       
       // Validate partner in RW for agent sales before creating task
       if (data.isAgent && data.partnerPhone) {
@@ -446,6 +448,7 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
       startPoll(tId);
     } catch (e) {
       showToast('Не удалось сформировать платежную ссылку');
+      setPayError(true);
     } finally { setLoading(false); }
   };
 
@@ -633,7 +636,7 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
           <button disabled={!canStart} onClick={goPay} className={actionBtnClasses}>
             Перейти к оплате
           </button>
-          {started && !loading ? (
+          {payError ? (
             <button onClick={goPay} className="inline-flex items-center justify-center rounded-lg border px-4 h-9 text-sm">
               Повторить
             </button>
