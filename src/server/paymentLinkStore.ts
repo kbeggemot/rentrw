@@ -164,6 +164,7 @@ export async function updatePaymentLink(userId: string, code: string, updates: P
     }
     if (typeof updates.allowCartAdjust === 'boolean') next.allowCartAdjust = updates.allowCartAdjust;
     if (typeof updates.amountRub === 'number' && Number.isFinite(updates.amountRub)) next.amountRub = updates.amountRub;
+    if (updates.cartDisplay === 'list' || updates.cartDisplay === 'grid') next.cartDisplay = updates.cartDisplay;
   }
   if (typeof updates.method === 'string' && (updates.method === 'any' || updates.method === 'qr' || updates.method === 'card')) next.method = updates.method;
   if (typeof updates.isAgent === 'boolean') next.isAgent = updates.isAgent;
