@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Button } from '@/components/ui/Button';
 import { applyAgentCommissionToCart } from '@/lib/pricing';
 
@@ -118,6 +118,25 @@ export default function NewLinkStandalonePage() {
       else setVanityTaken(false);
     } catch {}
   };
+
+  // Derived cart with agent commission applied (for live preview)
+  const cartNumeric = useMemo(() => (
+    cart.map((c) => ({ title: c.title, price: Number(String(c.price || '0').replace(',', '.')), qty: Number(String(c.qty || '1').replace(',', '.')) }))
+  ), [cart]);
+  const commissionValid = useMemo(() => linkAgent && ((linkCommType === 'percent' && Number(linkCommVal.replace(',', '.')) >= 0) || (linkCommType === 'fixed' && Number(linkCommVal.replace(',', '.')) > 0)), [linkAgent, linkCommType, linkCommVal]);
+  const effectiveCart = useMemo(() => {
+    if (!commissionValid) return cartNumeric;
+    const v = Number(linkCommVal.replace(',', '.'));
+    try { return applyAgentCommissionToCart(cartNumeric, linkCommType, v).adjusted; } catch { return cartNumeric; }
+  }, [cartNumeric, commissionValid, linkCommType, linkCommVal]);
+  const agentLine = useMemo(() => {
+    if (!commissionValid || effectiveCart.length === 0) return null;
+    const T = cartNumeric.reduce((s, r) => s + r.price * r.qty, 0);
+    const v = Number(linkCommVal.replace(',', '.'));
+    const A = linkCommType === 'percent' ? T * (v / 100) : v;
+    const agentAmount = Math.round((Math.min(Math.max(A, 0), T) + Number.EPSILON) * 100) / 100;
+    return { title: agentDesc || 'Услуги агента', price: agentAmount, qty: 1 };
+  }, [commissionValid, agentDesc, linkCommType, linkCommVal, cartNumeric, effectiveCart.length]);
 
   const onCreate = async () => {
     try {
@@ -362,25 +381,21 @@ export default function NewLinkStandalonePage() {
                   <button type="button" className="px-3 h-9 rounded border" onClick={()=> setCart((prev)=> [...prev, { id:'', title:'', price:'', qty:'1' }])}>+ Добавить</button>
                 </div>
                 <div className="text-xs text-gray-600 dark:text-gray-400">Нет нужной позиции? <a className="underline" href="/products/new" target="_blank" onClick={()=> showToast('Откроем создание позиции в новом окне', 'info')}>Создать новую позицию на витрине</a></div>
-                {/* Итоговая сумма по корзине */}
-                {(() => {
-                  const toNum = (v: string) => Number(String(v || '0').replace(',', '.'));
-                  const total = cart.reduce((sum, r) => {
-                    const price = toNum(r.price);
-                    const qty = toNum(r.qty || '1');
-                    if (!Number.isFinite(price) || !Number.isFinite(qty)) return sum;
-                    return sum + price * qty;
-                  }, 0);
-                  const formatted = Number.isFinite(total) ? total.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '';
-                  return (
-                    <div className="mt-2">
-                      <label className="block text-sm text-gray-700 dark:text-gray-300 mb-1">Сумма, ₽</label>
-                      <div className="w-44">
-                        <input className="w-full rounded border pl-2 h-9 text-sm bg-gray-100 dark:bg-gray-900 dark:border-gray-700" value={formatted} readOnly disabled />
-                      </div>
+                {/* Итоговая сумма по корзине (с учётом агентской) + строка агента */}
+                <div className="mt-2">
+                  <label className="block text-sm text-gray-700 dark:text-gray-300 mb-1">Сумма, ₽</label>
+                  <div className="w-44">
+                    <input className="w-full rounded border pl-2 h-9 text-sm bg-gray-100 dark:bg-gray-900 dark:border-gray-700" value={(() => { const T = cartNumeric.reduce((s,r)=> s + r.price*r.qty, 0); return Number.isFinite(T) ? T.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : ''; })()} readOnly disabled />
+                  </div>
+                </div>
+                {agentLine ? (
+                  <div className="mt-2 text-sm text-gray-700">
+                    <div className="inline-flex items-center gap-2 rounded border px-2 py-1 bg-gray-50">
+                      <span>{agentLine.title}</span>
+                      <span className="text-gray-500">— {agentLine.price.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₽</span>
                     </div>
-                  );
-                })()}
+                  </div>
+                ) : null}
               </div>
             )}
           </div>
