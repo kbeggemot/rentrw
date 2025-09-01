@@ -18,6 +18,7 @@ export default function NewLinkStandalonePage() {
   const [allowCartAdjust, setAllowCartAdjust] = useState(false);
   const [orgProducts, setOrgProducts] = useState<Array<{ id: string; title: string; price: number }>>([]);
   const [agentDesc, setAgentDesc] = useState<string | null>(null);
+  const [defaultComm, setDefaultComm] = useState<{ type: 'percent' | 'fixed'; value: number } | null>(null);
   const [linkSumMode, setLinkSumMode] = useState<'custom' | 'fixed'>('custom');
   const [linkAmount, setLinkAmount] = useState('');
   const [linkVat, setLinkVat] = useState<'none' | '0' | '5' | '7' | '10' | '20'>('none');
@@ -73,6 +74,10 @@ export default function NewLinkStandalonePage() {
         const r = await fetch('/api/settings/agent', { cache: 'no-store' });
         const j = await r.json();
         if (typeof j?.agentDescription === 'string') setAgentDesc(j.agentDescription);
+        const dc = j?.defaultCommission as { type?: 'percent' | 'fixed'; value?: number } | undefined;
+        if (dc && (dc.type === 'percent' || dc.type === 'fixed') && typeof dc.value === 'number') {
+          setDefaultComm({ type: dc.type, value: dc.value });
+        }
       } catch {}
     })();
     (async () => {
@@ -138,6 +143,20 @@ export default function NewLinkStandalonePage() {
     const agentAmount = Math.round((Math.min(Math.max(A, 0), T) + Number.EPSILON) * 100) / 100;
     return { title: agentDesc || 'Услуги агента', price: agentAmount, qty: 1 };
   }, [commissionValid, agentDesc, linkCommType, linkCommVal, cartNumeric, effectiveCart.length]);
+
+  // Автоподстановка дефолтной ставки при включении агентской продажи
+  useEffect(() => {
+    if (!linkAgent) return;
+    if (linkCommVal.trim().length > 0) return;
+    if (!defaultComm) return;
+    setLinkCommType(defaultComm.type);
+    setLinkCommVal(String(defaultComm.value));
+  }, [linkAgent, defaultComm]);
+
+  // При смене настроек агента снимаем фокус с цены, чтобы показать пониженные значения
+  useEffect(() => {
+    setEditingPriceIdx(null);
+  }, [linkAgent, linkCommType, linkCommVal]);
 
   const onCreate = async () => {
     try {
