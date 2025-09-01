@@ -306,29 +306,44 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
   const isValidEmail = (s: string) => /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/.test(s.trim());
 
   // adjusted (displayed) sum of items
+  // Сумма отображаемых цен (после понижения, если агент включен)
   const cartAdjustedSum = useMemo(() => {
     if (!(Array.isArray(cart) && cart.length > 0)) return 0;
-    const total = cart.reduce((s, r) => s + (Number(r.price || 0) * Number(r.qty || 0)), 0);
-    return Number.isFinite(total) ? total : 0;
-  }, [cart]);
+    if (!data?.isAgent || !data.commissionType || typeof data.commissionValue !== 'number') {
+      const total = cart.reduce((s, r) => s + (Number(r.price || 0) * Number(r.qty || 0)), 0);
+      return Number.isFinite(total) ? total : 0;
+    }
+    try {
+      // Пересчитываем от оригинальных цен при каждом изменении qty
+      const original = cart.map((i, idx) => ({
+        title: i.title,
+        price: Number((data.cartItems && data.cartItems[idx] ? data.cartItems[idx].price : i.price) || 0),
+        qty: Number(i.qty || 0),
+      }));
+      const adjusted = applyAgentCommissionToCart(original, data.commissionType as any, Number(data.commissionValue)).adjusted;
+      const total = adjusted.reduce((s, r) => s + r.price * r.qty, 0);
+      return Number.isFinite(total) ? total : 0;
+    } catch {
+      const total = cart.reduce((s, r) => s + (Number(r.price || 0) * Number(r.qty || 0)), 0);
+      return Number.isFinite(total) ? total : 0;
+    }
+  }, [cart, data?.isAgent, data?.commissionType, data?.commissionValue, data?.cartItems]);
 
   function round2(n: number): number { return Math.round((n + Number.EPSILON) * 100) / 100; }
   const agentLine = useMemo(() => {
     if (!data?.isAgent || !Array.isArray(cart) || cart.length === 0 || !data.commissionType || typeof data.commissionValue !== 'number') return null;
-    const S = cartAdjustedSum; // adjusted sum currently отображаемых цен
-    if (!(S > 0)) return null;
-    let A = 0;
-    if (data.commissionType === 'percent') {
-      const p = Number(data.commissionValue) / 100;
-      const K = 1 - p; // S = K * T
-      if (K <= 0) return null;
-      A = round2(S * (1 / K - 1)); // A = T - S = S*(1/K - 1)
-    } else {
-      A = round2(Number(data.commissionValue));
+    try {
+      const original = cart.map((i, idx) => ({
+        title: i.title,
+        price: Number((data.cartItems && data.cartItems[idx] ? data.cartItems[idx].price : i.price) || 0),
+        qty: Number(i.qty || 0),
+      }));
+      const res = applyAgentCommissionToCart(original, data.commissionType as any, Number(data.commissionValue));
+      return { title: data.agentDescription || 'Услуги агента', price: res.agentAmount, qty: 1 };
+    } catch {
+      return null;
     }
-    if (!(A > 0)) return { title: data.agentDescription || 'Услуги агента', price: 0, qty: 1 };
-    return { title: data.agentDescription || 'Услуги агента', price: A, qty: 1 };
-  }, [data?.isAgent, data?.commissionType, data?.commissionValue, data?.agentDescription, cartAdjustedSum, cart]);
+  }, [data?.isAgent, data?.commissionType, data?.commissionValue, data?.agentDescription, cart, data?.cartItems]);
 
   const effectiveCart = useMemo(() => {
     if (!(Array.isArray(cart) && cart.length > 0)) return cart;
@@ -617,7 +632,7 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
                     />
                     <div className="flex-1">
                       <div className="text-sm font-medium">{item.title}</div>
-                      <div className="text-xs text-gray-600">Цена: {Number(item.price || 0).toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₽</div>
+                      <div className="text-xs text-gray-600">Цена: {Number((effectiveCart[idx]?.price ?? item.price) || 0).toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₽</div>
                     </div>
                     <input type="number" min={1} step={1} disabled={!data.allowCartAdjust} className="w-10 rounded border px-2 h-9 text-sm bg-white text-black dark:bg-gray-800 dark:text-white placeholder-gray-400 dark:placeholder-gray-400" value={String(item.qty)} onChange={(e) => { const raw = e.target.value; const q = raw.trim() === '' ? 0 : Math.max(0, Number(raw)); setCart((prev) => prev.map((it, i) => i === idx ? { ...it, qty: q } : it)); }} />
                     {data.allowCartAdjust ? (
@@ -651,7 +666,7 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
                       {(() => { try { const id = item.id || null; const fromLink = Array.isArray(data.cartItems) ? (data.cartItems as any[]).find((x: any) => (x?.id ?? null) === (id ?? null) || x?.title === item.title) : null; const count = Array.isArray(fromLink?.photos) ? fromLink.photos.length : 0; if (count > 1) { return (<></>); } } catch {} return null; })()}
                     </div>
                     <div className="text-sm font-medium">{item.title}</div>
-                    <div className="text-xs text-gray-600">Цена: {Number(item.price || 0).toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₽</div>
+                    <div className="text-xs text-gray-600">Цена: {Number((effectiveCart[idx]?.price ?? item.price) || 0).toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₽</div>
                     <div className="mt-2 flex items-center gap-2 overflow-x-auto touch-pan-x">
                       <input type="number" min={1} step={1} disabled={!data.allowCartAdjust} className="w-10 rounded border px-2 h-9 text-sm bg-white text-black dark:bg-gray-800 dark:text-white placeholder-gray-400 dark:placeholder-gray-400" value={String(item.qty)} onChange={(e) => { const raw = e.target.value; const q = raw.trim() === '' ? 0 : Math.max(0, Number(raw)); setCart((prev) => prev.map((it, i) => i === idx ? { ...it, qty: q } : it)); }} />
                       {data.allowCartAdjust ? (
