@@ -370,21 +370,7 @@ export default function EditLinkPage(props: { params: Promise<{ code: string }> 
               ) : null}
               <button type="button" className="px-3 h-9 rounded border" onClick={() => setCartItems((prev) => [...prev, { id: '', title: '', price: '', qty: '1' }])}>+ Добавить</button>
               {(() => {
-                const v = Number(commissionValue.replace(',', '.'));
-                const commissionValidLocal = isAgent && ((commissionType === 'percent' && v >= 0) || (commissionType === 'fixed' && v > 0));
-                const base = shouldApplyDisplayAdjustment ? adjustedForDisplay : numericCart;
-                const eff = base.reduce((s, r) => s + r.price * r.qty, 0);
-                let A = 0;
-                if (commissionValidLocal) {
-                  if (commissionType === 'percent') {
-                    const k = 1 - (v / 100);
-                    A = k > 0 ? eff * (1 / k - 1) : 0;
-                  } else {
-                    A = v;
-                  }
-                }
-                const total = eff + (Math.round((A + Number.EPSILON) * 100) / 100);
-                const formatted = Number.isFinite(total) ? total.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '';
+                const formatted = Number.isFinite(totalCart) ? totalCart.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '';
                 return (
                   <div className="mt-2">
                     <label className="block text-sm text-gray-700 dark:text-gray-300 mb-1">Сумма, ₽</label>
