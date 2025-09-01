@@ -125,6 +125,8 @@ export default function EditLinkPage(props: { params: Promise<{ code: string }> 
       const effTarget = Math.max(initialTotal - A, 0);
       const effSaved = numericCart.reduce((s, r) => s + r.price * r.qty, 0);
       if (effSaved <= 0) return numericCart;
+      // Мы хотим показать пониженные цены, исходя из исходных цен (которые получим из effSaved и T).
+      // Если текущие numericCart уже понижены (effSaved≈T−A), масштабирование к effTarget оставляет их как есть.
       const factor = effTarget / effSaved;
       const round2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
       return numericCart.map((i) => ({ ...i, price: round2(i.price * factor) }));
@@ -133,8 +135,9 @@ export default function EditLinkPage(props: { params: Promise<{ code: string }> 
     if (commissionType === 'percent') {
       const k = 1 - v / 100;
       if (k > 0) {
-        // original sum T = effSaved / k → share to items proportionally
-        return numericCart.map((i) => ({ ...i, price: Math.round(((i.price / k) + Number.EPSILON) * 100) / 100 }));
+        // original sum T = effSaved / k, target eff = T - A = effSaved
+        // значит дополнительных преобразований не требуется
+        return numericCart;
       }
     }
     return numericCart;
@@ -163,7 +166,7 @@ export default function EditLinkPage(props: { params: Promise<{ code: string }> 
     // независимо от текущего отображения цен.
     if (initialIsAgent && initialTotal != null && Number.isFinite(initialTotal)) return initialTotal;
     const commissionValidLocal = isAgent && ((commissionType === 'percent' && v >= 0) || (commissionType === 'fixed' && v > 0));
-    const effBase = shouldApplyDisplayAdjustment ? adjustedForDisplay : numericCart;
+    const effBase = shouldApplyDisplayAdjustment ? adjustedForDisplay : (initialIsAgent ? displayFromStored : numericCart);
     const eff = effBase.reduce((s, r) => s + r.price * r.qty, 0);
     let A = 0;
     if (commissionValidLocal) {
@@ -174,8 +177,16 @@ export default function EditLinkPage(props: { params: Promise<{ code: string }> 
         A = v;
       }
     }
-    return eff + (Math.round((A + Number.EPSILON) * 100) / 100);
-  }, [mode, adjustedForDisplay, shouldApplyDisplayAdjustment, numericCart, isAgent, commissionType, commissionValue, initialTotal, initialIsAgent]);
+    // Если ссылка была без агента (initialIsAgent=false) и мы включили агент сейчас,
+    // eff уже пониженный, A считаем от исходной суммы: T = eff / (1 - p)
+    if (!initialIsAgent && commissionType === 'percent' && commissionValidLocal) {
+      const k = 1 - (v / 100);
+      const T = k > 0 ? eff / k : eff;
+      A = T - eff;
+      return Math.round(((eff + A) + Number.EPSILON) * 100) / 100;
+    }
+    return Math.round(((eff + A) + Number.EPSILON) * 100) / 100;
+  }, [mode, adjustedForDisplay, shouldApplyDisplayAdjustment, numericCart, isAgent, commissionType, commissionValue, initialTotal, initialIsAgent, displayFromStored]);
 
   const onSave = async () => {
     try {
