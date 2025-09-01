@@ -213,6 +213,10 @@ export async function updateSaleFromStatus(userId: string, taskId: number | stri
     if (typeof update.ofdFullUrl !== 'undefined' && update.ofdFullUrl) next.ofdFullUrl = update.ofdFullUrl;
     if (typeof update.additionalCommissionOfdUrl !== 'undefined' && update.additionalCommissionOfdUrl) next.additionalCommissionOfdUrl = update.additionalCommissionOfdUrl;
     if (typeof update.npdReceiptUri !== 'undefined' && update.npdReceiptUri) next.npdReceiptUri = update.npdReceiptUri;
+    // no-op guard: skip write if nothing changed
+    const beforeVals = { status: current.status, ofdUrl: current.ofdUrl, ofdFullUrl: current.ofdFullUrl, additionalCommissionOfdUrl: current.additionalCommissionOfdUrl, npdReceiptUri: current.npdReceiptUri };
+    const afterVals = { status: next.status, ofdUrl: next.ofdUrl, ofdFullUrl: next.ofdFullUrl, additionalCommissionOfdUrl: next.additionalCommissionOfdUrl, npdReceiptUri: next.npdReceiptUri };
+    if (JSON.stringify(beforeVals) === JSON.stringify(afterVals)) return;
     next.updatedAt = new Date().toISOString();
     store.sales[idx] = next;
     await writeTasks(store);
@@ -285,6 +289,7 @@ export async function setSaleCreatedAtRw(userId: string, taskId: number | string
   if (idx !== -1) {
     const current = store.sales[idx];
     const next = { ...current } as SaleRecord;
+    if ((next.createdAtRw ?? null) === (createdAtRw ?? null)) return;
     if (!next.createdAtRw && createdAtRw) next.createdAtRw = createdAtRw;
     next.updatedAt = new Date().toISOString();
     store.sales[idx] = next;
@@ -402,6 +407,7 @@ export async function updateSaleRwOrderId(userId: string, taskId: number | strin
   if (idx !== -1) {
     const current = store.sales[idx];
     const next = { ...current } as SaleRecord;
+    if ((next.rwOrderId ?? null) === (rwOrderId ?? null)) return;
     next.rwOrderId = rwOrderId;
     next.updatedAt = new Date().toISOString();
     store.sales[idx] = next;
@@ -417,6 +423,7 @@ export async function setSaleHidden(userId: string, taskId: number | string, hid
   if (idx !== -1) {
     const current = store.sales[idx];
     const next = { ...current } as SaleRecord;
+    if (Boolean(next.hidden) === Boolean(hidden)) return;
     next.hidden = Boolean(hidden);
     next.updatedAt = new Date().toISOString();
     store.sales[idx] = next;
