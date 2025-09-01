@@ -2,9 +2,17 @@
 import type { ReactNode } from 'react';
 import { useState } from 'react';
 import { Sidebar } from '@/components/layout/Sidebar';
+import { usePathname } from 'next/navigation';
 
 export default function LinksLayout({ children }: { children: ReactNode }) {
+  const pathname = usePathname();
+  const isSuccess = pathname?.startsWith('/link/s/') || pathname === '/link/success';
   const [open, setOpen] = useState(false);
+  if (isSuccess) {
+    return (
+      <main className="p-4 sm:p-6">{children}</main>
+    );
+  }
   return (
     <div className="min-h-screen grid grid-rows-[auto_1fr] md:grid-cols-[16rem_1fr] md:grid-rows-1">
       <div className="md:hidden sticky top-0 z-30 bg-background/80 backdrop-blur border-b border-gray-200 dark:border-gray-800 p-2 flex items-center gap-2">

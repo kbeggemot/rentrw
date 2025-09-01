@@ -16,8 +16,14 @@ export function middleware(req: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  const protectedPaths = ['/dashboard', '/settings', '/sales'];
+  const protectedPaths = ['/dashboard', '/settings', '/sales', '/partners', '/link'];
   const isProtected = protectedPaths.some((p) => pathname.startsWith(p));
+  // Public link pages that must be accessible without auth
+  const isPublicLink = (
+    pathname === '/link/success' ||
+    /^\/link\/s\/[^/]+$/.test(pathname) ||
+    /^\/link\/[^/]+$/.test(pathname) // only direct /link/{code}
+  );
   if (!isProtected) {
     // Protect admin area with separate cookie
     if (pathname.startsWith('/admin')) {
@@ -27,6 +33,11 @@ export function middleware(req: NextRequest) {
         return NextResponse.next();
       }
     }
+    return NextResponse.next();
+  }
+
+  // Allow public link pages without auth
+  if (pathname.startsWith('/link') && isPublicLink) {
     return NextResponse.next();
   }
 
@@ -40,7 +51,7 @@ export function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/', '/auth', '/dashboard/:path*', '/settings/:path*', '/sales/:path*', '/admin/:path*'],
+  matcher: ['/', '/auth', '/dashboard/:path*', '/settings/:path*', '/sales/:path*', '/partners/:path*', '/link/:path*', '/admin/:path*'],
 };
 
 
