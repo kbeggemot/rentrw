@@ -159,7 +159,9 @@ export default function EditLinkPage(props: { params: Promise<{ code: string }> 
   const totalCart = useMemo(() => {
     if (mode !== 'cart') return 0;
     const v = Number(commissionValue.replace(',', '.'));
-    if (initialTotal != null && Number.isFinite(initialTotal)) return initialTotal;
+    // Если ссылка уже была агентской и есть исходная сумма T — всегда показываем ровно T,
+    // независимо от текущего отображения цен.
+    if (initialIsAgent && initialTotal != null && Number.isFinite(initialTotal)) return initialTotal;
     const commissionValidLocal = isAgent && ((commissionType === 'percent' && v >= 0) || (commissionType === 'fixed' && v > 0));
     const effBase = shouldApplyDisplayAdjustment ? adjustedForDisplay : numericCart;
     const eff = effBase.reduce((s, r) => s + r.price * r.qty, 0);
@@ -173,7 +175,7 @@ export default function EditLinkPage(props: { params: Promise<{ code: string }> 
       }
     }
     return eff + (Math.round((A + Number.EPSILON) * 100) / 100);
-  }, [mode, adjustedForDisplay, shouldApplyDisplayAdjustment, numericCart, isAgent, commissionType, commissionValue, initialTotal]);
+  }, [mode, adjustedForDisplay, shouldApplyDisplayAdjustment, numericCart, isAgent, commissionType, commissionValue, initialTotal, initialIsAgent]);
 
   const onSave = async () => {
     try {
