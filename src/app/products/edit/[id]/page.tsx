@@ -171,7 +171,12 @@ export default function EditProductPage(props: { params: Promise<{ id?: string }
                 {(previews.length ? previews : photos).map((src, idx) => (
                   <div key={`${src}-${idx}`} className="relative w-28 h-28 border border-gray-200 dark:border-gray-800 rounded-md overflow-hidden bg-white dark:bg-gray-900">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={src.startsWith('.data/') ? `/api/products/${encodeURIComponent(id)}?path=${encodeURIComponent(src)}` : src} alt="Фото" className="w-full h-full object-cover" />
+                    <img
+                      src={src.startsWith('.data/') ? `/api/products/${encodeURIComponent(id)}?path=${encodeURIComponent(src)}` : src}
+                      alt="Фото"
+                      className="w-full h-full object-cover cursor-pointer"
+                      onClick={() => { try { const url = src.startsWith('.data/') ? `/api/products/${encodeURIComponent(id)}?path=${encodeURIComponent(src)}` : src; window.open(url, '_blank'); } catch {} }}
+                    />
                     <button type="button" className="absolute top-1 right-1 bg-black/60 text-white rounded p-1" aria-label="Удалить фото" onClick={() => {
                       setPhotos((arr) => arr.filter((_, i) => i !== idx));
                       const url = previews[idx];

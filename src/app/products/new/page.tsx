@@ -174,7 +174,7 @@ export default function NewProductPage() {
             {previews.map((src, idx) => (
               <div key={src} className="relative w-28 h-28 border border-gray-200 dark:border-gray-800 rounded-md overflow-hidden bg-white dark:bg-gray-900">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={src} alt="Фото" className="w-full h-full object-cover" />
+                <img src={src} alt="Фото" className="w-full h-full object-cover cursor-pointer" onClick={() => { try { window.open(src, '_blank'); } catch {} }} />
                 <button type="button" className="absolute top-1 right-1 bg-black/60 text-white rounded p-1" aria-label="Удалить фото" onClick={() => { setPhotos((arr) => arr.filter((_, i) => i !== idx)); const url = previews[idx]; if (url) { try { URL.revokeObjectURL(url); } catch {} } setPreviews((arr) => arr.filter((_, i) => i !== idx)); }}>✕</button>
               </div>
             ))}
