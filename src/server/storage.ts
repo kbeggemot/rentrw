@@ -348,7 +348,20 @@ async function rotateWal(ttlDays: number): Promise<void> {
       const iso = `${m[1]}T${m[2]}:${m[3]}:${m[4]}Z`;
       const ts = Date.parse(iso);
       if (Number.isFinite(ts) && ts < cutoff) {
-        await deleteFileInternal(p).catch(() => void 0);
+        // Delete old WAL entry
+        if (process.env.S3_ENABLED === '1') {
+          try {
+            ensureS3();
+            if (s3Client && s3Bucket) {
+              const { DeleteObjectCommand } = require('@aws-sdk/client-s3');
+              const key = (s3Prefix + p).replace(/^\/+/, '');
+              const cmd = new DeleteObjectCommand({ Bucket: s3Bucket, Key: key });
+              await s3Client.send(cmd);
+            }
+          } catch {}
+        } else {
+          try { await fs.unlink(path.join(process.cwd(), p)); } catch {}
+        }
       }
     }
   } catch {}
