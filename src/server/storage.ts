@@ -7,6 +7,20 @@ let s3Client: any = null;
 let s3Bucket: string | null = null;
 let s3Prefix = '';
 
+function shouldDebugS3(): boolean {
+  return (process.env.S3_DEBUG_LOG || '0') === '1';
+}
+
+async function logS3Io(kind: 'GET' | 'PUT' | 'LIST', key: string, bytes?: number): Promise<void> {
+  if (!shouldDebugS3()) return;
+  try {
+    const line = JSON.stringify({ ts: new Date().toISOString(), kind, key, bytes: typeof bytes === 'number' ? bytes : undefined }) + '\n';
+    const abs = path.join(process.cwd(), '.data', 's3_io.log');
+    await fs.mkdir(path.dirname(abs), { recursive: true });
+    await fs.appendFile(abs, line, 'utf8');
+  } catch {}
+}
+
 function ensureS3() {
   if (s3Client) return;
   if (process.env.S3_ENABLED !== '1') return;
@@ -40,7 +54,9 @@ export async function readText(relPath: string): Promise<string | null> {
       const out = await s3Client.send(cmd);
       const chunks: Uint8Array[] = [];
       for await (const c of out.Body as any) chunks.push(c as Uint8Array);
-      return Buffer.concat(chunks).toString('utf8');
+      const buf = Buffer.concat(chunks);
+      try { await logS3Io('GET', key, buf.length); } catch {}
+      return buf.toString('utf8');
     } catch {
       return null;
     }
@@ -133,6 +149,7 @@ export async function writeText(relPath: string, text: string): Promise<void> {
       const key = (s3Prefix + p).replace(/^\/+/, '');
       const cmd = new (s3Client as any)._Put({ Bucket: s3Bucket, Key: key, Body: body, ContentType: 'application/json; charset=utf-8' });
       await s3Client.send(cmd);
+      try { await logS3Io('PUT', key, Buffer.byteLength(body)); } catch {}
       return;
     }
     const abs = path.join(process.cwd(), p);
@@ -170,10 +187,18 @@ export async function writeText(relPath: string, text: string): Promise<void> {
       if (relPath === '.data/tasks.json' && (process.env.TASKS_WAL || '1') === '1') {
         const tsWal = new Date().toISOString().replace(/[:.]/g, '-');
         await writeTextInternal(`.data/tasks_wal/tasks-${tsWal}.json`, text);
+        // WAL rotation by TTL days
+        try {
+          const days = Number(process.env.TASKS_WAL_TTL_DAYS || '7');
+          if (Number.isFinite(days) && days > 0) {
+            await rotateWal(days);
+          }
+        } catch {}
       }
     } catch {}
     const cmd = new (s3Client as any)._Put({ Bucket: s3Bucket, Key: key, Body: text, ContentType: 'application/json; charset=utf-8' });
     await s3Client.send(cmd);
+    try { await logS3Io('PUT', key, Buffer.byteLength(text)); } catch {}
     return;
   }
   const abs = path.join(process.cwd(), relPath);
@@ -183,6 +208,12 @@ export async function writeText(relPath: string, text: string): Promise<void> {
     if (relPath === '.data/tasks.json' && (process.env.TASKS_WAL || '1') === '1') {
       const tsWal = new Date().toISOString().replace(/[:.]/g, '-');
       await writeTextInternal(`.data/tasks_wal/tasks-${tsWal}.json`, text);
+      try {
+        const days = Number(process.env.TASKS_WAL_TTL_DAYS || '7');
+        if (Number.isFinite(days) && days > 0) {
+          await rotateWal(days);
+        }
+      } catch {}
     }
   } catch {}
   await fs.writeFile(tmp, text, 'utf8');
@@ -303,6 +334,24 @@ export async function list(prefix: string): Promise<string[]> {
   } catch {
     return [];
   }
+}
+
+// Rotate WAL files older than N days
+async function rotateWal(ttlDays: number): Promise<void> {
+  try {
+    const all = await list('.data/tasks_wal').catch(() => [] as string[]);
+    if (!Array.isArray(all) || all.length === 0) return;
+    const cutoff = Date.now() - ttlDays * 24 * 60 * 60 * 1000;
+    for (const p of all) {
+      const m = /\.data\/tasks_wal\/tasks-(\d{4}-\d{2}-\d{2})T(\d{2})-(\d{2})-(\d{2})/.exec(p);
+      if (!m) continue;
+      const iso = `${m[1]}T${m[2]}:${m[3]}:${m[4]}Z`;
+      const ts = Date.parse(iso);
+      if (Number.isFinite(ts) && ts < cutoff) {
+        await deleteFileInternal(p).catch(() => void 0);
+      }
+    }
+  } catch {}
 }
 
 export async function readBinary(relPath: string): Promise<{ data: Buffer; contentType: string | null } | null> {
