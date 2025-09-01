@@ -45,6 +45,7 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
   const [fadeIn, setFadeIn] = useState(true);
   const [touchStartX, setTouchStartX] = useState<number | null>(null);
   const [touchDeltaX, setTouchDeltaX] = useState(0);
+  const [partnerFio, setPartnerFio] = useState<string | null>(null);
 
   const showPrev = () => {
     setFadeIn(false);
@@ -67,6 +68,21 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [viewer.open]);
+
+  // Load partner FIO for agent sale header
+  useEffect(() => {
+    (async () => {
+      try {
+        const phone = (data?.isAgent && data?.partnerPhone) ? String(data.partnerPhone) : '';
+        const digits = phone.replace(/\D/g, '');
+        if (!digits) { setPartnerFio(null); return; }
+        const r = await fetch(`/api/partners?phone=${encodeURIComponent(digits)}`, { cache: 'no-store' });
+        const d = await r.json().catch(() => ({}));
+        const found = Array.isArray(d?.partners) ? (d.partners as any[]).find((p) => String(p.phone || '').replace(/\D/g, '') === digits) : null;
+        setPartnerFio((found?.fio && String(found.fio).trim().length > 0) ? String(found.fio).trim() : null);
+      } catch { setPartnerFio(null); }
+    })();
+  }, [data?.isAgent, data?.partnerPhone]);
 
   // Flow state
   const [taskId, setTaskId] = useState<string | number | null>(null);
@@ -474,30 +490,7 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
       {data.orgName ? (
         <div className="text-sm text-gray-600 mb-4">
           {data.isAgent && data.partnerPhone ? (
-            (() => {
-              try {
-                const digits = String(data.partnerPhone).replace(/\D/g, '');
-                const [fio, setFio] = (() => {
-                  const r = useState<string | null>(null) as any;
-                  return r as [string | null, (v: string | null) => void];
-                })();
-                // Fetch FIO once
-                useEffect(() => {
-                  let cancelled = false;
-                  (async () => {
-                    try {
-                      const r = await fetch(`/api/partners?phone=${encodeURIComponent(digits)}`, { cache: 'no-store' });
-                      const d = await r.json();
-                      const found = Array.isArray(d?.partners) ? (d.partners as any[]).find((p) => String(p.phone || '').replace(/\D/g, '') === digits) : null;
-                      if (!cancelled) setFio(found?.fio || null);
-                    } catch { if (!cancelled) setFio(null); }
-                  })();
-                  return () => { cancelled = true; };
-                }, [digits]);
-                const label = (fio && fio.trim().length > 0) ? fio : 'партнёра';
-                return (<span>Оплата для {label}, через {data.orgName}</span>);
-              } catch { return (<span>Оплата через {data.orgName}</span>); }
-            })()
+            <span>Оплата для {partnerFio || 'партнёра'}, через {data.orgName}</span>
           ) : (
             <span>Оплата в пользу {data.orgName}</span>
           )}
