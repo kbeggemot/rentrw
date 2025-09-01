@@ -468,7 +468,23 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
     <div className="max-w-xl mx-auto p-4">
       <h1 className="text-xl font-semibold mb-1">{data.title}</h1>
       {data.orgName ? (
-        <div className="text-sm text-gray-600 mb-4">Оплата в пользу {data.orgName}</div>
+        <div className="text-sm text-gray-600 mb-4">
+          {data.isAgent && data.partnerPhone ? (
+            (() => {
+              try {
+                const phoneDigits = String(data.partnerPhone).replace(/\D/g, '');
+                const fio = (() => {
+                  // try to reuse partner list loaded on create/edit (not available here) → show phone if FIO неизвестно
+                  return '';
+                })();
+                const label = fio && fio.trim().length > 0 ? fio : `партнёра ${phoneDigits}`;
+                return (<span>Оплата для {label}, через {data.orgName}</span>);
+              } catch { return (<span>Оплата через {data.orgName}</span>); }
+            })()
+          ) : (
+            <span>Оплата в пользу {data.orgName}</span>
+          )}
+        </div>
       ) : null}
       <div className="bg-white dark:bg-gray-950 border border-gray-200 dark:border-gray-800 rounded-lg p-4">
         {toast ? (<div className="fixed top-3 left-1/2 -translate-x-1/2 z-50 bg-black text-white text-sm px-3 py-2 rounded shadow">{toast}</div>) : null}
@@ -633,9 +649,9 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
           )}
         </div>
         <div className="flex gap-2">
-          <button disabled={!canStart} onClick={goPay} className={actionBtnClasses}>
-            Перейти к оплате
-          </button>
+        <button disabled={!canStart} onClick={goPay} className={actionBtnClasses}>
+          Перейти к оплате
+        </button>
           {payError ? (
             <button onClick={goPay} className="inline-flex items-center justify-center rounded-lg border px-4 h-9 text-sm">
               Повторить
