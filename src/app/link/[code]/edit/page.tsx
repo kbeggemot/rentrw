@@ -16,6 +16,9 @@ export default function EditLinkPage(props: { params: Promise<{ code: string }> 
   const [method, setMethod] = useState<'any' | 'qr' | 'card'>('any');
   const [isAgent, setIsAgent] = useState(false);
   const [initialIsAgent, setInitialIsAgent] = useState<boolean | null>(null);
+  const [initialCommissionType, setInitialCommissionType] = useState<'percent' | 'fixed' | null>(null);
+  const [initialCommissionValue, setInitialCommissionValue] = useState<number | null>(null);
+  const [initialTotal, setInitialTotal] = useState<number | null>(null);
   const [commissionType, setCommissionType] = useState<'percent' | 'fixed'>('percent');
   const [commissionValue, setCommissionValue] = useState('');
   const [partnerPhone, setPartnerPhone] = useState('');
@@ -47,6 +50,9 @@ export default function EditLinkPage(props: { params: Promise<{ code: string }> 
         setMethod(d.method || 'any');
         setIsAgent(!!d.isAgent);
         setInitialIsAgent(!!d.isAgent);
+        setInitialCommissionType((d.commissionType === 'fixed' || d.commissionType === 'percent') ? d.commissionType : null);
+        setInitialCommissionValue(typeof d.commissionValue === 'number' ? d.commissionValue : null);
+        setInitialTotal(typeof d.amountRub === 'number' ? d.amountRub : null);
         setCommissionType((d.commissionType === 'fixed' || d.commissionType === 'percent') ? d.commissionType : 'percent');
         setCommissionValue(d.commissionValue != null ? String(d.commissionValue) : '');
         setPartnerPhone(d.partnerPhone || '');
@@ -107,29 +113,48 @@ export default function EditLinkPage(props: { params: Promise<{ code: string }> 
     const v = Number(commissionValue.replace(',', '.'));
     try { return applyAgentCommissionToCart(numericCart, commissionType, v).adjusted; } catch { return numericCart; }
   }, [shouldApplyDisplayAdjustment, numericCart, commissionType, commissionValue]);
+
+  // When link is already agent and prices are stored lowered, recover one step so that UI shows
+  // the expected single-lowered values based on the original total (amountRub) and commission.
+  const displayFromStored = useMemo(() => {
+    if (!commissionValid) return numericCart;
+    const v = Number(commissionValue.replace(',', '.'));
+    const effSaved = numericCart.reduce((s, r) => s + r.price * r.qty, 0);
+    let effTarget: number | null = null;
+    if (initialTotal != null && Number.isFinite(initialTotal)) {
+      if (commissionType === 'percent') effTarget = initialTotal * (1 - v / 100);
+      else effTarget = Math.max(initialTotal - v, 0);
+    } else {
+      if (commissionType === 'percent') {
+        const k = 1 - v / 100; if (k > 0) effTarget = effSaved / k; // reverse one step
+      }
+    }
+    if (effTarget == null || !Number.isFinite(effTarget) || effSaved <= 0) return numericCart;
+    const factor = effTarget / effSaved;
+    const round2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
+    return numericCart.map((i) => ({ ...i, price: round2(i.price * factor) }));
+  }, [commissionValid, numericCart, commissionType, commissionValue, initialTotal]);
   const agentLine = useMemo(() => {
     if (!commissionValid || numericCart.length === 0) return null;
     const v = Number(commissionValue.replace(',', '.'));
-    const effSum = numericCart.reduce((s, r) => s + r.price * r.qty, 0);
-    let A = 0;
-    if (commissionType === 'percent') {
-      const k = 1 - (v / 100);
-      if (k > 0) {
-        // исходная сумма T = eff / k, комиссия = T - eff
-        A = (effSum * (1 / k - 1));
-      } else {
-        A = 0;
-      }
-    } else {
-      A = v;
+    const round2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
+    if (initialTotal != null && Number.isFinite(initialTotal)) {
+      const A = commissionType === 'percent' ? initialTotal * (v / 100) : v;
+      return { title: 'Услуги агента', price: round2(Math.max(0, A)), qty: 1 };
     }
-    const agentAmount = Math.round((Math.max(0, A) + Number.EPSILON) * 100) / 100;
-    return { title: 'Услуги агента', price: agentAmount, qty: 1 };
-  }, [commissionValid, commissionType, commissionValue, numericCart]);
+    // Fallback from saved lowered values
+    const effSum = numericCart.reduce((s, r) => s + r.price * r.qty, 0);
+    if (commissionType === 'percent') {
+      const k = 1 - v / 100; if (k <= 0) return { title: 'Услуги агента', price: 0, qty: 1 };
+      const T = effSum / k; const A = T - effSum; return { title: 'Услуги агента', price: round2(Math.max(0, A)), qty: 1 };
+    }
+    return { title: 'Услуги агента', price: round2(Math.max(0, v)), qty: 1 };
+  }, [commissionValid, commissionType, commissionValue, numericCart, initialTotal]);
 
   const totalCart = useMemo(() => {
     if (mode !== 'cart') return 0;
     const v = Number(commissionValue.replace(',', '.'));
+    if (initialTotal != null && Number.isFinite(initialTotal)) return initialTotal;
     const commissionValidLocal = isAgent && ((commissionType === 'percent' && v >= 0) || (commissionType === 'fixed' && v > 0));
     const effBase = shouldApplyDisplayAdjustment ? adjustedForDisplay : numericCart;
     const eff = effBase.reduce((s, r) => s + r.price * r.qty, 0);
@@ -143,7 +168,7 @@ export default function EditLinkPage(props: { params: Promise<{ code: string }> 
       }
     }
     return eff + (Math.round((A + Number.EPSILON) * 100) / 100);
-  }, [mode, adjustedForDisplay, shouldApplyDisplayAdjustment, numericCart, isAgent, commissionType, commissionValue]);
+  }, [mode, adjustedForDisplay, shouldApplyDisplayAdjustment, numericCart, isAgent, commissionType, commissionValue, initialTotal]);
 
   const onSave = async () => {
     try {
