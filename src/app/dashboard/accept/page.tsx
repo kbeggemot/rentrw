@@ -4,6 +4,7 @@ import React, { useEffect, useRef, useState, useMemo } from 'react';
 import { useSearchParams } from 'next/navigation';
 import QRCode from 'qrcode';
 import { Input } from '@/components/ui/Input';
+import { applyAgentCommissionToCart } from '@/lib/pricing';
 import { Textarea } from '@/components/ui/Textarea';
 import { Button } from '@/components/ui/Button';
 
@@ -412,17 +413,9 @@ function AcceptPaymentContent() {
     e.preventDefault();
     setMessage(null);
     setMessageKind('info');
-    const numAmount = (mode === 'cart')
-      ? (() => {
-          const toNum = (v: string) => Number(String(v || '0').replace(',', '.'));
-          return cart.reduce((sum, r) => {
-            const price = toNum(r.price);
-            const qty = toNum(r.qty || '1');
-            if (!Number.isFinite(price) || !Number.isFinite(qty)) return sum;
-            return sum + price * qty;
-          }, 0);
-        })()
-      : Number(amount.replace(',', '.'));
+    const toNum = (v: string) => Number(String(v || '0').replace(',', '.'));
+    const cartNumeric = (mode === 'cart') ? cart.map((r) => ({ title: r.title, price: toNum(r.price), qty: toNum(r.qty || '1') })) : [];
+    const numAmount = (mode === 'cart') ? cartNumeric.reduce((s, r) => s + (r.price * r.qty), 0) : Number(amount.replace(',', '.'));
     const numComm = Number(commission.replace(',', '.'));
     if (!Number.isFinite(numAmount) || numAmount <= 0) { showToast(mode==='cart' ? 'Итоговая сумма должна быть больше нуля' : 'Введите корректную сумму', 'error'); return; }
     // Business rule: минимальная сумма оплаты – не менее 10 ₽ (для агентских – после вычета комиссии)
@@ -595,6 +588,22 @@ function AcceptPaymentContent() {
       }
         } catch {}
         startPolling(taskId, myAttempt);
+        // Persist items snapshot (adjusted if agent) into sale store
+        try {
+          if (mode === 'cart') {
+            const payload: any = { cart: cartNumeric };
+            if (isAgentSale && commissionType && Number.isFinite(numComm)) {
+              const adj = applyAgentCommissionToCart(cartNumeric, commissionType, numComm);
+              payload.cart = adj.adjusted;
+            }
+            // Fire-and-forget to our internal endpoint to enrich sale (reuse existing record API)
+            // We piggyback on recordSaleOnCreate call that is already made inside tasks/route via store
+            // So here we only send a lightweight beacon to attach snapshot in background
+            try {
+              navigator.sendBeacon?.('/api/sales/attach-snapshot', new Blob([JSON.stringify({ taskId, items: payload.cart })], { type: 'application/json' }));
+            } catch {}
+          }
+        } catch {}
         startStatusWatcher(taskId, myAttempt, isAgentSale);
       } else { setLoading(false); showToast('Не удалось получить идентификатор задачи', 'error'); setCollapsed(false); }
     } catch (err) {

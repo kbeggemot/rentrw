@@ -3,6 +3,7 @@ import { createPaymentLink, listPaymentLinks, listPaymentLinksForOrg, listAllPay
 import { resolveRwTokenWithFingerprint } from '@/server/rwToken';
 import { getSelectedOrgInn } from '@/server/orgContext';
 import { partnerExists, upsertPartnerFromValidation } from '@/server/partnerStore';
+import { applyAgentCommissionToCart } from '@/lib/pricing';
 
 export const runtime = 'nodejs';
 
@@ -99,7 +100,7 @@ export async function POST(req: Request) {
     const method = (body?.method === 'qr' || body?.method === 'card') ? body?.method : 'any';
     if (!title) return NextResponse.json({ error: 'TITLE_REQUIRED' }, { status: 400 });
     // description is required only for "free service" mode; when cartItems present, it's optional
-    const cartItems = Array.isArray(body?.cartItems) ? body.cartItems : null;
+    let cartItems = Array.isArray(body?.cartItems) ? body.cartItems : null;
     if (!cartItems && !description) return NextResponse.json({ error: 'DESCRIPTION_REQUIRED' }, { status: 400 });
     if (sumMode === 'fixed' && (!Number.isFinite(amountRub) || Number(amountRub) <= 0)) return NextResponse.json({ error: 'INVALID_AMOUNT' }, { status: 400 });
     // Validate agent fields and partner in RW when isAgent
@@ -141,7 +142,13 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: msg }, { status: 400 });
       }
     }
-    const item = await createPaymentLink(userId, { title, description, sumMode, amountRub: amountRub ?? undefined, vatRate, isAgent, commissionType: commissionType as any, commissionValue: commissionValue ?? undefined, partnerPhone, method, orgInn: inn ?? undefined, preferredCode: preferredCode ?? undefined, cartItems: cartItems ?? undefined, allowCartAdjust: Boolean(body?.allowCartAdjust), cartDisplay: (body?.cartDisplay === 'list' ? 'list' : (body?.cartDisplay === 'grid' ? 'grid' : undefined)) } as any);
+    // If cart + agent: persist adjusted prices into link
+    if (Array.isArray(cartItems) && cartItems.length > 0 && isAgent && commissionType && commissionValue != null) {
+      try {
+        cartItems = applyAgentCommissionToCart(cartItems.map((i:any)=>({ title:i.title, price:Number(i.price||0), qty:Number(i.qty||1) })), commissionType as any, Number(commissionValue)).adjusted as any;
+      } catch {}
+    }
+    const item = await createPaymentLink(userId, { title, description, sumMode, amountRub: amountRub ?? undefined, vatRate, isAgent, commissionType: commissionType as any, commissionValue: commissionValue ?? undefined, partnerPhone, method, orgInn: inn ?? undefined, preferredCode: preferredCode ?? undefined, cartItems: cartItems ?? undefined, allowCartAdjust: Boolean(body?.allowCartAdjust), cartDisplay: (body?.cartDisplay === 'list' ? 'list' : (body?.cartDisplay === 'grid' ? 'grid' : undefined)), agentDescription: (typeof body?.agentDescription === 'string' ? body.agentDescription : undefined) } as any);
     const hostHdr = req.headers.get('x-forwarded-host') || req.headers.get('host') || 'localhost:3000';
     const protoHdr = req.headers.get('x-forwarded-proto') || (hostHdr.startsWith('localhost') ? 'http' : 'https');
     const url = `${protoHdr}://${hostHdr}/link/${encodeURIComponent(item.code)}`;

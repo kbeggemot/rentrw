@@ -17,6 +17,7 @@ export type PaymentLink = {
   cartItems?: Array<{ id?: string | null; title: string; price: number; qty: number }> | null;
   allowCartAdjust?: boolean;
   cartDisplay?: 'grid' | 'list' | null;
+  agentDescription?: string | null;
   createdAt: string;
   hits?: number;
   lastAccessAt?: string | null;
@@ -84,6 +85,7 @@ export async function createPaymentLink(userId: string, data: Omit<PaymentLink, 
     })) : null,
     allowCartAdjust: Boolean((data as any)?.allowCartAdjust),
     cartDisplay: (data as any)?.cartDisplay === 'list' ? 'list' : ((data as any)?.cartDisplay === 'grid' ? 'grid' : null),
+    agentDescription: typeof (data as any)?.agentDescription === 'string' ? ((data as any).agentDescription as string) : null,
     createdAt: now,
     hits: 0,
     lastAccessAt: null,
@@ -172,10 +174,12 @@ export async function updatePaymentLink(userId: string, code: string, updates: P
     if (updates.commissionType === 'percent' || updates.commissionType === 'fixed') next.commissionType = updates.commissionType;
     if (typeof updates.commissionValue === 'number' && Number.isFinite(updates.commissionValue)) next.commissionValue = updates.commissionValue;
     if (typeof updates.partnerPhone === 'string') next.partnerPhone = updates.partnerPhone;
+    if (typeof (updates as any).agentDescription === 'string') (next as any).agentDescription = (updates as any).agentDescription as any;
   } else {
     next.commissionType = null;
     next.commissionValue = null;
     next.partnerPhone = null;
+    (next as any).agentDescription = null;
   }
 
   store.items[idx] = next;

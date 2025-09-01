@@ -1,6 +1,7 @@
 "use client";
 
 import { use, useEffect, useMemo, useRef, useState } from 'react';
+import { applyAgentCommissionToCart } from '@/lib/pricing';
 
 // Very lightweight RU genitive case inflector for full name like "Фамилия Имя Отчество"
 // Covers common male patterns; indeclinable and rare patterns are returned unchanged
@@ -73,6 +74,7 @@ type LinkData = {
   cartItems?: Array<{ id?: string | null; title: string; price: number; qty: number }> | null;
   allowCartAdjust?: boolean;
   cartDisplay?: 'list' | 'grid';
+  agentDescription?: string | null;
 };
 
 export default function PublicPayPage(props: { params: Promise<{ code?: string }> }) {
@@ -305,9 +307,39 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
 
   const cartTotal = useMemo(() => {
     if (!(Array.isArray(cart) && cart.length > 0)) return null;
-    const total = cart.reduce((s, r) => s + (Number(r.price || 0) * Number(r.qty || 0)), 0);
+    let items = cart.map((i) => ({ title: i.title, price: Number(i.price || 0), qty: Number(i.qty || 0) }));
+    if (data?.isAgent && data.commissionType && typeof data.commissionValue === 'number') {
+      try {
+        items = applyAgentCommissionToCart(items, data.commissionType as any, Number(data.commissionValue)).adjusted;
+      } catch {}
+    }
+    const total = items.reduce((s, r) => s + (Number(r.price || 0) * Number(r.qty || 0)), 0);
     return Number.isFinite(total) ? total : 0;
   }, [cart]);
+
+  const agentLine = useMemo(() => {
+    if (!data?.isAgent || !Array.isArray(cart) || cart.length === 0 || !data.commissionType || typeof data.commissionValue !== 'number') return null;
+    const rawTotal = cart.reduce((s, r) => s + (Number(r.price || 0) * Number(r.qty || 0)), 0);
+    if (!(rawTotal > 0)) return null;
+    const amt = data.commissionType === 'percent' ? rawTotal * (Number(data.commissionValue) / 100) : Number(data.commissionValue);
+    const agentAmount = Math.round((Math.min(Math.max(amt, 0), rawTotal) + Number.EPSILON) * 100) / 100;
+    return { title: data.agentDescription || 'Услуги агента', price: agentAmount, qty: 1 };
+  }, [data?.isAgent, data?.commissionType, data?.commissionValue, data?.agentDescription, cart]);
+
+  const effectiveCart = useMemo(() => {
+    if (!(Array.isArray(cart) && cart.length > 0)) return cart;
+    if (!data?.isAgent || !data.commissionType || typeof data.commissionValue !== 'number') return cart;
+    try {
+      const adjusted = applyAgentCommissionToCart(
+        cart.map((i) => ({ title: i.title, price: Number(i.price || 0), qty: Number(i.qty || 0) })),
+        data.commissionType as any,
+        Number(data.commissionValue)
+      ).adjusted;
+      return adjusted.map((a, i) => ({ ...cart[i], price: a.price }));
+    } catch {
+      return cart;
+    }
+  }, [cart, data?.isAgent, data?.commissionType, data?.commissionValue]);
 
   const canPay = useMemo(() => {
     if (!data) return false;
@@ -587,6 +619,16 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
                     ) : null}
                   </div>
                 ))}
+                {agentLine ? (
+                  <div className="rounded border p-2 flex items-center gap-3 bg-gray-50">
+                    <div className="flex-1">
+                      <div className="text-sm font-medium">{agentLine.title}</div>
+                      <div className="text-xs text-gray-600">Цена: {Number(agentLine.price || 0).toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₽</div>
+                    </div>
+                    <input type="number" className="w-10 rounded border px-2 h-9 text-sm bg-gray-100 text-gray-500" value="1" readOnly disabled />
+                    <button type="button" className="px-3 h-9 rounded border text-sm text-gray-400" disabled>Удалить</button>
+                  </div>
+                ) : null}
               </div>
             ) : (
               <div className="grid grid-cols-2 gap-3">
@@ -612,6 +654,16 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
                     </div>
                   </div>
                 ))}
+                {agentLine ? (
+                  <div className="rounded border p-2 bg-gray-50">
+                    <div className="text-sm font-medium">{agentLine.title}</div>
+                    <div className="text-xs text-gray-600">Цена: {Number(agentLine.price || 0).toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₽</div>
+                    <div className="mt-2 flex items-center gap-2">
+                      <input type="number" className="w-10 rounded border px-2 h-9 text-sm bg-gray-100 text-gray-500" value="1" readOnly disabled />
+                      <button type="button" className="px-3 h-9 rounded border text-sm text-gray-400" disabled>Удалить</button>
+                    </div>
+                  </div>
+                ) : null}
               </div>
             )}
             {data.allowCartAdjust ? (

@@ -6,6 +6,7 @@ import { resolveRwToken } from '@/server/rwToken';
 import { getSelectedOrgInn } from '@/server/orgContext';
 import { getNextOrderId } from '@/server/orderStore';
 import { saveTaskId, recordSaleOnCreate } from '@/server/taskStore';
+import { applyAgentCommissionToCart } from '@/lib/pricing';
 import { getUserAgentSettings } from '@/server/userStore';
 import type { RocketworkTask } from '@/types/rocketwork';
 import { getOrgPayoutRequisites } from '@/server/orgStore';
@@ -34,6 +35,8 @@ type BodyIn = {
   commissionType?: 'percent' | 'fixed';
   commissionValue?: number; // percent or fixed rubles depending on commissionType
   serviceEndDate?: string; // YYYY-MM-DD
+  cartItems?: Array<{ title: string; price: number; qty: number }> | null;
+  agentDescription?: string | null;
 };
 
 export async function POST(req: Request) {
@@ -379,6 +382,15 @@ export async function POST(req: Request) {
         commissionValue: commissionValueForRecord,
         serviceEndDate: typeof (body as any)?.serviceEndDate === 'string' ? (body as any).serviceEndDate : undefined,
         vatRate: vatRate || undefined,
+        cartItems: (() => {
+          const items = Array.isArray((body as any)?.cartItems) ? (body as any).cartItems : null;
+          if (!items) return null;
+          if (body.agentSale && body.commissionType && typeof body.commissionValue === 'number') {
+            try { return applyAgentCommissionToCart(items, body.commissionType, Number(body.commissionValue)).adjusted; } catch { return items; }
+          }
+          return items;
+        })(),
+        agentDescription: (typeof (body as any)?.agentDescription === 'string' ? (body as any).agentDescription : null) ?? null,
       });
 
       // Removed: prepayment receipt creation and offset scheduling at creation time

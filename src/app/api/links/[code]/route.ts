@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { applyAgentCommissionToCart } from '@/lib/pricing';
 import { deletePaymentLink, findLinkByCode, markLinkAccessed, updatePaymentLink } from '@/server/paymentLinkStore';
 import { getUserPayoutRequisites } from '@/server/userStore';
 import { listProductsForOrg } from '@/server/productsStore';
@@ -72,7 +73,7 @@ export async function GET(req: Request) {
         });
       }
     } catch {}
-    return NextResponse.json({ code, userId, title, description, sumMode, amountRub, vatRate, isAgent, commissionType, commissionValue, partnerPhone, method, orgName: orgName || null, orgInn: item.orgInn || null, cartItems, allowCartAdjust: !!item.allowCartAdjust, cartDisplay: item.cartDisplay || null }, { status: 200 });
+    return NextResponse.json({ code, userId, title, description, sumMode, amountRub, vatRate, isAgent, commissionType, commissionValue, partnerPhone, method, orgName: orgName || null, orgInn: item.orgInn || null, cartItems, allowCartAdjust: !!item.allowCartAdjust, cartDisplay: item.cartDisplay || null, agentDescription: (item as any)?.agentDescription ?? null }, { status: 200 });
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'Server error';
     return NextResponse.json({ error: msg }, { status: 500 });
@@ -148,13 +149,17 @@ export async function PUT(req: Request) {
       // cart mode
       const cartItems = Array.isArray(body?.cartItems) ? body.cartItems : [];
       if (!Array.isArray(cartItems) || cartItems.length === 0) return NextResponse.json({ error: 'CART_EMPTY' }, { status: 400 });
-      const normalized = cartItems.map((c: any) => ({
+      let normalized = cartItems.map((c: any) => ({
         id: c?.id ?? null,
         title: String(c?.title || ''),
         price: Number(String(c?.price ?? '0').toString().replace(/,/g, '.')),
         qty: Number(String(c?.qty ?? '1').toString().replace(/,/g, '.')),
       })).filter((c: any) => Number.isFinite(c.price) && Number.isFinite(c.qty) && c.price > 0 && c.qty > 0);
       if (normalized.length === 0) return NextResponse.json({ error: 'CART_EMPTY' }, { status: 400 });
+      // If agent — persist adjusted prices so that subsequent public page sees the same split
+      if (isAgent && commissionType && commissionValue != null) {
+        try { normalized = applyAgentCommissionToCart(normalized.map(i=>({ title:i.title, price:i.price, qty:i.qty })), commissionType as any, Number(commissionValue)).adjusted as any; } catch {}
+      }
       const allowCartAdjust = !!body?.allowCartAdjust;
       const cartDisplay = body?.cartDisplay === 'list' ? 'list' : (body?.cartDisplay === 'grid' ? 'grid' : undefined);
       const total = normalized.reduce((s: number, r: any) => s + r.price * r.qty, 0);

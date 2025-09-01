@@ -44,6 +44,9 @@ export type SaleRecord = {
   invoiceIdPrepay?: string | null;
   invoiceIdOffset?: string | null;
   invoiceIdFull?: string | null;
+  // Snapshot of items at creation (prices already adjusted if agent commission applies)
+  itemsSnapshot?: Array<{ title: string; price: number; qty: number }> | null;
+  agentDescription?: string | null; // description text used for agent line
 };
 
 function normalizeOrderId(value: string | number): number {
@@ -93,8 +96,10 @@ export async function recordSaleOnCreate(params: {
   commissionValue?: number;
   serviceEndDate?: string;
   vatRate?: string;
+  cartItems?: Array<{ title: string; price: number; qty: number }> | null;
+  agentDescription?: string | null;
 }): Promise<void> {
-  const { userId, taskId, orderId, orgInn, rwTokenFp, clientEmail, description, amountGrossRub, isAgent, commissionType, commissionValue, serviceEndDate, vatRate } = params;
+  const { userId, taskId, orderId, orgInn, rwTokenFp, clientEmail, description, amountGrossRub, isAgent, commissionType, commissionValue, serviceEndDate, vatRate, cartItems, agentDescription } = params;
   // Try infer orgInn from fingerprint if missing or unknown
   let resolvedInn: string | null | undefined = orgInn;
   try {
@@ -163,6 +168,8 @@ export async function recordSaleOnCreate(params: {
     invoiceIdPrepay,
     invoiceIdOffset,
     invoiceIdFull,
+    itemsSnapshot: Array.isArray(cartItems) ? cartItems.map((i) => ({ title: String(i.title || ''), price: Number(i.price || 0), qty: Number(i.qty || 1) })) : null,
+    agentDescription: agentDescription ?? null,
   });
   await writeTasks(store);
   try { getHub().publish(userId, 'sales:update'); } catch {}

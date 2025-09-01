@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/Button';
+import { applyAgentCommissionToCart } from '@/lib/pricing';
 
 export default function NewLinkStandalonePage() {
   const [toast, setToast] = useState<{ msg: string; kind: 'success' | 'error' | 'info'; actionLabel?: string; actionHref?: string } | null>(null);
@@ -16,6 +17,7 @@ export default function NewLinkStandalonePage() {
   const [cart, setCart] = useState<Array<{ id: string; title: string; price: string; qty: string }>>([]);
   const [allowCartAdjust, setAllowCartAdjust] = useState(false);
   const [orgProducts, setOrgProducts] = useState<Array<{ id: string; title: string; price: number }>>([]);
+  const [agentDesc, setAgentDesc] = useState<string | null>(null);
   const [linkSumMode, setLinkSumMode] = useState<'custom' | 'fixed'>('custom');
   const [linkAmount, setLinkAmount] = useState('');
   const [linkVat, setLinkVat] = useState<'none' | '0' | '5' | '7' | '10' | '20'>('none');
@@ -64,6 +66,14 @@ export default function NewLinkStandalonePage() {
       } catch {}
     })();
     // preload partners for agent selector
+    // preload agent description
+    (async () => {
+      try {
+        const r = await fetch('/api/settings/agent', { cache: 'no-store' });
+        const j = await r.json();
+        if (typeof j?.agentDescription === 'string') setAgentDesc(j.agentDescription);
+      } catch {}
+    })();
     (async () => {
       try {
         const r = await fetch('/api/partners', { cache: 'no-store' });
@@ -155,7 +165,19 @@ export default function NewLinkStandalonePage() {
           qty: Number((c.qty || '1').replace(',', '.')),
         })).filter((c) => c.price > 0 && c.qty > 0);
         if (normalized.length === 0) { showToast('Добавьте хотя бы одну позицию в корзину', 'error'); return; }
-        payload.cartItems = normalized;
+        // If agent — adjust prices proportionally and add agent line client-side
+        if (linkAgent && linkCommType && linkCommVal.trim().length > 0) {
+          const v = Number(linkCommVal.replace(',', '.'));
+          if (Number.isFinite(v)) {
+            const adj = applyAgentCommissionToCart(normalized.map(i => ({ title: i.title, price: i.price, qty: i.qty })), linkCommType, v);
+            payload.cartItems = adj.adjusted;
+            payload.agentDescription = agentDesc || null;
+          } else {
+            payload.cartItems = normalized;
+          }
+        } else {
+          payload.cartItems = normalized;
+        }
         payload.allowCartAdjust = allowCartAdjust;
         payload.cartDisplay = cartDisplay;
         // Укажем исходную сумму для сервера (нормализуем в число с точкой)
