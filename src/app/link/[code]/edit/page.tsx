@@ -95,24 +95,20 @@ export default function EditLinkPage(props: { params: Promise<{ code: string }> 
 
   const numericCart = useMemo(() => cartItems.map((c) => ({ title: c.title, price: Number(String(c.price || '0').replace(',', '.')), qty: Number(String(c.qty || '1').replace(',', '.')) })), [cartItems]);
   const commissionValid = useMemo(() => isAgent && ((commissionType === 'percent' && Number(commissionValue.replace(',', '.')) >= 0) || (commissionType === 'fixed' && Number(commissionValue.replace(',', '.')) > 0)), [isAgent, commissionType, commissionValue]);
-  const effectiveCart = useMemo(() => {
-    if (!commissionValid) return numericCart;
-    const v = Number(commissionValue.replace(',', '.'));
-    try { return applyAgentCommissionToCart(numericCart, commissionType, v).adjusted; } catch { return numericCart; }
-  }, [numericCart, commissionValid, commissionType, commissionValue]);
   const agentLine = useMemo(() => {
-    if (!commissionValid || effectiveCart.length === 0) return null;
+    if (!commissionValid || numericCart.length === 0) return null;
     const T = numericCart.reduce((s, r) => s + r.price * r.qty, 0);
     const v = Number(commissionValue.replace(',', '.'));
     const A = commissionType === 'percent' ? T * (v / 100) : v;
     const agentAmount = Math.round((Math.min(Math.max(A, 0), T) + Number.EPSILON) * 100) / 100;
     return { title: 'Услуги агента', price: agentAmount, qty: 1 };
-  }, [commissionValid, commissionType, commissionValue, numericCart, effectiveCart.length]);
+  }, [commissionValid, commissionType, commissionValue, numericCart]);
 
   const totalCart = useMemo(() => {
     if (mode !== 'cart') return 0;
-    return effectiveCart.reduce((s, r) => s + r.price * r.qty, 0);
-  }, [mode, effectiveCart]);
+    // cartItems в ссылке уже пониженные — сумма по ним
+    return numericCart.reduce((s, r) => s + r.price * r.qty, 0);
+  }, [mode, numericCart]);
 
   const onSave = async () => {
     try {
@@ -249,9 +245,8 @@ export default function EditLinkPage(props: { params: Promise<{ code: string }> 
                       {idx===0 ? (<div className="text-xs text-gray-500 mb-1">Цена, ₽</div>) : null}
                       {(() => {
                         const baseNum = Number(String(row.price || '0').replace(',', '.'));
-                        const shownNum = (commissionValid && editingPriceIdx !== idx && effectiveCart[idx]) ? Number(effectiveCart[idx].price || 0) : baseNum;
                         const shownStr = (commissionValid && editingPriceIdx !== idx)
-                          ? shownNum.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2, useGrouping: false })
+                          ? baseNum.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2, useGrouping: false })
                           : String(row.price || '').replace('.', ',');
                         return (
                           <input
