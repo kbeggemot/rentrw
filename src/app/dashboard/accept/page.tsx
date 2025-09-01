@@ -622,7 +622,10 @@ function AcceptPaymentContent() {
 
   return (
     <div className="max-w-2xl mx-auto">
-      <h1 className="text-2xl font-bold mb-4">Принять оплату</h1>
+      <div className="flex items-center justify-between mb-4">
+        <h1 className="text-2xl font-bold">Принять оплату</h1>
+        <a href="/dashboard" className="p-2 rounded hover:bg-gray-50 dark:hover:bg-gray-900" aria-label="Закрыть">✕</a>
+      </div>
       <form onSubmit={handleSubmit} className="space-y-4">
         {collapsed ? (
           <div className="flex items-center justify-between p-3 border rounded bg-white dark:bg-gray-950">
