@@ -98,9 +98,9 @@ export default function EditLinkPage(props: { params: Promise<{ code: string }> 
   const numericCart = useMemo(() => cartItems.map((c) => ({ title: c.title, price: Number(String(c.price || '0').replace(',', '.')), qty: Number(String(c.qty || '1').replace(',', '.')) })), [cartItems]);
   const commissionValid = useMemo(() => isAgent && ((commissionType === 'percent' && Number(commissionValue.replace(',', '.')) >= 0) || (commissionType === 'fixed' && Number(commissionValue.replace(',', '.')) > 0)), [isAgent, commissionType, commissionValue]);
   const shouldApplyDisplayAdjustment = useMemo(() => {
-    // Понижаем цены для отображения только когда включили агентскую продажу на странице,
-    // где изначально её не было (чтобы не понижать повторно сохранённые значения)
-    return commissionValid && initialIsAgent === false;
+    // Понижаем цены для отображения, если агент включён сейчас и ссылка изначально была без агента
+    // (или исходное состояние ещё не успело загрузиться).
+    return commissionValid && initialIsAgent !== true;
   }, [commissionValid, initialIsAgent]);
   const adjustedForDisplay = useMemo(() => {
     if (!shouldApplyDisplayAdjustment) return numericCart;
