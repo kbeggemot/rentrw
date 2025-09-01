@@ -17,6 +17,10 @@ export async function GET(req: Request) {
       const txt = await readText('.data/ofd_audit.log');
       return new NextResponse(txt || '', { status: 200, headers: { 'Content-Type': 'text/plain; charset=utf-8' } });
     }
+    if (type === 's3') {
+      const txt = await readText('.data/s3_io.log');
+      return new NextResponse(txt || '', { status: 200, headers: { 'Content-Type': 'text/plain; charset=utf-8' } });
+    }
     return new NextResponse('', { status: 200, headers: { 'Content-Type': 'text/plain; charset=utf-8' } });
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'Server error';
