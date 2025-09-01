@@ -334,16 +334,18 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
     if (!(Array.isArray(cart) && cart.length > 0)) return cart;
     if (!data?.isAgent || !data.commissionType || typeof data.commissionValue !== 'number') return cart;
     try {
-      const adjusted = applyAgentCommissionToCart(
-        cart.map((i) => ({ title: i.title, price: Number(i.price || 0), qty: Number(i.qty || 0) })),
-        data.commissionType as any,
-        Number(data.commissionValue)
-      ).adjusted;
+      // ВСЕГДА считать от оригинальных цен: заменяем текущие price на исходные из data.cartItems
+      const original = cart.map((i, idx) => ({
+        title: i.title,
+        price: Number((data.cartItems && data.cartItems[idx] ? data.cartItems[idx].price : i.price) || 0),
+        qty: Number(i.qty || 0),
+      }));
+      const adjusted = applyAgentCommissionToCart(original, data.commissionType as any, Number(data.commissionValue)).adjusted;
       return adjusted.map((a, i) => ({ ...cart[i], price: a.price }));
     } catch {
       return cart;
     }
-  }, [cart, data?.isAgent, data?.commissionType, data?.commissionValue]);
+  }, [cart, data?.isAgent, data?.commissionType, data?.commissionValue, data?.cartItems]);
 
   const canPay = useMemo(() => {
     if (!data) return false;

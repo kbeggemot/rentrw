@@ -593,6 +593,7 @@ function AcceptPaymentContent() {
           if (mode === 'cart') {
             const payload: any = { cart: cartNumeric };
             if (isAgentSale && commissionType && Number.isFinite(numComm)) {
+              // Всегда считать от оригинальных цен (cartNumeric уже отражает исходные price, qty)
               const adj = applyAgentCommissionToCart(cartNumeric, commissionType, numComm);
               payload.cart = adj.adjusted;
             }
@@ -704,6 +705,7 @@ function AcceptPaymentContent() {
                         const base = String(row.price || '').replace('.', ',');
                         const v = Number(commission.replace(',', '.'));
                         const commissionValid = isAgentSale && ((commissionType === 'percent' && v >= 0) || (commissionType === 'fixed' && v > 0));
+                        // Пересчитываем от исходных цен при каждом изменении qty/price
                         const numeric = cart.map((c) => ({ title: c.title, price: Number(String(c.price || '0').replace(',', '.')), qty: Number(String(c.qty || '1').replace(',', '.')) }));
                         const adjusted = commissionValid ? applyAgentCommissionToCart(numeric, commissionType, v).adjusted : numeric;
                         const shown = commissionValid ? (adjusted[idx]?.price ?? Number(String(row.price||'0').replace(',', '.'))) : Number(String(row.price||'0').replace(',', '.'));
@@ -753,6 +755,7 @@ function AcceptPaymentContent() {
               <button type="button" className="px-3 h-9 rounded border" onClick={()=> setCart((prev)=> [...prev, { id:'', title:'', price:'', qty:'1' }])}>+ Добавить</button>
               {(() => {
                 const toNum = (v: string) => Number(String(v || '0').replace(',', '.'));
+                // Считаем от оригинальных цен (numeric)
                 const numeric = cart.map((c) => ({ price: toNum(c.price), qty: toNum(c.qty || '1') }));
                 const v = Number(commission.replace(',', '.'));
                 const commissionValidLocal = isAgentSale && ((commissionType === 'percent' && v >= 0) || (commissionType === 'fixed' && v > 0));
