@@ -1,6 +1,7 @@
 "use client";
 
 import { use, useEffect, useMemo, useState } from 'react';
+import { applyAgentCommissionToCart } from '@/lib/pricing';
 import { Button } from '@/components/ui/Button';
 
 export default function EditLinkPage(props: { params: Promise<{ code: string }> }) {
@@ -31,6 +32,7 @@ export default function EditLinkPage(props: { params: Promise<{ code: string }> 
 
   // Cart specific
   const [cartItems, setCartItems] = useState<Array<{ id?: string | null; title: string; price: string; qty: string }>>([]);
+  const [editingPriceIdx, setEditingPriceIdx] = useState<number | null>(null);
   const [allowCartAdjust, setAllowCartAdjust] = useState(false);
   const [cartDisplay, setCartDisplay] = useState<'grid' | 'list'>('list');
 
@@ -91,10 +93,26 @@ export default function EditLinkPage(props: { params: Promise<{ code: string }> 
     })();
   }, []);
 
+  const numericCart = useMemo(() => cartItems.map((c) => ({ title: c.title, price: Number(String(c.price || '0').replace(',', '.')), qty: Number(String(c.qty || '1').replace(',', '.')) })), [cartItems]);
+  const commissionValid = useMemo(() => isAgent && ((commissionType === 'percent' && Number(commissionValue.replace(',', '.')) >= 0) || (commissionType === 'fixed' && Number(commissionValue.replace(',', '.')) > 0)), [isAgent, commissionType, commissionValue]);
+  const effectiveCart = useMemo(() => {
+    if (!commissionValid) return numericCart;
+    const v = Number(commissionValue.replace(',', '.'));
+    try { return applyAgentCommissionToCart(numericCart, commissionType, v).adjusted; } catch { return numericCart; }
+  }, [numericCart, commissionValid, commissionType, commissionValue]);
+  const agentLine = useMemo(() => {
+    if (!commissionValid || effectiveCart.length === 0) return null;
+    const T = numericCart.reduce((s, r) => s + r.price * r.qty, 0);
+    const v = Number(commissionValue.replace(',', '.'));
+    const A = commissionType === 'percent' ? T * (v / 100) : v;
+    const agentAmount = Math.round((Math.min(Math.max(A, 0), T) + Number.EPSILON) * 100) / 100;
+    return { title: 'Услуги агента', price: agentAmount, qty: 1 };
+  }, [commissionValid, commissionType, commissionValue, numericCart, effectiveCart.length]);
+
   const totalCart = useMemo(() => {
     if (mode !== 'cart') return 0;
-    return cartItems.reduce((s, r) => s + Number(String(r.price || '0').replace(',', '.')) * Number(String(r.qty || '1').replace(',', '.')), 0);
-  }, [mode, cartItems]);
+    return effectiveCart.reduce((s, r) => s + r.price * r.qty, 0);
+  }, [mode, effectiveCart]);
 
   const onSave = async () => {
     try {
@@ -229,7 +247,23 @@ export default function EditLinkPage(props: { params: Promise<{ code: string }> 
                     </div>
                     <div>
                       {idx===0 ? (<div className="text-xs text-gray-500 mb-1">Цена, ₽</div>) : null}
-                      <input className="w-24 sm:w-28 rounded border px-2 h-9 text-sm" placeholder="Цена" value={String(row.price||'').replace('.', ',')} onChange={(e)=> setCartItems((prev)=> prev.map((r,i)=> i===idx ? { ...r, price: e.target.value.replace(',', '.') } : r))} />
+                      {(() => {
+                        const baseNum = Number(String(row.price || '0').replace(',', '.'));
+                        const shownNum = (commissionValid && editingPriceIdx !== idx && effectiveCart[idx]) ? Number(effectiveCart[idx].price || 0) : baseNum;
+                        const shownStr = (commissionValid && editingPriceIdx !== idx)
+                          ? shownNum.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2, useGrouping: false })
+                          : String(row.price || '').replace('.', ',');
+                        return (
+                          <input
+                            className="w-24 sm:w-28 rounded border px-2 h-9 text-sm"
+                            placeholder="Цена"
+                            value={shownStr}
+                            onFocus={() => setEditingPriceIdx(idx)}
+                            onBlur={() => setEditingPriceIdx(null)}
+                            onChange={(e)=> setCartItems((prev)=> prev.map((r,i)=> i===idx ? { ...r, price: e.target.value.replace(',', '.') } : r))}
+                          />
+                        );
+                      })()}
                     </div>
                     <div className="flex flex-col">
                       {idx===0 ? (<div className="text-xs mb-1 invisible">label</div>) : null}
@@ -238,6 +272,24 @@ export default function EditLinkPage(props: { params: Promise<{ code: string }> 
                   </div>
                 </div>
               ))}
+              {agentLine ? (
+                <div className="overflow-x-auto sm:overflow-visible -mx-1 px-1 touch-pan-x">
+                  <div className="flex items-start gap-2 w-max opacity-90">
+                    <div className="relative flex-1 min-w-[8rem] sm:min-w-[14rem]">
+                      <input className="w-full rounded border px-2 h-9 text-sm bg-gray-100" value={agentLine.title} readOnly disabled />
+                    </div>
+                    <div>
+                      <input className="w-16 sm:w-20 rounded border px-2 h-9 text-sm bg-gray-100" value="1" readOnly disabled />
+                    </div>
+                    <div>
+                      <input className="w-24 sm:w-28 rounded border px-2 h-9 text-sm bg-gray-100" value={agentLine.price.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2, useGrouping: false })} readOnly disabled />
+                    </div>
+                    <div className="flex flex-col">
+                      <button type="button" className="px-2 h-9 rounded border text-gray-400" disabled>Удалить</button>
+                    </div>
+                  </div>
+                </div>
+              ) : null}
               <button type="button" className="px-3 h-9 rounded border" onClick={() => setCartItems((prev) => [...prev, { id: '', title: '', price: '', qty: '1' }])}>+ Добавить</button>
               {(() => {
                 const formatted = Number.isFinite(totalCart) ? totalCart.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '';
