@@ -280,13 +280,11 @@ export default function EditLinkPage(props: { params: Promise<{ code: string }> 
                       {idx===0 ? (<div className="text-xs text-gray-500 mb-1">Цена, ₽</div>) : null}
                       {(() => {
                         const baseNum = Number(String(row.price || '0').replace(',', '.'));
-                        const v = Number(commissionValue.replace(',', '.'));
-                        const k = commissionType === 'percent' ? (1 - (v / 100)) : undefined;
-                        const isLiveAdjusted = isAgent && (commissionType === 'fixed' || (commissionType === 'percent' && typeof k === 'number'));
-                        const shownNum = (isLiveAdjusted && editingPriceIdx !== idx)
-                          ? (commissionType === 'percent' ? (baseNum * (k ?? 1)) : Math.max(baseNum - v, 0))
+                        const shouldAdjustNow = shouldApplyDisplayAdjustment; // понижаем только если агент включён сейчас (а не был сохранён ранее)
+                        const shownNum = (shouldAdjustNow && editingPriceIdx !== idx)
+                          ? (adjustedForDisplay[idx]?.price ?? baseNum)
                           : baseNum;
-                        const shownStr = (isLiveAdjusted && editingPriceIdx !== idx)
+                        const shownStr = (shouldAdjustNow && editingPriceIdx !== idx)
                           ? shownNum.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2, useGrouping: false })
                           : String(row.price || '').replace('.', ',');
                         return (
