@@ -787,6 +787,7 @@ function AcceptPaymentContent() {
           </div>
         </div>
         <div>
+          <div className="text-base font-semibold mb-1">Принимаете оплату как Агент?</div>
           <label className="inline-flex items-center gap-2 text-sm">
             <input
               type="checkbox"
