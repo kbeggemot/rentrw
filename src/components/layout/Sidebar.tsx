@@ -49,6 +49,19 @@ export function Sidebar() {
           Продажи
         </Link>
         <Link
+          href="/products"
+          onMouseDown={() => setPressedHref('/products')}
+          onTouchStart={() => setPressedHref('/products')}
+          prefetch={false}
+          className={`px-3 py-2 rounded-md text-sm w-full text-left transition-colors ${
+            isActive('/products') || pressedHref === '/products'
+              ? 'bg-gray-100 dark:bg-gray-900 font-medium'
+              : 'hover:bg-gray-50 dark:hover:bg-gray-900 active:bg-gray-100 active:dark:bg-gray-900'
+          }`}
+        >
+          Витрина
+        </Link>
+        <Link
           href="/partners"
           onMouseDown={() => setPressedHref('/partners')}
           onTouchStart={() => setPressedHref('/partners')}
@@ -60,6 +73,19 @@ export function Sidebar() {
           }`}
         >
           Партнёры
+        </Link>
+        <Link
+          href="/link"
+          onMouseDown={() => setPressedHref('/link')}
+          onTouchStart={() => setPressedHref('/link')}
+          prefetch={false}
+          className={`px-3 py-2 rounded-md text-sm w-full text-left transition-colors ${
+            isActive('/link') || pressedHref === '/link'
+              ? 'bg-gray-100 dark:bg-gray-900 font-medium'
+              : 'hover:bg-gray-50 dark:hover:bg-gray-900 active:bg-gray-100 active:dark:bg-gray-900'
+          }`}
+        >
+          Страницы
         </Link>
         <Link
           href="/settings?view=1"
