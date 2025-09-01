@@ -262,11 +262,12 @@ export default function EditLinkPage(props: { params: Promise<{ code: string }> 
                       {idx===0 ? (<div className="text-xs text-gray-500 mb-1">Цена, ₽</div>) : null}
                       {(() => {
                         const baseNum = Number(String(row.price || '0').replace(',', '.'));
-                        const displayNum = (shouldApplyDisplayAdjustment && editingPriceIdx !== idx)
+                        const isLiveAdjusted = shouldApplyDisplayAdjustment || initialIsAgent === true;
+                        const shownNum = (isLiveAdjusted && editingPriceIdx !== idx)
                           ? (adjustedForDisplay[idx]?.price ?? baseNum)
                           : baseNum;
-                        const shownStr = (shouldApplyDisplayAdjustment && editingPriceIdx !== idx)
-                          ? displayNum.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2, useGrouping: false })
+                        const shownStr = (isLiveAdjusted && editingPriceIdx !== idx)
+                          ? shownNum.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2, useGrouping: false })
                           : String(row.price || '').replace('.', ',');
                         return (
                           <input
@@ -309,7 +310,8 @@ export default function EditLinkPage(props: { params: Promise<{ code: string }> 
               {(() => {
                 const v = Number(commissionValue.replace(',', '.'));
                 const commissionValidLocal = isAgent && ((commissionType === 'percent' && v >= 0) || (commissionType === 'fixed' && v > 0));
-                const eff = (commissionValidLocal ? applyAgentCommissionToCart(numericCart, commissionType, v).adjusted : numericCart).reduce((s, r) => s + r.price * r.qty, 0);
+                const base = shouldApplyDisplayAdjustment ? adjustedForDisplay : numericCart;
+                const eff = base.reduce((s, r) => s + r.price * r.qty, 0);
                 const T = numericCart.reduce((s, r) => s + r.price * r.qty, 0);
                 const A = commissionValidLocal ? (commissionType === 'percent' ? T * (v / 100) : v) : 0;
                 const total = eff + A;
