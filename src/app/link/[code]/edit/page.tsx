@@ -15,6 +15,7 @@ export default function EditLinkPage(props: { params: Promise<{ code: string }> 
   const [title, setTitle] = useState('');
   const [method, setMethod] = useState<'any' | 'qr' | 'card'>('any');
   const [isAgent, setIsAgent] = useState(false);
+  const [initialIsAgent, setInitialIsAgent] = useState<boolean | null>(null);
   const [commissionType, setCommissionType] = useState<'percent' | 'fixed'>('percent');
   const [commissionValue, setCommissionValue] = useState('');
   const [partnerPhone, setPartnerPhone] = useState('');
@@ -45,6 +46,7 @@ export default function EditLinkPage(props: { params: Promise<{ code: string }> 
         setTitle(d.title || '');
         setMethod(d.method || 'any');
         setIsAgent(!!d.isAgent);
+        setInitialIsAgent(!!d.isAgent);
         setCommissionType((d.commissionType === 'fixed' || d.commissionType === 'percent') ? d.commissionType : 'percent');
         setCommissionValue(d.commissionValue != null ? String(d.commissionValue) : '');
         setPartnerPhone(d.partnerPhone || '');
@@ -95,6 +97,16 @@ export default function EditLinkPage(props: { params: Promise<{ code: string }> 
 
   const numericCart = useMemo(() => cartItems.map((c) => ({ title: c.title, price: Number(String(c.price || '0').replace(',', '.')), qty: Number(String(c.qty || '1').replace(',', '.')) })), [cartItems]);
   const commissionValid = useMemo(() => isAgent && ((commissionType === 'percent' && Number(commissionValue.replace(',', '.')) >= 0) || (commissionType === 'fixed' && Number(commissionValue.replace(',', '.')) > 0)), [isAgent, commissionType, commissionValue]);
+  const shouldApplyDisplayAdjustment = useMemo(() => {
+    // Понижаем цены для отображения только когда включили агентскую продажу на странице,
+    // где изначально её не было (чтобы не понижать повторно сохранённые значения)
+    return commissionValid && initialIsAgent === false;
+  }, [commissionValid, initialIsAgent]);
+  const adjustedForDisplay = useMemo(() => {
+    if (!shouldApplyDisplayAdjustment) return numericCart;
+    const v = Number(commissionValue.replace(',', '.'));
+    try { return applyAgentCommissionToCart(numericCart, commissionType, v).adjusted; } catch { return numericCart; }
+  }, [shouldApplyDisplayAdjustment, numericCart, commissionType, commissionValue]);
   const agentLine = useMemo(() => {
     if (!commissionValid || numericCart.length === 0) return null;
     const T = numericCart.reduce((s, r) => s + r.price * r.qty, 0);
@@ -106,9 +118,14 @@ export default function EditLinkPage(props: { params: Promise<{ code: string }> 
 
   const totalCart = useMemo(() => {
     if (mode !== 'cart') return 0;
-    // cartItems в ссылке уже пониженные — сумма по ним
-    return numericCart.reduce((s, r) => s + r.price * r.qty, 0);
-  }, [mode, numericCart]);
+    const v = Number(commissionValue.replace(',', '.'));
+    const commissionValidLocal = isAgent && ((commissionType === 'percent' && v >= 0) || (commissionType === 'fixed' && v > 0));
+    const effBase = shouldApplyDisplayAdjustment ? adjustedForDisplay : numericCart;
+    const eff = effBase.reduce((s, r) => s + r.price * r.qty, 0);
+    const T = numericCart.reduce((s, r) => s + r.price * r.qty, 0);
+    const A = commissionValidLocal ? (commissionType === 'percent' ? T * (v / 100) : v) : 0;
+    return eff + A;
+  }, [mode, adjustedForDisplay, shouldApplyDisplayAdjustment, numericCart, isAgent, commissionType, commissionValue]);
 
   const onSave = async () => {
     try {
@@ -245,8 +262,11 @@ export default function EditLinkPage(props: { params: Promise<{ code: string }> 
                       {idx===0 ? (<div className="text-xs text-gray-500 mb-1">Цена, ₽</div>) : null}
                       {(() => {
                         const baseNum = Number(String(row.price || '0').replace(',', '.'));
-                        const shownStr = (commissionValid && editingPriceIdx !== idx)
-                          ? baseNum.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2, useGrouping: false })
+                        const displayNum = (shouldApplyDisplayAdjustment && editingPriceIdx !== idx)
+                          ? (adjustedForDisplay[idx]?.price ?? baseNum)
+                          : baseNum;
+                        const shownStr = (shouldApplyDisplayAdjustment && editingPriceIdx !== idx)
+                          ? displayNum.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2, useGrouping: false })
                           : String(row.price || '').replace('.', ',');
                         return (
                           <input
