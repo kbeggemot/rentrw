@@ -753,11 +753,13 @@ function AcceptPaymentContent() {
               <button type="button" className="px-3 h-9 rounded border" onClick={()=> setCart((prev)=> [...prev, { id:'', title:'', price:'', qty:'1' }])}>+ Добавить</button>
               {(() => {
                 const toNum = (v: string) => Number(String(v || '0').replace(',', '.'));
-                const total = cart.reduce((sum, r) => {
-                  const price = toNum(r.price); const qty = toNum(r.qty || '1');
-                  if (!Number.isFinite(price) || !Number.isFinite(qty)) return sum;
-                  return sum + price * qty;
-                }, 0);
+                const numeric = cart.map((c) => ({ price: toNum(c.price), qty: toNum(c.qty || '1') }));
+                const v = Number(commission.replace(',', '.'));
+                const commissionValidLocal = isAgentSale && ((commissionType === 'percent' && v >= 0) || (commissionType === 'fixed' && v > 0));
+                const eff = (commissionValidLocal ? applyAgentCommissionToCart(numeric.map(x=>({ title:'', ...x })), commissionType, v).adjusted : numeric.map(x=>({ title:'', ...x }))).reduce((s,r)=> s + r.price * r.qty, 0);
+                const T = numeric.reduce((s,r)=> s + r.price * r.qty, 0);
+                const A = commissionValidLocal ? (commissionType === 'percent' ? T * (v / 100) : v) : 0;
+                const total = eff + A;
                 const formatted = Number.isFinite(total) ? total.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '';
                 return (
                   <div className="mt-2">

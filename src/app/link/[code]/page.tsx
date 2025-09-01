@@ -305,26 +305,30 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
   const mskToday = () => new Date().toLocaleDateString('ru-RU', { timeZone: 'Europe/Moscow' }).split('.').reverse().join('-');
   const isValidEmail = (s: string) => /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/.test(s.trim());
 
-  const cartTotal = useMemo(() => {
-    if (!(Array.isArray(cart) && cart.length > 0)) return null;
-    let items = cart.map((i) => ({ title: i.title, price: Number(i.price || 0), qty: Number(i.qty || 0) }));
-    if (data?.isAgent && data.commissionType && typeof data.commissionValue === 'number') {
-      try {
-        items = applyAgentCommissionToCart(items, data.commissionType as any, Number(data.commissionValue)).adjusted;
-      } catch {}
-    }
-    const total = items.reduce((s, r) => s + (Number(r.price || 0) * Number(r.qty || 0)), 0);
+  // adjusted (displayed) sum of items
+  const cartAdjustedSum = useMemo(() => {
+    if (!(Array.isArray(cart) && cart.length > 0)) return 0;
+    const total = cart.reduce((s, r) => s + (Number(r.price || 0) * Number(r.qty || 0)), 0);
     return Number.isFinite(total) ? total : 0;
   }, [cart]);
 
+  function round2(n: number): number { return Math.round((n + Number.EPSILON) * 100) / 100; }
   const agentLine = useMemo(() => {
     if (!data?.isAgent || !Array.isArray(cart) || cart.length === 0 || !data.commissionType || typeof data.commissionValue !== 'number') return null;
-    const rawTotal = cart.reduce((s, r) => s + (Number(r.price || 0) * Number(r.qty || 0)), 0);
-    if (!(rawTotal > 0)) return null;
-    const amt = data.commissionType === 'percent' ? rawTotal * (Number(data.commissionValue) / 100) : Number(data.commissionValue);
-    const agentAmount = Math.round((Math.min(Math.max(amt, 0), rawTotal) + Number.EPSILON) * 100) / 100;
-    return { title: data.agentDescription || 'Услуги агента', price: agentAmount, qty: 1 };
-  }, [data?.isAgent, data?.commissionType, data?.commissionValue, data?.agentDescription, cart]);
+    const S = cartAdjustedSum; // adjusted sum currently отображаемых цен
+    if (!(S > 0)) return null;
+    let A = 0;
+    if (data.commissionType === 'percent') {
+      const p = Number(data.commissionValue) / 100;
+      const K = 1 - p; // S = K * T
+      if (K <= 0) return null;
+      A = round2(S * (1 / K - 1)); // A = T - S = S*(1/K - 1)
+    } else {
+      A = round2(Number(data.commissionValue));
+    }
+    if (!(A > 0)) return { title: data.agentDescription || 'Услуги агента', price: 0, qty: 1 };
+    return { title: data.agentDescription || 'Услуги агента', price: A, qty: 1 };
+  }, [data?.isAgent, data?.commissionType, data?.commissionValue, data?.agentDescription, cartAdjustedSum, cart]);
 
   const effectiveCart = useMemo(() => {
     if (!(Array.isArray(cart) && cart.length > 0)) return cart;
@@ -343,14 +347,14 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
 
   const canPay = useMemo(() => {
     if (!data) return false;
-    const isCartMode = Array.isArray(cart) && cart.length > 0 && cartTotal != null;
-    const n = isCartMode ? Number(cartTotal) : Number((data.sumMode === 'fixed' ? (data.amountRub ?? 0) : Number(amount.replace(',', '.'))));
+    const isCartMode = Array.isArray(cart) && cart.length > 0;
+    const n = isCartMode ? (cartAdjustedSum + (agentLine ? agentLine.price : 0)) : Number((data.sumMode === 'fixed' ? (data.amountRub ?? 0) : Number(amount.replace(',', '.'))));
     if (!Number.isFinite(n) || n <= 0) return false;
     const minOk = data.isAgent
       ? (n - (data.commissionType === 'percent' ? n * (Number(data.commissionValue || 0) / 100) : Number(data.commissionValue || 0))) >= 10
       : n >= 10;
     return minOk && isValidEmail(email);
-  }, [data, amount, email, cartTotal, cart]);
+  }, [data, amount, email, cartAdjustedSum, agentLine, cart]);
 
   // Validate before pay with detailed messages
   const validateBeforePay = (): boolean => {
@@ -360,7 +364,7 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
         const badQty = cart.some((i) => !Number.isFinite(Number(i.qty)) || Number(i.qty) <= 0);
         if (badQty) { showToast('Ошибка суммы: количество должно быть больше нуля'); return false; }
       }
-      const total = Number(cartTotal || 0);
+      const total = Number(cartAdjustedSum + (agentLine ? agentLine.price : 0));
       if (!(total > 0)) { showToast('Ошибка суммы: итоговая сумма должна быть больше нуля'); return false; }
     } else if (data.sumMode === 'custom') {
       const n = Number(String(amount || '0').replace(',', '.'));
@@ -524,8 +528,8 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
         }
       }
       
-      const isCartMode = Array.isArray(cart) && cart.length > 0 && cartTotal != null;
-      const amountNum = isCartMode ? Number(cartTotal) : (data.sumMode === 'fixed' ? (data.amountRub || 0) : Number(amount.replace(',', '.')));
+      const isCartMode = Array.isArray(cart) && cart.length > 0;
+      const amountNum = isCartMode ? Number(cartAdjustedSum + (agentLine ? agentLine.price : 0)) : (data.sumMode === 'fixed' ? (data.amountRub || 0) : Number(amount.replace(',', '.')));
       const body: any = {
         amountRub: amountNum,
         description: data.description,
@@ -711,7 +715,7 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
             ) : null}
             <div className="mt-2">
               <label className="block text-sm text-gray-600 mb-1">Итоговая сумма, ₽</label>
-              <input className="w-40 rounded-lg border px-2 h-9 text-sm bg-gray-100 text-black dark:bg-gray-800 dark:text-white" value={(cartTotal || 0).toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} readOnly />
+              <input className="w-40 rounded-lg border px-2 h-9 text-sm bg-gray-100 text-black dark:bg-gray-800 dark:text-white" value={(() => { const S = cartAdjustedSum; const A = agentLine ? agentLine.price : 0; const total = S + A; return total.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); })()} readOnly />
             </div>
             {/* Фуллскрин просмотрщик */}
             {viewer.open ? (

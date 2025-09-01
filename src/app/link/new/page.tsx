@@ -420,7 +420,7 @@ export default function NewLinkStandalonePage() {
                 <div className="mt-2">
                   <label className="block text-sm text-gray-700 dark:text-gray-300 mb-1">Сумма, ₽</label>
                   <div className="w-44">
-                    <input className="w-full rounded border pl-2 h-9 text-sm bg-gray-100 dark:bg-gray-900 dark:border-gray-700" value={(() => { const T = cartNumeric.reduce((s,r)=> s + r.price*r.qty, 0); return Number.isFinite(T) ? T.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : ''; })()} readOnly disabled />
+                    <input className="w-full rounded border pl-2 h-9 text-sm bg-gray-100 dark:bg-gray-900 dark:border-gray-700" value={(() => { const eff = effectiveCart.reduce((s,r)=> s + Number(r.price||0)*Number(r.qty||0), 0); const A = agentLine ? agentLine.price : 0; const total = eff + A; return Number.isFinite(total) ? total.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : ''; })()} readOnly disabled />
                   </div>
                 </div>
                 {agentLine ? (
