@@ -45,6 +45,17 @@ function declineFioGenitive(full: string): string {
   return `${declineSurnameGenitive(parts[0])} ${declineNameGenitive(parts[1])} ${declinePatronymicGenitive(parts[2])}`;
 }
 
+function declineOrgNameGenitive(name: string | null | undefined): string | null {
+  if (!name) return null;
+  const raw = String(name).trim();
+  const m = /^\s*ИП\s+(.+)$/i.exec(raw);
+  if (m) {
+    const gen = declineFioGenitive(m[1].trim());
+    return `ИП ${gen}`;
+  }
+  return raw;
+}
+
 type LinkData = {
   code: string;
   userId: string;
@@ -89,6 +100,7 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
   const [touchStartX, setTouchStartX] = useState<number | null>(null);
   const [touchDeltaX, setTouchDeltaX] = useState(0);
   const [partnerFio, setPartnerFio] = useState<string | null>(null);
+  const orgNameGen = useMemo(() => declineOrgNameGenitive(data?.orgName || null), [data?.orgName]);
 
   const showPrev = () => {
     setFadeIn(false);
@@ -540,9 +552,9 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
       {data.orgName ? (
         <div className="text-sm text-gray-600 mb-4">
           {data.isAgent && data.partnerPhone ? (
-            <span>Оплата для {partnerFio || 'партнёра'}, через {data.orgName}</span>
+            <span>Оплата для {partnerFio || 'партнёра'}, через {orgNameGen || data.orgName}</span>
           ) : (
-            <span>Оплата в пользу {data.orgName}</span>
+            <span>Оплата в пользу {orgNameGen || data.orgName}</span>
           )}
         </div>
       ) : null}
