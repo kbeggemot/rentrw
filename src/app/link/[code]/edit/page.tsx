@@ -119,20 +119,25 @@ export default function EditLinkPage(props: { params: Promise<{ code: string }> 
   const displayFromStored = useMemo(() => {
     if (!commissionValid) return numericCart;
     const v = Number(commissionValue.replace(',', '.'));
-    const effSaved = numericCart.reduce((s, r) => s + r.price * r.qty, 0);
-    let effTarget: number | null = null;
+    // If initialTotal (T) known, compute per-item lowered prices proportionally to T - A
     if (initialTotal != null && Number.isFinite(initialTotal)) {
-      if (commissionType === 'percent') effTarget = initialTotal * (1 - v / 100);
-      else effTarget = Math.max(initialTotal - v, 0);
-    } else {
-      if (commissionType === 'percent') {
-        const k = 1 - v / 100; if (k > 0) effTarget = effSaved / k; // reverse one step
+      const A = commissionType === 'percent' ? initialTotal * (v / 100) : v;
+      const effTarget = Math.max(initialTotal - A, 0);
+      const effSaved = numericCart.reduce((s, r) => s + r.price * r.qty, 0);
+      if (effSaved <= 0) return numericCart;
+      const factor = effTarget / effSaved;
+      const round2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
+      return numericCart.map((i) => ({ ...i, price: round2(i.price * factor) }));
+    }
+    // Fallback: if T unknown and percent — recover original via k; fixed cannot be recovered reliably without T
+    if (commissionType === 'percent') {
+      const k = 1 - v / 100;
+      if (k > 0) {
+        // original sum T = effSaved / k → share to items proportionally
+        return numericCart.map((i) => ({ ...i, price: Math.round(((i.price / k) + Number.EPSILON) * 100) / 100 }));
       }
     }
-    if (effTarget == null || !Number.isFinite(effTarget) || effSaved <= 0) return numericCart;
-    const factor = effTarget / effSaved;
-    const round2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
-    return numericCart.map((i) => ({ ...i, price: round2(i.price * factor) }));
+    return numericCart;
   }, [commissionValid, numericCart, commissionType, commissionValue, initialTotal]);
   const agentLine = useMemo(() => {
     if (!commissionValid || numericCart.length === 0) return null;
@@ -305,9 +310,10 @@ export default function EditLinkPage(props: { params: Promise<{ code: string }> 
                       {idx===0 ? (<div className="text-xs text-gray-500 mb-1">Цена, ₽</div>) : null}
                       {(() => {
                         const baseNum = Number(String(row.price || '0').replace(',', '.'));
-                        const shouldAdjustNow = shouldApplyDisplayAdjustment; // понижаем только если агент включён сейчас (а не был сохранён ранее)
+                        const shouldAdjustNow = shouldApplyDisplayAdjustment || (initialIsAgent === true);
+                        const baseForView = initialIsAgent ? displayFromStored : adjustedForDisplay;
                         const shownNum = (shouldAdjustNow && editingPriceIdx !== idx)
-                          ? (adjustedForDisplay[idx]?.price ?? baseNum)
+                          ? (baseForView[idx]?.price ?? baseNum)
                           : baseNum;
                         const shownStr = (shouldAdjustNow && editingPriceIdx !== idx)
                           ? shownNum.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2, useGrouping: false })
