@@ -337,7 +337,7 @@ export default function EditLinkPage(props: { params: Promise<{ code: string }> 
                     </div>
                     <div className="flex flex-col">
                       {idx===0 ? (<div className="text-xs mb-1 invisible">label</div>) : null}
-                      <button type="button" className="px-2 h-9 rounded border" onClick={()=> setCartItems((prev)=> prev.filter((_,i)=> i!==idx))}>Удалить</button>
+                      <button type="button" className="px-2 h-9 rounded border" onClick={()=> { setCartItems((prev)=> prev.filter((_,i)=> i!==idx)); setBaseUnits((b)=> b.filter((_,i)=> i!==idx)); }}>Удалить</button>
                     </div>
                   </div>
                 </div>
@@ -360,7 +360,7 @@ export default function EditLinkPage(props: { params: Promise<{ code: string }> 
                   </div>
                 </div>
               ) : null}
-              <button type="button" className="px-3 h-9 rounded border" onClick={() => setCartItems((prev) => [...prev, { id: '', title: '', price: '', qty: '1' }])}>+ Добавить</button>
+              <button type="button" className="px-3 h-9 rounded border" onClick={() => { setCartItems((prev) => [...prev, { id: '', title: '', price: '', qty: '1' }]); setBaseUnits((b)=> [...b, 0]); }}>+ Добавить</button>
               {(() => {
                 const formatted = Number.isFinite(totalCart) ? totalCart.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '';
                 return (
@@ -400,21 +400,11 @@ export default function EditLinkPage(props: { params: Promise<{ code: string }> 
                 const checked = e.target.checked;
                 setIsAgent(checked);
                 if (!checked) {
-                  // restore original prices when agent flag is off
-                  setCartItems((prev) => {
-                    const v = Number(commissionValue.replace(',', '.'));
-                    if (initialTotal != null && Number.isFinite(initialTotal) && v >= 0) {
-                      const A = commissionType === 'percent' ? initialTotal * (v / 100) : v;
-                      const effTarget = Math.max(initialTotal - A, 0);
-                      const savedEff = prev.reduce((s, r) => s + Number(String(r.price||'0').replace(',', '.')) * Number(String(r.qty||'1').replace(',', '.')), 0);
-                      if (savedEff > 0) {
-                        const factor = initialTotal / savedEff; // scale back to original
-                        const round2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
-                        return prev.map((i) => ({ ...i, price: String(round2(Number(String(i.price||'0').replace(',', '.')) * factor)).replace('.', ',') }));
-                      }
-                    }
-                    return prev;
-                  });
+                  // Restore from baseUnits (массив исходных цен)
+                  setCartItems((prev) => prev.map((it, i) => {
+                    const unit = Number(isFinite(baseUnits[i]) ? baseUnits[i] : Number(String(it.price||'0').replace(',', '.')));
+                    return { ...it, price: String(unit).replace('.', ',') };
+                  }));
                 }
               }} />
               <span>Агентская продажа</span>
