@@ -435,21 +435,14 @@ export default function NewLinkStandalonePage() {
                   <button type="button" className="px-3 h-9 rounded border" onClick={()=> setCart((prev)=> [...prev, { id:'', title:'', price:'', qty:'1' }])}>+ Добавить</button>
                 </div>
                 <div className="text-xs text-gray-600 dark:text-gray-400">Нет нужной позиции? <a className="underline" href="/products/new" target="_blank" onClick={()=> showToast('Откроем создание позиции в новом окне', 'info')}>Создать новую позицию на витрине</a></div>
-                {/* Итоговая сумма по корзине (с учётом агентской) + строка агента */}
+                {/* Итоговая сумма по корзине (с учётом агентской) */}
                 <div className="mt-2">
                   <label className="block text-sm text-gray-700 dark:text-gray-300 mb-1">Сумма, ₽</label>
                   <div className="w-44">
                     <input className="w-full rounded border pl-2 h-9 text-sm bg-gray-100 dark:bg-gray-900 dark:border-gray-700" value={(() => { const eff = effectiveCart.reduce((s,r)=> s + Number(r.price||0)*Number(r.qty||0), 0); const A = agentLine ? agentLine.price : 0; const total = eff + A; return Number.isFinite(total) ? total.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : ''; })()} readOnly disabled />
                   </div>
                 </div>
-                {agentLine ? (
-                  <div className="mt-2 text-sm text-gray-700">
-                    <div className="inline-flex items-center gap-2 rounded border px-2 py-1 bg-gray-50">
-                      <span>{agentLine.title}</span>
-                      <span className="text-gray-500">— {agentLine.price.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₽</span>
-                    </div>
-                  </div>
-                ) : null}
+                {/* Повторную подпись агентской комиссии под суммой убрали */}
               </div>
             )}
           </div>
