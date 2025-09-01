@@ -624,8 +624,9 @@ function AcceptPaymentContent() {
     <div className="max-w-2xl mx-auto">
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-2xl font-bold">Принять оплату</h1>
-        <a href="/dashboard" className="p-2 rounded hover:bg-gray-50 dark:hover:bg-gray-900" aria-label="Закрыть">✕</a>
+        <a href="/dashboard" className="rounded hover:bg-gray-50 dark:hover:bg-gray-900" aria-label="Закрыть">✕</a>
       </div>
+      <div className="bg-white dark:bg-gray-950 border border-gray-200 dark:border-gray-800 rounded-lg p-4 shadow-sm">
       <form onSubmit={handleSubmit} className="space-y-4">
         {collapsed ? (
           <div className="flex items-center justify-between p-3 border rounded bg-white dark:bg-gray-950">
@@ -869,26 +870,26 @@ function AcceptPaymentContent() {
           </div>
         ) : null}
         {aoStatus && (aoStatus.toLowerCase() === 'paid' || aoStatus.toLowerCase() === 'transfered' || aoStatus.toLowerCase() === 'transferred') ? (
-          <div className="mt-4 space-y-3">
-            <div className="text-green-700 dark:text-green-400 text-sm">Успешно оплачено</div>
-            <div className="flex gap-2 items-end">
-              <Input label="Чек на покупку" value={purchaseReceiptUrl ?? ''} readOnly placeholder={`Подгружаем${dots}`} className="flex-1" onFocus={(e) => e.currentTarget.select()} />
+          <div className="mt-4">
+            <div className="text-green-700 font-medium mb-2">Успешно оплачено</div>
+            <div className="grid grid-cols-[9rem_1fr] gap-y-2 text-sm">
+              <div className="text-gray-500">Чек на покупку</div>
               {purchaseReceiptUrl ? (
-                <Button type="button" variant="secondary" onClick={async () => { try { if (purchaseReceiptUrl) await navigator.clipboard.writeText(purchaseReceiptUrl); showToast('Ссылка скопирована', 'success'); } catch { showToast('Не удалось скопировать', 'error'); } }}>Копировать</Button>
+                <a className="text-black dark:text-white font-semibold hover:underline" href={purchaseReceiptUrl} target="_blank" rel="noreferrer">Открыть</a>
               ) : (
-                <div className="w-9 h-9 flex items-center justify-center"><span className="inline-block w-4 h-4 rounded-full border-2 border-gray-300 border-t-gray-600 animate-spin" /></div>
+                <div className="text-gray-600">Подгружаем{dots}</div>
               )}
+              {taskIsAgent ? (
+                <>
+                  <div className="text-gray-500">Чек на комиссию</div>
+                  {commissionReceiptUrl ? (
+                    <a className="text-black dark:text-white font-semibold hover:underline" href={commissionReceiptUrl} target="_blank" rel="noreferrer">Открыть</a>
+                  ) : (
+                    <div className="text-gray-600">Подгружаем{dots}</div>
+                  )}
+                </>
+              ) : null}
             </div>
-            {taskIsAgent ? (
-              <div className="flex gap-2 items-end">
-                <Input label="Чек на комиссию" value={commissionReceiptUrl ?? ''} readOnly placeholder={`Подгружаем${dots}`} className="flex-1" onFocus={(e) => e.currentTarget.select()} />
-                {commissionReceiptUrl ? (
-                  <Button type="button" variant="secondary" onClick={async () => { try { if (commissionReceiptUrl) await navigator.clipboard.writeText(commissionReceiptUrl); showToast('Ссылка скопирована', 'success'); } catch { showToast('Не удалось скопировать', 'error'); } }}>Копировать</Button>
-                ) : (
-                  <div className="w-9 h-9 flex items-center justify-center"><span className="inline-block w-4 h-4 rounded-full border-2 border-gray-300 border-t-gray-600 animate-spin" /></div>
-                )}
-              </div>
-            ) : null}
           </div>
         ) : null}
         {loading ? (
@@ -928,6 +929,7 @@ function AcceptPaymentContent() {
           <div className={`mt-2 text-sm ${messageKind === 'error' ? 'text-red-600' : messageKind === 'success' ? 'text-green-600' : 'text-gray-700 dark:text-gray-300'}`}>{message}</div>
         ) : null}
       </form>
+      </div>
       {toast ? (
         <div className={`fixed bottom-4 right-4 z-50 px-4 py-3 rounded-md shadow-lg text-sm ${toast.kind === 'success' ? 'bg-green-600 text-white' : toast.kind === 'error' ? 'bg-red-600 text-white' : 'bg-gray-900 text-white'}`}>{toast.msg}</div>
       ) : null}

@@ -286,7 +286,7 @@ export default function DashboardClient({ hasTokenInitial }: { hasTokenInitial: 
           </div>
 
           {/* Permanent links block */}
-          <div className="mt-4">
+          <div className="hidden">
             <Button
               variant="secondary"
               className="text-base w-full"
@@ -425,44 +425,44 @@ export default function DashboardClient({ hasTokenInitial }: { hasTokenInitial: 
                 </div>
               </div>
             ) : null}
+          </div>
 
-            {/* Spoiler for the links list */}
-            <div className="mt-3">
-              <button type="button" className="w-full text-left px-3 py-2 rounded-md hover:bg-gray-50 dark:hover:bg-gray-900 border border-gray-200 dark:border-gray-800 flex items-center justify-between" onClick={async () => { const next = !linksOpen; setLinksOpen(next); if (next && links.length === 0) { await refreshLinks(); } }}>
-                <span className="text-base font-semibold">Мои постоянные ссылки</span>
-                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`${linksOpen ? 'rotate-180' : ''}`}><path d="M6 9l6 6 6-6"/></svg>
-              </button>
-              {linksOpen ? (
-                <div className="mt-2 overflow-x-auto bg-white dark:bg-gray-950 border border-gray-200 dark:border-gray-800 rounded">
-                  {links.length === 0 ? (
-                    <div className="px-3 py-3 text-sm text-gray-500 dark:text-gray-400">Ссылок нет</div>
-                  ) : (
-                    <div className="divide-y divide-gray-100 dark:divide-gray-800">
-                      {links.map((l) => (
-                        <div key={l.code} className="flex items-center justify-between px-3 py-2">
-                          <div className="text-sm"><a className="text-black dark:text-white font-semibold hover:underline" href={`/link/${encodeURIComponent(l.code)}`} target="_blank" rel="noreferrer">{l.title || l.code}</a></div>
-                          <div className="flex items-center gap-2">
-                            <Button variant="secondary" size="icon" aria-label="Скопировать ссылку" onClick={async () => { try { await navigator.clipboard.writeText(new URL(`/link/${encodeURIComponent(l.code)}`, window.location.origin).toString()); showToast('Ссылка скопирована', 'success'); } catch {} }}>
-                              <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                                <rect x="6" y="3" width="7" height="9" rx="1" />
-                                <rect x="3" y="6" width="7" height="9" rx="1" />
-                              </svg>
-                            </Button>
-                            <Button variant="secondary" size="icon" aria-label="Удалить ссылку" onClick={async () => { if (!confirm('Удалить ссылку?')) return; try { await fetch(`/api/links/${encodeURIComponent(l.code)}`, { method: 'DELETE' }); setLinks((prev) => prev.filter((x) => x.code !== l.code)); } catch {} }}>
-                              <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                                <path d="M3 5l1 9h8l1-9" />
-                                <path d="M2 5h12" />
-                                <path d="M6 5V3h4v2" />
-                              </svg>
-                            </Button>
-                          </div>
+          {/* Spoiler for the links list */}
+          <div className="hidden mt-3">
+            <button type="button" className="w-full text-left px-3 py-2 rounded-md hover:bg-gray-50 dark:hover:bg-gray-900 border border-gray-200 dark:border-gray-800 flex items-center justify-between" onClick={async () => { const next = !linksOpen; setLinksOpen(next); if (next && links.length === 0) { await refreshLinks(); } }}>
+              <span className="text-base font-semibold">Мои постоянные ссылки</span>
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`${linksOpen ? 'rotate-180' : ''}`}><path d="M6 9l6 6 6-6"/></svg>
+            </button>
+            {linksOpen ? (
+              <div className="mt-2 overflow-x-auto bg-white dark:bg-gray-950 border border-gray-200 dark:border-gray-800 rounded">
+                {links.length === 0 ? (
+                  <div className="px-3 py-3 text-sm text-gray-500 dark:text-gray-400">Ссылок нет</div>
+                ) : (
+                  <div className="divide-y divide-gray-100 dark:divide-gray-800">
+                    {links.map((l) => (
+                      <div key={l.code} className="flex items-center justify-between px-3 py-2">
+                        <div className="text-sm"><a className="text-black dark:text-white font-semibold hover:underline" href={`/link/${encodeURIComponent(l.code)}`} target="_blank" rel="noreferrer">{l.title || l.code}</a></div>
+                        <div className="flex items-center gap-2">
+                          <Button variant="secondary" size="icon" aria-label="Скопировать ссылку" onClick={async () => { try { await navigator.clipboard.writeText(new URL(`/link/${encodeURIComponent(l.code)}`, window.location.origin).toString()); showToast('Ссылка скопирована', 'success'); } catch {} }}>
+                            <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                              <rect x="6" y="3" width="7" height="9" rx="1" />
+                              <rect x="3" y="6" width="7" height="9" rx="1" />
+                            </svg>
+                          </Button>
+                          <Button variant="secondary" size="icon" aria-label="Удалить ссылку" onClick={async () => { if (!confirm('Удалить ссылку?')) return; try { await fetch(`/api/links/${encodeURIComponent(l.code)}`, { method: 'DELETE' }); setLinks((prev) => prev.filter((x) => x.code !== l.code)); } catch {} }}>
+                            <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                              <path d="M3 5l1 9h8l1-9" />
+                              <path d="M2 5h12" />
+                              <path d="M6 5V3h4v2" />
+                            </svg>
+                          </Button>
                         </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              ) : null}
-            </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ) : null}
           </div>
 
           <div className="mt-6">
