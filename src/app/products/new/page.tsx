@@ -20,6 +20,23 @@ export default function NewProductPage() {
   const [photos, setPhotos] = useState<string[]>([]);
   const [previews, setPreviews] = useState<string[]>([]);
   const [uploading, setUploading] = useState(false);
+  const [viewer, setViewer] = useState<{ open: boolean; photos: string[]; index: number }>({ open: false, photos: [], index: 0 });
+  const [fadeIn, setFadeIn] = useState(true);
+  const [touchStartX, setTouchStartX] = useState<number | null>(null);
+  const [touchDeltaX, setTouchDeltaX] = useState(0);
+
+  const showPrev = () => { setFadeIn(false); setTimeout(() => setFadeIn(true), 20); setViewer((v) => ({ ...v, index: (v.index - 1 + v.photos.length) % v.photos.length })); };
+  const showNext = () => { setFadeIn(false); setTimeout(() => setFadeIn(true), 20); setViewer((v) => ({ ...v, index: (v.index + 1) % v.photos.length })); };
+  useEffect(() => {
+    if (!viewer.open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowLeft') { e.preventDefault(); showPrev(); }
+      else if (e.key === 'ArrowRight') { e.preventDefault(); showNext(); }
+      else if (e.key === 'Escape') { e.preventDefault(); setViewer({ open: false, photos: [], index: 0 }); }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [viewer.open]);
 
   useEffect(() => {
     (async () => {
@@ -174,10 +191,32 @@ export default function NewProductPage() {
             {previews.map((src, idx) => (
               <div key={src} className="relative w-28 h-28 border border-gray-200 dark:border-gray-800 rounded-md overflow-hidden bg-white dark:bg-gray-900">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={src} alt="Фото" className="w-full h-full object-cover cursor-pointer" onClick={() => { try { window.open(src, '_blank'); } catch {} }} />
+                <img src={src} alt="Фото" className="w-full h-full object-cover cursor-pointer" onClick={() => { try { setViewer({ open: true, photos: previews, index: idx }); } catch {} }} />
                 <button type="button" className="absolute top-1 right-1 bg-black/60 text-white rounded p-1" aria-label="Удалить фото" onClick={() => { setPhotos((arr) => arr.filter((_, i) => i !== idx)); const url = previews[idx]; if (url) { try { URL.revokeObjectURL(url); } catch {} } setPreviews((arr) => arr.filter((_, i) => i !== idx)); }}>✕</button>
               </div>
             ))}
+            {viewer.open ? (
+              <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center" onClick={() => setViewer({ open: false, photos: [], index: 0 })}>
+                <div className="relative max-w-[90vw] max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={viewer.photos[viewer.index]}
+                    alt="photo"
+                    className={`max-w-full max-h-[90vh] object-contain transition-opacity duration-300 ${fadeIn ? 'opacity-100' : 'opacity-0'}`}
+                    style={{ transform: `translateX(${touchDeltaX}px)` }}
+                    onTouchStart={(e) => { setTouchStartX(e.touches[0].clientX); setTouchDeltaX(0); }}
+                    onTouchMove={(e) => { if (touchStartX != null) setTouchDeltaX(e.touches[0].clientX - touchStartX); }}
+                    onTouchEnd={() => { const threshold = 50; if (touchDeltaX > threshold) showPrev(); else if (touchDeltaX < -threshold) showNext(); setTouchStartX(null); setTouchDeltaX(0); }}
+                  />
+                  {viewer.photos.length > 1 ? (
+                    <>
+                      <button className="absolute left-2 top-1/2 -translate-y-1/2 bg-white/70 rounded px-2 py-1" onClick={showPrev}>‹</button>
+                      <button className="absolute right-2 top-1/2 -translate-y-1/2 bg-white/70 rounded px-2 py-1" onClick={showNext}>›</button>
+                    </>
+                  ) : null}
+                </div>
+              </div>
+            ) : null}
           </div>
           <p className="text-xs text-gray-500 mt-1">Поддерживаются JPG, PNG, WEBP. До 5 МБ на файл. Можно с камеры.</p>
         </div>
