@@ -330,9 +330,16 @@ export default function EditLinkPage(props: { params: Promise<{ code: string }> 
                 const commissionValidLocal = isAgent && ((commissionType === 'percent' && v >= 0) || (commissionType === 'fixed' && v > 0));
                 const base = shouldApplyDisplayAdjustment ? adjustedForDisplay : numericCart;
                 const eff = base.reduce((s, r) => s + r.price * r.qty, 0);
-                const T = numericCart.reduce((s, r) => s + r.price * r.qty, 0);
-                const A = commissionValidLocal ? (commissionType === 'percent' ? T * (v / 100) : v) : 0;
-                const total = eff + A;
+                let A = 0;
+                if (commissionValidLocal) {
+                  if (commissionType === 'percent') {
+                    const k = 1 - (v / 100);
+                    A = k > 0 ? eff * (1 / k - 1) : 0;
+                  } else {
+                    A = v;
+                  }
+                }
+                const total = eff + (Math.round((A + Number.EPSILON) * 100) / 100);
                 const formatted = Number.isFinite(total) ? total.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '';
                 return (
                   <div className="mt-2">
