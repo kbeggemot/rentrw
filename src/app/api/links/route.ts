@@ -142,10 +142,26 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: msg }, { status: 400 });
       }
     }
-    // If cart + agent: persist adjusted prices into link
+    // If cart + agent: avoid double-lowering.
     if (Array.isArray(cartItems) && cartItems.length > 0 && isAgent && commissionType && commissionValue != null) {
       try {
-        cartItems = applyAgentCommissionToCart(cartItems.map((i:any)=>({ title:i.title, price:Number(i.price||0), qty:Number(i.qty||1) })), commissionType as any, Number(commissionValue)).adjusted as any;
+        const normalized = cartItems.map((i:any)=>({ title:i.title, price:Number(i.price||0), qty:Number(i.qty||1) }));
+        const sumCart = normalized.reduce((s, r)=> s + r.price * r.qty, 0);
+        const p = Number(commissionValue);
+        const eps = 0.01;
+        const hasT = Number.isFinite(Number(amountRub));
+        const T = hasT ? Number(amountRub) : sumCart;
+        const effExpected = commissionType === 'percent' ? (T * (1 - p/100)) : Math.max(T - p, 0);
+        const looksAdjusted = Math.abs(sumCart - effExpected) < eps;
+        const looksOriginal = Math.abs(sumCart - T) < eps;
+        if (looksAdjusted) {
+          cartItems = normalized as any; // already lowered on client
+        } else if (looksOriginal) {
+          cartItems = applyAgentCommissionToCart(normalized, commissionType as any, p).adjusted as any;
+        } else {
+          // ambiguous — prefer no extra adjustment
+          cartItems = normalized as any;
+        }
       } catch {}
     }
     const item = await createPaymentLink(userId, { title, description, sumMode, amountRub: amountRub ?? undefined, vatRate, isAgent, commissionType: commissionType as any, commissionValue: commissionValue ?? undefined, partnerPhone, method, orgInn: inn ?? undefined, preferredCode: preferredCode ?? undefined, cartItems: cartItems ?? undefined, allowCartAdjust: Boolean(body?.allowCartAdjust), cartDisplay: (body?.cartDisplay === 'list' ? 'list' : (body?.cartDisplay === 'grid' ? 'grid' : undefined)), agentDescription: (typeof body?.agentDescription === 'string' ? body.agentDescription : undefined) } as any);
