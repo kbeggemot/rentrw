@@ -6,9 +6,19 @@ import { usePathname } from 'next/navigation';
 
 export default function LinksLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname();
-  const isSuccess = pathname?.startsWith('/link/s/') || pathname === '/link/success';
+  // Public link pages (no sidebar): /link/[code], /link/s/[code], /link/success
+  const isPublic = (() => {
+    const p = pathname || '';
+    if (p.startsWith('/link/s/') || p === '/link/success') return true;
+    // Match /link/{code} but exclude reserved segments: new, s, success
+    try {
+      return /^\/link\/(?!new$|s$|success$)[^/]+\/?$/.test(p);
+    } catch {
+      return false;
+    }
+  })();
   const [open, setOpen] = useState(false);
-  if (isSuccess) {
+  if (isPublic) {
     return (
       <main className="p-4 sm:p-6">{children}</main>
     );
