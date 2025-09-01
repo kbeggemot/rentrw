@@ -306,61 +306,69 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
   const isValidEmail = (s: string) => /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/.test(s.trim());
 
   // adjusted (displayed) sum of items
+  // Восстановим исходные цены за единицу из сохранённых пониженных (если агент был включен)
+  const baseUnits = useMemo(() => {
+    if (!data || !Array.isArray(data.cartItems)) return [] as number[];
+    const savedUnits: number[] = (data.cartItems as any[]).map((c: any) => Number(c?.price || 0));
+    if (!data.isAgent || !data.commissionType || typeof data.commissionValue !== 'number') return savedUnits;
+    const v = Number(data.commissionValue);
+    if (data.commissionType === 'percent') {
+      const k = 1 - (v / 100);
+      const restored = savedUnits.map((u) => (k > 0 ? Math.round(((u / k) + Number.EPSILON) * 100) / 100 : u));
+      return restored;
+    }
+    // fixed — восстановим добавив долю на единицу из сохранённого общего количества
+    const savedQty: number[] = (data.cartItems as any[]).map((c: any) => Number(c?.qty || 0));
+    const totalQty = savedQty.reduce((s, q) => s + (Number.isFinite(q) ? q : 0), 0);
+    const perUnit = totalQty > 0 ? (v / totalQty) : 0;
+    return savedUnits.map((u) => Math.round(((u + perUnit) + Number.EPSILON) * 100) / 100);
+  }, [data]);
+
   // Сумма отображаемых цен (после понижения, если агент включен)
   const cartAdjustedSum = useMemo(() => {
     if (!(Array.isArray(cart) && cart.length > 0)) return 0;
+    const baseCart = cart.map((i, idx) => ({
+      title: i.title,
+      price: Number((baseUnits[idx] ?? i.price) || 0),
+      qty: Number(i.qty || 0),
+    }));
     if (!data?.isAgent || !data.commissionType || typeof data.commissionValue !== 'number') {
-      const total = cart.reduce((s, r) => s + (Number(r.price || 0) * Number(r.qty || 0)), 0);
+      const total = baseCart.reduce((s, r) => s + (Number(r.price || 0) * Number(r.qty || 0)), 0);
       return Number.isFinite(total) ? total : 0;
     }
     try {
-      // Пересчитываем от оригинальных цен при каждом изменении qty
-      const original = cart.map((i, idx) => ({
-        title: i.title,
-        price: Number((data.cartItems && data.cartItems[idx] ? data.cartItems[idx].price : i.price) || 0),
-        qty: Number(i.qty || 0),
-      }));
-      const adjusted = applyAgentCommissionToCart(original, data.commissionType as any, Number(data.commissionValue)).adjusted;
+      const adjusted = applyAgentCommissionToCart(baseCart, data.commissionType as any, Number(data.commissionValue)).adjusted;
       const total = adjusted.reduce((s, r) => s + r.price * r.qty, 0);
       return Number.isFinite(total) ? total : 0;
     } catch {
-      const total = cart.reduce((s, r) => s + (Number(r.price || 0) * Number(r.qty || 0)), 0);
+      const total = baseCart.reduce((s, r) => s + (Number(r.price || 0) * Number(r.qty || 0)), 0);
       return Number.isFinite(total) ? total : 0;
     }
-  }, [cart, data?.isAgent, data?.commissionType, data?.commissionValue, data?.cartItems]);
+  }, [cart, data?.isAgent, data?.commissionType, data?.commissionValue, baseUnits]);
 
   function round2(n: number): number { return Math.round((n + Number.EPSILON) * 100) / 100; }
   const agentLine = useMemo(() => {
     if (!data?.isAgent || !Array.isArray(cart) || cart.length === 0 || !data.commissionType || typeof data.commissionValue !== 'number') return null;
     try {
-      const original = cart.map((i, idx) => ({
-        title: i.title,
-        price: Number((data.cartItems && data.cartItems[idx] ? data.cartItems[idx].price : i.price) || 0),
-        qty: Number(i.qty || 0),
-      }));
-      const res = applyAgentCommissionToCart(original, data.commissionType as any, Number(data.commissionValue));
+      const baseCart = cart.map((i, idx) => ({ title: i.title, price: Number((baseUnits[idx] ?? i.price) || 0), qty: Number(i.qty || 0) }));
+      const res = applyAgentCommissionToCart(baseCart, data.commissionType as any, Number(data.commissionValue));
       return { title: data.agentDescription || 'Услуги агента', price: res.agentAmount, qty: 1 };
     } catch {
       return null;
     }
-  }, [data?.isAgent, data?.commissionType, data?.commissionValue, data?.agentDescription, cart, data?.cartItems]);
+  }, [data?.isAgent, data?.commissionType, data?.commissionValue, data?.agentDescription, cart, baseUnits]);
 
   const effectiveCart = useMemo(() => {
     if (!(Array.isArray(cart) && cart.length > 0)) return cart;
     if (!data?.isAgent || !data.commissionType || typeof data.commissionValue !== 'number') return cart;
     try {
-      // ВСЕГДА считать от оригинальных цен: заменяем текущие price на исходные из data.cartItems
-      const original = cart.map((i, idx) => ({
-        title: i.title,
-        price: Number((data.cartItems && data.cartItems[idx] ? data.cartItems[idx].price : i.price) || 0),
-        qty: Number(i.qty || 0),
-      }));
-      const adjusted = applyAgentCommissionToCart(original, data.commissionType as any, Number(data.commissionValue)).adjusted;
+      const baseCart = cart.map((i, idx) => ({ title: i.title, price: Number((baseUnits[idx] ?? i.price) || 0), qty: Number(i.qty || 0) }));
+      const adjusted = applyAgentCommissionToCart(baseCart, data.commissionType as any, Number(data.commissionValue)).adjusted;
       return adjusted.map((a, i) => ({ ...cart[i], price: a.price }));
     } catch {
       return cart;
     }
-  }, [cart, data?.isAgent, data?.commissionType, data?.commissionValue, data?.cartItems]);
+  }, [cart, data?.isAgent, data?.commissionType, data?.commissionValue, baseUnits]);
 
   const canPay = useMemo(() => {
     if (!data) return false;
