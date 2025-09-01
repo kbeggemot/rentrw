@@ -149,7 +149,7 @@ export default function EditProductPage(props: { params: Promise<{ id?: string }
               <div>
                 <label className="block mb-1">Ед.</label>
                 <select className="w-full rounded border px-2 h-9" value={unit} onChange={(e) => setUnit(e.target.value as any)}>
-                  {['усл','шт','упак','гр','кг','м'].map(u => (<option key={u} value={u}>{u}</option>))}
+                  {(kind==='service' ? ['усл'] : ['шт','упак','гр','кг','м']).map(u => (<option key={u} value={u}>{u}</option>))}
                 </select>
               </div>
             </div>

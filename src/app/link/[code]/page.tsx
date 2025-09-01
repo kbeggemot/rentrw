@@ -566,7 +566,7 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
         <>
         {Array.isArray(cart) && cart.length > 0 ? (
           <div className="mb-3">
-            <div className="text-sm text-gray-600 mb-2">Соберите свою корзину</div>
+            <div className="text-sm text-gray-600 mb-2">{data.allowCartAdjust ? 'Соберите свою корзину' : 'Ваша корзина'}</div>
             {data.cartDisplay === 'list' ? (
               <div className="flex flex-col gap-2">
                 {cart.map((item, idx) => (

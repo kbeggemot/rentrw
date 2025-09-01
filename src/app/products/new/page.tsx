@@ -103,7 +103,7 @@ export default function NewProductPage() {
           <div>
             <label className="block text-sm text-gray-700 dark:text-gray-300 mb-1">Единица измерения</label>
             <select className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 h-9 text-sm" value={unit} onChange={(e) => setUnit(e.target.value as any)}>
-              {['усл','шт','упак','гр','кг','м'].map((u) => (<option key={u} value={u}>{u}</option>))}
+              {((kind==='service') ? ['усл'] : ['шт','упак','гр','кг','м']).map((u) => (<option key={u} value={u}>{u}</option>))}
             </select>
           </div>
           <div>
