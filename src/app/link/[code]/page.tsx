@@ -472,12 +472,25 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
           {data.isAgent && data.partnerPhone ? (
             (() => {
               try {
-                const phoneDigits = String(data.partnerPhone).replace(/\D/g, '');
-                const fio = (() => {
-                  // try to reuse partner list loaded on create/edit (not available here) → show phone if FIO неизвестно
-                  return '';
+                const digits = String(data.partnerPhone).replace(/\D/g, '');
+                const [fio, setFio] = (() => {
+                  const r = useState<string | null>(null) as any;
+                  return r as [string | null, (v: string | null) => void];
                 })();
-                const label = fio && fio.trim().length > 0 ? fio : `партнёра ${phoneDigits}`;
+                // Fetch FIO once
+                useEffect(() => {
+                  let cancelled = false;
+                  (async () => {
+                    try {
+                      const r = await fetch(`/api/partners?phone=${encodeURIComponent(digits)}`, { cache: 'no-store' });
+                      const d = await r.json();
+                      const found = Array.isArray(d?.partners) ? (d.partners as any[]).find((p) => String(p.phone || '').replace(/\D/g, '') === digits) : null;
+                      if (!cancelled) setFio(found?.fio || null);
+                    } catch { if (!cancelled) setFio(null); }
+                  })();
+                  return () => { cancelled = true; };
+                }, [digits]);
+                const label = (fio && fio.trim().length > 0) ? fio : 'партнёра';
                 return (<span>Оплата для {label}, через {data.orgName}</span>);
               } catch { return (<span>Оплата через {data.orgName}</span>); }
             })()
