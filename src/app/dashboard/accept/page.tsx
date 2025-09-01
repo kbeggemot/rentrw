@@ -717,14 +717,16 @@ function AcceptPaymentContent() {
             </div>
           )}
         </div>
-        <Textarea
-          label="Описание услуги"
-          placeholder="Например: Оплата консультации"
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-          rows={4}
-          required
-        />
+        {mode==='service' ? (
+          <Textarea
+            label="Описание услуги"
+            placeholder="Например: Оплата консультации"
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            rows={4}
+            required
+          />
+        ) : null}
         <Input
           label="Email покупателя (необязательно)"
           type="email"
@@ -734,17 +736,19 @@ function AcceptPaymentContent() {
           value={buyerEmail}
           onChange={(e) => setBuyerEmail(e.target.value)}
         />
-        <div>
-          <div className="text-sm text-gray-700 dark:text-gray-300 mb-2">НДС</div>
-          <select className="border rounded px-2 py-1 text-sm bg-white dark:bg-gray-950" value={vatRate} onChange={(e) => setVatRate(e.target.value)}>
-            <option value="none">Без НДС</option>
-            <option value="0">НДС 0%</option>
-            <option value="5">НДС 5%</option>
-            <option value="7">НДС 7%</option>
-            <option value="10">НДС 10%</option>
-            <option value="20">НДС 20%</option>
-          </select>
-        </div>
+        {mode==='service' ? (
+          <div>
+            <div className="text-sm text-gray-700 dark:text-gray-300 mb-2">НДС</div>
+            <select className="border rounded px-2 py-1 text-sm bg-white dark:bg-gray-950" value={vatRate} onChange={(e) => setVatRate(e.target.value)}>
+              <option value="none">Без НДС</option>
+              <option value="0">НДС 0%</option>
+              <option value="5">НДС 5%</option>
+              <option value="7">НДС 7%</option>
+              <option value="10">НДС 10%</option>
+              <option value="20">НДС 20%</option>
+            </select>
+          </div>
+        ) : null}
         <Input
           label="Дата окончания оказания услуги"
           type="date"
@@ -787,58 +791,43 @@ function AcceptPaymentContent() {
             />
             <span>Агентская продажа</span>
           </label>
+          <div className="text-sm text-gray-500 mt-1">Разделите оплату между вами и самозанятым партнёром. Описание ваших услуг — в <a className="underline" href="/settings">настройках</a>.</div>
         </div>
         {isAgentSale ? (
           <>
-            <div>
-              <div className="text-sm text-gray-700 dark:text-gray-300 mb-2">Тип комиссии</div>
-              <div className="flex gap-4 mb-2">
-                <label className="inline-flex items-center gap-2 text-sm">
-                  <input
-                    type="radio"
-                    name="commissionType"
-                    value="percent"
-                    checked={commissionType === 'percent'}
-                    onChange={() => setCommissionType('percent')}
-                  />
-                  <span>% от суммы</span>
-                </label>
-                <label className="inline-flex items-center gap-2 text-sm">
-                  <input
-                    type="radio"
-                    name="commissionType"
-                    value="fixed"
-                    checked={commissionType === 'fixed'}
-                    onChange={() => setCommissionType('fixed')}
-                  />
-                  <span>Фикс (₽)</span>
-                </label>
-              </div>
+            <div className="mt-2 flex flex-wrap items-end gap-3">
+              <select
+                className="rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-950 px-2 h-9 text-sm"
+                value={commissionType}
+                onChange={(e) => setCommissionType(e.target.value as 'percent'|'fixed')}
+              >
+                <option value="percent">%</option>
+                <option value="fixed">₽</option>
+              </select>
               <Input
-                label={commissionType === 'percent' ? 'Комиссия агента, %' : 'Комиссия агента, ₽'}
                 type="text"
-                placeholder={commissionType === 'percent' ? '0' : '0,00'}
+                placeholder="Комиссия"
                 value={commission.replace('.', ',')}
                 onChange={(e) => setCommission(e.target.value.replace(',', '.'))}
                 onBlur={validateMinNet}
                 required
-                hint={commissionType === 'percent' ? 'Укажите дробное значение при необходимости, например 2.5' : 'Укажите фиксированную сумму в рублях'}
+                className="w-48"
+              />
+              <Input
+                type="tel"
+                inputMode="tel"
+                placeholder="Телефон партнёра"
+                value={agentPhone}
+                onChange={(e) => setAgentPhone(e.target.value)}
+                required
+                className="flex-1 min-w-[14rem]"
               />
             </div>
-            <Input
-              label="Телефон партнёра"
-              type="tel"
-              inputMode="tel"
-              placeholder="+7 900 000-00-00"
-              value={agentPhone}
-              onChange={(e) => setAgentPhone(e.target.value)}
-              required
-            />
           </>
         ) : null}
           </>
         ) : null}
-        <Button type="submit" disabled={loading || checkingExecutor}>{checkingExecutor ? `Проверяю${btnDots}` : (loading ? 'Создаю…' : (lastTaskId ? 'Повторить' : 'Продолжить'))}</Button>
+        <Button type="submit" disabled={loading || checkingExecutor}>{checkingExecutor ? `Проверяю${btnDots}` : (loading ? 'Создаю…' : (lastTaskId ? 'Повторить' : 'Создать'))}</Button>
         {paymentUrl ? (
           <div className="mt-4 space-y-3">
             <div className="flex gap-2 items-end">
