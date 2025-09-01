@@ -38,6 +38,10 @@ function AcceptPaymentContent() {
   }, []);
   const [amount, setAmount] = useState('');
   const [description, setDescription] = useState('');
+  // New: service vs cart mode + cart builder like payment link
+  const [mode, setMode] = useState<'service' | 'cart'>('service');
+  const [orgProducts, setOrgProducts] = useState<Array<{ id: string; title: string; price: number }>>([]);
+  const [cart, setCart] = useState<Array<{ id: string; title: string; price: string; qty: string }>>([]);
   const [commission, setCommission] = useState('');
   const [isAgentSale, setIsAgentSale] = useState(false);
   const [agentPhone, setAgentPhone] = useState('');
@@ -109,7 +113,18 @@ function AcceptPaymentContent() {
 
   const validateMinNet = () => {
     const MIN_AMOUNT = 10;
-    const numAmount = Number(amount.replace(',', '.'));
+    const numAmount = (mode === 'cart')
+      ? (() => {
+          const toNum = (v: string) => Number(String(v || '0').replace(',', '.'));
+          const total = cart.reduce((sum, r) => {
+            const price = toNum(r.price);
+            const qty = toNum(r.qty || '1');
+            if (!Number.isFinite(price) || !Number.isFinite(qty)) return sum;
+            return sum + price * qty;
+          }, 0);
+          return total;
+        })()
+      : Number(amount.replace(',', '.'));
     if (!Number.isFinite(numAmount)) return;
     if (isAgentSale) {
       const numComm = Number(commission.replace(',', '.'));
@@ -152,6 +167,18 @@ function AcceptPaymentContent() {
     };
     loadDefaults();
     return () => { aborted = true; };
+  }, []);
+
+  // Load products for cart selector
+  useEffect(() => {
+    (async () => {
+      try {
+        const r = await fetch('/api/products', { cache: 'no-store' });
+        const d = await r.json();
+        const items = Array.isArray(d?.items) ? d.items : [];
+        setOrgProducts(items.map((p: any) => ({ id: p.id, title: p.title, price: Number(p.price || 0) })));
+      } catch {}
+    })();
   }, []);
 
   useEffect(() => {
@@ -385,9 +412,19 @@ function AcceptPaymentContent() {
     e.preventDefault();
     setMessage(null);
     setMessageKind('info');
-    const numAmount = Number(amount.replace(',', '.'));
+    const numAmount = (mode === 'cart')
+      ? (() => {
+          const toNum = (v: string) => Number(String(v || '0').replace(',', '.'));
+          return cart.reduce((sum, r) => {
+            const price = toNum(r.price);
+            const qty = toNum(r.qty || '1');
+            if (!Number.isFinite(price) || !Number.isFinite(qty)) return sum;
+            return sum + price * qty;
+          }, 0);
+        })()
+      : Number(amount.replace(',', '.'));
     const numComm = Number(commission.replace(',', '.'));
-    if (!Number.isFinite(numAmount) || numAmount <= 0) { showToast('Введите корректную сумму', 'error'); return; }
+    if (!Number.isFinite(numAmount) || numAmount <= 0) { showToast(mode==='cart' ? 'Итоговая сумма должна быть больше нуля' : 'Введите корректную сумму', 'error'); return; }
     // Business rule: минимальная сумма оплаты – не менее 10 ₽ (для агентских – после вычета комиссии)
     const MIN_AMOUNT = 10;
     if (isAgentSale) {
@@ -595,15 +632,91 @@ function AcceptPaymentContent() {
         ) : null}
         {!collapsed ? (
           <>
-        <Input
-          label="Сумма, ₽"
-          type="text"
-          placeholder="0,00"
-          value={amount.replace('.', ',')}
-          onChange={(e) => setAmount(e.target.value.replace(',', '.'))}
-          onBlur={validateMinNet}
-          required
-        />
+        <div>
+          <div className="text-base font-semibold mb-2">Что продаете?</div>
+          <div className="flex gap-2 mb-3">
+            <button type="button" className={`px-3 h-9 rounded border ${mode==='service'?'bg-black text-white':'bg-white text-black dark:text-black'}`} onClick={() => setMode('service')}>Свободная услуга</button>
+            <button type="button" className={`px-3 h-9 rounded border ${mode==='cart'?'bg-black text-white':'bg-white text-black dark:text-black'}`} onClick={() => setMode('cart')}>Собрать корзину</button>
+          </div>
+          {mode==='service' ? (
+            <Input
+              label="Сумма, ₽"
+              type="text"
+              placeholder="0,00"
+              value={amount.replace('.', ',')}
+              onChange={(e) => setAmount(e.target.value.replace(',', '.'))}
+              onBlur={validateMinNet}
+              required
+            />
+          ) : (
+            <div className="space-y-2">
+              <label className="block text-sm text-gray-700 dark:text-gray-300 mb-1">Выберите нужные позиции на витрине</label>
+              {cart.map((row, idx) => (
+                <div key={idx} className="overflow-x-auto sm:overflow-visible -mx-1 px-1 touch-pan-x">
+                  <div className="flex items-start gap-2 w-max">
+                    <div className="relative flex-1 min-w-[8rem] sm:min-w-[14rem]">
+                      {idx===0 ? (<div className="text-xs text-gray-500 mb-1">Наименование</div>) : null}
+                      <input
+                        className="w-full rounded border px-2 h-9 text-sm"
+                        placeholder="Начните вводить название"
+                        list={`products-list-${idx}`}
+                        value={row.title}
+                        onChange={(e)=>{
+                          const title = e.target.value;
+                          const p = orgProducts.find((x)=> x.title.toLowerCase() === title.toLowerCase());
+                          setCart((prev)=> prev.map((r,i)=> i===idx ? {
+                            id: p?.id || '',
+                            title,
+                            price: (p ? (p.price ?? 0) : (r.price || '')).toString(),
+                            qty: r.qty || '1',
+                          } : r));
+                        }}
+                        onBlur={(e)=>{
+                          const title = e.currentTarget.value;
+                          const p = orgProducts.find((x)=> x.title.toLowerCase() === title.toLowerCase());
+                          if (p) setCart((prev)=> prev.map((r,i)=> i===idx ? { ...r, id: p.id, title: p.title, price: (p.price ?? 0).toString() } : r));
+                        }}
+                      />
+                      <datalist id={`products-list-${idx}`}>
+                        {orgProducts.map((p)=> (<option key={p.id} value={p.title} />))}
+                      </datalist>
+                    </div>
+                    <div>
+                      {idx===0 ? (<div className="text-xs text-gray-500 mb-1">Количество</div>) : null}
+                      <input className="w-16 sm:w-20 rounded border px-2 h-9 text-sm" placeholder="Кол-во" value={row.qty} onChange={(e)=> setCart((prev)=> prev.map((r,i)=> i===idx ? { ...r, qty: e.target.value } : r))} />
+                    </div>
+                    <div>
+                      {idx===0 ? (<div className="text-xs text-gray-500 mb-1">Цена, ₽</div>) : null}
+                      <input className="w-24 sm:w-28 rounded border px-2 h-9 text-sm" placeholder="Цена" value={String(row.price||'').replace('.', ',')} onChange={(e)=> setCart((prev)=> prev.map((r,i)=> i===idx ? { ...r, price: e.target.value.replace(',', '.') } : r))} />
+                    </div>
+                    <div className="flex flex-col">
+                      {idx===0 ? (<div className="text-xs mb-1 invisible">label</div>) : null}
+                      <button type="button" className="px-2 h-9 rounded border" onClick={()=> setCart((prev)=> prev.filter((_,i)=> i!==idx))}>Удалить</button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+              <button type="button" className="px-3 h-9 rounded border" onClick={()=> setCart((prev)=> [...prev, { id:'', title:'', price:'', qty:'1' }])}>+ Добавить</button>
+              {(() => {
+                const toNum = (v: string) => Number(String(v || '0').replace(',', '.'));
+                const total = cart.reduce((sum, r) => {
+                  const price = toNum(r.price); const qty = toNum(r.qty || '1');
+                  if (!Number.isFinite(price) || !Number.isFinite(qty)) return sum;
+                  return sum + price * qty;
+                }, 0);
+                const formatted = Number.isFinite(total) ? total.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '';
+                return (
+                  <div className="mt-2">
+                    <label className="block text-sm text-gray-700 dark:text-gray-300 mb-1">Сумма, ₽</label>
+                    <div className="w-44">
+                      <input className="w-full rounded border pl-2 h-9 text-sm bg-gray-100 dark:bg-gray-900 dark:border-gray-700" value={formatted} readOnly disabled />
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+          )}
+        </div>
         <Textarea
           label="Описание услуги"
           placeholder="Например: Оплата консультации"
