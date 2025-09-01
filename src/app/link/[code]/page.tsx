@@ -135,7 +135,7 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
                 setData((prev) => ({ ...(prev || {} as any), ...(ld || {} as any) } as any));
                 if (ld?.sumMode === 'fixed' && typeof ld?.amountRub === 'number') setAmount(String(ld.amountRub));
                 if (ld?.method === 'card') setMethod('card'); else setMethod('qr');
-                  if (Array.isArray(ld?.cartItems) && ld?.allowCartAdjust) {
+                  if (Array.isArray(ld?.cartItems)) {
                     try { setCart((ld.cartItems as any[]).map((c: any) => ({ id: c?.id ?? null, title: String(c?.title || ''), price: Number(c?.price || 0), qty: Number(c?.qty || 1) }))); } catch {}
                   }
                 }
@@ -177,7 +177,7 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
           } catch {}
           if (d?.sumMode === 'fixed' && typeof d?.amountRub === 'number') setAmount(String(d.amountRub));
           if (d?.method === 'card') setMethod('card'); else setMethod('qr');
-          if (Array.isArray(d?.cartItems) && d?.allowCartAdjust) {
+          if (Array.isArray(d?.cartItems)) {
             try { setCart((d.cartItems as any[]).map((c: any) => ({ id: c?.id ?? null, title: String(c?.title || ''), price: Number(c?.price || 0), qty: Number(c?.qty || 1) }))); } catch {}
           }
         } catch (e) { if (!cancelled) setMsg('Ссылка не найдена'); }
@@ -226,27 +226,30 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
   const isValidEmail = (s: string) => /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/.test(s.trim());
 
   const cartTotal = useMemo(() => {
-    if (!(data?.allowCartAdjust && Array.isArray(cart) && cart.length > 0)) return null;
+    if (!(Array.isArray(cart) && cart.length > 0)) return null;
     const total = cart.reduce((s, r) => s + (Number(r.price || 0) * Number(r.qty || 0)), 0);
     return Number.isFinite(total) ? total : 0;
-  }, [cart, data?.allowCartAdjust]);
+  }, [cart]);
 
   const canPay = useMemo(() => {
     if (!data) return false;
-    const n = data.allowCartAdjust && cartTotal != null ? Number(cartTotal) : Number((data.sumMode === 'fixed' ? (data.amountRub ?? 0) : Number(amount.replace(',', '.'))));
+    const isCartMode = Array.isArray(cart) && cart.length > 0 && cartTotal != null;
+    const n = isCartMode ? Number(cartTotal) : Number((data.sumMode === 'fixed' ? (data.amountRub ?? 0) : Number(amount.replace(',', '.'))));
     if (!Number.isFinite(n) || n <= 0) return false;
     const minOk = data.isAgent
       ? (n - (data.commissionType === 'percent' ? n * (Number(data.commissionValue || 0) / 100) : Number(data.commissionValue || 0))) >= 10
       : n >= 10;
     return minOk && isValidEmail(email);
-  }, [data, amount, email, cartTotal]);
+  }, [data, amount, email, cartTotal, cart]);
 
   // Validate before pay with detailed messages
   const validateBeforePay = (): boolean => {
     if (!data) return false;
-    if (data.allowCartAdjust) {
-      const badQty = Array.isArray(cart) && cart.some((i) => !Number.isFinite(Number(i.qty)) || Number(i.qty) <= 0);
-      if (badQty) { showToast('Ошибка суммы: количество должно быть больше нуля'); return false; }
+    if (Array.isArray(cart) && cart.length > 0) {
+      if (data.allowCartAdjust) {
+        const badQty = cart.some((i) => !Number.isFinite(Number(i.qty)) || Number(i.qty) <= 0);
+        if (badQty) { showToast('Ошибка суммы: количество должно быть больше нуля'); return false; }
+      }
       const total = Number(cartTotal || 0);
       if (!(total > 0)) { showToast('Ошибка суммы: итоговая сумма должна быть больше нуля'); return false; }
     } else if (data.sumMode === 'custom') {
@@ -411,7 +414,8 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
         }
       }
       
-      const amountNum = data.allowCartAdjust && cartTotal != null ? Number(cartTotal) : (data.sumMode === 'fixed' ? (data.amountRub || 0) : Number(amount.replace(',', '.')));
+      const isCartMode = Array.isArray(cart) && cart.length > 0 && cartTotal != null;
+      const amountNum = isCartMode ? Number(cartTotal) : (data.sumMode === 'fixed' ? (data.amountRub || 0) : Number(amount.replace(',', '.')));
       const body: any = {
         amountRub: amountNum,
         description: data.description,

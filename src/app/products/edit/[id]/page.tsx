@@ -12,7 +12,9 @@ export default function EditProductPage(props: { params: Promise<{ id?: string }
 
   const [kind, setKind] = useState<'goods' | 'service'>('service');
   const [title, setTitle] = useState('');
-  const [category, setCategory] = useState<string | null>(null);
+  const [category, setCategory] = useState<string>('');
+  const [useCustomCategory, setUseCustomCategory] = useState(false);
+  const [categories, setCategories] = useState<string[]>([]);
   const [price, setPrice] = useState('');
   const [unit, setUnit] = useState<'усл' | 'шт' | 'упак' | 'гр' | 'кг' | 'м'>('усл');
   const [vat, setVat] = useState<'none' | '0' | '10' | '20'>('none');
@@ -58,7 +60,7 @@ export default function EditProductPage(props: { params: Promise<{ id?: string }
         const p = j.item || {};
         setKind(p.kind === 'goods' ? 'goods' : 'service');
         setTitle(p.title || '');
-        setCategory(p.category ?? null);
+        setCategory(p.category || '');
         setPrice(typeof p.price === 'number' ? String(p.price).replace('.', ',') : '');
         setUnit((['усл','шт','упак','гр','кг','м'].includes(p.unit) ? p.unit : 'усл') as any);
         setVat((['none','0','10','20'].includes(p.vat) ? p.vat : 'none') as any);
@@ -73,6 +75,24 @@ export default function EditProductPage(props: { params: Promise<{ id?: string }
         setLoading(false);
       }
     })();
+  }, [id]);
+
+  // Load category list (same as on create page)
+  useEffect(() => {
+    (async () => {
+      try {
+        const r = await fetch('/api/products?categories=1', { cache: 'no-store' });
+        const j = await r.json();
+        const list = Array.isArray(j?.categories) ? j.categories as string[] : [];
+        setCategories(list);
+        // If current category is custom (not in list) – show custom input by default
+        setUseCustomCategory((prev) => {
+          const cur = (category || '').trim();
+          return cur.length > 0 && !list.includes(cur);
+        });
+      } catch {}
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
   const onSave = async () => {
@@ -133,20 +153,42 @@ export default function EditProductPage(props: { params: Promise<{ id?: string }
                 </select>
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block mb-1">НДС</label>
-                <select className="w-full rounded border px-2 h-9" value={vat} onChange={(e) => setVat(e.target.value as any)}>
-                  <option value="none">Без НДС</option>
-                  <option value="0">0%</option>
-                  <option value="10">10%</option>
-                  <option value="20">20%</option>
+            <div>
+              <label className="block mb-1">НДС</label>
+              <select className="w-full rounded border px-2 h-9" value={vat} onChange={(e) => setVat(e.target.value as any)}>
+                <option value="none">Без НДС</option>
+                <option value="0">0%</option>
+                <option value="10">10%</option>
+                <option value="20">20%</option>
+              </select>
+            </div>
+            <div>
+              <label className="block mb-1">Категория (необязательно)</label>
+              {!useCustomCategory ? (
+                <select
+                  className="w-full rounded border px-2 h-9"
+                  value={category || ''}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    if (v === '__custom__') { setUseCustomCategory(true); setCategory(''); }
+                    else setCategory(v);
+                  }}
+                >
+                  <option value="">— не выбрано —</option>
+                  {categories.map((c) => (<option key={c} value={c}>{c}</option>))}
+                  <option value="__custom__">Новое значение…</option>
                 </select>
-              </div>
-              <div>
-                <label className="block mb-1">Категория</label>
-                <input className="w-full rounded border px-2 h-9" value={category || ''} onChange={(e) => setCategory(e.target.value)} />
-              </div>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <input
+                    className="flex-1 rounded border px-2 h-9"
+                    value={category}
+                    onChange={(e) => setCategory(e.target.value)}
+                    placeholder="Введите категорию"
+                  />
+                  <button type="button" className="text-sm px-2 py-1 rounded border" onClick={() => { setUseCustomCategory(false); setCategory(''); }}>Отменить</button>
+                </div>
+              )}
             </div>
             <div>
               <label className="block mb-1">Артикул</label>
