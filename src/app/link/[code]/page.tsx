@@ -2,6 +2,49 @@
 
 import { use, useEffect, useMemo, useRef, useState } from 'react';
 
+// Very lightweight RU genitive case inflector for full name like "Фамилия Имя Отчество"
+// Covers common male patterns; indeclinable and rare patterns are returned unchanged
+function declineSurnameGenitive(s: string): string {
+  const low = s.toLowerCase();
+  if (/^(ко|енко|их|ых)$/.test(low.slice(-3)) || /(?:ко|енко|иха|ых)$/i.test(s)) return s; // indeclinable
+  if (/(ко|енко|их|ых|о|е|ё|и|у|ю)$/i.test(low)) return s; // indeclinable endings
+  if (/(ский|цкий)$/i.test(low)) return s.slice(0, -2) + 'го';
+  if (/(ий|ый|ой)$/i.test(low)) return s.slice(0, -2) + 'ого';
+  if (/ь$/i.test(low)) return s.slice(0, -1) + 'я';
+  if (/[бвгджзклмнпрстфхцчшщ]$/i.test(low)) return s + 'а';
+  return s;
+}
+function declineNameGenitive(s: string): string {
+  const irregular: Record<string, string> = {
+    'Пётр': 'Петра', 'Петр': 'Петра', 'Лев': 'Льва', 'Павел': 'Павла', 'Яков': 'Якова',
+    'Илья': 'Ильи', 'Фома': 'Фомы', 'Никита': 'Никиты', 'Андрей': 'Андрея', 'Сергей': 'Сергея',
+    'Алексей': 'Алексея', 'Григорий': 'Григория', 'Матвей': 'Матвея', 'Юрий': 'Юрия', 'Дмитрий': 'Дмитрия'
+  };
+  if (irregular[s]) return irregular[s];
+  const low = s.toLowerCase();
+  if (/ий$/i.test(low)) return s.slice(0, -2) + 'ия';
+  if (/й$/i.test(low)) return s.slice(0, -1) + 'я';
+  if (/ь$/i.test(low)) return s.slice(0, -1) + 'я';
+  if (/а$/i.test(low)) return s.slice(0, -1) + 'ы';
+  if (/я$/i.test(low)) return s.slice(0, -1) + 'и';
+  if (/[бвгджзклмнпрстфхцчшщ]$/i.test(low)) return s + 'а';
+  return s;
+}
+function declinePatronymicGenitive(s: string): string {
+  const low = s.toLowerCase();
+  if (/ович$/i.test(low)) return s + 'а'; // овича
+  if (/евич$/i.test(low)) return s + 'а';
+  if (/ич$/i.test(low)) return s + 'а';
+  return s;
+}
+function declineFioGenitive(full: string): string {
+  const parts = String(full || '').trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return '';
+  if (parts.length === 1) return declineSurnameGenitive(parts[0]);
+  if (parts.length === 2) return `${declineSurnameGenitive(parts[0])} ${declineNameGenitive(parts[1])}`;
+  return `${declineSurnameGenitive(parts[0])} ${declineNameGenitive(parts[1])} ${declinePatronymicGenitive(parts[2])}`;
+}
+
 type LinkData = {
   code: string;
   userId: string;
@@ -76,10 +119,17 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
         const phone = (data?.isAgent && data?.partnerPhone) ? String(data.partnerPhone) : '';
         const digits = phone.replace(/\D/g, '');
         if (!digits) { setPartnerFio(null); return; }
+        try {
+          const cached = sessionStorage.getItem(`fio.g.${digits}`);
+          if (cached && cached.trim().length > 0) setPartnerFio(cached);
+        } catch {}
         const r = await fetch(`/api/partners?phone=${encodeURIComponent(digits)}`, { cache: 'no-store' });
         const d = await r.json().catch(() => ({}));
         const found = Array.isArray(d?.partners) ? (d.partners as any[]).find((p) => String(p.phone || '').replace(/\D/g, '') === digits) : null;
-        setPartnerFio((found?.fio && String(found.fio).trim().length > 0) ? String(found.fio).trim() : null);
+        const fioN = (found?.fio && String(found.fio).trim().length > 0) ? String(found.fio).trim() : null;
+        const gen = fioN ? declineFioGenitive(fioN) : null;
+        setPartnerFio(gen);
+        try { if (gen) sessionStorage.setItem(`fio.g.${digits}`, gen); } catch {}
       } catch { setPartnerFio(null); }
     })();
   }, [data?.isAgent, data?.partnerPhone]);
