@@ -32,6 +32,7 @@ export default function NewLinkStandalonePage() {
   const [vanity, setVanity] = useState('');
   const [vanityTaken, setVanityTaken] = useState<boolean | null>(null);
   const [cartDisplay, setCartDisplay] = useState<'grid' | 'list'>('list');
+  const [editingPriceIdx, setEditingPriceIdx] = useState<number | null>(null);
 
   const translitMap: Record<string, string> = { 'ё':'yo','й':'y','ц':'ts','у':'u','к':'k','е':'e','н':'n','г':'g','ш':'sh','щ':'sch','з':'z','х':'h','ъ':'','ф':'f','ы':'y','в':'v','а':'a','п':'p','р':'r','о':'o','л':'l','д':'d','ж':'zh','э':'e','я':'ya','ч':'ch','с':'s','м':'m','и':'i','т':'t','ь':'','б':'b','ю':'yu' };
   const normalizeVanity = (s: string) => s
@@ -369,7 +370,23 @@ export default function NewLinkStandalonePage() {
                         </div>
                         <div>
                           {idx===0 ? (<div className="text-xs text-gray-500 mb-1">Цена, ₽</div>) : null}
-                          <input className="w-24 sm:w-28 rounded border px-2 h-9 text-sm" placeholder="Цена" value={String(row.price||'').replace('.', ',')} onChange={(e)=> setCart((prev)=> prev.map((r,i)=> i===idx ? { ...r, price: e.target.value.replace(',', '.') } : r))} />
+                          {(() => {
+                            const baseNum = Number(String(row.price || '0').replace(',', '.'));
+                            const shownNum = (commissionValid && editingPriceIdx !== idx && effectiveCart[idx]) ? Number(effectiveCart[idx].price || 0) : baseNum;
+                            const shownStr = (commissionValid && editingPriceIdx !== idx)
+                              ? shownNum.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2, useGrouping: false })
+                              : String(row.price || '').replace('.', ',');
+                            return (
+                              <input
+                                className="w-24 sm:w-28 rounded border px-2 h-9 text-sm"
+                                placeholder="Цена"
+                                value={shownStr}
+                                onFocus={() => setEditingPriceIdx(idx)}
+                                onBlur={() => setEditingPriceIdx(null)}
+                                onChange={(e)=> setCart((prev)=> prev.map((r,i)=> i===idx ? { ...r, price: e.target.value.replace(',', '.') } : r))}
+                              />
+                            );
+                          })()}
                         </div>
                         <div className="flex flex-col">
                           {idx===0 ? (<div className="text-xs mb-1 invisible">label</div>) : null}
@@ -378,6 +395,24 @@ export default function NewLinkStandalonePage() {
                       </div>
                     </div>
                   ))}
+                  {agentLine ? (
+                    <div className="overflow-x-auto sm:overflow-visible -mx-1 px-1 touch-pan-x">
+                      <div className="flex items-start gap-2 w-max opacity-90">
+                        <div className="relative flex-1 min-w-[8rem] sm:min-w-[14rem]">
+                          <input className="w-full rounded border px-2 h-9 text-sm bg-gray-100" value={agentLine.title} readOnly disabled />
+                        </div>
+                        <div>
+                          <input className="w-16 sm:w-20 rounded border px-2 h-9 text-sm bg-gray-100" value="1" readOnly disabled />
+                        </div>
+                        <div>
+                          <input className="w-24 sm:w-28 rounded border px-2 h-9 text-sm bg-gray-100" value={agentLine.price.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2, useGrouping: false })} readOnly disabled />
+                        </div>
+                        <div className="flex flex-col">
+                          <button type="button" className="px-2 h-9 rounded border text-gray-400" disabled>Удалить</button>
+                        </div>
+                      </div>
+                    </div>
+                  ) : null}
                   <button type="button" className="px-3 h-9 rounded border" onClick={()=> setCart((prev)=> [...prev, { id:'', title:'', price:'', qty:'1' }])}>+ Добавить</button>
                 </div>
                 <div className="text-xs text-gray-600 dark:text-gray-400">Нет нужной позиции? <a className="underline" href="/products/new" target="_blank" onClick={()=> showToast('Откроем создание позиции в новом окне', 'info')}>Создать новую позицию на витрине</a></div>
