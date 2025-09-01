@@ -140,7 +140,7 @@ export async function PUT(req: Request) {
         amountRub = Number.isFinite(n) ? n : NaN;
         if (!Number.isFinite(amountRub) || Number(amountRub) <= 0) return NextResponse.json({ error: 'INVALID_AMOUNT' }, { status: 400 });
       }
-      const vatRate = (['none','0','10','20'].includes(String(body?.vatRate)) ? String(body?.vatRate) : 'none') as 'none'|'0'|'10'|'20';
+      const vatRate = (['none','0','5','7','10','20'].includes(String(body?.vatRate)) ? String(body?.vatRate) : 'none') as 'none'|'0'|'5'|'7'|'10'|'20';
       const updated = await updatePaymentLink(userId, code, { title, description, sumMode, amountRub: amountRub ?? undefined, vatRate, method, isAgent, commissionType: commissionType as any, commissionValue: commissionValue ?? undefined, partnerPhone });
       if (!updated) return NextResponse.json({ error: 'NOT_FOUND' }, { status: 404 });
       return NextResponse.json({ ok: true, item: updated });

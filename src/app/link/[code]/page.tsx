@@ -10,7 +10,7 @@ type LinkData = {
   orgName?: string | null;
   sumMode: 'custom' | 'fixed';
   amountRub?: number | null;
-  vatRate?: 'none' | '0' | '10' | '20' | null;
+  vatRate?: 'none' | '0' | '5' | '7' | '10' | '20' | null;
   isAgent?: boolean;
   commissionType?: 'percent' | 'fixed' | null;
   commissionValue?: number | null;

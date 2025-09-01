@@ -626,6 +626,8 @@ function AcceptPaymentContent() {
           <select className="border rounded px-2 py-1 text-sm bg-white dark:bg-gray-950" value={vatRate} onChange={(e) => setVatRate(e.target.value)}>
             <option value="none">Без НДС</option>
             <option value="0">НДС 0%</option>
+            <option value="5">НДС 5%</option>
+            <option value="7">НДС 7%</option>
             <option value="10">НДС 10%</option>
             <option value="20">НДС 20%</option>
           </select>

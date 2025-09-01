@@ -27,7 +27,7 @@ export default function EditLinkPage(props: { params: Promise<{ code: string }> 
   const [description, setDescription] = useState('');
   const [sumMode, setSumMode] = useState<'custom' | 'fixed'>('custom');
   const [amount, setAmount] = useState('');
-  const [vatRate, setVatRate] = useState<'none' | '0' | '10' | '20'>('none');
+  const [vatRate, setVatRate] = useState<'none' | '0' | '5' | '7' | '10' | '20'>('none');
 
   // Cart specific
   const [cartItems, setCartItems] = useState<Array<{ id?: string | null; title: string; price: string; qty: string }>>([]);
@@ -57,7 +57,7 @@ export default function EditLinkPage(props: { params: Promise<{ code: string }> 
           setDescription(d.description || '');
           setSumMode(d.sumMode === 'fixed' ? 'fixed' : 'custom');
           setAmount(d.amountRub != null ? String(d.amountRub) : '');
-          setVatRate((['none','0','10','20'].includes(String(d.vatRate)) ? d.vatRate : 'none'));
+          setVatRate((['none','0','5','7','10','20'].includes(String(d.vatRate)) ? d.vatRate : 'none'));
         }
       } catch {
         showToast('Не удалось загрузить ссылку', 'error');
@@ -182,6 +182,8 @@ export default function EditLinkPage(props: { params: Promise<{ code: string }> 
                   <select className="w-44 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-950 px-2 h-9 text-sm" value={vatRate} onChange={(e) => setVatRate(e.target.value as any)}>
                     <option value="none">Без НДС</option>
                     <option value="0">0%</option>
+                    <option value="5">5%</option>
+                    <option value="7">7%</option>
                     <option value="10">10%</option>
                     <option value="20">20%</option>
                   </select>

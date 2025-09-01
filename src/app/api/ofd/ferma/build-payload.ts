@@ -1,11 +1,13 @@
 // Build Ferma (OFD.ru) payloads for receipts
 
-export type VatRate = 'none' | '0' | '10' | '20';
+export type VatRate = 'none' | '0' | '5' | '7' | '10' | '20';
 
 // Ferma VAT code mapping (example; adjust if Ferma expects numeric codes)
 export function mapVatToFerma(v: VatRate): { vatType: string } {
   switch (v) {
     case '0': return { vatType: 'Vat0' };
+    case '5': return { vatType: 'Vat5' };
+    case '7': return { vatType: 'Vat7' };
     case '10': return { vatType: 'Vat10' };
     case '20': return { vatType: 'Vat20' };
     case 'none':

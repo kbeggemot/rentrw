@@ -34,7 +34,7 @@ export type SaleRecord = {
   additionalCommissionOfdUrl?: string | null;
   npdReceiptUri?: string | null; // receipt_uri from root task (НПД)
   serviceEndDate?: string | null; // YYYY-MM-DD
-  vatRate?: string | null; // e.g. none|0|10|20
+  vatRate?: string | null; // e.g. none|0|5|7|10|20
   createdAtRw?: string | null; // created_at from RW task (ISO)
   hidden?: boolean; // soft-hide from UI
   rwTokenFp?: string | null; // sha256 of RW token used to create

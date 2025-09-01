@@ -57,7 +57,7 @@ export async function POST(req: Request) {
       const n = Number(normalized);
       amountRub = Number.isFinite(n) ? n : NaN;
     }
-    const vatRate = (['none','0','10','20'].includes(String(body?.vatRate)) ? String(body?.vatRate) : 'none') as 'none'|'0'|'10'|'20';
+    const vatRate = (['none','0','5','7','10','20'].includes(String(body?.vatRate)) ? String(body?.vatRate) : 'none') as 'none'|'0'|'5'|'7'|'10'|'20';
     const isAgent = !!body?.isAgent;
     // Vanity code (optional)
     const preferredRaw: string = typeof body?.preferredCode === 'string' ? body.preferredCode : '';

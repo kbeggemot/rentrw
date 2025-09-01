@@ -12,7 +12,7 @@ export default function NewProductPage() {
   const [categories, setCategories] = useState<string[]>([]);
   const [price, setPrice] = useState('');
   const [unit, setUnit] = useState<'усл' | 'шт' | 'упак' | 'гр' | 'кг' | 'м'>('усл');
-  const [vat, setVat] = useState<'none' | '0' | '10' | '20'>('none');
+  const [vat, setVat] = useState<'none' | '0' | '5' | '7' | '10' | '20'>('none');
   const [sku, setSku] = useState('');
   const [description, setDescription] = useState('');
   const [loading, setLoading] = useState(false);
@@ -111,6 +111,8 @@ export default function NewProductPage() {
             <select className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 h-9 text-sm" value={vat} onChange={(e) => setVat(e.target.value as any)}>
               <option value="none">Без НДС</option>
               <option value="0">0%</option>
+              <option value="5">5%</option>
+              <option value="7">7%</option>
               <option value="10">10%</option>
               <option value="20">20%</option>
             </select>

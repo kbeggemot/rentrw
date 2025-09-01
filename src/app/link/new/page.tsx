@@ -18,7 +18,7 @@ export default function NewLinkStandalonePage() {
   const [orgProducts, setOrgProducts] = useState<Array<{ id: string; title: string; price: number }>>([]);
   const [linkSumMode, setLinkSumMode] = useState<'custom' | 'fixed'>('custom');
   const [linkAmount, setLinkAmount] = useState('');
-  const [linkVat, setLinkVat] = useState<'none' | '0' | '10' | '20'>('none');
+  const [linkVat, setLinkVat] = useState<'none' | '0' | '5' | '7' | '10' | '20'>('none');
   const [linkAgent, setLinkAgent] = useState(false);
   const [linkCommType, setLinkCommType] = useState<'percent' | 'fixed'>('percent');
   const [linkCommVal, setLinkCommVal] = useState('');
@@ -277,6 +277,8 @@ export default function NewLinkStandalonePage() {
                     <select className="w-44 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-950 px-2 h-9 text-sm" value={linkVat} onChange={(e) => setLinkVat(e.target.value as any)}>
                       <option value="none">Без НДС</option>
                       <option value="0">0%</option>
+                      <option value="5">5%</option>
+                      <option value="7">7%</option>
                       <option value="10">10%</option>
                       <option value="20">20%</option>
                     </select>

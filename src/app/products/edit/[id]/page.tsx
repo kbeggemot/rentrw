@@ -17,7 +17,7 @@ export default function EditProductPage(props: { params: Promise<{ id?: string }
   const [categories, setCategories] = useState<string[]>([]);
   const [price, setPrice] = useState('');
   const [unit, setUnit] = useState<'усл' | 'шт' | 'упак' | 'гр' | 'кг' | 'м'>('усл');
-  const [vat, setVat] = useState<'none' | '0' | '10' | '20'>('none');
+  const [vat, setVat] = useState<'none' | '0' | '5' | '7' | '10' | '20'>('none');
   const [sku, setSku] = useState('');
   const [description, setDescription] = useState('');
   const [photos, setPhotos] = useState<string[]>([]);
@@ -63,7 +63,7 @@ export default function EditProductPage(props: { params: Promise<{ id?: string }
         setCategory(p.category || '');
         setPrice(typeof p.price === 'number' ? String(p.price).replace('.', ',') : '');
         setUnit((['усл','шт','упак','гр','кг','м'].includes(p.unit) ? p.unit : 'усл') as any);
-        setVat((['none','0','10','20'].includes(p.vat) ? p.vat : 'none') as any);
+        setVat((['none','0','5','7','10','20'].includes(p.vat) ? p.vat : 'none') as any);
         setSku(p.sku || '');
         setDescription(p.description || '');
         const phs = Array.isArray(p.photos) ? p.photos : [];
@@ -158,6 +158,8 @@ export default function EditProductPage(props: { params: Promise<{ id?: string }
               <select className="w-full rounded border px-2 h-9" value={vat} onChange={(e) => setVat(e.target.value as any)}>
                 <option value="none">Без НДС</option>
                 <option value="0">0%</option>
+                <option value="5">5%</option>
+                <option value="7">7%</option>
                 <option value="10">10%</option>
                 <option value="20">20%</option>
               </select>

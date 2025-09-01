@@ -268,6 +268,8 @@ export async function POST(req: Request) {
       const map: Record<string, string> = {
         none: 'VatNo',
         '0': 'Vat0',
+        '5': 'Vat5',
+        '7': 'Vat7',
         '10': 'Vat10',
         '20': 'Vat20',
       };

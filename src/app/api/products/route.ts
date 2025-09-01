@@ -29,7 +29,7 @@ export async function POST(req: Request) {
     const title = String(body?.title || '').trim();
     const unitAllowed = ['усл', 'шт', 'упак', 'гр', 'кг', 'м'] as const;
     const unit = unitAllowed.includes(body?.unit) ? body.unit : 'шт';
-    const vatAllowed = ['none', '0', '10', '20'] as const;
+    const vatAllowed = ['none', '0', '5', '7', '10', '20'] as const;
     const vat = vatAllowed.includes(body?.vat) ? body.vat : 'none';
     const price = Number(body?.price);
     if (!title) return NextResponse.json({ error: 'Название обязательно' }, { status: 400 });

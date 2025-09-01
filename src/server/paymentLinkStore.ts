@@ -8,7 +8,7 @@ export type PaymentLink = {
   description: string;
   sumMode: 'custom' | 'fixed';
   amountRub?: number | null;
-  vatRate?: 'none' | '0' | '10' | '20' | null;
+  vatRate?: 'none' | '0' | '5' | '7' | '10' | '20' | null;
   isAgent?: boolean;
   commissionType?: 'percent' | 'fixed' | null;
   commissionValue?: number | null;
@@ -150,7 +150,7 @@ export async function updatePaymentLink(userId: string, code: string, updates: P
     if (typeof updates.description === 'string') next.description = updates.description;
     if (updates.sumMode === 'custom' || updates.sumMode === 'fixed') next.sumMode = updates.sumMode;
     if (typeof updates.amountRub === 'number' && Number.isFinite(updates.amountRub)) next.amountRub = updates.amountRub;
-    if (updates.vatRate === 'none' || updates.vatRate === '0' || updates.vatRate === '10' || updates.vatRate === '20') next.vatRate = updates.vatRate;
+    if (updates.vatRate === 'none' || updates.vatRate === '0' || updates.vatRate === '5' || updates.vatRate === '7' || updates.vatRate === '10' || updates.vatRate === '20') next.vatRate = updates.vatRate;
     next.cartItems = null;
     next.allowCartAdjust = false;
   } else {

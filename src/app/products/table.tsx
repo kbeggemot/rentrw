@@ -10,7 +10,7 @@ type Item = {
   category?: string | null;
   price: number;
   unit: 'усл' | 'шт' | 'упак' | 'гр' | 'кг' | 'м';
-  vat: 'none' | '0' | '10' | '20';
+  vat: 'none' | '0' | '5' | '7' | '10' | '20';
   sku?: string | null;
 };
 

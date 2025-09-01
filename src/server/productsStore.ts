@@ -9,7 +9,7 @@ export type ProductRecord = {
   category?: string | null;
   price: number; // in RUB
   unit: 'усл' | 'шт' | 'упак' | 'гр' | 'кг' | 'м';
-  vat: 'none' | '0' | '10' | '20';
+  vat: 'none' | '0' | '5' | '7' | '10' | '20';
   sku?: string | null;
   description?: string | null;
   photos?: string[]; // relative paths under .data
@@ -109,7 +109,7 @@ export async function updateProduct(
   if (typeof data.category !== 'undefined') next.category = data.category ?? null;
   if (typeof data.price === 'number' && Number.isFinite(data.price)) next.price = Math.max(0, Math.round(Number(data.price) * 100) / 100);
   if (data.unit && ['усл','шт','упак','гр','кг','м'].includes(data.unit as any)) next.unit = data.unit as any;
-  if (data.vat && ['none','0','10','20'].includes(data.vat as any)) next.vat = data.vat as any;
+  if (data.vat && ['none','0','5','7','10','20'].includes(data.vat as any)) next.vat = data.vat as any;
   if (typeof data.sku !== 'undefined') next.sku = data.sku ?? null;
   if (typeof data.description !== 'undefined') next.description = data.description ?? null;
   if (Array.isArray(data.photos)) next.photos = data.photos.slice(0, 5);
