@@ -315,7 +315,7 @@ export default function EditLinkPage(props: { params: Promise<{ code: string }> 
                       {idx===0 ? (<div className="text-xs text-gray-500 mb-1">Цена, ₽</div>) : null}
                       {(() => {
                         const baseNum = Number(String(row.price || '0').replace(',', '.'));
-                        const shouldAdjustNow = commissionValid || (initialIsAgent === true);
+                        const shouldAdjustNow = commissionValid;
                         const baseForView = adjustedForDisplay;
                         const shownNum = (shouldAdjustNow && editingPriceIdx !== idx)
                           ? (baseForView[idx]?.price ?? baseNum)
@@ -330,7 +330,13 @@ export default function EditLinkPage(props: { params: Promise<{ code: string }> 
                             value={shownStr}
                             onFocus={() => setEditingPriceIdx(idx)}
                             onBlur={() => setEditingPriceIdx(null)}
-                            onChange={(e)=> setCartItems((prev)=> prev.map((r,i)=> i===idx ? { ...r, price: e.target.value.replace(',', '.') } : r))}
+                            onChange={(e)=> {
+                              const val = e.target.value.replace(',', '.');
+                              setCartItems((prev)=> prev.map((r,i)=> i===idx ? { ...r, price: val } : r));
+                              // обновим исходную цену для пересчёта
+                              const num = Number(val);
+                              if (Number.isFinite(num)) setBaseUnits((prev) => prev.map((v,i)=> i===idx ? num : v));
+                            }}
                           />
                         );
                       })()}
