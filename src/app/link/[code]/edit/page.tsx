@@ -39,6 +39,7 @@ export default function EditLinkPage(props: { params: Promise<{ code: string }> 
   const [editingPriceIdx, setEditingPriceIdx] = useState<number | null>(null);
   const [allowCartAdjust, setAllowCartAdjust] = useState(false);
   const [cartDisplay, setCartDisplay] = useState<'grid' | 'list'>('list');
+  const [baseUnits, setBaseUnits] = useState<number[]>([]); // исходные цены за единицу для пересчёта
 
   useEffect(() => {
     (async () => {
@@ -62,6 +63,24 @@ export default function EditLinkPage(props: { params: Promise<{ code: string }> 
           setCartItems(d.cartItems.map((c: any) => ({ id: c?.id ?? null, title: String(c?.title || ''), price: String(c?.price ?? 0), qty: String(c?.qty ?? 1) })));
           setAllowCartAdjust(!!d.allowCartAdjust);
           setCartDisplay(d.cartDisplay === 'grid' ? 'grid' : 'list');
+          // восстановим исходные цены за единицу для пересчёта
+          const savedUnits: number[] = (d.cartItems as any[]).map((c) => Number(c?.price ?? 0));
+          const savedQty: number[] = (d.cartItems as any[]).map((c) => Number(c?.qty ?? 0));
+          const v = Number(d?.commissionValue ?? 0);
+          if (d?.isAgent && (d?.commissionType === 'percent' || d?.commissionType === 'fixed')) {
+            if (d.commissionType === 'percent') {
+              const k = 1 - (v / 100);
+              const restored = savedUnits.map((u) => k > 0 ? Math.round(((u / k) + Number.EPSILON) * 100) / 100 : u);
+              setBaseUnits(restored);
+            } else {
+              const totalQty = savedQty.reduce((s, q) => s + (Number.isFinite(q) ? q : 0), 0);
+              const perUnit = totalQty > 0 ? (v / totalQty) : 0;
+              const restored = savedUnits.map((u) => Math.round(((u + perUnit) + Number.EPSILON) * 100) / 100);
+              setBaseUnits(restored);
+            }
+          } else {
+            setBaseUnits(savedUnits);
+          }
         } else {
           setMode('service');
           setDescription(d.description || '');
@@ -103,16 +122,16 @@ export default function EditLinkPage(props: { params: Promise<{ code: string }> 
 
   const numericCart = useMemo(() => cartItems.map((c) => ({ title: c.title, price: Number(String(c.price || '0').replace(',', '.')), qty: Number(String(c.qty || '1').replace(',', '.')) })), [cartItems]);
   const commissionValid = useMemo(() => isAgent && ((commissionType === 'percent' && Number(commissionValue.replace(',', '.')) >= 0) || (commissionType === 'fixed' && Number(commissionValue.replace(',', '.')) > 0)), [isAgent, commissionType, commissionValue]);
-  const shouldApplyDisplayAdjustment = useMemo(() => {
-    // Понижаем цены для отображения, если агент включён сейчас и ссылка изначально была без агента
-    // (или исходное состояние ещё не успело загрузиться).
-    return commissionValid && initialIsAgent !== true;
-  }, [commissionValid, initialIsAgent]);
+  // исходный набор (цены — из baseUnits, количества — текущие из формы)
+  const baseCart = useMemo(() => (
+    cartItems.map((c, i) => ({ title: c.title, price: Number(baseUnits[i] ?? Number(String(c.price || '0').replace(',', '.'))), qty: Number(String(c.qty || '1').replace(',', '.')) }))
+  ), [cartItems, baseUnits]);
+  // пониженные для отображения
   const adjustedForDisplay = useMemo(() => {
-    if (!shouldApplyDisplayAdjustment) return numericCart;
+    if (!commissionValid) return baseCart;
     const v = Number(commissionValue.replace(',', '.'));
-    try { return applyAgentCommissionToCart(numericCart, commissionType, v).adjusted; } catch { return numericCart; }
-  }, [shouldApplyDisplayAdjustment, numericCart, commissionType, commissionValue]);
+    try { return applyAgentCommissionToCart(baseCart, commissionType, v).adjusted; } catch { return baseCart; }
+  }, [baseCart, commissionValid, commissionType, commissionValue]);
 
   // When link is already agent and prices are stored lowered, recover one step so that UI shows
   // the expected single-lowered values based on the original total (amountRub) and commission.
@@ -143,50 +162,23 @@ export default function EditLinkPage(props: { params: Promise<{ code: string }> 
     return numericCart;
   }, [commissionValid, numericCart, commissionType, commissionValue, initialTotal]);
   const agentLine = useMemo(() => {
-    if (!commissionValid || numericCart.length === 0) return null;
+    if (!commissionValid || baseCart.length === 0) return null;
     const v = Number(commissionValue.replace(',', '.'));
-    const round2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
-    if (initialTotal != null && Number.isFinite(initialTotal)) {
-      const A = commissionType === 'percent' ? initialTotal * (v / 100) : v;
-      return { title: 'Услуги агента', price: round2(Math.max(0, A)), qty: 1 };
-    }
-    // Fallback from saved lowered values
-    const effSum = numericCart.reduce((s, r) => s + r.price * r.qty, 0);
-    if (commissionType === 'percent') {
-      const k = 1 - v / 100; if (k <= 0) return { title: 'Услуги агента', price: 0, qty: 1 };
-      const T = effSum / k; const A = T - effSum; return { title: 'Услуги агента', price: round2(Math.max(0, A)), qty: 1 };
-    }
-    return { title: 'Услуги агента', price: round2(Math.max(0, v)), qty: 1 };
-  }, [commissionValid, commissionType, commissionValue, numericCart, initialTotal]);
+    try { const res = applyAgentCommissionToCart(baseCart, commissionType, v); return { title: 'Услуги агента', price: res.agentAmount, qty: 1 }; } catch { return null; }
+  }, [commissionValid, commissionType, commissionValue, baseCart]);
 
   const totalCart = useMemo(() => {
     if (mode !== 'cart') return 0;
+    if (!commissionValid) { return adjustedForDisplay.reduce((s, r) => s + r.price * r.qty, 0); }
     const v = Number(commissionValue.replace(',', '.'));
-    // Если ссылка уже была агентской и есть исходная сумма T — всегда показываем ровно T,
-    // независимо от текущего отображения цен.
-    if (initialIsAgent && initialTotal != null && Number.isFinite(initialTotal)) return initialTotal;
-    const commissionValidLocal = isAgent && ((commissionType === 'percent' && v >= 0) || (commissionType === 'fixed' && v > 0));
-    const effBase = shouldApplyDisplayAdjustment ? adjustedForDisplay : (initialIsAgent ? displayFromStored : numericCart);
-    const eff = effBase.reduce((s, r) => s + r.price * r.qty, 0);
-    let A = 0;
-    if (commissionValidLocal) {
-      if (commissionType === 'percent') {
-        const k = 1 - (v / 100);
-        A = k > 0 ? eff * (1 / k - 1) : 0;
-      } else {
-        A = v;
-      }
+    try {
+      const res = applyAgentCommissionToCart(baseCart, commissionType, v);
+      const eff = res.adjusted.reduce((s, r) => s + r.price * r.qty, 0);
+      return Math.round(((eff + res.agentAmount) + Number.EPSILON) * 100) / 100;
+    } catch {
+      return adjustedForDisplay.reduce((s, r) => s + r.price * r.qty, 0);
     }
-    // Если ссылка была без агента (initialIsAgent=false) и мы включили агент сейчас,
-    // eff уже пониженный, A считаем от исходной суммы: T = eff / (1 - p)
-    if (!initialIsAgent && commissionType === 'percent' && commissionValidLocal) {
-      const k = 1 - (v / 100);
-      const T = k > 0 ? eff / k : eff;
-      A = T - eff;
-      return Math.round(((eff + A) + Number.EPSILON) * 100) / 100;
-    }
-    return Math.round(((eff + A) + Number.EPSILON) * 100) / 100;
-  }, [mode, adjustedForDisplay, shouldApplyDisplayAdjustment, numericCart, isAgent, commissionType, commissionValue, initialTotal, initialIsAgent, displayFromStored]);
+  }, [mode, baseCart, adjustedForDisplay, commissionValid, commissionType, commissionValue]);
 
   const onSave = async () => {
     try {
@@ -323,8 +315,8 @@ export default function EditLinkPage(props: { params: Promise<{ code: string }> 
                       {idx===0 ? (<div className="text-xs text-gray-500 mb-1">Цена, ₽</div>) : null}
                       {(() => {
                         const baseNum = Number(String(row.price || '0').replace(',', '.'));
-                        const shouldAdjustNow = shouldApplyDisplayAdjustment || (initialIsAgent === true);
-                        const baseForView = initialIsAgent ? displayFromStored : adjustedForDisplay;
+                        const shouldAdjustNow = commissionValid || (initialIsAgent === true);
+                        const baseForView = adjustedForDisplay;
                         const shownNum = (shouldAdjustNow && editingPriceIdx !== idx)
                           ? (baseForView[idx]?.price ?? baseNum)
                           : baseNum;
