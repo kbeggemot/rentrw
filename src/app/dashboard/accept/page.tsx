@@ -701,19 +701,19 @@ function AcceptPaymentContent() {
                     <div>
                       {idx===0 ? (<div className="text-xs text-gray-500 mb-1">Цена, ₽</div>) : null}
                       {(() => {
-                        const base = Number(String(row.price || '0').replace(',', '.'));
+                        const base = String(row.price || '').replace('.', ',');
                         const v = Number(commission.replace(',', '.'));
                         const commissionValid = isAgentSale && ((commissionType === 'percent' && v >= 0) || (commissionType === 'fixed' && v > 0));
-                        let shown = base;
-                        if (commissionValid) {
-                          try {
-                            const numeric = cart.map((c) => ({ title: c.title, price: Number(String(c.price || '0').replace(',', '.')), qty: Number(String(c.qty || '1').replace(',', '.')) }));
-                            const adj = applyAgentCommissionToCart(numeric, commissionType, v).adjusted;
-                            shown = Number(adj[idx]?.price || base);
-                          } catch {}
-                        }
+                        const numeric = cart.map((c) => ({ title: c.title, price: Number(String(c.price || '0').replace(',', '.')), qty: Number(String(c.qty || '1').replace(',', '.')) }));
+                        const adjusted = commissionValid ? applyAgentCommissionToCart(numeric, commissionType, v).adjusted : numeric;
+                        const shown = commissionValid ? (adjusted[idx]?.price ?? Number(String(row.price||'0').replace(',', '.'))) : Number(String(row.price||'0').replace(',', '.'));
                         return (
-                          <input className="w-24 sm:w-28 rounded border px-2 h-9 text-sm" placeholder="Цена" value={commissionValid ? shown.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2, useGrouping: false }) : String(row.price||'').replace('.', ',')} onChange={(e)=> setCart((prev)=> prev.map((r,i)=> i===idx ? { ...r, price: e.target.value.replace(',', '.') } : r))} />
+                          <input
+                            className="w-24 sm:w-28 rounded border px-2 h-9 text-sm"
+                            placeholder="Цена"
+                            value={commissionValid ? shown.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2, useGrouping: false }) : base}
+                            onChange={(e)=> setCart((prev)=> prev.map((r,i)=> i===idx ? { ...r, price: e.target.value.replace(',', '.') } : r))}
+                          />
                         );
                       })()}
                     </div>
