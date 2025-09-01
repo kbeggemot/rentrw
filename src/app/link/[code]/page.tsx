@@ -509,7 +509,7 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
           <div className="text-sm text-gray-700">{msg || 'Оплата временно недоступна. Пожалуйста, уточните детали у продавца.'}</div>
         ) : (
         <>
-        {data.allowCartAdjust && Array.isArray(cart) && cart.length > 0 ? (
+        {Array.isArray(cart) && cart.length > 0 ? (
           <div className="mb-3">
             <div className="text-sm text-gray-600 mb-2">Соберите свою корзину</div>
             {data.cartDisplay === 'list' ? (
@@ -526,8 +526,10 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
                       <div className="text-sm font-medium">{item.title}</div>
                       <div className="text-xs text-gray-600">Цена: {Number(item.price || 0).toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₽</div>
                     </div>
-                    <input type="number" min={1} step={1} className="w-10 rounded border px-2 h-9 text-sm bg-white text-black dark:bg-gray-800 dark:text-white placeholder-gray-400 dark:placeholder-gray-400" value={String(item.qty)} onChange={(e) => { const raw = e.target.value; const q = raw.trim() === '' ? 0 : Math.max(0, Number(raw)); setCart((prev) => prev.map((it, i) => i === idx ? { ...it, qty: q } : it)); }} />
-                    <button type="button" className="px-3 h-9 rounded border text-sm text-gray-700 whitespace-nowrap" onClick={() => setCart((prev) => prev.filter((_, i) => i !== idx))}>Удалить</button>
+                    <input type="number" min={1} step={1} disabled={!data.allowCartAdjust} className="w-10 rounded border px-2 h-9 text-sm bg-white text-black dark:bg-gray-800 dark:text-white placeholder-gray-400 dark:placeholder-gray-400" value={String(item.qty)} onChange={(e) => { const raw = e.target.value; const q = raw.trim() === '' ? 0 : Math.max(0, Number(raw)); setCart((prev) => prev.map((it, i) => i === idx ? { ...it, qty: q } : it)); }} />
+                    {data.allowCartAdjust ? (
+                      <button type="button" className="px-3 h-9 rounded border text-sm text-gray-700 whitespace-nowrap" onClick={() => setCart((prev) => prev.filter((_, i) => i !== idx))}>Удалить</button>
+                    ) : null}
                   </div>
                 ))}
               </div>
@@ -548,13 +550,16 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
                     <div className="text-sm font-medium">{item.title}</div>
                     <div className="text-xs text-gray-600">Цена: {Number(item.price || 0).toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₽</div>
                     <div className="mt-2 flex items-center gap-2 overflow-x-auto touch-pan-x">
-                      <input type="number" min={1} step={1} className="w-10 rounded border px-2 h-9 text-sm bg-white text-black dark:bg-gray-800 dark:text-white placeholder-gray-400 dark:placeholder-gray-400" value={String(item.qty)} onChange={(e) => { const raw = e.target.value; const q = raw.trim() === '' ? 0 : Math.max(0, Number(raw)); setCart((prev) => prev.map((it, i) => i === idx ? { ...it, qty: q } : it)); }} />
-                      <button type="button" className="px-3 h-9 rounded border text-sm text-gray-700 whitespace-nowrap" onClick={() => setCart((prev) => prev.filter((_, i) => i !== idx))}>Удалить</button>
+                      <input type="number" min={1} step={1} disabled={!data.allowCartAdjust} className="w-10 rounded border px-2 h-9 text-sm bg-white text-black dark:bg-gray-800 dark:text-white placeholder-gray-400 dark:placeholder-gray-400" value={String(item.qty)} onChange={(e) => { const raw = e.target.value; const q = raw.trim() === '' ? 0 : Math.max(0, Number(raw)); setCart((prev) => prev.map((it, i) => i === idx ? { ...it, qty: q } : it)); }} />
+                      {data.allowCartAdjust ? (
+                        <button type="button" className="px-3 h-9 rounded border text-sm text-gray-700 whitespace-nowrap" onClick={() => setCart((prev) => prev.filter((_, i) => i !== idx))}>Удалить</button>
+                      ) : null}
                     </div>
                   </div>
                 ))}
               </div>
             )}
+            {data.allowCartAdjust ? (
             <div className="flex items-center gap-2 relative mt-3">
               <div className="relative flex-1">
                 <input
@@ -596,6 +601,7 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
               </div>
               <button type="button" className="rounded border px-3 h-9 text-sm" onClick={() => { const q = addQuery.trim().toLowerCase(); const catalog = Array.isArray(data.cartItems) ? data.cartItems : []; const remaining = catalog.filter((p: any) => !cart.some((c) => c.title === p.title)); if (remaining.length === 0) { setAddHint('больше ничего нет('); setAddOpen(true); return; } if (!q) { setAddOpen(true); return; } const found = (catalog as any[]).find((p: any) => String(p?.title || '').toLowerCase().includes(q)); if (found) { const id = found?.id ?? null; setCart((prev) => { const i = prev.findIndex((x) => (x.id || null) === (id || null) && x.title === found.title); if (i >= 0) return prev.map((x, j) => (j === i ? { ...x, qty: Number(x.qty || 0) + 1 } : x)); return [...prev, { id, title: String(found.title || ''), price: Number(found.price || 0), qty: 1 }]; }); setAddQuery(''); setAddHint(null); } else { setAddHint('больше ничего нет('); setAddOpen(true); } }}>Добавить</button>
             </div>
+            ) : null}
             <div className="mt-2">
               <label className="block text-sm text-gray-600 mb-1">Итоговая сумма, ₽</label>
               <input className="w-40 rounded-lg border px-2 h-9 text-sm bg-gray-100 text-black dark:bg-gray-800 dark:text-white" value={(cartTotal || 0).toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} readOnly />
