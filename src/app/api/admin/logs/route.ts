@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 import { readText } from '@/server/storage';
+import { promises as fs } from 'fs';
+import path from 'path';
 
 export const runtime = 'nodejs';
 
@@ -18,8 +20,15 @@ export async function GET(req: Request) {
       return new NextResponse(txt || '', { status: 200, headers: { 'Content-Type': 'text/plain; charset=utf-8' } });
     }
     if (type === 's3') {
-      const txt = await readText('.data/s3_io.log');
-      return new NextResponse(txt || '', { status: 200, headers: { 'Content-Type': 'text/plain; charset=utf-8' } });
+      // ВАЖНО: лог s3_io.log всегда пишется на локальный FS, даже когда S3_ENABLED=1.
+      // Поэтому читаем напрямую с диска, а не через storage.readText (который уходит в S3).
+      try {
+        const abs = path.join(process.cwd(), '.data', 's3_io.log');
+        const buf = await fs.readFile(abs, 'utf8').catch(() => '');
+        return new NextResponse(buf || '', { status: 200, headers: { 'Content-Type': 'text/plain; charset=utf-8' } });
+      } catch {
+        return new NextResponse('', { status: 200, headers: { 'Content-Type': 'text/plain; charset=utf-8' } });
+      }
     }
     return new NextResponse('', { status: 200, headers: { 'Content-Type': 'text/plain; charset=utf-8' } });
   } catch (e) {
