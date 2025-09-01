@@ -109,10 +109,21 @@ export default function EditLinkPage(props: { params: Promise<{ code: string }> 
   }, [shouldApplyDisplayAdjustment, numericCart, commissionType, commissionValue]);
   const agentLine = useMemo(() => {
     if (!commissionValid || numericCart.length === 0) return null;
-    const T = numericCart.reduce((s, r) => s + r.price * r.qty, 0);
     const v = Number(commissionValue.replace(',', '.'));
-    const A = commissionType === 'percent' ? T * (v / 100) : v;
-    const agentAmount = Math.round((Math.min(Math.max(A, 0), T) + Number.EPSILON) * 100) / 100;
+    const effSum = numericCart.reduce((s, r) => s + r.price * r.qty, 0);
+    let A = 0;
+    if (commissionType === 'percent') {
+      const k = 1 - (v / 100);
+      if (k > 0) {
+        // исходная сумма T = eff / k, комиссия = T - eff
+        A = (effSum * (1 / k - 1));
+      } else {
+        A = 0;
+      }
+    } else {
+      A = v;
+    }
+    const agentAmount = Math.round((Math.max(0, A) + Number.EPSILON) * 100) / 100;
     return { title: 'Услуги агента', price: agentAmount, qty: 1 };
   }, [commissionValid, commissionType, commissionValue, numericCart]);
 
@@ -122,9 +133,16 @@ export default function EditLinkPage(props: { params: Promise<{ code: string }> 
     const commissionValidLocal = isAgent && ((commissionType === 'percent' && v >= 0) || (commissionType === 'fixed' && v > 0));
     const effBase = shouldApplyDisplayAdjustment ? adjustedForDisplay : numericCart;
     const eff = effBase.reduce((s, r) => s + r.price * r.qty, 0);
-    const T = numericCart.reduce((s, r) => s + r.price * r.qty, 0);
-    const A = commissionValidLocal ? (commissionType === 'percent' ? T * (v / 100) : v) : 0;
-    return eff + A;
+    let A = 0;
+    if (commissionValidLocal) {
+      if (commissionType === 'percent') {
+        const k = 1 - (v / 100);
+        A = k > 0 ? eff * (1 / k - 1) : 0;
+      } else {
+        A = v;
+      }
+    }
+    return eff + (Math.round((A + Number.EPSILON) * 100) / 100);
   }, [mode, adjustedForDisplay, shouldApplyDisplayAdjustment, numericCart, isAgent, commissionType, commissionValue]);
 
   const onSave = async () => {
@@ -262,9 +280,11 @@ export default function EditLinkPage(props: { params: Promise<{ code: string }> 
                       {idx===0 ? (<div className="text-xs text-gray-500 mb-1">Цена, ₽</div>) : null}
                       {(() => {
                         const baseNum = Number(String(row.price || '0').replace(',', '.'));
-                        const isLiveAdjusted = shouldApplyDisplayAdjustment || initialIsAgent === true;
+                        const v = Number(commissionValue.replace(',', '.'));
+                        const k = commissionType === 'percent' ? (1 - (v / 100)) : undefined;
+                        const isLiveAdjusted = isAgent && (commissionType === 'fixed' || (commissionType === 'percent' && typeof k === 'number'));
                         const shownNum = (isLiveAdjusted && editingPriceIdx !== idx)
-                          ? (adjustedForDisplay[idx]?.price ?? baseNum)
+                          ? (commissionType === 'percent' ? (baseNum * (k ?? 1)) : Math.max(baseNum - v, 0))
                           : baseNum;
                         const shownStr = (isLiveAdjusted && editingPriceIdx !== idx)
                           ? shownNum.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2, useGrouping: false })
