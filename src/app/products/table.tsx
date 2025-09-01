@@ -77,7 +77,7 @@ export default function ProductsTable({ initialItems }: { initialItems: Item[] }
 
       {/* Desktop table */}
       <div className="hidden md:block overflow-x-auto border border-gray-200 dark:border-gray-800 rounded-lg">
-        <table className="min-w-full text-sm">
+        <table className="w-full text-sm">
           <thead className="bg-gray-50 dark:bg-gray-900">
             <tr>
               <th className="text-left p-2">Тип</th>
@@ -87,7 +87,7 @@ export default function ProductsTable({ initialItems }: { initialItems: Item[] }
               <th className="text-left p-2">Ед.</th>
               <th className="text-left p-2">НДС</th>
               <th className="text-left p-2">Артикул</th>
-              <th className="text-left p-2">Действия</th>
+              <th className="text-left p-2 w-1 whitespace-nowrap">Действия</th>
             </tr>
           </thead>
           <tbody>
@@ -101,7 +101,7 @@ export default function ProductsTable({ initialItems }: { initialItems: Item[] }
                 <td className="p-2">{p.vat === 'none' ? 'Без НДС' : `${p.vat}%`}</td>
                 <td className="p-2">{p.sku || ''}</td>
                 <td className="p-2">
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 justify-end md:justify-start">
                     <a href={`/products/edit/${encodeURIComponent(p.id)}`} className="inline-flex items-center justify-center rounded-lg bg-gray-200 dark:bg-gray-800 hover:bg-gray-300 dark:hover:bg-gray-700 h-9 px-2 text-sm text-black dark:text-white" aria-label="Редактировать">Редактировать</a>
                     <Button variant="secondary" size="icon" aria-label="Удалить" onClick={() => onDelete(p.id)}>
                       <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>

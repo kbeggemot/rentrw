@@ -14,6 +14,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL('https://ypla.ru'),
+  applicationName: 'YPLA',
   title: "YPLA",
   description: "Платежная касса YPLA",
   openGraph: {
