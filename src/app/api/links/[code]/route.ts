@@ -156,9 +156,23 @@ export async function PUT(req: Request) {
         qty: Number(String(c?.qty ?? '1').toString().replace(/,/g, '.')),
       })).filter((c: any) => Number.isFinite(c.price) && Number.isFinite(c.qty) && c.price > 0 && c.qty > 0);
       if (normalized.length === 0) return NextResponse.json({ error: 'CART_EMPTY' }, { status: 400 });
-      // If agent — persist adjusted prices so that subsequent public page sees the same split
+      // If agent is enabled and agent params changed — recalc and persist adjusted prices.
+      // Otherwise, trust incoming prices (they are already adjusted in the stored link).
       if (isAgent && commissionType && commissionValue != null) {
-        try { normalized = applyAgentCommissionToCart(normalized.map(i=>({ title:i.title, price:i.price, qty:i.qty })), commissionType as any, Number(commissionValue)).adjusted as any; } catch {}
+        const agentChanged = (
+          !!current.isAgent !== !!isAgent ||
+          (current as any)?.commissionType !== commissionType ||
+          Number((current as any)?.commissionValue ?? NaN) !== Number(commissionValue)
+        );
+        if (agentChanged) {
+          try {
+            normalized = applyAgentCommissionToCart(
+              normalized.map(i=>({ title:i.title, price:i.price, qty:i.qty })),
+              commissionType as any,
+              Number(commissionValue)
+            ).adjusted as any;
+          } catch {}
+        }
       }
       const allowCartAdjust = !!body?.allowCartAdjust;
       const cartDisplay = body?.cartDisplay === 'list' ? 'list' : (body?.cartDisplay === 'grid' ? 'grid' : undefined);
