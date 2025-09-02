@@ -496,7 +496,7 @@ export default function EditLinkPage(props: { params: Promise<{ code: string }> 
                           const phoneDigits = p.phone.replace(/\D/g, '');
                           const phoneOk = qDigits.length > 0 && phoneDigits.includes(qDigits);
                           const fioOk = (p.fio || '').toLowerCase().includes(q);
-                          return qDigits.length > 0 ? phoneOk : fioOk;
+                          return qDigits.length > 0 ? phoneOk : (fioOk || phoneOk);
                         });
                         return items.length === 0 ? (
                           qDigits ? (

@@ -51,7 +51,12 @@ export async function listPartnersForOrg(userId: string, orgInn: string): Promis
   const store = await readStore();
   const arr = Array.isArray(store.users[userId]) ? store.users[userId] : [];
   const inn = (orgInn || '').replace(/\D/g, '');
-  return arr.filter((p) => !p.hidden && (p.orgInn || '') === inn);
+  // Also include legacy/unknown org entries to avoid "пропажа" при старых записях
+  return arr.filter((p) => {
+    if (p.hidden) return false;
+    const pin = (p.orgInn || '').replace(/\D/g, '');
+    return pin === inn || pin.length === 0 || (p.orgInn === 'неизвестно');
+  });
 }
 
 export async function listAllPartnersForOrg(orgInn: string): Promise<PartnerRecord[]> {
@@ -75,18 +80,34 @@ export async function upsertPartner(userId: string, partner: PartnerRecord): Pro
   const idx = arr.findIndex((p) => normalizePhone(p.phone) === normalizedPhone);
   
   // Always store phone in normalized format (digits only)
-  const normalizedPartner = { ...partner, phone: normalizedPhone };
+  const normalizedPartner = { ...partner, phone: normalizedPhone } as PartnerRecord;
+  // Normalize orgInn to digits (keep label 'неизвестно' when explicitly set)
+  const newInnDigits = normalizedPartner.orgInn === 'неизвестно' ? '' : (normalizedPartner.orgInn || '').replace(/\D/g, '');
+  const normalizedOrgInn = newInnDigits ? newInnDigits : (normalizedPartner.orgInn === 'неизвестно' ? 'неизвестно' : '');
+  normalizedPartner.orgInn = normalizedOrgInn;
   
   if (idx !== -1) {
     // Update existing partner, keeping the most recent data
-    arr[idx] = { 
-      ...arr[idx], 
-      ...normalizedPartner, 
-      createdAt: arr[idx].createdAt || arr[idx].updatedAt || new Date().toISOString(),
-      updatedAt: new Date().toISOString() 
+    const prev = arr[idx];
+    const prevInnDigits = (prev.orgInn || '').replace(/\D/g, '');
+    // Do not downgrade existing orgInn to unknown/empty
+    const mergedOrgInn = normalizedOrgInn
+      ? normalizedOrgInn
+      : (prevInnDigits ? prevInnDigits : (prev.orgInn || normalizedPartner.orgInn));
+    arr[idx] = {
+      ...prev,
+      ...normalizedPartner,
+      // preserve meaningful fields when incoming value is null/empty
+      fio: normalizedPartner.fio ?? prev.fio,
+      status: normalizedPartner.status ?? prev.status,
+      inn: normalizedPartner.inn ?? prev.inn,
+      orgInn: mergedOrgInn || '',
+      createdAt: prev.createdAt || prev.updatedAt || new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      hidden: normalizedPartner.hidden ?? prev.hidden,
     };
   } else {
-    arr.push({ ...normalizedPartner, createdAt: new Date().toISOString() });
+    arr.push({ ...normalizedPartner, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() });
   }
   
   store.users[userId] = arr;
