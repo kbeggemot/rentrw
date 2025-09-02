@@ -908,9 +908,10 @@ function AcceptPaymentContent() {
                       const q = agentPhone.toLowerCase();
                       const qDigits = q.replace(/\D/g, '');
                       const items = partners.filter((p) => {
-                        const phoneOk = p.phone.replace(/\D/g, '').includes(qDigits);
+                        const phoneDigits = p.phone.replace(/\D/g, '');
+                        const phoneOk = qDigits.length > 0 && phoneDigits.includes(qDigits);
                         const fioOk = (p.fio || '').toLowerCase().includes(q);
-                        return qDigits ? phoneOk : fioOk || phoneOk;
+                        return qDigits.length > 0 ? phoneOk : fioOk;
                       });
                       return items.length === 0 ? (
                         qDigits ? (
