@@ -64,10 +64,16 @@ export default function EditLinkPage(props: { params: Promise<{ code: string }> 
           setAllowCartAdjust(!!d.allowCartAdjust);
           setCartDisplay(d.cartDisplay === 'grid' ? 'grid' : 'list');
           // восстановим исходные цены за единицу для пересчёта
+          // если есть актуальная цена из витрины — используем её как исходную
+          const currentUnits: Array<number | null> = (d.cartItems as any[]).map((c: any) => (typeof c?.priceCurrent === 'number' && Number.isFinite(c.priceCurrent) ? Number(c.priceCurrent) : null));
+          const hasCurrent = currentUnits.some((v) => v != null);
           const savedUnits: number[] = (d.cartItems as any[]).map((c) => Number(c?.price ?? 0));
           const savedQty: number[] = (d.cartItems as any[]).map((c) => Number(c?.qty ?? 0));
           const v = Number(d?.commissionValue ?? 0);
-          if (d?.isAgent && (d?.commissionType === 'percent' || d?.commissionType === 'fixed')) {
+          if (hasCurrent) {
+            const filled = currentUnits.map((v, idx) => (v != null ? v : savedUnits[idx]));
+            setBaseUnits(filled);
+          } else if (d?.isAgent && (d?.commissionType === 'percent' || d?.commissionType === 'fixed')) {
             if (d.commissionType === 'percent') {
               const k = 1 - (v / 100);
               const restored = savedUnits.map((u) => k > 0 ? Math.round(((u / k) + Number.EPSILON) * 100) / 100 : u);
