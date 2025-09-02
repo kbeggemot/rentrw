@@ -8,7 +8,7 @@ const JOBS_FILE = path.join(DATA_DIR, 'subscription_jobs.json');
 type Job = {
   id: string; // `${userId}`
   userId: string;
-  callbackBase: string; // e.g. https://rentrw.onrender.com
+  callbackBase: string; // e.g. https://ypla.ru
   createdAt: string; // ISO
   attempts: number;
   nextRunAt: string; // ISO

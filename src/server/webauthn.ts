@@ -63,7 +63,7 @@ function isSameCredentialId(storedId: string, respId: string): boolean {
 }
 
 export async function startRegistration(user: UserRecord, opts?: { rpID?: string; origin?: string }) {
-  const rpName = 'RentRW';
+  const rpName = 'YPLA';
   const rpID = opts?.rpID || new URL(process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000').hostname;
   const origin = opts?.origin || process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
   const optionsJSON: any = {
