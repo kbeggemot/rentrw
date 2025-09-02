@@ -891,7 +891,7 @@ function AcceptPaymentContent() {
               <div className="relative flex-1 min-w-[14rem]">
                 <input
                   className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-950 px-2 h-9 text-sm"
-                  placeholder="ФИО — телефон"
+                  placeholder="Телефон или ФИО партнёра"
                   value={(() => {
                     const digits = agentPhone.replace(/\D/g, '');
                     const found = partners.find((p) => p.phone.replace(/\D/g, '') === digits);
@@ -913,26 +913,30 @@ function AcceptPaymentContent() {
                         return qDigits ? phoneOk : fioOk || phoneOk;
                       });
                       return items.length === 0 ? (
-                        <div className="px-2 py-2 text-xs">
-                          <button type="button" className="px-2 py-1 text-sm rounded border hover:bg-gray-50 dark:hover:bg-gray-900" onClick={async () => {
-                            const phoneDigits = agentPhone.replace(/\D/g, '');
-                            if (!phoneDigits) return;
-                            setPartnerLoading(true);
-                            try {
-                              const res = await fetch('/api/partners', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ phone: phoneDigits }) });
-                              const d = await res.json();
-                              if (res.ok) {
-                                const p = d?.partner || {};
-                                const fio = p?.fio || null;
-                                setPartners((prev) => {
-                                  const exists = prev.some((x) => x.phone.replace(/\D/g, '') === phoneDigits);
-                                  return exists ? prev.map((x) => (x.phone.replace(/\D/g, '') === phoneDigits ? { phone: phoneDigits, fio } : x)) : [...prev, { phone: phoneDigits, fio }];
-                                });
-                                setPartnersOpen(false);
-                              }
-                            } catch {} finally { setPartnerLoading(false); }
-                          }}>Добавить</button>
-                        </div>
+                        qDigits ? (
+                          <div className="px-2 py-2 text-xs">
+                            <button type="button" className="px-2 py-1 text-sm rounded border hover:bg-gray-50 dark:hover:bg-gray-900" onClick={async () => {
+                              const phoneDigits = agentPhone.replace(/\D/g, '');
+                              if (!phoneDigits) return;
+                              setPartnerLoading(true);
+                              try {
+                                const res = await fetch('/api/partners', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ phone: phoneDigits }) });
+                                const d = await res.json();
+                                if (res.ok) {
+                                  const p = d?.partner || {};
+                                  const fio = p?.fio || null;
+                                  setPartners((prev) => {
+                                    const exists = prev.some((x) => x.phone.replace(/\D/g, '') === phoneDigits);
+                                    return exists ? prev.map((x) => (x.phone.replace(/\D/g, '') === phoneDigits ? { phone: phoneDigits, fio } : x)) : [...prev, { phone: phoneDigits, fio }];
+                                  });
+                                  setPartnersOpen(false);
+                                }
+                              } catch {} finally { setPartnerLoading(false); }
+                            }}>Добавить</button>
+                          </div>
+                        ) : (
+                          <div className="px-2 py-2 text-xs text-gray-500">Ничего не найдено</div>
+                        )
                       ) : (
                         items.map((p, i) => (
                           <button key={i} type="button" className="w-full text-left px-2 py-1 text-sm hover:bg-gray-50 dark:hover:bg-gray-900" onMouseDown={() => { setAgentPhone(p.phone); setPartnersOpen(false); }}>

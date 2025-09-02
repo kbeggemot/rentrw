@@ -456,10 +456,10 @@ export default function EditLinkPage(props: { params: Promise<{ code: string }> 
                   <option value="fixed">₽</option>
                 </select>
                 <input className="w-32 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-950 px-2 h-9 text-sm" placeholder="Комиссия" value={commissionValue} onChange={(e) => setCommissionValue(e.target.value)} />
-                <div className="relative">
+                <div className="relative md:col-span-2">
                   <input
-                    className="w-56 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-950 px-2 h-9 text-sm"
-                    placeholder="ФИО — телефон"
+                    className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-950 px-2 h-9 text-sm"
+                    placeholder="Телефон или ФИО партнёра"
                     value={(() => {
                       const digits = partnerPhone.replace(/\D/g, '');
                       const found = partners.find((p) => p.phone.replace(/\D/g, '') === digits);
@@ -480,33 +480,37 @@ export default function EditLinkPage(props: { params: Promise<{ code: string }> 
                           return qDigits ? phoneOk : fioOk || phoneOk;
                         });
                         return items.length === 0 ? (
-                          <div className="px-2 py-2 text-xs">
-                            <button type="button" className="px-2 py-1 text-sm rounded border hover:bg-gray-50 dark:hover:bg-gray-900" onClick={async () => {
-                              const phoneDigits = partnerPhone.replace(/\D/g, '');
-                              if (!phoneDigits) return;
-                              setPartnerLoading(true);
-                              try {
-                                const res = await fetch('/api/partners', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ phone: phoneDigits }) });
-                                const d = await res.json();
-                                if (!res.ok) {
-                                  const msg = d?.error || 'Не удалось добавить партнёра';
-                                  showToast(msg, 'error');
-                                } else {
-                                  const p = d?.partner || {};
-                                  const fio = p?.fio || null;
-                                  setPartners((prev) => {
-                                    const exists = prev.some((x) => x.phone.replace(/\D/g, '') === phoneDigits);
-                                    return exists ? prev.map((x) => (x.phone.replace(/\D/g, '') === phoneDigits ? { phone: phoneDigits, fio } : x)) : [...prev, { phone: phoneDigits, fio }];
-                                  });
-                                  setPartnersOpen(false);
+                          qDigits ? (
+                            <div className="px-2 py-2 text-xs">
+                              <button type="button" className="px-2 py-1 text-sm rounded border hover:bg-gray-50 dark:hover:bg-gray-900" onClick={async () => {
+                                const phoneDigits = partnerPhone.replace(/\D/g, '');
+                                if (!phoneDigits) return;
+                                setPartnerLoading(true);
+                                try {
+                                  const res = await fetch('/api/partners', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ phone: phoneDigits }) });
+                                  const d = await res.json();
+                                  if (!res.ok) {
+                                    const msg = d?.error || 'Не удалось добавить партнёра';
+                                    showToast(msg, 'error');
+                                  } else {
+                                    const p = d?.partner || {};
+                                    const fio = p?.fio || null;
+                                    setPartners((prev) => {
+                                      const exists = prev.some((x) => x.phone.replace(/\D/g, '') === phoneDigits);
+                                      return exists ? prev.map((x) => (x.phone.replace(/\D/g, '') === phoneDigits ? { phone: phoneDigits, fio } : x)) : [...prev, { phone: phoneDigits, fio }];
+                                    });
+                                    setPartnersOpen(false);
+                                  }
+                                } catch {
+                                  showToast('Не удалось добавить партнёра', 'error');
+                                } finally {
+                                  setPartnerLoading(false);
                                 }
-                              } catch {
-                                showToast('Не удалось добавить партнёра', 'error');
-                              } finally {
-                                setPartnerLoading(false);
-                              }
-                            }}>Добавить</button>
-                          </div>
+                              }}>Добавить</button>
+                            </div>
+                          ) : (
+                            <div className="px-2 py-2 text-xs text-gray-500">Ничего не найдено</div>
+                          )
                         ) : (
                           items.map((p, i) => (
                             <button key={i} type="button" className="w-full text-left px-2 py-1 text-sm hover:bg-gray-50 dark:hover:bg-gray-900" onMouseDown={() => { setPartnerPhone(p.phone); setPartnersOpen(false); }}>
