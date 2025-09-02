@@ -656,8 +656,6 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
                       <div className="text-sm font-medium">{agentLine.title}</div>
                       <div className="text-xs text-gray-600">Цена: {Number(agentLine.price || 0).toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₽</div>
                     </div>
-                    <input type="number" className="w-10 rounded border px-2 h-9 text-sm bg-gray-100 text-gray-500" value="1" readOnly disabled />
-                    <button type="button" className="px-3 h-9 rounded border text-sm text-gray-400" disabled>Удалить</button>
                   </div>
                 ) : null}
               </div>
@@ -691,10 +689,6 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
                   <div className="rounded border p-2 bg-gray-50">
                     <div className="text-sm font-medium">{agentLine.title}</div>
                     <div className="text-xs text-gray-600">Цена: {Number(agentLine.price || 0).toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₽</div>
-                    <div className="mt-2 flex items-center gap-2">
-                      <input type="number" className="w-10 rounded border px-2 h-9 text-sm bg-gray-100 text-gray-500" value="1" readOnly disabled />
-                      <button type="button" className="px-3 h-9 rounded border text-sm text-gray-400" disabled>Удалить</button>
-                    </div>
                   </div>
                 ) : null}
               </div>
