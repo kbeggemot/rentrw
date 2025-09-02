@@ -20,7 +20,7 @@ export function Textarea({ label, hint, id, className = '', rows = 4, ...props }
       <textarea
         id={textareaId}
         rows={rows}
-        className="w-full rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-foreground"
+        className="w-full rounded-md border border-gray-300 dark:border-gray-700 bg-white text-black dark:bg-gray-800 dark:text-white px-3 py-2 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-foreground"
         {...props}
       />
       {hint ? <p className="text-xs text-gray-500 dark:text-gray-400">{hint}</p> : null}
