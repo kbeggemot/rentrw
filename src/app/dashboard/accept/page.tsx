@@ -443,7 +443,7 @@ function AcceptPaymentContent() {
       } else {
         if (!Number.isFinite(numComm) || numComm <= 0) { showToast('Укажите фиксированную комиссию в рублях (> 0)', 'error'); return; }
       }
-      if (agentPhone.trim().length === 0) { showToast('Укажите телефон партнёра', 'error'); return; }
+      if (agentPhone.replace(/\D/g, '').length === 0) { showToast('Укажите телефон партнёра', 'error'); return; }
       // Validate net amount after commission
       const retained = commissionType === 'percent' ? (numAmount * (numComm / 100)) : numComm;
       const net = numAmount - retained;
@@ -564,7 +564,7 @@ function AcceptPaymentContent() {
           method,
           clientEmail: buyerEmail || null,
           agentSale: isAgentSale || undefined,
-          agentPhone: isAgentSale && agentPhone.trim().length > 0 ? agentPhone.trim() : undefined,
+          agentPhone: isAgentSale && agentPhone.replace(/\D/g, '').length > 0 ? agentPhone.replace(/\D/g, '') : undefined,
           commissionType: isAgentSale ? commissionType : undefined,
           commissionValue: isAgentSale ? numComm : undefined,
           serviceEndDate,
@@ -891,28 +891,17 @@ function AcceptPaymentContent() {
               <div className="relative flex-1 min-w-[14rem]">
                 <input
                   className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-950 px-2 h-9 text-sm"
-                  placeholder="Телефон партнёра"
-                  value={agentPhone}
+                  placeholder="ФИО — телефон"
+                  value={(() => {
+                    const digits = agentPhone.replace(/\D/g, '');
+                    const found = partners.find((p) => p.phone.replace(/\D/g, '') === digits);
+                    return found?.fio ? `${found.fio} — ${digits || agentPhone}` : agentPhone;
+                  })()}
                   onChange={(e) => { setAgentPhone(e.target.value); setPartnersOpen(true); }}
                   onFocus={() => setPartnersOpen(true)}
                   onBlur={() => setTimeout(() => setPartnersOpen(false), 150)}
                 />
-                {/* FIO on desktop (right), below on mobile */}
-                {/* Desktop FIO to the right (absolute); Mobile below with fixed height to avoid jumps */}
-                <div className="hidden sm:block mt-1 text-xs text-gray-600 whitespace-normal sm:whitespace-nowrap sm:absolute sm:top-0 sm:left-full sm:ml-2 sm:h-9 sm:flex sm:items-center sm:mt-0">
-                  {(() => {
-                    const digits = agentPhone.replace(/\D/g, '');
-                    const found = partners.find((p) => p.phone.replace(/\D/g, '') === digits);
-                    return found?.fio || '';
-                  })()}
-                </div>
-                <div className="sm:hidden col-span-3 mt-1 text-xs text-gray-600 h-5">
-                  {(() => {
-                    const digits = agentPhone.replace(/\D/g, '');
-                    const found = partners.find((p) => p.phone.replace(/\D/g, '') === digits);
-                    return found?.fio || '';
-                  })()}
-                </div>
+                {/* никаких внешних подпісей ФИО */}
                 {partnersOpen ? (
                   <div className="absolute left-0 top-full mt-1 w-[22rem] max-h-56 overflow-auto rounded border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 shadow z-10">
                     {(() => {

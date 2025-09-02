@@ -459,36 +459,16 @@ export default function EditLinkPage(props: { params: Promise<{ code: string }> 
                 <div className="relative">
                   <input
                     className="w-56 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-950 px-2 h-9 text-sm"
-                    placeholder="Телефон партнёра"
-                    value={partnerPhone}
+                    placeholder="ФИО — телефон"
+                    value={(() => {
+                      const digits = partnerPhone.replace(/\D/g, '');
+                      const found = partners.find((p) => p.phone.replace(/\D/g, '') === digits);
+                      return found?.fio ? `${found.fio} — ${digits || partnerPhone}` : partnerPhone;
+                    })()}
                     onChange={(e) => { setPartnerPhone(e.target.value); setPartnersOpen(true); }}
                     onFocus={() => setPartnersOpen(true)}
                     onBlur={() => setTimeout(() => setPartnersOpen(false), 150)}
                   />
-                  {/* Desktop: to the right (absolute) — не влияет на поток */}
-                  <div className="hidden sm:block mt-1 text-xs text-gray-600 whitespace-normal sm:whitespace-nowrap sm:absolute sm:top-0 sm:left-full sm:ml-2 sm:h-9 sm:flex sm:items-center sm:mt-0">
-                    {partnerLoading ? (
-                      <svg className="animate-spin h-4 w-4 text-gray-500" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path></svg>
-                    ) : (
-                      (() => {
-                        const digits = partnerPhone.replace(/\D/g, '');
-                        const found = partners.find((p) => p.phone.replace(/\D/g, '') === digits);
-                        return found?.fio || '';
-                      })()
-                    )}
-                  </div>
-                  {/* Mobile: всегда держим фиксированную высоту, чтобы не прыгало */}
-                  <div className="sm:hidden col-span-3 mt-1 text-xs text-gray-600 h-5">
-                    {partnerLoading ? (
-                      <svg className="animate-spin h-4 w-4 text-gray-500" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path></svg>
-                    ) : (
-                      (() => {
-                        const digits = partnerPhone.replace(/\D/g, '');
-                        const found = partners.find((p) => p.phone.replace(/\D/g, '') === digits);
-                        return found?.fio || '';
-                      })()
-                    )}
-                  </div>
                   {partnersOpen ? (
                     <div className="absolute z-10 mt-1 w-[22rem] max-h-56 overflow-auto rounded border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 shadow">
                       {(() => {
