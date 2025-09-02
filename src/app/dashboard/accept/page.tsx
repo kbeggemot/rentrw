@@ -752,7 +752,7 @@ function AcceptPaymentContent() {
                   <div className="overflow-x-auto sm:overflow-visible -mx-1 px-1 touch-pan-x">
                     <div className="flex items-start gap-2 w-max opacity-90">
                       <div className="relative flex-1 min-w-[8rem] sm:min-w-[14rem]">
-                        <input className="w-full rounded border px-2 h-9 text-sm bg-gray-100" value="Услуги агента" readOnly disabled />
+                        <input className="w-full rounded border px-2 h-9 text-sm bg-gray-100" value={agentDesc || 'Услуги агента'} readOnly disabled />
                       </div>
                       <div>
                         <input className="w-16 sm:w-20 rounded border px-2 h-9 text-sm bg-gray-100" value="1" readOnly disabled />

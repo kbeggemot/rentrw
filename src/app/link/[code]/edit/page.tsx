@@ -40,6 +40,7 @@ export default function EditLinkPage(props: { params: Promise<{ code: string }> 
   const [allowCartAdjust, setAllowCartAdjust] = useState(false);
   const [cartDisplay, setCartDisplay] = useState<'grid' | 'list'>('list');
   const [baseUnits, setBaseUnits] = useState<number[]>([]); // исходные цены за единицу для пересчёта
+  const [agentDesc, setAgentDesc] = useState<string | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -114,6 +115,17 @@ export default function EditLinkPage(props: { params: Promise<{ code: string }> 
     })();
   }, []);
 
+  // Load agent description from settings
+  useEffect(() => {
+    (async () => {
+      try {
+        const r = await fetch('/api/settings/agent', { cache: 'no-store' });
+        const j = await r.json();
+        if (typeof j?.agentDescription === 'string') setAgentDesc(j.agentDescription);
+      } catch {}
+    })();
+  }, []);
+
   // Preload products for cart selector
   useEffect(() => {
     (async () => {
@@ -170,8 +182,8 @@ export default function EditLinkPage(props: { params: Promise<{ code: string }> 
   const agentLine = useMemo(() => {
     if (!commissionValid || baseCart.length === 0) return null;
     const v = Number(commissionValue.replace(',', '.'));
-    try { const res = applyAgentCommissionToCart(baseCart, commissionType, v); return { title: 'Услуги агента', price: res.agentAmount, qty: 1 }; } catch { return null; }
-  }, [commissionValid, commissionType, commissionValue, baseCart]);
+    try { const res = applyAgentCommissionToCart(baseCart, commissionType, v); return { title: agentDesc || 'Услуги агента', price: res.agentAmount, qty: 1 }; } catch { return null; }
+  }, [commissionValid, commissionType, commissionValue, baseCart, agentDesc]);
 
   const totalCart = useMemo(() => {
     if (mode !== 'cart') return 0;
@@ -224,6 +236,7 @@ export default function EditLinkPage(props: { params: Promise<{ code: string }> 
         body.amountRub = totalCart;
         body.cartDisplay = cartDisplay;
       }
+      if (isAgent) body.agentDescription = agentDesc || null;
       const r = await fetch(`/api/links/${encodeURIComponent(code)}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
       const d = await r.json();
       if (!r.ok) throw new Error(d?.error || 'SAVE_ERROR');
