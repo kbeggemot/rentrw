@@ -35,7 +35,7 @@ type BodyIn = {
   commissionType?: 'percent' | 'fixed';
   commissionValue?: number; // percent or fixed rubles depending on commissionType
   serviceEndDate?: string; // YYYY-MM-DD
-  cartItems?: Array<{ title: string; price: number; qty: number }> | null;
+  cartItems?: Array<{ id?: string | null; title: string; price: number; qty: number }> | null;
   agentDescription?: string | null;
 };
 
@@ -229,14 +229,25 @@ export async function POST(req: Request) {
 
     // Формируем тело запроса к RocketWork: создание сделки для приёма платежа
     // Документация: tasks POST
+    // Derive RW description from cart titles when cart provided (truncate to 256)
+    const cartTitlesJoined = (() => {
+      const items = Array.isArray((body as any)?.cartItems) ? (body as any).cartItems : null;
+      if (!items || items.length === 0) return null;
+      const titles = items.map((i: any) => String(i?.title || '').trim()).filter((t: string) => t.length > 0);
+      if (titles.length === 0) return null;
+      return titles.join(', ').slice(0, 256);
+    })();
+
+    const rwDesc = cartTitlesJoined || description;
+
     const payload: Record<string, unknown> = {
-      description, // описание услуги на верхнем уровне — обязательно
+      description: rwDesc, // описание услуги на верхнем уровне — обязательно
       document_name: 'Типовой договор',
       title: 'Типовой договор',
       amount_gross: amountRub, // в рублях
       services: [
         {
-          description, // описание позиции услуги
+          description: rwDesc, // описание позиции услуги
           unit_price_cents: netUnitPriceCents,
           quantity,
           total_price_cents: netUnitPriceCents * quantity,
@@ -246,7 +257,7 @@ export async function POST(req: Request) {
       acquiring_order: {
         type: method.toUpperCase(), // QR | CARD
         client_email: clientEmail,
-        payment_purpose: description,
+        payment_purpose: rwDesc,
         vat: 'VatNo',
         // мы сами формируем чеки в ОФД (и для "сегодня", и для отложенных)
         with_ofd_receipt: false,

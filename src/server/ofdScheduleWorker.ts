@@ -6,6 +6,7 @@ import { getUserOrgInn, getUserPayoutRequisites } from './userStore';
 import { getDecryptedApiToken } from './secureStore';
 import { resolveRwTokenWithFingerprint } from './rwToken';
 import { listSales } from './taskStore';
+import { listProductsForOrg } from './productsStore';
 
 // Offset jobs are created only when invoiceIdOffset was assigned at creation
 
@@ -122,6 +123,26 @@ export async function runDueOffsetJobs(): Promise<void> {
         const sale = sales.find((s) => s.orderId === job.orderId);
         const invoiceIdOffset = sale?.invoiceIdOffset || null;
         if (!invoiceIdOffset) throw new Error('NO_INVOICE_ID_OFFSET');
+        // Try build Items[] from sale snapshot and product metadata
+        const itemsParam = await (async () => {
+          try {
+            const snap = (sale as any)?.itemsSnapshot as any[] | null;
+            if (!Array.isArray(snap) || snap.length === 0) return undefined;
+            const orgInnDigits = (sale as any)?.orgInn ? String((sale as any).orgInn).replace(/\D/g, '') : undefined;
+            const products = orgInnDigits ? await listProductsForOrg(orgInnDigits) : [];
+            return snap.map((it: any) => {
+              const prod = products.find((p) => (p.id && it?.id && String(p.id) === String(it.id)) || (p.title && it?.title && String(p.title).toLowerCase() === String(it.title).toLowerCase())) || null;
+              return {
+                label: String(it.title || ''),
+                price: Number(it.price || 0),
+                qty: Number(it.qty || 1),
+                vatRate: (prod?.vat as any) || (job.vatRate as any),
+                unit: (prod?.unit as any),
+                kind: (prod?.kind as any),
+              } as any;
+            });
+          } catch { return undefined; }
+        })();
         payload = buildFermaReceiptPayload({
           party: 'partner',
           partyInn: job.partnerInn,
@@ -136,6 +157,7 @@ export async function runDueOffsetJobs(): Promise<void> {
           callbackUrl,
           withAdvanceOffset: true,
           paymentAgentInfo: { AgentType: 'AGENT', SupplierInn: job.partnerInn, SupplierName: partnerName || 'Исполнитель' },
+          items: itemsParam,
         });
       } else {
         const orgInn = await getUserOrgInn(job.userId);
@@ -169,6 +191,24 @@ export async function runDueOffsetJobs(): Promise<void> {
           }
         } catch {}
         if (!supplierName) throw new Error('NO_ORG_NAME');
+        const itemsParam = await (async () => {
+          try {
+            const snap = (sale as any)?.itemsSnapshot as any[] | null;
+            if (!Array.isArray(snap) || snap.length === 0) return undefined;
+            const products = await listProductsForOrg(orgInn);
+            return snap.map((it: any) => {
+              const prod = products.find((p) => (p.id && it?.id && String(p.id) === String(it.id)) || (p.title && it?.title && String(p.title).toLowerCase() === String(it.title).toLowerCase())) || null;
+              return {
+                label: String(it.title || ''),
+                price: Number(it.price || 0),
+                qty: Number(it.qty || 1),
+                vatRate: (prod?.vat as any) || (job.vatRate as any),
+                unit: (prod?.unit as any),
+                kind: (prod?.kind as any),
+              } as any;
+            });
+          } catch { return undefined; }
+        })();
         payload = buildFermaReceiptPayload({
           party: 'org',
           partyInn: orgInn,
@@ -183,6 +223,7 @@ export async function runDueOffsetJobs(): Promise<void> {
           callbackUrl,
           withAdvanceOffset: true,
           paymentAgentInfo: { AgentType: 'AGENT', SupplierInn: orgInn, SupplierName: supplierName },
+          items: itemsParam,
         });
       }
       const created = await fermaCreateReceipt(payload, { baseUrl, authToken: token });

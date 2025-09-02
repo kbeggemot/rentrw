@@ -11,6 +11,7 @@ import { getUserOrgInn, getUserPayoutRequisites } from '@/server/userStore';
 import { enqueueOffsetJob, startOfdScheduleWorker } from '@/server/ofdScheduleWorker';
 import { appendOfdAudit } from '@/server/audit';
 import { readText, writeText } from '@/server/storage';
+import { listProductsForOrg } from '@/server/productsStore';
 // duplicated import removed
 
 export const runtime = 'nodejs';
@@ -222,7 +223,6 @@ export async function POST(req: Request) {
                 const partnerInn: string | undefined = (taskObj?.executor?.inn as string | undefined);
                 if (partnerInn) {
                   const defaultEmail = process.env.OFD_DEFAULT_EMAIL || process.env.DEFAULT_RECEIPT_EMAIL || 'ofd@rockethumans.com';
-                  const itemLabel = (sale.description && sale.description.trim().length > 0) ? sale.description.trim() : 'Оплата услуги';
                   const amountNet = Math.max(0, Number(sale.amountGrossRub || 0) - Number(sale.retainedCommissionRub || 0));
                   if (isToday) {
                     let invoiceIdFull = (sale as any).invoiceIdFull || null;
@@ -236,7 +236,8 @@ export async function POST(req: Request) {
                         const line = JSON.stringify({ ts: new Date().toISOString(), src: 'postback', stage: 'create_attempt', party: 'partner', userId, taskId, orderId: sale.orderId, invoiceId: invoiceIdFull, callbackUrl });
                         await writeText('.data/ofd_create_attempts.log', prev + line + '\n');
                       } catch {}
-                      const payload = buildFermaReceiptPayload({ party: 'partner', partyInn: partnerInn, description: itemLabel, amountRub: amountNet, vatRate: usedVat, methodCode: PAYMENT_METHOD_FULL_PAYMENT, orderId: sale.orderId, docType: 'Income', buyerEmail: sale.clientEmail || defaultEmail, invoiceId: invoiceIdFull, callbackUrl, paymentAgentInfo: { AgentType: 'AGENT', SupplierInn: partnerInn, SupplierName: partnerName || 'Исполнитель' } });
+                      const itemsParam = await (async ()=>{ try { const snap = (sale as any)?.itemsSnapshot as any[] | null; if (!Array.isArray(snap) || snap.length === 0) return undefined; const inn = (sale as any)?.orgInn ? String((sale as any).orgInn).replace(/\D/g,'') : undefined; const products = inn ? await listProductsForOrg(inn) : []; return snap.map((it:any)=>{ const prod = products.find((p)=> (p.id && it?.id && String(p.id)===String(it.id)) || (p.title && it?.title && String(p.title).toLowerCase()===String(it.title).toLowerCase())) || null; return { label: String(it.title||''), price: Number(it.price||0), qty: Number(it.qty||1), vatRate: (prod?.vat as any) || (usedVat as any), unit: (prod?.unit as any), kind: (prod?.kind as any) } as any; }); } catch { return undefined; } })();
+                      const payload = buildFermaReceiptPayload({ party: 'partner', partyInn: partnerInn, description: 'Оплата услуг', amountRub: amountNet, vatRate: usedVat, methodCode: PAYMENT_METHOD_FULL_PAYMENT, orderId: sale.orderId, docType: 'Income', buyerEmail: sale.clientEmail || defaultEmail, invoiceId: invoiceIdFull, callbackUrl, paymentAgentInfo: { AgentType: 'AGENT', SupplierInn: partnerInn, SupplierName: partnerName || 'Исполнитель' }, items: itemsParam });
                       const created = await fermaCreateReceipt(payload, { baseUrl, authToken: tokenOfd });
                       try {
                         const prev2 = (await readText('.data/ofd_create_attempts.log')) || '';
@@ -265,7 +266,8 @@ export async function POST(req: Request) {
                         const line = JSON.stringify({ ts: new Date().toISOString(), src: 'postback', stage: 'create_attempt', party: 'partner', userId, taskId, orderId: sale.orderId, invoiceId: invoiceIdPrepay, callbackUrl });
                         await writeText('.data/ofd_create_attempts.log', prev + line + '\n');
                       } catch {}
-                      const payload = buildFermaReceiptPayload({ party: 'partner', partyInn: partnerInn, description: itemLabel, amountRub: amountNet, vatRate: usedVat, methodCode: PAYMENT_METHOD_PREPAY_FULL, orderId: sale.orderId, docType: 'IncomePrepayment', buyerEmail: sale.clientEmail || defaultEmail, invoiceId: invoiceIdPrepay, callbackUrl, withPrepaymentItem: true, paymentAgentInfo: { AgentType: 'AGENT', SupplierInn: partnerInn, SupplierName: partnerName2 || 'Исполнитель' } });
+                      const itemsParamA = await (async ()=>{ try { const snap = (sale as any)?.itemsSnapshot as any[] | null; if (!Array.isArray(snap) || snap.length === 0) return undefined; const inn = (sale as any)?.orgInn ? String((sale as any).orgInn).replace(/\D/g,'') : undefined; const products = inn ? await listProductsForOrg(inn) : []; return snap.map((it:any)=>{ const prod = products.find((p)=> (p.id && it?.id && String(p.id)===String(it.id)) || (p.title && it?.title && String(p.title).toLowerCase()===String(it.title).toLowerCase())) || null; return { label: String(it.title||''), price: Number(it.price||0), qty: Number(it.qty||1), vatRate: (prod?.vat as any) || (usedVat as any), unit: (prod?.unit as any), kind: (prod?.kind as any) } as any; }); } catch { return undefined; } })();
+                      const payload = buildFermaReceiptPayload({ party: 'partner', partyInn: partnerInn, description: 'Оплата услуг', amountRub: amountNet, vatRate: usedVat, methodCode: PAYMENT_METHOD_PREPAY_FULL, orderId: sale.orderId, docType: 'IncomePrepayment', buyerEmail: sale.clientEmail || defaultEmail, invoiceId: invoiceIdPrepay, callbackUrl, withPrepaymentItem: true, paymentAgentInfo: { AgentType: 'AGENT', SupplierInn: partnerInn, SupplierName: partnerName2 || 'Исполнитель' }, items: itemsParamA });
                       const created = await fermaCreateReceipt(payload, { baseUrl, authToken: tokenOfd });
                       try {
                         const prev2 = (await readText('.data/ofd_create_attempts.log')) || '';
@@ -297,7 +299,6 @@ export async function POST(req: Request) {
               const orgData = orgInn ? await getOrgPayoutRequisites(orgInn) : { bik: null, account: null } as any;
               if (orgInn) {
                 const defaultEmail = process.env.OFD_DEFAULT_EMAIL || process.env.DEFAULT_RECEIPT_EMAIL || 'ofd@rockethumans.com';
-                const itemLabelOrg = (sale.description && sale.description.trim().length > 0) ? sale.description.trim() : 'Оплата услуги';
                 if (isToday) {
                   let invoiceIdFull = (sale as any).invoiceIdFull || null;
                   if (!invoiceIdFull) {
@@ -327,7 +328,8 @@ export async function POST(req: Request) {
                         }
                       }
                     } catch {}
-                    const payload = buildFermaReceiptPayload({ party: 'org', partyInn: orgInn, description: itemLabelOrg, amountRub: amountRub, vatRate: usedVat, methodCode: PAYMENT_METHOD_FULL_PAYMENT, orderId: sale.orderId, docType: 'Income', buyerEmail: sale.clientEmail || defaultEmail, invoiceId: invoiceIdFull, callbackUrl, paymentAgentInfo: { AgentType: 'AGENT', SupplierInn: orgInn, SupplierName: supplierName } });
+                    const itemsParamOrg = await (async ()=>{ try { const snap = (sale as any)?.itemsSnapshot as any[] | null; if (!Array.isArray(snap) || snap.length === 0) return undefined; const products = await listProductsForOrg(orgInn); return snap.map((it:any)=>{ const prod = products.find((p)=> (p.id && it?.id && String(p.id)===String(it.id)) || (p.title && it?.title && String(p.title).toLowerCase()===String(it.title).toLowerCase())) || null; return { label: String(it.title||''), price: Number(it.price||0), qty: Number(it.qty||1), vatRate: (prod?.vat as any) || (usedVat as any), unit: (prod?.unit as any), kind: (prod?.kind as any) } as any; }); } catch { return undefined; } })();
+                    const payload = buildFermaReceiptPayload({ party: 'org', partyInn: orgInn, description: 'Оплата услуг', amountRub: amountRub, vatRate: usedVat, methodCode: PAYMENT_METHOD_FULL_PAYMENT, orderId: sale.orderId, docType: 'Income', buyerEmail: sale.clientEmail || defaultEmail, invoiceId: invoiceIdFull, callbackUrl, paymentAgentInfo: { AgentType: 'AGENT', SupplierInn: orgInn, SupplierName: supplierName }, items: itemsParamOrg });
                     const created = await fermaCreateReceipt(payload, { baseUrl, authToken: tokenOfd });
                     try {
                       const prev2 = (await readText('.data/ofd_create_attempts.log')) || '';
@@ -372,7 +374,8 @@ export async function POST(req: Request) {
                         }
                       }
                     } catch {}
-                    const payload = buildFermaReceiptPayload({ party: 'org', partyInn: orgInn, description: itemLabelOrg, amountRub: amountRub, vatRate: usedVat, methodCode: PAYMENT_METHOD_PREPAY_FULL, orderId: sale.orderId, docType: 'IncomePrepayment', buyerEmail: sale.clientEmail || defaultEmail, invoiceId: invoiceIdPrepay, callbackUrl, withPrepaymentItem: true, paymentAgentInfo: { AgentType: 'AGENT', SupplierInn: orgInn, SupplierName: supplierName2 } });
+                    const itemsParamAOrg = await (async ()=>{ try { const snap = (sale as any)?.itemsSnapshot as any[] | null; if (!Array.isArray(snap) || snap.length === 0) return undefined; const products = await listProductsForOrg(orgInn); return snap.map((it:any)=>{ const prod = products.find((p)=> (p.id && it?.id && String(p.id)===String(it.id)) || (p.title && it?.title && String(p.title).toLowerCase()===String(it.title).toLowerCase())) || null; return { label: String(it.title||''), price: Number(it.price||0), qty: Number(it.qty||1), vatRate: (prod?.vat as any) || (usedVat as any), unit: (prod?.unit as any), kind: (prod?.kind as any) } as any; }); } catch { return undefined; } })();
+                    const payload = buildFermaReceiptPayload({ party: 'org', partyInn: orgInn, description: 'Оплата услуг', amountRub: amountRub, vatRate: usedVat, methodCode: PAYMENT_METHOD_PREPAY_FULL, orderId: sale.orderId, docType: 'IncomePrepayment', buyerEmail: sale.clientEmail || defaultEmail, invoiceId: invoiceIdPrepay, callbackUrl, withPrepaymentItem: true, paymentAgentInfo: { AgentType: 'AGENT', SupplierInn: orgInn, SupplierName: supplierName2 }, items: itemsParamAOrg });
                     const created = await fermaCreateReceipt(payload, { baseUrl, authToken: tokenOfd });
                     try {
                       const prev2 = (await readText('.data/ofd_create_attempts.log')) || '';

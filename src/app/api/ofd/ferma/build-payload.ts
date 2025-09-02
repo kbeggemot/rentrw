@@ -25,6 +25,37 @@ export type ReceiptParty = 'partner' | 'org';
 
 export type DocumentType = 'Income' | 'IncomePrepayment' | 'IncomePrepaymentOffset';
 
+type OfdCartItemIn = {
+  label: string;
+  price: number;
+  qty: number;
+  vatRate?: VatRate;
+  unit?: 'усл' | 'шт' | 'упак' | 'гр' | 'кг' | 'м';
+  kind?: 'goods' | 'service';
+  paymentTypeOverride?: 1 | 4; // 1 – Товар, 4 – Услуга
+};
+
+function sanitizeLabel(label: string): string {
+  const s = String(label || '').replace(/[\r\n\t]+/g, ' ').replace(/\s{2,}/g, ' ').trim();
+  return s.slice(0, 128) || 'Позиция';
+}
+
+function mapUnitToMeasure(u?: OfdCartItemIn['unit']): string {
+  switch (u) {
+    case 'гр': return 'GRAM';
+    case 'кг': return 'KILOGRAM';
+    case 'м': return 'METER';
+    case 'усл':
+    case 'шт':
+    case 'упак':
+    default: return 'PIECE';
+  }
+}
+
+function mapKindToPaymentType(kind?: OfdCartItemIn['kind']): number {
+  return kind === 'goods' ? 1 : 4;
+}
+
 export function buildFermaReceiptPayload(params: {
   party: ReceiptParty; // партнёр или юрлицо
   partyInn: string; // ИНН того, от чьего имени чек (SupplierInn)
@@ -41,15 +72,45 @@ export function buildFermaReceiptPayload(params: {
   callbackUrl?: string;
   paymentAgentInfo?: { AgentType: string; SupplierInn: string; SupplierName?: string; SupplierPhone?: string };
   withPrepaymentItem?: boolean; // добавить PaymentItems с PaymentType=1
+  items?: OfdCartItemIn[]; // массив позиций корзины (при наличии)
 }): Record<string, unknown> {
   const qty = params.quantity && params.quantity > 0 ? params.quantity : 1;
   const price = Math.max(0, Number(params.amountRub || 0));
-  const sum = Math.round((price * qty + Number.EPSILON) * 100) / 100;
   const vat = mapVatToFerma(params.vatRate);
 
-  const items: any[] = [
-    {
-      Label: params.description || 'Услуги',
+  const normalizedPai = (() => {
+    const src = params.paymentAgentInfo ?? (params.party === 'partner' ? { AgentType: 'AGENT', SupplierInn: params.partyInn } : undefined);
+    if (!src) return undefined as any;
+    const out: any = { AgentType: src.AgentType || 'AGENT', SupplierInn: src.SupplierInn || params.partyInn };
+    out.SupplierName = (src.SupplierName && String(src.SupplierName).trim().length > 0) ? String(src.SupplierName).trim() : 'Исполнитель';
+    return out;
+  })();
+
+  let items: any[];
+  if (Array.isArray(params.items) && params.items.length > 0) {
+    items = params.items.map((it) => {
+      const itemVat = mapVatToFerma(it.vatRate ?? params.vatRate);
+      const unitPrice = Math.max(0, Number(it.price || 0));
+      const quantity = (it.qty && it.qty > 0) ? it.qty : 1;
+      const amount = Math.round((unitPrice * quantity + Number.EPSILON) * 100) / 100;
+      const paymentType = (typeof it.paymentTypeOverride === 'number') ? it.paymentTypeOverride : mapKindToPaymentType(it.kind);
+      const rec: any = {
+        Label: sanitizeLabel(it.label),
+        Price: unitPrice,
+        Quantity: quantity,
+        Amount: amount,
+        Vat: itemVat.vatType,
+        PaymentMethod: (typeof params.methodCode === 'number' ? params.methodCode : 1),
+        PaymentType: paymentType,
+        Measure: mapUnitToMeasure(it.unit),
+      };
+      if (normalizedPai) rec.PaymentAgentInfo = normalizedPai;
+      return rec;
+    });
+  } else {
+    const sum = Math.round((price * qty + Number.EPSILON) * 100) / 100;
+    items = [{
+      Label: sanitizeLabel(params.description || 'Услуги'),
       Price: price,
       Quantity: qty,
       Amount: sum,
@@ -57,32 +118,17 @@ export function buildFermaReceiptPayload(params: {
       PaymentMethod: (typeof params.methodCode === 'number' ? params.methodCode : 1),
       PaymentType: 4,
       Measure: 'PIECE',
-    },
-  ];
-  // Normalize PaymentAgentInfo when provided (or default for partner deals)
-  const normalizedPai = (() => {
-    const src = params.paymentAgentInfo ?? (params.party === 'partner' ? { AgentType: 'AGENT', SupplierInn: params.partyInn } : undefined);
-    if (!src) return undefined as any;
-    const out: any = {
-      AgentType: src.AgentType || 'AGENT',
-      SupplierInn: src.SupplierInn || params.partyInn,
-    };
-    // SupplierName required when AgentType present — fallback if missing
-    out.SupplierName = (src.SupplierName && String(src.SupplierName).trim().length > 0)
-      ? String(src.SupplierName).trim()
-      : 'Исполнитель';
-    // SupplierPhone не передаём по ТЗ
-    return out;
-  })();
-  if (normalizedPai) {
-    items[0].PaymentAgentInfo = normalizedPai;
+      ...(normalizedPai ? { PaymentAgentInfo: normalizedPai } : {}),
+    }];
   }
+
+  const totalSum = items.reduce((s, r) => s + (Number(r?.Amount) || 0), 0);
+  const sumRounded = Math.round((totalSum + Number.EPSILON) * 100) / 100;
 
   const customerReceipt: Record<string, unknown> = {
     TaxationSystem: 'Common',
     Items: items,
-    Payments: [ { Type: 2, Amount: sum } ],
-    // Признак предмета расчёта на уровне чека (дублируем с уровня позиций)
+    Payments: [ { Type: 2, Amount: sumRounded } ],
     PaymentType: 4,
   };
   if (params.buyerEmail && params.buyerEmail.trim().length > 0) {
@@ -91,12 +137,8 @@ export function buildFermaReceiptPayload(params: {
   if (normalizedPai) {
     (customerReceipt as any).PaymentAgentInfo = normalizedPai;
   }
-  // PaymentItems: предоплата -> 1, зачёт предоплаты -> 2
-  // Логика:
-  // - when withAdvanceOffset => 2 (зачёт предоплаты)
-  // - when withPrepaymentItem => 1 (полный расчёт без отложенного зачёта, но с пометкой предоплаты)
   const paymentItemType = params.withAdvanceOffset ? 2 : (params.withPrepaymentItem ? 1 : undefined);
-  const paymentItems = (typeof paymentItemType === 'number') ? [{ PaymentType: paymentItemType, Sum: sum }] : undefined;
+  const paymentItems = (typeof paymentItemType === 'number') ? [{ PaymentType: paymentItemType, Sum: sumRounded }] : undefined;
   if (paymentItems) {
     (customerReceipt as any).PaymentItems = paymentItems;
   }

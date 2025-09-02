@@ -5,6 +5,7 @@ import { buildFermaReceiptPayload, PAYMENT_METHOD_FULL_PAYMENT, PAYMENT_METHOD_P
 import { getUserOrgInn, getUserPayoutRequisites } from './userStore';
 import { getDecryptedApiToken } from './secureStore';
 import { getInvoiceIdForOffset } from './orderStore';
+import { listProductsForOrg } from './productsStore';
 
 let started = false;
 let timer: NodeJS.Timer | null = null;
@@ -127,7 +128,19 @@ export async function repairUserSales(userId: string, onlyOrderId?: number): Pro
             const partnerInn = (task?.executor?.inn as string | undefined) ?? undefined;
             if (!partnerInn) continue;
             const partnerName = (task?.executor && [task.executor.last_name, task.executor.first_name, task.executor.second_name].filter(Boolean).join(' ').trim()) || undefined;
-            const payload = buildFermaReceiptPayload({ party: 'partner', partyInn: partnerInn, description: s.description || 'Оплата услуги', amountRub: s.isAgent ? Math.max(0, s.amountGrossRub - s.retainedCommissionRub) : s.amountGrossRub, vatRate: (s.vatRate as any) || 'none', methodCode: PAYMENT_METHOD_FULL_PAYMENT, orderId: s.orderId, docType: 'Income', buyerEmail: s.clientEmail || defaultEmail, invoiceId: s.invoiceIdFull, callbackUrl: undefined, paymentAgentInfo: { AgentType: 'AGENT', SupplierInn: partnerInn, SupplierName: partnerName || 'Исполнитель' } });
+            const itemsParam = await (async () => {
+              try {
+                const snap = (s as any)?.itemsSnapshot as any[] | null;
+                if (!Array.isArray(snap) || snap.length === 0) return undefined;
+                const orgInnDigits = (s as any)?.orgInn ? String((s as any).orgInn).replace(/\D/g, '') : undefined;
+                const products = orgInnDigits ? await listProductsForOrg(orgInnDigits) : [];
+                return snap.map((it: any) => {
+                  const prod = products.find((p) => (p.id && it?.id && String(p.id) === String(it.id)) || (p.title && it?.title && String(p.title).toLowerCase() === String(it.title).toLowerCase())) || null;
+                  return { label: String(it.title || ''), price: Number(it.price || 0), qty: Number(it.qty || 1), vatRate: (prod?.vat as any) || ((s as any)?.vatRate as any), unit: (prod?.unit as any), kind: (prod?.kind as any) } as any;
+                });
+              } catch { return undefined; }
+            })();
+            const payload = buildFermaReceiptPayload({ party: 'partner', partyInn: partnerInn, description: 'Оплата услуг', amountRub: s.isAgent ? Math.max(0, s.amountGrossRub - s.retainedCommissionRub) : s.amountGrossRub, vatRate: (s.vatRate as any) || 'none', methodCode: PAYMENT_METHOD_FULL_PAYMENT, orderId: s.orderId, docType: 'Income', buyerEmail: s.clientEmail || defaultEmail, invoiceId: s.invoiceIdFull, callbackUrl: undefined, paymentAgentInfo: { AgentType: 'AGENT', SupplierInn: partnerInn, SupplierName: partnerName || 'Исполнитель' }, items: itemsParam });
             const created = await fermaCreateReceipt(payload, { baseUrl, authToken: ofdToken });
             try { (global as any).__OFD_SOURCE__ = 'repair_worker'; } catch {}
             { const numOrder = Number(String(s.orderId).match(/(\d+)/g)?.slice(-1)[0] || NaN); await updateSaleOfdUrlsByOrderId(userId, numOrder, { ofdFullId: created.id || null }); }
@@ -180,7 +193,18 @@ export async function repairUserSales(userId: string, onlyOrderId?: number): Pro
               }
             } catch {}
             if (!supplierName) continue;
-            const payload = buildFermaReceiptPayload({ party: 'org', partyInn: orgInn, description: s.description || 'Оплата услуги', amountRub: s.amountGrossRub, vatRate: (s.vatRate as any) || 'none', methodCode: PAYMENT_METHOD_FULL_PAYMENT, orderId: s.orderId, docType: 'Income', buyerEmail: s.clientEmail || defaultEmail, invoiceId: s.invoiceIdFull, callbackUrl: undefined, paymentAgentInfo: { AgentType: 'AGENT', SupplierInn: orgInn, SupplierName: supplierName } });
+            const itemsParamOrg = await (async () => {
+              try {
+                const snap = (s as any)?.itemsSnapshot as any[] | null;
+                if (!Array.isArray(snap) || snap.length === 0) return undefined;
+                const products = await listProductsForOrg(orgInn);
+                return snap.map((it: any) => {
+                  const prod = products.find((p) => (p.id && it?.id && String(p.id) === String(it.id)) || (p.title && it?.title && String(p.title).toLowerCase() === String(it.title).toLowerCase())) || null;
+                  return { label: String(it.title || ''), price: Number(it.price || 0), qty: Number(it.qty || 1), vatRate: (prod?.vat as any) || ((s as any)?.vatRate as any), unit: (prod?.unit as any), kind: (prod?.kind as any) } as any;
+                });
+              } catch { return undefined; }
+            })();
+            const payload = buildFermaReceiptPayload({ party: 'org', partyInn: orgInn, description: 'Оплата услуг', amountRub: s.amountGrossRub, vatRate: (s.vatRate as any) || 'none', methodCode: PAYMENT_METHOD_FULL_PAYMENT, orderId: s.orderId, docType: 'Income', buyerEmail: s.clientEmail || defaultEmail, invoiceId: s.invoiceIdFull, callbackUrl: undefined, paymentAgentInfo: { AgentType: 'AGENT', SupplierInn: orgInn, SupplierName: supplierName }, items: itemsParamOrg });
             const created = await fermaCreateReceipt(payload, { baseUrl, authToken: ofdToken });
             try { (global as any).__OFD_SOURCE__ = 'repair_worker'; } catch {}
             { const numOrder = Number(String(s.orderId).match(/(\d+)/g)?.slice(-1)[0] || NaN); await updateSaleOfdUrlsByOrderId(userId, numOrder, { ofdFullId: created.id || null }); }
@@ -244,7 +268,19 @@ export async function repairUserSales(userId: string, onlyOrderId?: number): Pro
           const partnerInn = (task?.executor?.inn as string | undefined) ?? undefined;
           if (!partnerInn) continue;
           const partnerName = (task?.executor && [task.executor.last_name, task.executor.first_name, task.executor.second_name].filter(Boolean).join(' ').trim()) || undefined;
-          const payload = buildFermaReceiptPayload({ party: 'partner', partyInn: partnerInn, description: s.description || 'Оплата услуги', amountRub: Math.max(0, s.amountGrossRub - s.retainedCommissionRub), vatRate: (s.vatRate as any) || 'none', methodCode: PAYMENT_METHOD_PREPAY_FULL, orderId: s.orderId, docType: 'IncomePrepayment', buyerEmail: s.clientEmail || defaultEmail, invoiceId: s.invoiceIdPrepay, callbackUrl: undefined, withPrepaymentItem: true, paymentAgentInfo: { AgentType: 'AGENT', SupplierInn: partnerInn, SupplierName: partnerName || 'Исполнитель' } });
+          const itemsParamA = await (async () => {
+            try {
+              const snap = (s as any)?.itemsSnapshot as any[] | null;
+              if (!Array.isArray(snap) || snap.length === 0) return undefined;
+              const orgInnDigits = (s as any)?.orgInn ? String((s as any).orgInn).replace(/\D/g, '') : undefined;
+              const products = orgInnDigits ? await listProductsForOrg(orgInnDigits) : [];
+              return snap.map((it: any) => {
+                const prod = products.find((p) => (p.id && it?.id && String(p.id) === String(it.id)) || (p.title && it?.title && String(p.title).toLowerCase() === String(it.title).toLowerCase())) || null;
+                return { label: String(it.title || ''), price: Number(it.price || 0), qty: Number(it.qty || 1), vatRate: (prod?.vat as any) || ((s as any)?.vatRate as any), unit: (prod?.unit as any), kind: (prod?.kind as any) } as any;
+              });
+            } catch { return undefined; }
+          })();
+          const payload = buildFermaReceiptPayload({ party: 'partner', partyInn: partnerInn, description: 'Оплата услуг', amountRub: Math.max(0, s.amountGrossRub - s.retainedCommissionRub), vatRate: (s.vatRate as any) || 'none', methodCode: PAYMENT_METHOD_PREPAY_FULL, orderId: s.orderId, docType: 'IncomePrepayment', buyerEmail: s.clientEmail || defaultEmail, invoiceId: s.invoiceIdPrepay, callbackUrl: undefined, withPrepaymentItem: true, paymentAgentInfo: { AgentType: 'AGENT', SupplierInn: partnerInn, SupplierName: partnerName || 'Исполнитель' }, items: itemsParamA });
           const created = await fermaCreateReceipt(payload, { baseUrl, authToken: ofdToken });
           try { (global as any).__OFD_SOURCE__ = 'repair_worker'; } catch {}
           { const numOrder = Number(String(s.orderId).match(/(\d+)/g)?.slice(-1)[0] || NaN); await updateSaleOfdUrlsByOrderId(userId, numOrder, { ofdPrepayId: created.id || null }); }
@@ -273,7 +309,18 @@ export async function repairUserSales(userId: string, onlyOrderId?: number): Pro
             }
           } catch {}
           if (!supplierName) continue;
-          const payload = buildFermaReceiptPayload({ party: 'org', partyInn: orgInn, description: s.description || 'Оплата услуги', amountRub: s.amountGrossRub, vatRate: (s.vatRate as any) || 'none', methodCode: PAYMENT_METHOD_PREPAY_FULL, orderId: s.orderId, docType: 'IncomePrepayment', buyerEmail: s.clientEmail || defaultEmail, invoiceId: s.invoiceIdPrepay, callbackUrl: undefined, withPrepaymentItem: true, paymentAgentInfo: { AgentType: 'AGENT', SupplierInn: orgInn, SupplierName: supplierName } });
+          const itemsParamAOrg = await (async () => {
+            try {
+              const snap = (s as any)?.itemsSnapshot as any[] | null;
+              if (!Array.isArray(snap) || snap.length === 0) return undefined;
+              const products = await listProductsForOrg(orgInn);
+              return snap.map((it: any) => {
+                const prod = products.find((p) => (p.id && it?.id && String(p.id) === String(it.id)) || (p.title && it?.title && String(p.title).toLowerCase() === String(it.title).toLowerCase())) || null;
+                return { label: String(it.title || ''), price: Number(it.price || 0), qty: Number(it.qty || 1), vatRate: (prod?.vat as any) || ((s as any)?.vatRate as any), unit: (prod?.unit as any), kind: (prod?.kind as any) } as any;
+              });
+            } catch { return undefined; }
+          })();
+          const payload = buildFermaReceiptPayload({ party: 'org', partyInn: orgInn, description: 'Оплата услуг', amountRub: s.amountGrossRub, vatRate: (s.vatRate as any) || 'none', methodCode: PAYMENT_METHOD_PREPAY_FULL, orderId: s.orderId, docType: 'IncomePrepayment', buyerEmail: s.clientEmail || defaultEmail, invoiceId: s.invoiceIdPrepay, callbackUrl: undefined, withPrepaymentItem: true, paymentAgentInfo: { AgentType: 'AGENT', SupplierInn: orgInn, SupplierName: supplierName }, items: itemsParamAOrg });
           const created = await fermaCreateReceipt(payload, { baseUrl, authToken: ofdToken });
           try { (global as any).__OFD_SOURCE__ = 'repair_worker'; } catch {}
           { const numOrder = Number(String(s.orderId).match(/(\d+)/g)?.slice(-1)[0] || NaN); await updateSaleOfdUrlsByOrderId(userId, numOrder, { ofdPrepayId: created.id || null }); }
@@ -329,10 +376,22 @@ export async function repairUserSales(userId: string, onlyOrderId?: number): Pro
                 const line = JSON.stringify({ ts: new Date().toISOString(), src: 'repair_worker', stage: 'create_attempt', party: 'partner', userId, taskId: s.taskId, orderId: s.orderId, invoiceId: invOffset, callbackUrl }) + '\n';
                 await writeText('.data/ofd_create_attempts.log', prev + line);
               } catch {}
+              const itemsParamB = await (async () => {
+                try {
+                  const snap = (s as any)?.itemsSnapshot as any[] | null;
+                  if (!Array.isArray(snap) || snap.length === 0) return undefined;
+                  const orgInnDigits = (s as any)?.orgInn ? String((s as any).orgInn).replace(/\D/g, '') : undefined;
+                  const products = orgInnDigits ? await listProductsForOrg(orgInnDigits) : [];
+                  return snap.map((it: any) => {
+                    const prod = products.find((p) => (p.id && it?.id && String(p.id) === String(it.id)) || (p.title && it?.title && String(p.title).toLowerCase() === String(it.title).toLowerCase())) || null;
+                    return { label: String(it.title || ''), price: Number(it.price || 0), qty: Number(it.qty || 1), vatRate: (prod?.vat as any) || ((s as any)?.vatRate as any), unit: (prod?.unit as any), kind: (prod?.kind as any) } as any;
+                  });
+                } catch { return undefined; }
+              })();
               const payload = buildFermaReceiptPayload({
                 party: 'partner',
                 partyInn: partnerInn,
-                description: s.description || 'Оплата услуги',
+                description: 'Оплата услуг',
                 amountRub: Math.max(0, (s.amountGrossRub || 0) - ((s as any).retainedCommissionRub || 0)),
                 vatRate: (s.vatRate as any) || 'none',
                 methodCode: PAYMENT_METHOD_FULL_PAYMENT,
@@ -343,6 +402,7 @@ export async function repairUserSales(userId: string, onlyOrderId?: number): Pro
                 callbackUrl,
                 withAdvanceOffset: true,
                 paymentAgentInfo: { AgentType: 'AGENT', SupplierInn: partnerInn, SupplierName: partnerName || 'Исполнитель' },
+                items: itemsParamB,
               });
               const created = await fermaCreateReceipt(payload, { baseUrl, authToken: ofdToken });
               try {
@@ -412,10 +472,21 @@ export async function repairUserSales(userId: string, onlyOrderId?: number): Pro
                 const line = JSON.stringify({ ts: new Date().toISOString(), src: 'repair_worker', stage: 'create_attempt', party: 'org', userId, taskId: s.taskId, orderId: s.orderId, invoiceId: invOffset, callbackUrl, orgInn }) + '\n';
                 await writeText('.data/ofd_create_attempts.log', prev + line);
               } catch {}
+              const itemsParamBOrg = await (async () => {
+                try {
+                  const snap = (s as any)?.itemsSnapshot as any[] | null;
+                  if (!Array.isArray(snap) || snap.length === 0) return undefined;
+                  const products = await listProductsForOrg(orgInn);
+                  return snap.map((it: any) => {
+                    const prod = products.find((p) => (p.id && it?.id && String(p.id) === String(it.id)) || (p.title && it?.title && String(p.title).toLowerCase() === String(it.title).toLowerCase())) || null;
+                    return { label: String(it.title || ''), price: Number(it.price || 0), qty: Number(it.qty || 1), vatRate: (prod?.vat as any) || ((s as any)?.vatRate as any), unit: (prod?.unit as any), kind: (prod?.kind as any) } as any;
+                  });
+                } catch { return undefined; }
+              })();
               const payload = buildFermaReceiptPayload({
                 party: 'org',
                 partyInn: orgInn,
-                description: s.description || 'Оплата услуги',
+                description: 'Оплата услуг',
                 amountRub: s.amountGrossRub,
                 vatRate: (s.vatRate as any) || 'none',
                 methodCode: PAYMENT_METHOD_FULL_PAYMENT,
@@ -426,6 +497,7 @@ export async function repairUserSales(userId: string, onlyOrderId?: number): Pro
                 callbackUrl,
                 withAdvanceOffset: true,
                 paymentAgentInfo: { AgentType: 'AGENT', SupplierInn: orgInn, SupplierName: supplierName },
+                items: itemsParamBOrg,
               });
               const created = await fermaCreateReceipt(payload, { baseUrl, authToken: ofdToken });
               try {
