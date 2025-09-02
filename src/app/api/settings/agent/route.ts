@@ -12,11 +12,17 @@ function getUserId(req: Request): string | null {
   return hdr && hdr.trim().length > 0 ? hdr.trim() : null;
 }
 
+function getOrgInnFromReq(req: Request): string | null {
+  const hdrInn = req.headers.get('x-org-inn');
+  if (hdrInn && hdrInn.trim().length > 0) return hdrInn.trim();
+  return getSelectedOrgInn(req);
+}
+
 export async function GET(req: Request) {
   try {
     const userId = getUserId(req);
     if (!userId) return NextResponse.json({ error: 'NO_USER' }, { status: 401 });
-    const inn = getSelectedOrgInn(req);
+    const inn = getOrgInnFromReq(req);
     const s = await getUserAgentSettings(userId, inn || undefined);
     const res = NextResponse.json({ agentDescription: s.agentDescription, defaultCommission: s.defaultCommission });
     // Disable any caches along the way

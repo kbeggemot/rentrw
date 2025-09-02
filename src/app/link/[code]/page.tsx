@@ -127,12 +127,20 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
     return () => window.removeEventListener('keydown', onKey);
   }, [viewer.open]);
 
-  // Load current agent description from settings of link owner
+  // Load current agent description from settings of link owner (respect selected org)
   useEffect(() => {
     (async () => {
       try {
         if (!data?.userId) return;
-        const r = await fetch('/api/settings/agent', { cache: 'no-store', headers: { 'x-user-id': data.userId } as any });
+        const headers: Record<string, string> = { 'x-user-id': data.userId } as any;
+        if (data?.orgName) {
+          // org_inn может быть не на странице, попробуем взять его из cookie API уже умеет x-org-inn
+          try {
+            const cookieInn = document.cookie.split('; ').find((c) => c.startsWith('org_inn='))?.split('=')[1];
+            if (cookieInn) headers['x-org-inn'] = decodeURIComponent(cookieInn);
+          } catch {}
+        }
+        const r = await fetch('/api/settings/agent', { cache: 'no-store', headers });
         const j = await r.json().catch(() => ({}));
         if (typeof j?.agentDescription === 'string') setAgentDesc(j.agentDescription);
       } catch {}

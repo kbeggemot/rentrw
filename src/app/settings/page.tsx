@@ -13,7 +13,7 @@ export default async function SettingsPage() {
     // В контексте выбранной организации показываем токен только этой организации
     const maskedToken = userId ? (orgInn ? await getMaskedTokenForOrg(orgInn, userId) : await getMaskedToken(userId)) : null;
     const user = userId ? await getUserById(userId) : null;
-    const agent = userId ? await getUserAgentSettings(userId) : { agentDescription: null, defaultCommission: null };
+    const agent = userId ? await getUserAgentSettings(userId, orgInn || undefined) : { agentDescription: null, defaultCommission: null };
     const payout = orgInn ? await getOrgPayoutRequisites(orgInn) : { bik: null, account: null };
     // Переопределяем orgName названием выбранной организации (если есть)
     let orgNameFromOrg: string | null = null;

@@ -867,7 +867,12 @@ function AcceptPaymentContent() {
             />
             <span>Агентская продажа</span>
           </label>
-          <div className="text-xs text-gray-500 mt-1">Разделите оплату между вами и самозанятым партнёром. Описание ваших услуг — в <a className="underline" href="/settings">настройках</a>.</div>
+          <div className="text-xs text-gray-500 mt-1">
+            Разделите оплату между вами и самозанятым партнёром.
+            <span className="ml-1 text-gray-700 dark:text-gray-300">Описание услуги агента:</span>
+            <span className="ml-1 text-black dark:text-white">{agentDesc || 'Услуги агента'}</span>
+            <span className="ml-1">(<a className="underline" href="/settings">изменить</a>)</span>
+          </div>
         </div>
         {isAgentSale ? (
           <>
