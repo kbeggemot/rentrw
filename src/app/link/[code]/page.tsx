@@ -625,7 +625,7 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
           <div className="text-sm text-gray-700">{msg || 'Оплата временно недоступна. Пожалуйста, уточните детали у продавца.'}</div>
         ) : (
         <>
-        {Array.isArray(cart) && cart.length > 0 ? (
+        {Array.isArray(cart) && (cart.length > 0 || data.allowCartAdjust) ? (
           <div className="mb-3">
             <div className="text-sm text-gray-600 mb-2">{data.allowCartAdjust ? 'Соберите свою корзину' : 'Ваша корзина'}</div>
             {data.cartDisplay === 'list' ? (
@@ -633,7 +633,7 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
                 {cart.map((item, idx) => (
                   <div key={idx} className="rounded border p-2 flex items-center gap-3 overflow-x-auto touch-pan-x">
                     <img
-                      src={(() => { try { const id = item.id || null; const fromLink = Array.isArray(data.cartItems) ? (data.cartItems as any[]).find((x: any) => (x?.id ?? null) === (id ?? null) || x?.title === item.title) : null; const ph = Array.isArray(fromLink?.photos) ? fromLink.photos[0] : null; return ph || '/window.svg'; } catch { return '/window.svg'; } })()}
+                      src={(() => { try { const id = item.id || null; const fromLink = Array.isArray(data.cartItems) ? (data.cartItems as any[]).find((x: any) => ((id != null && x?.id != null && String(x.id) === String(id)) || x?.title === item.title)) : null; const ph = Array.isArray(fromLink?.photos) ? fromLink.photos[0] : null; return ph || '/window.svg'; } catch { return '/window.svg'; } })()}
                       alt="preview"
                       className={(() => { try { const id = item.id || null; const fromLink = Array.isArray(data.cartItems) ? (data.cartItems as any[]).find((x: any) => (x?.id ?? null) === (id ?? null) || x?.title === item.title) : null; const has = Array.isArray(fromLink?.photos) && fromLink.photos.length > 0; return `h-9 w-9 rounded object-cover ${has ? 'cursor-pointer' : 'cursor-default'}`; } catch { return 'h-9 w-9 rounded object-cover'; } })()}
                       onClick={() => { try { const id = item.id || null; const fromLink = Array.isArray(data.cartItems) ? (data.cartItems as any[]).find((x: any) => (x?.id ?? null) === (id ?? null) || x?.title === item.title) : null; const arr = Array.isArray(fromLink?.photos) ? (fromLink.photos as string[]) : []; if (!arr.length) return; setViewer({ open: true, photos: arr, index: 0 }); } catch {} }}
@@ -666,7 +666,7 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
                     <div className="relative w-full rounded overflow-hidden bg-white mb-2" style={{ aspectRatio: '1 / 1' }}>
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
-                        src={(() => { try { const id = item.id || null; const fromLink = Array.isArray(data.cartItems) ? (data.cartItems as any[]).find((x: any) => (x?.id ?? null) === (id ?? null) || x?.title === item.title) : null; const ph = Array.isArray(fromLink?.photos) ? fromLink.photos[0] : null; return ph || '/window.svg'; } catch { return '/window.svg'; } })()}
+                        src={(() => { try { const id = item.id || null; const fromLink = Array.isArray(data.cartItems) ? (data.cartItems as any[]).find((x: any) => ((id != null && x?.id != null && String(x.id) === String(id)) || x?.title === item.title)) : null; const ph = Array.isArray(fromLink?.photos) ? fromLink.photos[0] : null; return ph || '/window.svg'; } catch { return '/window.svg'; } })()}
                         alt="item"
                         className={(() => { try { const id = item.id || null; const fromLink = Array.isArray(data.cartItems) ? (data.cartItems as any[]).find((x: any) => (x?.id ?? null) === (id ?? null) || x?.title === item.title) : null; const has = Array.isArray(fromLink?.photos) && fromLink.photos.length > 0; return `w-full h-full object-cover ${has ? 'cursor-pointer' : 'cursor-default'}`; } catch { return 'w-full h-full object-cover'; } })()}
                         onClick={() => { try { const id = item.id || null; const fromLink = Array.isArray(data.cartItems) ? (data.cartItems as any[]).find((x: any) => (x?.id ?? null) === (id ?? null) || x?.title === item.title) : null; const arr = Array.isArray(fromLink?.photos) ? (fromLink.photos as string[]) : []; if (!arr.length) return; setViewer({ open: true, photos: arr, index: 0 }); } catch {} }}
