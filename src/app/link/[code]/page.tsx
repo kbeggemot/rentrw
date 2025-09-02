@@ -309,6 +309,12 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
   // Восстановим исходные цены за единицу из сохранённых пониженных (если агент был включен)
   const baseUnits = useMemo(() => {
     if (!data || !Array.isArray(data.cartItems)) return [] as number[];
+    const currentUnits: Array<number | null> = (data.cartItems as any[]).map((c: any) => (typeof c?.priceCurrent === 'number' && Number.isFinite(c.priceCurrent) ? Number(c.priceCurrent) : null));
+    const hasCurrent = currentUnits.some((v) => v != null);
+    if (hasCurrent) {
+      return currentUnits.map((v, idx) => (v != null ? v : Number((data.cartItems as any[])[idx]?.price || 0)));
+    }
+    // otherwise, restore from saved lowered units if agent link
     const savedUnits: number[] = (data.cartItems as any[]).map((c: any) => Number(c?.price || 0));
     if (!data.isAgent || !data.commissionType || typeof data.commissionValue !== 'number') return savedUnits;
     const v = Number(data.commissionValue);
