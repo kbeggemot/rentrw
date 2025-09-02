@@ -710,7 +710,7 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
                         <>
                           <input type="number" min={1} step={1} className="w-16 rounded border px-2 h-9 text-sm bg-white text-black dark:bg-gray-800 dark:text-white placeholder-gray-400 dark:placeholder-gray-400" value={String(item.qty)} onChange={(e) => { const raw = e.target.value; const q = raw.trim() === '' ? 0 : Math.max(0, Number(raw)); setCart((prev) => prev.map((it, i) => i === idx ? { ...it, qty: q } : it)); }} />
                           <div className="flex-1" />
-                          <button type="button" aria-label="Удалить" className="w-9 h-9 rounded border text-sm text-gray-700 flex items-center justify-center ml-auto" onClick={() => setCart((prev) => prev.filter((_, i) => i !== idx))}>✕</button>
+                          <button type="button" aria-label="Удалить" className="w-9 h-9 rounded border flex items-center justify-center ml-auto bg-white text-black dark:bg-gray-800 dark:text-white dark:border-gray-700" onClick={() => setCart((prev) => prev.filter((_, i) => i !== idx))}>✕</button>
                         </>
                       ) : null}
                     </div>
@@ -769,7 +769,7 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
             ) : null}
             <div className="mt-2">
               <label className="block text-sm text-gray-600 mb-1">Итоговая сумма, ₽</label>
-              <input className="w-40 rounded-lg border px-2 h-9 text-sm bg-gray-100 text-black dark:bg-gray-800 dark:text-white" value={(() => { const S = cartAdjustedSum; const A = agentLine ? agentLine.price : 0; const total = S + A; return total.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); })()} readOnly />
+              <input className="w-40 rounded-lg border px-2 h-9 text-sm bg-gray-100 text-gray-500 dark:bg-gray-900 dark:text-gray-400 dark:border-gray-800" value={(() => { const S = cartAdjustedSum; const A = agentLine ? agentLine.price : 0; const total = S + A; return total.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); })()} readOnly disabled />
             </div>
             {/* Фуллскрин просмотрщик */}
             {viewer.open ? (
