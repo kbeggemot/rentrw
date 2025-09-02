@@ -102,6 +102,7 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
   const [touchStartX, setTouchStartX] = useState<number | null>(null);
   const [touchDeltaX, setTouchDeltaX] = useState(0);
   const [partnerFio, setPartnerFio] = useState<string | null>(null);
+  const [agentDesc, setAgentDesc] = useState<string | null>(null);
   const orgNameGen = useMemo(() => declineOrgNameGenitive(data?.orgName || null), [data?.orgName]);
 
   const showPrev = () => {
@@ -125,6 +126,18 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [viewer.open]);
+
+  // Load current agent description from settings of link owner
+  useEffect(() => {
+    (async () => {
+      try {
+        if (!data?.userId) return;
+        const r = await fetch('/api/settings/agent', { cache: 'no-store', headers: { 'x-user-id': data.userId } as any });
+        const j = await r.json().catch(() => ({}));
+        if (typeof j?.agentDescription === 'string') setAgentDesc(j.agentDescription);
+      } catch {}
+    })();
+  }, [data?.userId]);
 
   // Load partner FIO for agent sale header
   useEffect(() => {
@@ -358,11 +371,11 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
     try {
       const baseCart = cart.map((i, idx) => ({ title: i.title, price: Number((baseUnits[idx] ?? i.price) || 0), qty: Number(i.qty || 0) }));
       const res = applyAgentCommissionToCart(baseCart, data.commissionType as any, Number(data.commissionValue));
-      return { title: data.agentDescription || 'Услуги агента', price: res.agentAmount, qty: 1 };
+      return { title: agentDesc || data.agentDescription || 'Услуги агента', price: res.agentAmount, qty: 1 };
     } catch {
       return null;
     }
-  }, [data?.isAgent, data?.commissionType, data?.commissionValue, data?.agentDescription, cart, baseUnits]);
+  }, [data?.isAgent, data?.commissionType, data?.commissionValue, data?.agentDescription, cart, baseUnits, agentDesc]);
 
   const effectiveCart = useMemo(() => {
     if (!(Array.isArray(cart) && cart.length > 0)) return cart;
