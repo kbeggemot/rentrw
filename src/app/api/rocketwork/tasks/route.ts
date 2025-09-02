@@ -117,8 +117,20 @@ export async function POST(req: Request) {
     if (!Number.isFinite(amountRub) || amountRub <= 0) {
       return NextResponse.json({ error: 'Некорректная сумма' }, { status: 400 });
     }
-    if (!description) {
-      return NextResponse.json({ error: 'Описание обязательно' }, { status: 400 });
+    // Cart mode: when positions are provided, description is not required
+    const rawCart: Array<{ id?: string | null; title: string; price: number; qty: number }> | null = Array.isArray((body as any)?.cartItems) ? (body as any).cartItems : null;
+    if (rawCart && rawCart.length > 0) {
+      const normalized = rawCart
+        .map((c: any) => ({ id: c?.id ?? null, title: String(c?.title || ''), price: Number(c?.price || 0), qty: Number(c?.qty || 0) }))
+        .filter((c) => c.title.trim().length > 0 && Number.isFinite(c.price) && Number.isFinite(c.qty) && c.price > 0 && c.qty > 0);
+      if (normalized.length === 0) {
+        return NextResponse.json({ error: 'CART_EMPTY' }, { status: 400 });
+      }
+      (body as any).cartItems = normalized;
+    } else {
+      if (!description) {
+        return NextResponse.json({ error: 'Описание обязательно' }, { status: 400 });
+      }
     }
     if (commissionPercent !== undefined) {
       if (!Number.isFinite(commissionPercent) || commissionPercent < 0 || commissionPercent > 100) {
