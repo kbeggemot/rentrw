@@ -456,7 +456,7 @@ export default function EditLinkPage(props: { params: Promise<{ code: string }> 
                   <option value="fixed">₽</option>
                 </select>
                 <input className="w-32 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-950 px-2 h-9 text-sm" placeholder="Комиссия" value={commissionValue} onChange={(e) => setCommissionValue(e.target.value)} />
-                <div className="relative md:col-span-2">
+                <div className="relative flex-1 min-w-[14rem]">
                   <input
                     className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-950 px-2 h-9 text-sm"
                     placeholder="Телефон или ФИО партнёра"
