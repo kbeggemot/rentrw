@@ -18,7 +18,12 @@ export async function GET(req: Request) {
     if (!userId) return NextResponse.json({ error: 'NO_USER' }, { status: 401 });
     const inn = getSelectedOrgInn(req);
     const s = await getUserAgentSettings(userId, inn || undefined);
-    return NextResponse.json({ agentDescription: s.agentDescription, defaultCommission: s.defaultCommission });
+    const res = NextResponse.json({ agentDescription: s.agentDescription, defaultCommission: s.defaultCommission });
+    // Disable any caches along the way
+    res.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.headers.set('Pragma', 'no-cache');
+    res.headers.set('Expires', '0');
+    return res;
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Server error';
     return NextResponse.json({ error: message }, { status: 500 });
@@ -38,7 +43,11 @@ export async function POST(req: Request) {
     const inn = getSelectedOrgInn(req);
     await updateUserAgentSettings(userId, { agentDescription, defaultCommission }, inn || undefined);
     const s = await getUserAgentSettings(userId, inn || undefined);
-    return NextResponse.json({ agentDescription: s.agentDescription, defaultCommission: s.defaultCommission });
+    const res = NextResponse.json({ agentDescription: s.agentDescription, defaultCommission: s.defaultCommission });
+    res.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.headers.set('Pragma', 'no-cache');
+    res.headers.set('Expires', '0');
+    return res;
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Server error';
     return NextResponse.json({ error: message }, { status: 500 });
