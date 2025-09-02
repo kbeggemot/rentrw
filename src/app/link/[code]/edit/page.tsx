@@ -421,7 +421,7 @@ export default function EditLinkPage(props: { params: Promise<{ code: string }> 
                   </label>
                   <label className={`flex items-center justify-center px-3 h-9 rounded border cursor-pointer text-center ${cartDisplay==='grid'?'bg-black text-white':'bg-white text-black dark:text-black'}`} style={{ lineHeight: 1.1 }}>
                     <input type="radio" name="cart_display" className="hidden" checked={cartDisplay==='grid'} onChange={() => setCartDisplay('grid')} />
-                    Показавать сеткой, большие превью
+                    Показывать сеткой, большие превью
                   </label>
                 </div>
               </div>
