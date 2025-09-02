@@ -194,7 +194,26 @@ export default function EditLinkPage(props: { params: Promise<{ code: string }> 
         if (sumMode === 'fixed') body.amountRub = Number(String(amount).replace(',', '.'));
         body.vatRate = vatRate;
       } else {
-        body.cartItems = cartItems.map((c) => ({ id: c.id ?? null, title: c.title, price: Number(String(c.price).replace(',', '.')), qty: Number(String(c.qty).replace(',', '.')) }));
+        // Нормализуем исходные цены/qty from baseUnits + текущих qty
+        const normalizedBase = cartItems.map((c, i) => ({
+          id: c.id ?? null,
+          title: c.title,
+          price: Number.isFinite(Number(baseUnits[i])) ? Number(baseUnits[i]) : Number(String(c.price).replace(',', '.')),
+          qty: Number(String(c.qty).replace(',', '.')),
+        }));
+        // Если агент включён — сохраняем пониженные цены
+        const v = Number(commissionValue.replace(',', '.'));
+        const agentValid = isAgent && ((commissionType === 'percent' && Number.isFinite(v)) || (commissionType === 'fixed' && Number.isFinite(v) && v > 0));
+        if (agentValid) {
+          try {
+            const adj = applyAgentCommissionToCart(normalizedBase.map(x=>({ title:x.title, price:x.price, qty:x.qty })), commissionType, v);
+            body.cartItems = adj.adjusted.map((a, idx) => ({ id: normalizedBase[idx].id, title: normalizedBase[idx].title, price: a.price, qty: a.qty }));
+          } catch {
+            body.cartItems = normalizedBase;
+          }
+        } else {
+          body.cartItems = normalizedBase;
+        }
         body.allowCartAdjust = allowCartAdjust;
         body.amountRub = totalCart;
         body.cartDisplay = cartDisplay;
@@ -296,11 +315,19 @@ export default function EditLinkPage(props: { params: Promise<{ code: string }> 
                             price: (p ? (p.price ?? 0) : (r.price || '')).toString(),
                             qty: r.qty || '1',
                           } : r));
+                          if (p) {
+                            const unit = Number(p.price ?? 0);
+                            setBaseUnits((prev)=> prev.map((v,i)=> i===idx ? unit : v));
+                          }
                         }}
                         onBlur={(e)=>{
                           const title = e.currentTarget.value;
                           const p = orgProducts.find((x)=> x.title.toLowerCase() === title.toLowerCase());
-                          if (p) setCartItems((prev)=> prev.map((r,i)=> i===idx ? { ...r, id: p.id, title: p.title, price: (p.price ?? 0).toString() } : r));
+                          if (p) {
+                            setCartItems((prev)=> prev.map((r,i)=> i===idx ? { ...r, id: p.id, title: p.title, price: (p.price ?? 0).toString() } : r));
+                            const unit = Number(p.price ?? 0);
+                            setBaseUnits((prev)=> prev.map((v,i)=> i===idx ? unit : v));
+                          }
                         }}
                       />
                       <datalist id={`products-list-${idx}`}>
