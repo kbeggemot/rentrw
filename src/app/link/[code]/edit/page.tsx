@@ -465,33 +465,30 @@ export default function EditLinkPage(props: { params: Promise<{ code: string }> 
                     onFocus={() => setPartnersOpen(true)}
                     onBlur={() => setTimeout(() => setPartnersOpen(false), 150)}
                   />
-                  {partnerPhone ? (
-                    <>
-                      {/* desktop: to the right, absolute; mobile: below */}
-                      <div className="hidden sm:block mt-1 text-xs text-gray-600 whitespace-normal sm:whitespace-nowrap sm:absolute sm:top-0 sm:left-full sm:ml-2 sm:h-9 sm:flex sm:items-center sm:mt-0">
-                        {partnerLoading ? (
-                          <svg className="animate-spin h-4 w-4 text-gray-500" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path></svg>
-                        ) : (
-                          (() => {
-                            const digits = partnerPhone.replace(/\D/g, '');
-                            const found = partners.find((p) => p.phone.replace(/\D/g, '') === digits);
-                            return found?.fio || '';
-                          })()
-                        )}
-                      </div>
-                      <div className="sm:hidden col-span-3 mt-1 text-xs text-gray-600">
-                        {partnerLoading ? (
-                          <svg className="animate-spin h-4 w-4 text-gray-500" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path></svg>
-                        ) : (
-                          (() => {
-                            const digits = partnerPhone.replace(/\D/g, '');
-                            const found = partners.find((p) => p.phone.replace(/\D/g, '') === digits);
-                            return found?.fio || '';
-                          })()
-                        )}
-                      </div>
-                    </>
-                  ) : null}
+                  {/* Desktop: to the right (absolute) — не влияет на поток */}
+                  <div className="hidden sm:block mt-1 text-xs text-gray-600 whitespace-normal sm:whitespace-nowrap sm:absolute sm:top-0 sm:left-full sm:ml-2 sm:h-9 sm:flex sm:items-center sm:mt-0">
+                    {partnerLoading ? (
+                      <svg className="animate-spin h-4 w-4 text-gray-500" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path></svg>
+                    ) : (
+                      (() => {
+                        const digits = partnerPhone.replace(/\D/g, '');
+                        const found = partners.find((p) => p.phone.replace(/\D/g, '') === digits);
+                        return found?.fio || '';
+                      })()
+                    )}
+                  </div>
+                  {/* Mobile: всегда держим фиксированную высоту, чтобы не прыгало */}
+                  <div className="sm:hidden col-span-3 mt-1 text-xs text-gray-600 h-5">
+                    {partnerLoading ? (
+                      <svg className="animate-spin h-4 w-4 text-gray-500" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path></svg>
+                    ) : (
+                      (() => {
+                        const digits = partnerPhone.replace(/\D/g, '');
+                        const found = partners.find((p) => p.phone.replace(/\D/g, '') === digits);
+                        return found?.fio || '';
+                      })()
+                    )}
+                  </div>
                   {partnersOpen ? (
                     <div className="absolute z-10 mt-1 w-[22rem] max-h-56 overflow-auto rounded border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 shadow">
                       {(() => {

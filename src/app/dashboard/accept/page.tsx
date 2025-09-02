@@ -898,24 +898,21 @@ function AcceptPaymentContent() {
                   onBlur={() => setTimeout(() => setPartnersOpen(false), 150)}
                 />
                 {/* FIO on desktop (right), below on mobile */}
-                {agentPhone ? (
-                  <>
-                    <div className="hidden sm:block mt-1 text-xs text-gray-600 whitespace-normal sm:whitespace-nowrap sm:absolute sm:top-0 sm:left-full sm:ml-2 sm:h-9 sm:flex sm:items-center sm:mt-0">
-                      {(() => {
-                        const digits = agentPhone.replace(/\D/g, '');
-                        const found = partners.find((p) => p.phone.replace(/\D/g, '') === digits);
-                        return found?.fio || '';
-                      })()}
-                    </div>
-                    <div className="sm:hidden col-span-3 mt-1 text-xs text-gray-600">
-                      {(() => {
-                        const digits = agentPhone.replace(/\D/g, '');
-                        const found = partners.find((p) => p.phone.replace(/\D/g, '') === digits);
-                        return found?.fio || '';
-                      })()}
-                    </div>
-                  </>
-                ) : null}
+                {/* Desktop FIO to the right (absolute); Mobile below with fixed height to avoid jumps */}
+                <div className="hidden sm:block mt-1 text-xs text-gray-600 whitespace-normal sm:whitespace-nowrap sm:absolute sm:top-0 sm:left-full sm:ml-2 sm:h-9 sm:flex sm:items-center sm:mt-0">
+                  {(() => {
+                    const digits = agentPhone.replace(/\D/g, '');
+                    const found = partners.find((p) => p.phone.replace(/\D/g, '') === digits);
+                    return found?.fio || '';
+                  })()}
+                </div>
+                <div className="sm:hidden col-span-3 mt-1 text-xs text-gray-600 h-5">
+                  {(() => {
+                    const digits = agentPhone.replace(/\D/g, '');
+                    const found = partners.find((p) => p.phone.replace(/\D/g, '') === digits);
+                    return found?.fio || '';
+                  })()}
+                </div>
                 {partnersOpen ? (
                   <div className="absolute left-0 top-full mt-1 w-[22rem] max-h-56 overflow-auto rounded border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 shadow z-10">
                     {(() => {
