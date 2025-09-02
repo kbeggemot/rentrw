@@ -489,9 +489,9 @@ export default function NewLinkStandalonePage() {
                     onFocus={() => setPartnersOpen(true)}
                     onBlur={() => setTimeout(() => setPartnersOpen(false), 150)}
                   />
-                  {/* FIO at the right of phone on ≥sm, inside container */}
+                  {/* FIO at the right of phone on ≥sm (absolute), below on mobile */}
                   {linkPartner ? (
-                    <div className="hidden sm:block text-xs text-gray-600 truncate max-w-[14rem]">
+                    <div className="hidden sm:block mt-1 text-xs text-gray-600 whitespace-normal md:whitespace-nowrap md:absolute md:top-0 md:left-full md:ml-2 md:h-9 md:flex md:items-center md:mt-0">
                       {partnerLoading ? (
                         <svg className="inline-block animate-spin h-4 w-4 text-gray-500 align-middle" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path></svg>
                       ) : (
