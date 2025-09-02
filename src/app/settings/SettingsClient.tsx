@@ -540,7 +540,10 @@ export default function SettingsClient({ initial, userId }: { initial: SettingsP
                       headers: { 'Content-Type': 'application/json' },
                       body: JSON.stringify({ agentDescription: agentDesc }),
                     });
+                    const t = await r.text();
+                    let d: any = null; try { d = t ? JSON.parse(t) : null; } catch {}
                     if (!r.ok) throw new Error('SAVE_FAILED');
+                    if (typeof d?.agentDescription === 'string') setAgentDesc(d.agentDescription);
                     setMessage('Описание сохранено');
                     try { showToast('Описание сохранено', 'success'); } catch {}
                   } catch {
