@@ -429,7 +429,7 @@ function AcceptPaymentContent() {
     setMessage(null);
     setMessageKind('info');
     const toNum = (v: string) => Number(String(v || '0').replace(',', '.'));
-    const cartNumeric = (mode === 'cart') ? cart.map((r) => ({ title: r.title, price: toNum(r.price), qty: toNum(r.qty || '1') })) : [];
+    const cartNumeric = (mode === 'cart') ? cart.map((r) => ({ id: r.id || null, title: r.title, price: toNum(r.price), qty: toNum(r.qty || '1') })) : [];
     const numAmount = (mode === 'cart') ? cartNumeric.reduce((s, r) => s + (r.price * r.qty), 0) : Number(amount.replace(',', '.'));
     const numComm = Number(commission.replace(',', '.'));
     if (!Number.isFinite(numAmount) || numAmount <= 0) { showToast(mode==='cart' ? 'Итоговая сумма должна быть больше нуля' : 'Введите корректную сумму', 'error'); return; }
@@ -569,6 +569,7 @@ function AcceptPaymentContent() {
           commissionValue: isAgentSale ? numComm : undefined,
           serviceEndDate,
           vatRate,
+          cartItems: mode === 'cart' ? cartNumeric : undefined,
         }),
       });
       const text = await res.text();
