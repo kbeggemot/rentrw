@@ -544,7 +544,7 @@ export default function NewLinkStandalonePage() {
                           </div>
                         ) : (
                           items.map((p, i) => (
-                            <button key={i} type="button" className="w-full text-left px-2 py-1 text-sm hover:bg-gray-50 dark:hover:bg-gray-900" onClick={() => { setLinkPartner(p.phone); setPartnersOpen(false); }}>
+                            <button key={i} type="button" className="w-full text-left px-2 py-1 text-sm hover:bg-gray-50 dark:hover:bg-gray-900" onMouseDown={() => { setLinkPartner(p.phone); setPartnersOpen(false); }}>
                               <span className="font-medium">{p.fio || 'Без имени'}</span>
                               <span className="text-gray-500"> — {p.phone}</span>
                             </button>
