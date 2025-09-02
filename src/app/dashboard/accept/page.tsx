@@ -46,6 +46,9 @@ function AcceptPaymentContent() {
   const [commission, setCommission] = useState('');
   const [isAgentSale, setIsAgentSale] = useState(false);
   const [agentPhone, setAgentPhone] = useState('');
+  const [partners, setPartners] = useState<Array<{ phone: string; fio: string | null }>>([]);
+  const [partnersOpen, setPartnersOpen] = useState(false);
+  const [partnerLoading, setPartnerLoading] = useState(false);
   const [commissionType, setCommissionType] = useState<'percent' | 'fixed'>('percent');
   const [buyerEmail, setBuyerEmail] = useState('');
   const [serviceEndDate, setServiceEndDate] = useState<string>(() => {
@@ -85,6 +88,18 @@ function AcceptPaymentContent() {
       }
     } catch {}
   };
+
+  // preload partners for agent selector
+  useEffect(() => {
+    (async () => {
+      try {
+        const r = await fetch('/api/partners', { cache: 'no-store' });
+        const d = await r.json();
+        const arr = Array.isArray(d?.partners) ? d.partners : [];
+        setPartners(arr.map((p: any) => ({ phone: String(p.phone || ''), fio: p.fio ?? null })));
+      } catch {}
+    })();
+  }, []);
 
   const [aoStatus, setAoStatus] = useState<string | null>(null);
   const [purchaseReceiptUrl, setPurchaseReceiptUrl] = useState<string | null>(null);
@@ -873,15 +888,67 @@ function AcceptPaymentContent() {
                 required
                 className="w-48"
               />
-              <Input
-                type="tel"
-                inputMode="tel"
-                placeholder="Телефон партнёра"
-                value={agentPhone}
-                onChange={(e) => setAgentPhone(e.target.value)}
-                required
-                className="flex-1 min-w-[14rem]"
-              />
+              <div className="relative flex-1 min-w-[14rem]">
+                <input
+                  className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-950 px-2 h-9 text-sm"
+                  placeholder="Телефон партнёра"
+                  value={agentPhone}
+                  onChange={(e) => { setAgentPhone(e.target.value); setPartnersOpen(true); }}
+                  onFocus={() => setPartnersOpen(true)}
+                  onBlur={() => setTimeout(() => setPartnersOpen(false), 150)}
+                />
+                {agentPhone ? (
+                  <div className="sm:hidden col-span-3 mt-1 text-xs text-gray-600">
+                    {(() => {
+                      const digits = agentPhone.replace(/\D/g, '');
+                      const found = partners.find((p) => p.phone.replace(/\D/g, '') === digits);
+                      return found?.fio || '';
+                    })()}
+                  </div>
+                ) : null}
+                {partnersOpen ? (
+                  <div className="absolute left-0 top-full mt-1 w-[22rem] max-h-56 overflow-auto rounded border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 shadow z-10">
+                    {(() => {
+                      const q = agentPhone.toLowerCase();
+                      const qDigits = q.replace(/\D/g, '');
+                      const items = partners.filter((p) => {
+                        const phoneOk = p.phone.replace(/\D/g, '').includes(qDigits);
+                        const fioOk = (p.fio || '').toLowerCase().includes(q);
+                        return qDigits ? phoneOk : fioOk || phoneOk;
+                      });
+                      return items.length === 0 ? (
+                        <div className="px-2 py-2 text-xs">
+                          <button type="button" className="px-2 py-1 text-sm rounded border hover:bg-gray-50 dark:hover:bg-gray-900" onClick={async () => {
+                            const phoneDigits = agentPhone.replace(/\D/g, '');
+                            if (!phoneDigits) return;
+                            setPartnerLoading(true);
+                            try {
+                              const res = await fetch('/api/partners', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ phone: phoneDigits }) });
+                              const d = await res.json();
+                              if (res.ok) {
+                                const p = d?.partner || {};
+                                const fio = p?.fio || null;
+                                setPartners((prev) => {
+                                  const exists = prev.some((x) => x.phone.replace(/\D/g, '') === phoneDigits);
+                                  return exists ? prev.map((x) => (x.phone.replace(/\D/g, '') === phoneDigits ? { phone: phoneDigits, fio } : x)) : [...prev, { phone: phoneDigits, fio }];
+                                });
+                                setPartnersOpen(false);
+                              }
+                            } catch {} finally { setPartnerLoading(false); }
+                          }}>Добавить</button>
+                        </div>
+                      ) : (
+                        items.map((p, i) => (
+                          <button key={i} type="button" className="w-full text-left px-2 py-1 text-sm hover:bg-gray-50 dark:hover:bg-gray-900" onMouseDown={() => { setAgentPhone(p.phone); setPartnersOpen(false); }}>
+                            <span className="font-medium">{p.fio || 'Без имени'}</span>
+                            <span className="text-gray-500"> — {p.phone}</span>
+                          </button>
+                        ))
+                      );
+                    })()}
+                  </div>
+                ) : null}
+              </div>
             </div>
           </>
         ) : null}
