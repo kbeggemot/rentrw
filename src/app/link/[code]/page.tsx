@@ -574,6 +574,8 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
       
       const isCartMode = Array.isArray(cart) && cart.length > 0;
       const amountNum = isCartMode ? Number(cartAdjustedSum + (agentLine ? agentLine.price : 0)) : (data.sumMode === 'fixed' ? (data.amountRub || 0) : Number(amount.replace(',', '.')));
+      // Build cart for server: always use ORIGINAL unit prices (baseUnits) + current qty
+      const baseCart = isCartMode ? cart.map((i, idx) => ({ id: i.id || null, title: i.title, price: Number((baseUnits[idx] ?? i.price) || 0), qty: Number(i.qty || 0) })) : [];
       const body: any = {
         amountRub: amountNum,
         description: data.description,
@@ -586,6 +588,7 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
         vatRate: (data.vatRate || 'none'),
         serviceEndDate: mskToday(),
         orgInn: (data as any)?.orgInn ? String((data as any).orgInn).replace(/\D/g,'') : undefined,
+        cartItems: isCartMode ? baseCart : undefined,
       };
       const res = await fetch('/api/rocketwork/tasks', { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-user-id': data.userId }, body: JSON.stringify(body) });
       const txt = await res.text();
