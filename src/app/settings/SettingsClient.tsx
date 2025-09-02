@@ -289,7 +289,7 @@ export default function SettingsClient({ initial, userId }: { initial: SettingsP
 
   return (
     <div className="max-w-2xl mx-auto">
-      <h1 className="hidden md:block text-2xl font-bold mb-4">Настройки</h1>
+      <h1 className="hidden md:block text-xl font-semibold mb-4">Настройки</h1>
       <form onSubmit={submit} className="space-y-4">
         <div>
           <label className="block text-sm text-gray-700 dark:text-gray-300 mb-1">Токен Рокет Ворк</label>

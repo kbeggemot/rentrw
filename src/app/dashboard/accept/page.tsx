@@ -649,7 +649,7 @@ function AcceptPaymentContent() {
   return (
     <div className="max-w-2xl mx-auto">
       <div className="flex items-center justify-between mb-4">
-        <h1 className="text-2xl font-bold">Принять оплату</h1>
+        <h1 className="text-xl font-semibold">Принять оплату</h1>
         <a href="/dashboard" className="rounded hover:bg-gray-50 dark:hover:bg-gray-900" aria-label="Закрыть">✕</a>
       </div>
       <div className="bg-white dark:bg-gray-950 border border-gray-200 dark:border-gray-800 rounded-lg p-4 shadow-sm">

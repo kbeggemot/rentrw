@@ -263,7 +263,7 @@ export default function DashboardClient({ hasTokenInitial }: { hasTokenInitial: 
   return (
     <div className="max-w-2xl mx-auto">
       <header className="mb-4">
-        <h1 className="hidden md:block text-2xl font-bold">Касса</h1>
+        <h1 className="hidden md:block text-xl font-semibold">Касса</h1>
         <p className="text-sm text-gray-600 dark:text-gray-400">Принимайте оплату быстро и удобно</p>
       </header>
       {hasToken === false ? (
