@@ -674,8 +674,8 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
                     </div>
                     {data.allowCartAdjust ? (
                       <>
-                        <input type="number" min={1} step={1} className="w-10 rounded border px-2 h-9 text-sm bg-white text-black dark:bg-gray-800 dark:text-white placeholder-gray-400 dark:placeholder-gray-400" value={String(item.qty)} onChange={(e) => { const raw = e.target.value; const q = raw.trim() === '' ? 0 : Math.max(0, Number(raw)); setCart((prev) => prev.map((it, i) => i === idx ? { ...it, qty: q } : it)); }} />
-                        <button type="button" className="px-3 h-9 rounded border text-sm text-gray-700 whitespace-nowrap" onClick={() => setCart((prev) => prev.filter((_, i) => i !== idx))}>Удалить</button>
+                        <input type="number" min={1} step={1} className="w-14 rounded border px-2 h-9 text-sm bg-white text-black dark:bg-gray-800 dark:text-white placeholder-gray-400 dark:placeholder-gray-400" value={String(item.qty)} onChange={(e) => { const raw = e.target.value; const q = raw.trim() === '' ? 0 : Math.max(0, Number(raw)); setCart((prev) => prev.map((it, i) => i === idx ? { ...it, qty: q } : it)); }} />
+                        <button type="button" aria-label="Удалить" className="w-9 h-9 rounded border text-sm text-gray-700 flex items-center justify-center" onClick={() => setCart((prev) => prev.filter((_, i) => i !== idx))}>✕</button>
                       </>
                     ) : null}
                   </div>
@@ -708,8 +708,8 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
                     <div className="mt-2 flex items-center gap-2 overflow-x-auto touch-pan-x">
                       {data.allowCartAdjust ? (
                         <>
-                          <input type="number" min={1} step={1} className="w-10 rounded border px-2 h-9 text-sm bg-white text-black dark:bg-gray-800 dark:text-white placeholder-gray-400 dark:placeholder-gray-400" value={String(item.qty)} onChange={(e) => { const raw = e.target.value; const q = raw.trim() === '' ? 0 : Math.max(0, Number(raw)); setCart((prev) => prev.map((it, i) => i === idx ? { ...it, qty: q } : it)); }} />
-                          <button type="button" className="px-3 h-9 rounded border text-sm text-gray-700 whitespace-nowrap" onClick={() => setCart((prev) => prev.filter((_, i) => i !== idx))}>Удалить</button>
+                          <input type="number" min={1} step={1} className="w-16 rounded border px-2 h-9 text-sm bg-white text-black dark:bg-gray-800 dark:text-white placeholder-gray-400 dark:placeholder-gray-400" value={String(item.qty)} onChange={(e) => { const raw = e.target.value; const q = raw.trim() === '' ? 0 : Math.max(0, Number(raw)); setCart((prev) => prev.map((it, i) => i === idx ? { ...it, qty: q } : it)); }} />
+                          <button type="button" aria-label="Удалить" className="w-9 h-9 rounded border text-sm text-gray-700 flex items-center justify-center" onClick={() => setCart((prev) => prev.filter((_, i) => i !== idx))}>✕</button>
                         </>
                       ) : null}
                     </div>

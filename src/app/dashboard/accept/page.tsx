@@ -713,7 +713,7 @@ function AcceptPaymentContent() {
                     </div>
                     <div>
                       {idx===0 ? (<div className="text-xs text-gray-500 mb-1">Количество</div>) : null}
-                      <input className="w-16 sm:w-20 rounded border px-2 h-9 text-sm" placeholder="Кол-во" value={row.qty} onChange={(e)=> setCart((prev)=> prev.map((r,i)=> i===idx ? { ...r, qty: e.target.value } : r))} />
+                      <input className="w-20 sm:w-24 rounded border px-2 h-9 text-sm" placeholder="Кол-во" value={row.qty} onChange={(e)=> setCart((prev)=> prev.map((r,i)=> i===idx ? { ...r, qty: e.target.value } : r))} />
                     </div>
                     <div>
                       {idx===0 ? (<div className="text-xs text-gray-500 mb-1">Цена, ₽</div>) : null}
@@ -737,7 +737,7 @@ function AcceptPaymentContent() {
                     </div>
                     <div className="flex flex-col">
                       {idx===0 ? (<div className="text-xs mb-1 invisible">label</div>) : null}
-                      <button type="button" className="px-2 h-9 rounded border" onClick={()=> setCart((prev)=> prev.filter((_,i)=> i!==idx))}>Удалить</button>
+                      <button type="button" aria-label="Удалить" className="w-9 h-9 rounded border flex items-center justify-center" onClick={()=> setCart((prev)=> prev.filter((_,i)=> i!==idx))}>✕</button>
                     </div>
                   </div>
                 </div>
@@ -762,7 +762,7 @@ function AcceptPaymentContent() {
                         <input className="w-24 sm:w-28 rounded border px-2 h-9 text-sm bg-gray-100" value={agentAmount.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2, useGrouping: false })} readOnly disabled />
                       </div>
                       <div className="flex flex-col">
-                        <button type="button" className="px-2 h-9 rounded border text-gray-400" disabled>Удалить</button>
+                        <button type="button" aria-label="Удалить" className="w-9 h-9 rounded border text-gray-400 flex items-center justify-center" disabled>✕</button>
                       </div>
                     </div>
                   </div>
