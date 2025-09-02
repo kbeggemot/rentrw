@@ -888,7 +888,7 @@ function AcceptPaymentContent() {
                 required
                 className="w-48"
               />
-              <div className="relative flex-1 min-w-[28rem] md:min-w-[36rem]">
+              <div className="relative flex-1 min-w-[14rem]">
                 <input
                   className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-950 px-2 h-9 text-sm"
                   placeholder="Телефон или ФИО партнёра"
