@@ -131,7 +131,7 @@ export default function PartnersClient({ initial, hasTokenInitial }: { initial: 
 
   return (
     <div className="max-w-4xl mx-auto">
-      <h1 className="hidden md:block text-xl font-semibold mb-4">Партнёры</h1>
+      <h1 className="hidden md:block text-2xl font-bold mb-4">Партнёры</h1>
       <div className="mb-4 flex flex-wrap items-end gap-3 text-sm">
         <Input label="Телефон" placeholder="+7 900 000-00-00" value={phone} onChange={(e) => setPhone(e.target.value)} className="w-56" />
         <Button onClick={invite} disabled={loading || phone.trim().length === 0}>{loading ? '...' : 'Пригласить'}</Button>

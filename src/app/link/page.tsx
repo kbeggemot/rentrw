@@ -42,7 +42,7 @@ export default function LinksStandalonePage() {
   return (
     <div className="max-w-3xl mx-auto p-4">
       <header className="mb-4">
-        <h1 className="text-xl font-semibold">Платежные страницы</h1>
+        <h1 className="text-2xl font-bold">Платежные страницы</h1>
         <p className="text-sm text-gray-600 dark:text-gray-400">Создание и управление платёжными ссылками</p>
       </header>
 
