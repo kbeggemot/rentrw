@@ -619,13 +619,13 @@ export default function SalesClient({ initial, hasTokenInitial }: { initial: Sal
           </div>
         </div>, document.body) : null}
       {/* Mobile cards */}
-      <div className="md:hidden space-y-3">
+      <div className="md:hidden space-y-2">
         {paged.length === 0 ? (
           <div className="text-center text-gray-500 border rounded-lg p-4 bg-white dark:bg-gray-950">Нет данных</div>
         ) : (
           paged.map((s) => (
-            <div key={String(s.taskId)} className="border border-gray-200 dark:border-gray-800 rounded-lg bg-white dark:bg-gray-950 p-3">
-              <div className="grid grid-cols-[5.75rem_1fr_6.75rem_1fr] gap-x-2 gap-y-1 text-[13px] leading-tight">
+            <div key={String(s.taskId)} className="border border-gray-200 dark:border-gray-800 rounded-lg bg-white dark:bg-gray-950 p-2">
+              <div className="grid grid-cols-[5.2rem_1fr_5.8rem_1fr] gap-x-2 gap-y-1 text-[12px] leading-tight">
                 <div className="text-xs text-gray-500">№</div>
                 <div className="font-medium">{s.taskId}</div>
                 <div className="text-xs text-gray-500">Статус</div>
@@ -641,7 +641,7 @@ export default function SalesClient({ initial, hasTokenInitial }: { initial: Sal
                 <div className="text-xs text-gray-500">Тип</div>
                 <div className="col-span-3">{s.isAgent ? 'Агентская' : 'Прямая'}</div>
               </div>
-              <div className="mt-3 grid grid-cols-2 items-center">
+              <div className="mt-2 grid grid-cols-2 items-center">
           <div>
                   <Button variant="secondary" onClick={() => setChecksOpenId((id) => (id === s.taskId ? null : s.taskId))}>Чеки</Button>
           </div>
@@ -650,7 +650,7 @@ export default function SalesClient({ initial, hasTokenInitial }: { initial: Sal
                     <Button aria-label="Действия" variant="secondary" size="icon" onClick={() => setMenuOpenId((id) => (id === s.taskId ? null : s.taskId))}>
                       <IconEdit />
           </Button>
-                    <div className={`absolute right-0 mt-2 w-48 bg-white dark:bg-gray-950 border border-gray-200 dark:border-gray-800 rounded shadow-sm z-[9999] ${menuOpenId === s.taskId ? '' : 'hidden'}`}>
+                    <div className={`absolute right-0 mt-2 w-44 bg-white dark:bg-gray-950 border border-gray-200 dark:border-gray-800 rounded shadow-sm z-[9999] ${menuOpenId === s.taskId ? '' : 'hidden'}`}>
                       {(() => {
                         const fin = String(s.status || '').toLowerCase();
                         const isFinal = fin === 'paid' || fin === 'transfered' || fin === 'transferred';
