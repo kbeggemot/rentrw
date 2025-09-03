@@ -42,6 +42,7 @@ export default function FlashToast() {
     clearCookie('flash', '/admin/orgs');
     clearCookie('flash', '/admin/links');
     clearCookie('flash', '/admin/partners');
+    clearCookie('flash', '/admin/lk-users');
     if (value === 'SALE_SAVED' || value === 'LINK_SAVED' || value === 'ORG_SAVED' || value === 'PARTNER_SAVED' || value === 'OK') {
       showToast('Сохранено', 'success');
     } else {

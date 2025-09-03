@@ -54,6 +54,7 @@ export async function POST(req: Request) {
   const ct = (req.headers.get('content-type') || '').toLowerCase();
   if (!ct.includes('application/json')) {
     const loc = back || `/admin/lk-users/${encodeURIComponent(id)}`;
+    // Return lightweight HTML redirect to avoid history replacement issues in some browsers
     const res = NextResponse.redirect(new URL(loc, req.url), 303);
     try { res.headers.set('Set-Cookie', `flash=OK; Path=/; Max-Age=5; SameSite=Lax`); } catch {}
     return res;
