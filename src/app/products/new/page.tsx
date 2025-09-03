@@ -183,21 +183,7 @@ export default function NewProductPage() {
           <label className="block text-sm text-gray-700 dark:text-gray-300 mb-1">Описание (необязательно)</label>
           <textarea className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 text-sm min-h-[100px]" value={description} onChange={(e) => setDescription(e.target.value)} />
         </div>
-        <div className="pt-1 border-t border-gray-200 dark:border-gray-800">
-          <div className="text-base font-semibold mb-1">Мгновенная выдача</div>
-          <label className="inline-flex items-center gap-2 text-sm mb-2">
-            <input type="checkbox" checked={instant} onChange={(e) => setInstant(e.target.checked)} />
-            <span>{kind === 'service' ? 'Это электронная услуга' : 'Это цифровой товар'}</span>
-          </label>
-          <div className="text-xs text-gray-500 mb-2">Покупатель получит результат сразу после оплаты — на e-mail, указанный при покупке</div>
-          {instant ? (
-            <div>
-              <label className="block text-sm text-gray-700 dark:text-gray-300 mb-1">Результат покупки</label>
-              <textarea className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 text-sm min-h-[80px]" value={instantText} onChange={(e) => setInstantText(e.target.value)} placeholder="Например: текст, ссылка или код доступа" />
-              <div className="text-xs text-gray-500 mt-1">Если нужен файл — добавьте ссылку на скачивание.</div>
-            </div>
-          ) : null}
-        </div>
+        
         {/* Photos */}
         <div>
           <label className="block text-sm text-gray-700 dark:text-gray-300 mb-1">Фото (необязательно, до 5 шт.)</label>
@@ -268,6 +254,21 @@ export default function NewProductPage() {
             ) : null}
           </div>
           <p className="text-xs text-gray-500 mt-1">Поддерживаются JPG, PNG, WEBP. До 5 МБ на файл. Можно с камеры.</p>
+        </div>
+        <div className="pt-1 border-t border-gray-200 dark:border-gray-800">
+          <div className="text-base font-semibold mb-1">Мгновенная выдача</div>
+          <label className="inline-flex items-center gap-2 text-sm mb-2">
+            <input type="checkbox" checked={instant} onChange={(e) => setInstant(e.target.checked)} />
+            <span>{kind === 'service' ? 'Это электронная услуга' : 'Это цифровой товар'}</span>
+          </label>
+          <div className="text-xs text-gray-500 mb-2">Покупатель получит результат сразу после оплаты — на e-mail, указанный при покупке</div>
+          {instant ? (
+            <div>
+              <label className="block text-sm text-gray-700 dark:text-gray-300 mb-1">Результат покупки</label>
+              <textarea className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 text-sm min-h-[80px]" value={instantText} onChange={(e) => setInstantText(e.target.value)} placeholder="Например: текст, ссылка или код доступа" />
+              <div className="text-xs text-gray-500 mt-1">Если нужен файл — добавьте ссылку на скачивание.</div>
+            </div>
+          ) : null}
         </div>
         {error ? <div className="text-sm text-red-600">{error}</div> : null}
         <div className="flex gap-2">
