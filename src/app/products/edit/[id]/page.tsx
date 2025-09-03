@@ -205,21 +205,6 @@ export default function EditProductPage(props: { params: Promise<{ id?: string }
               <label className="block mb-1">Описание</label>
               <textarea className="w-full rounded border px-2 py-2 min-h-[100px]" value={description} onChange={(e) => setDescription(e.target.value)} />
             </div>
-            <div className="pt-1 border-t border-gray-200 dark:border-gray-800">
-              <div className="text-base font-semibold mb-1">Мгновенная выдача</div>
-              <label className="inline-flex items-center gap-2 text-sm mb-2">
-                <input type="checkbox" checked={instant} onChange={(e) => setInstant(e.target.checked)} />
-                <span>{kind === 'service' ? 'Это электронная услуга' : 'Это цифровой товар'}</span>
-              </label>
-              <div className="text-xs text-gray-500 mb-2">Покупатель получит результат сразу после оплаты — на e-mail, указанный при покупке</div>
-              {instant ? (
-                <div>
-                  <label className="block text-sm mb-1">Результат покупки</label>
-                  <textarea className="w-full rounded border px-2 py-2 min-h-[80px]" value={instantText} onChange={(e) => setInstantText(e.target.value)} placeholder="Например: текст, ссылка или код доступа" />
-                  <div className="text-xs text-gray-500 mt-1">Если нужен файл — добавьте ссылку на скачивание.</div>
-                </div>
-              ) : null}
-            </div>
             {/* Фото: просмотр и добавление */}
             <div>
               <label className="block mb-1">Фото (до 5 шт.)</label>
@@ -303,6 +288,21 @@ export default function EditProductPage(props: { params: Promise<{ id?: string }
                       </>
                     ) : null}
                   </div>
+                </div>
+              ) : null}
+            </div>
+            <div className="pt-1 border-t border-gray-200 dark:border-gray-800">
+              <div className="text-base font-semibold mb-1">Мгновенная выдача</div>
+              <label className="inline-flex items-center gap-2 text-sm mb-2">
+                <input type="checkbox" checked={instant} onChange={(e) => setInstant(e.target.checked)} />
+                <span>{kind === 'service' ? 'Это электронная услуга' : 'Это цифровой товар'}</span>
+              </label>
+              <div className="text-xs text-gray-500 mb-2">Покупатель получит результат сразу после оплаты — на e-mail, указанный при покупке</div>
+              {instant ? (
+                <div>
+                  <label className="block text-sm mb-1">Результат покупки</label>
+                  <textarea className="w-full rounded border px-2 py-2 min-h-[80px]" value={instantText} onChange={(e) => setInstantText(e.target.value)} placeholder="Например: текст, ссылка или код доступа" />
+                  <div className="text-xs text-gray-500 mt-1">Если нужен файл — добавьте ссылку на скачивание.</div>
                 </div>
               ) : null}
             </div>
