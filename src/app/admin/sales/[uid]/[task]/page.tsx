@@ -115,6 +115,14 @@ export default async function AdminSaleEditor(props: { params: Promise<{ uid: st
             <h2 className="text-lg font-semibold mb-2">Действия</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               <div>
+                <form action="/api/admin/actions/instant-resend" method="post">
+                  <input type="hidden" name="userId" defaultValue={p.uid} />
+                  <input type="hidden" name="taskId" defaultValue={p.task} />
+                  <button className="px-3 py-2 border rounded inline-block" type="submit">Переотправить письмо выдачи</button>
+                </form>
+                <div className="text-xs text-gray-600 mt-1">Принудительно сформировать и отправить письмо «мгновенная выдача», если есть результат и чеки. Статус сохранится в продаже.</div>
+              </div>
+              <div>
                 <a className="px-3 py-2 border rounded inline-block" href={`/api/rocketwork/tasks/${encodeURIComponent(String(item.taskId))}?force=1`} target="_blank">Sync RW</a>
                 <div className="text-xs text-gray-600 mt-1">Запросить статус задачи и наличные чеки (ОФД/НПД) из RW; обновляет продажу локально.</div>
               </div>
