@@ -50,23 +50,7 @@ export async function sendInstantDeliveryIfReady(userId: string, sale: SaleRecor
     let legalName: string = '';
     try { const org = await findOrgByInn(inn); legalName = (org?.name || '') as string; } catch {}
     const seller_legal_name = legalName || 'Поставщик';
-    let brand_name_img = 'YPLA';
-    let attachments: Array<{ filename: string; content: string; contentType: string; cid?: string; disposition?: 'inline' | 'attachment' }> = [];
-    try {
-      const pngPath = path.join(process.cwd(), 'public', 'logo.png');
-      const png = await fs.readFile(pngPath);
-      const b64p = Buffer.from(png).toString('base64');
-      brand_name_img = `<img src="cid:brand_logo" alt="YPLA" height="16" style="height:16px;vertical-align:middle;"/>`;
-      attachments.push({ filename: 'logo.png', content: b64p, contentType: 'image/png', cid: 'brand_logo', disposition: 'inline' });
-    } catch {
-      try {
-        const svgPath = path.join(process.cwd(), 'public', 'logo.svg');
-        const svg = await fs.readFile(svgPath);
-        const b64 = Buffer.from(svg).toString('base64');
-        brand_name_img = `<img src="cid:brand_logo" alt="YPLA" height="16" style="height:16px;vertical-align:middle;"/>`;
-        attachments.push({ filename: 'logo.svg', content: b64, contentType: 'image/svg+xml', cid: 'brand_logo', disposition: 'inline' });
-      } catch {}
-    }
+    const brand_name_img = `<img src="https://ypla.ru/logo.png" alt="YPLA" height="16" style="height:16px;vertical-align:middle;"/>`;
 
     const purchase_result = instantTexts.map((t) => `<div style=\"margin-bottom:8px\">${escapeHtml(t)}</div>`).join('');
     const payment_receipt_url = String(sale.ofdFullUrl || sale.ofdUrl || '');
@@ -139,7 +123,7 @@ export async function sendInstantDeliveryIfReady(userId: string, sale: SaleRecor
       } catch {}
       // Persist status pending and send
       await updateSaleEmailStatus(userId, sale.taskId, 'pending', null);
-      await sendEmail({ to, subject: `Оплата прошла — результат покупки и чеки (заказ №${orderId})`, html, attachments });
+      await sendEmail({ to, subject: `Оплата прошла — результат покупки и чеки (заказ №${orderId})`, html });
       await updateSaleEmailStatus(userId, sale.taskId, 'sent', null);
       try { await appendAdminEntityLog('sale', [String(userId), String(sale.taskId)], { source: 'system', message: 'instant_email:sent', data: { to } }); } catch {}
     } finally {
