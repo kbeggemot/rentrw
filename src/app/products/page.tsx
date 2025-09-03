@@ -26,7 +26,7 @@ export default async function ProductsPage() {
   return (
     <div className="px-4 pt-0 pb-4">
       <div className="flex items-center justify-between mb-4" style={{minHeight: '40px'}}>
-        <h1 className="text-2xl font-bold">Позиции витрины</h1>
+        <h1 className="hidden md:block text-2xl font-bold">Позиции витрины</h1>
         <Link href="/products/new" className="px-3 py-2 rounded-md bg-foreground text-white text-sm">Создать</Link>
       </div>
       <ProductsTable initialItems={data?.items || []} />
