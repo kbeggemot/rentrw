@@ -23,6 +23,8 @@ export default function EditProductPage(props: { params: Promise<{ id?: string }
   const [photos, setPhotos] = useState<string[]>([]);
   const [previews, setPreviews] = useState<string[]>([]);
   const [uploading, setUploading] = useState(false);
+  const [instant, setInstant] = useState(false);
+  const [instantText, setInstantText] = useState('');
   // Viewer state (fullscreen pop-up, like public payment page)
   const [viewer, setViewer] = useState<{ open: boolean; photos: string[]; index: number }>({ open: false, photos: [], index: 0 });
   const [fadeIn, setFadeIn] = useState(true);
@@ -66,6 +68,8 @@ export default function EditProductPage(props: { params: Promise<{ id?: string }
         setVat((['none','0','5','7','10','20'].includes(p.vat) ? p.vat : 'none') as any);
         setSku(p.sku || '');
         setDescription(p.description || '');
+        setInstant(Boolean(p.instantResult));
+        setInstantText(p.instantResult || '');
         const phs = Array.isArray(p.photos) ? p.photos : [];
         setPhotos(phs);
         setPreviews(phs);
@@ -98,6 +102,7 @@ export default function EditProductPage(props: { params: Promise<{ id?: string }
   const onSave = async () => {
     setError(null);
     try {
+      if (instant && !(instantText.trim().length > 0)) { setError('Заполните «Результат покупки» или отключите автоматическую выдачу.'); return; }
       const body = {
         kind,
         title: title.trim(),
@@ -107,6 +112,7 @@ export default function EditProductPage(props: { params: Promise<{ id?: string }
         vat,
         sku: sku.trim() || null,
         description: description.trim() || null,
+        instantResult: instant ? (instantText.trim() || null) : null,
         photos,
       };
       const r = await fetch(`/api/products?id=${encodeURIComponent(id)}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
@@ -198,6 +204,21 @@ export default function EditProductPage(props: { params: Promise<{ id?: string }
             <div>
               <label className="block mb-1">Описание</label>
               <textarea className="w-full rounded border px-2 py-2 min-h-[100px]" value={description} onChange={(e) => setDescription(e.target.value)} />
+            </div>
+            <div className="pt-1 border-t border-gray-200 dark:border-gray-800">
+              <div className="text-base font-semibold mb-1">Мгновенная выдача</div>
+              <label className="inline-flex items-center gap-2 text-sm mb-2">
+                <input type="checkbox" checked={instant} onChange={(e) => setInstant(e.target.checked)} />
+                <span>{kind === 'service' ? 'Это электронная услуга' : 'Это цифровой товар'}</span>
+              </label>
+              <div className="text-xs text-gray-500 mb-2">Покупатель получит результат сразу после оплаты — на e-mail, указанный при покупке</div>
+              {instant ? (
+                <div>
+                  <label className="block text-sm mb-1">Результат покупки</label>
+                  <textarea className="w-full rounded border px-2 py-2 min-h-[80px]" value={instantText} onChange={(e) => setInstantText(e.target.value)} placeholder="Например: текст, ссылка или код доступа" />
+                  <div className="text-xs text-gray-500 mt-1">Если нужен файл — добавьте ссылку на скачивание.</div>
+                </div>
+              ) : null}
             </div>
             {/* Фото: просмотр и добавление */}
             <div>

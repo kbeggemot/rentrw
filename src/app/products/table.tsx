@@ -12,6 +12,7 @@ type Item = {
   unit: 'усл' | 'шт' | 'упак' | 'гр' | 'кг' | 'м';
   vat: 'none' | '0' | '5' | '7' | '10' | '20';
   sku?: string | null;
+  instantResult?: string | null;
 };
 
 export default function ProductsTable({ initialItems }: { initialItems: Item[] }) {
@@ -91,6 +92,7 @@ export default function ProductsTable({ initialItems }: { initialItems: Item[] }
               <th className="text-left p-2">Ед.</th>
               <th className="text-left p-2">НДС</th>
               <th className="text-left p-2">Артикул</th>
+              <th className="text-left p-2">Автовыдача</th>
               <th className="text-left p-2 w-1 whitespace-nowrap">Действия</th>
             </tr>
           </thead>
@@ -104,6 +106,7 @@ export default function ProductsTable({ initialItems }: { initialItems: Item[] }
                 <td className="p-2">{p.unit}</td>
                 <td className="p-2">{p.vat === 'none' ? 'Без НДС' : `${p.vat}%`}</td>
                 <td className="p-2">{p.sku || ''}</td>
+                <td className="p-2">{p.instantResult ? 'Да' : ''}</td>
                 <td className="p-2">
                   <div className="flex items-center gap-2 justify-end md:justify-start">
                     <a href={`/products/edit/${encodeURIComponent(p.id)}`} className="inline-flex items-center justify-center rounded-lg bg-gray-200 dark:bg-gray-800 hover:bg-gray-300 dark:hover:bg-gray-700 h-9 px-2 text-sm text-black dark:text-white" aria-label="Редактировать">Редактировать</a>

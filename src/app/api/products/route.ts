@@ -43,6 +43,7 @@ export async function POST(req: Request) {
       vat,
       sku: (body?.sku ?? null) as string | null,
       description: (body?.description ?? null) as string | null,
+      instantResult: typeof body?.instantResult === 'string' && body.instantResult.trim().length > 0 ? String(body.instantResult).trim() : null,
       photos: Array.isArray(body?.photos) ? body.photos.slice(0, 5) : [],
     });
     return NextResponse.json({ item });
@@ -70,6 +71,7 @@ export async function PUT(req: Request) {
       vat: body?.vat,
       sku: typeof body?.sku !== 'undefined' ? (body?.sku ?? null) : undefined,
       description: typeof body?.description !== 'undefined' ? (body?.description ?? null) : undefined,
+      instantResult: typeof body?.instantResult !== 'undefined' ? (body?.instantResult ?? null) : undefined,
       photos: Array.isArray(body?.photos) ? body.photos.slice(0, 5) : undefined,
     } as any);
     if (!updated) return NextResponse.json({ error: 'NOT_FOUND' }, { status: 404 });

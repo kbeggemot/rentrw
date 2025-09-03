@@ -28,6 +28,8 @@ export default function NewProductPage() {
   const [touchDeltaX, setTouchDeltaX] = useState(0);
   const [toast, setToast] = useState<{ msg: string; kind: 'success' | 'error' | 'info' } | null>(null);
   const showToast = (msg: string, kind: 'success' | 'error' | 'info' = 'info') => { setToast({ msg, kind }); setTimeout(() => setToast(null), 2500); };
+  const [instant, setInstant] = useState(false);
+  const [instantText, setInstantText] = useState('');
 
   const showPrev = () => { setFadeIn(false); setTimeout(() => setFadeIn(true), 20); setViewer((v) => ({ ...v, index: (v.index - 1 + v.photos.length) % v.photos.length })); };
   const showNext = () => { setFadeIn(false); setTimeout(() => setFadeIn(true), 20); setViewer((v) => ({ ...v, index: (v.index + 1) % v.photos.length })); };
@@ -73,8 +75,10 @@ export default function NewProductPage() {
         vat,
         sku: sku.trim() || null,
         description: description.trim() || null,
+        instantResult: instant ? (instantText.trim() || null) : null,
         photos,
       };
+      if (instant && !(instantText.trim().length > 0)) { showToast('Заполните «Результат покупки» или отключите автоматическую выдачу.', 'error'); return; }
       const r = await fetch('/api/products', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
       const t = await r.text();
       if (!r.ok) {
@@ -178,6 +182,21 @@ export default function NewProductPage() {
         <div>
           <label className="block text-sm text-gray-700 dark:text-gray-300 mb-1">Описание (необязательно)</label>
           <textarea className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 text-sm min-h-[100px]" value={description} onChange={(e) => setDescription(e.target.value)} />
+        </div>
+        <div className="pt-1 border-t border-gray-200 dark:border-gray-800">
+          <div className="text-base font-semibold mb-1">Мгновенная выдача</div>
+          <label className="inline-flex items-center gap-2 text-sm mb-2">
+            <input type="checkbox" checked={instant} onChange={(e) => setInstant(e.target.checked)} />
+            <span>{kind === 'service' ? 'Это электронная услуга' : 'Это цифровой товар'}</span>
+          </label>
+          <div className="text-xs text-gray-500 mb-2">Покупатель получит результат сразу после оплаты — на e-mail, указанный при покупке</div>
+          {instant ? (
+            <div>
+              <label className="block text-sm text-gray-700 dark:text-gray-300 mb-1">Результат покупки</label>
+              <textarea className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 text-sm min-h-[80px]" value={instantText} onChange={(e) => setInstantText(e.target.value)} placeholder="Например: текст, ссылка или код доступа" />
+              <div className="text-xs text-gray-500 mt-1">Если нужен файл — добавьте ссылку на скачивание.</div>
+            </div>
+          ) : null}
         </div>
         {/* Photos */}
         <div>

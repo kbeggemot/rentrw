@@ -12,6 +12,7 @@ export type ProductRecord = {
   vat: 'none' | '0' | '5' | '7' | '10' | '20';
   sku?: string | null;
   description?: string | null;
+  instantResult?: string | null; // текст мгновенной выдачи для цифровых товаров/услуг
   photos?: string[]; // relative paths under .data
   createdAt: string;
   updatedAt: string;
@@ -67,6 +68,7 @@ export async function createProduct(userId: string, orgInn: string, data: Omit<P
     vat: data.vat,
     sku: data.sku?.trim() || null,
     description: data.description?.trim() || null,
+    instantResult: (data as any).instantResult ? String((data as any).instantResult).trim() : null,
     photos: Array.isArray((data as any).photos) ? ((data as any).photos as string[]).slice(0, 5) : [],
     createdAt: now,
     updatedAt: now,
@@ -113,6 +115,7 @@ export async function updateProduct(
   if (data.vat && ['none','0','5','7','10','20'].includes(data.vat as any)) next.vat = data.vat as any;
   if (typeof data.sku !== 'undefined') next.sku = data.sku ?? null;
   if (typeof data.description !== 'undefined') next.description = data.description ?? null;
+  if (typeof (data as any).instantResult !== 'undefined') next.instantResult = ((data as any).instantResult ?? null) as any;
   if (Array.isArray(data.photos)) next.photos = data.photos.slice(0, 5);
   next.userId = current.userId || userId;
   next.updatedAt = new Date().toISOString();
