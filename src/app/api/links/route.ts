@@ -164,6 +164,22 @@ export async function POST(req: Request) {
         }
       } catch {}
     }
+    // Business rule: минимальная сумма после вычета комиссии — не менее 10 ₽
+    const MIN_AMOUNT_RUB = 10;
+    const totalRub = (() => {
+      if (Array.isArray(cartItems) && cartItems.length > 0) {
+        try { return cartItems.reduce((s: number, r: any) => s + Number(r.price || 0) * Number(r.qty || 1), 0); } catch { return Number(amountRub || 0); }
+      }
+      return Number(amountRub || 0);
+    })();
+    if (isAgent && commissionType && typeof commissionValue === 'number') {
+      const retained = commissionType === 'percent' ? totalRub * (commissionValue / 100) : commissionValue;
+      const net = totalRub - retained;
+      if (!(net >= MIN_AMOUNT_RUB)) return NextResponse.json({ error: 'MIN_NET_10' }, { status: 400 });
+    } else {
+      if (!(totalRub >= MIN_AMOUNT_RUB)) return NextResponse.json({ error: 'MIN_10' }, { status: 400 });
+    }
+
     const item = await createPaymentLink(userId, { title, description, sumMode, amountRub: amountRub ?? undefined, vatRate, isAgent, commissionType: commissionType as any, commissionValue: commissionValue ?? undefined, partnerPhone, method, orgInn: inn ?? undefined, preferredCode: preferredCode ?? undefined, cartItems: cartItems ?? undefined, allowCartAdjust: Boolean(body?.allowCartAdjust), cartDisplay: (body?.cartDisplay === 'list' ? 'list' : (body?.cartDisplay === 'grid' ? 'grid' : undefined)), agentDescription: (typeof body?.agentDescription === 'string' ? body.agentDescription : undefined) } as any);
     const hostHdr = req.headers.get('x-forwarded-host') || req.headers.get('host') || 'localhost:3000';
     const protoHdr = req.headers.get('x-forwarded-proto') || (hostHdr.startsWith('localhost') ? 'http' : 'https');

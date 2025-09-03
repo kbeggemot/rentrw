@@ -141,6 +141,17 @@ export async function PUT(req: Request) {
         amountRub = Number.isFinite(n) ? n : NaN;
         if (!Number.isFinite(amountRub) || Number(amountRub) <= 0) return NextResponse.json({ error: 'INVALID_AMOUNT' }, { status: 400 });
       }
+      // Business rule: минимальная сумма (после вычета комиссии при агентской) — 10 ₽
+      const MIN_AMOUNT_RUB = 10;
+      if (amountRub != null) {
+        if (isAgent && commissionType && commissionValue != null) {
+          const retained = commissionType === 'percent' ? Number(amountRub) * (Number(commissionValue) / 100) : Number(commissionValue);
+          const net = Number(amountRub) - retained;
+          if (!(net >= MIN_AMOUNT_RUB)) return NextResponse.json({ error: 'MIN_NET_10' }, { status: 400 });
+        } else {
+          if (!(Number(amountRub) >= MIN_AMOUNT_RUB)) return NextResponse.json({ error: 'MIN_10' }, { status: 400 });
+        }
+      }
       const vatRate = (['none','0','5','7','10','20'].includes(String(body?.vatRate)) ? String(body?.vatRate) : 'none') as 'none'|'0'|'5'|'7'|'10'|'20';
       const updated = await updatePaymentLink(userId, code, { title, description, sumMode, amountRub: amountRub ?? undefined, vatRate, method, isAgent, commissionType: commissionType as any, commissionValue: commissionValue ?? undefined, partnerPhone });
       if (!updated) return NextResponse.json({ error: 'NOT_FOUND' }, { status: 404 });
@@ -177,6 +188,15 @@ export async function PUT(req: Request) {
       const allowCartAdjust = !!body?.allowCartAdjust;
       const cartDisplay = body?.cartDisplay === 'list' ? 'list' : (body?.cartDisplay === 'grid' ? 'grid' : undefined);
       const total = normalized.reduce((s: number, r: any) => s + r.price * r.qty, 0);
+      // Business rule: минимальная сумма (после комиссии) — 10 ₽
+      const MIN_AMOUNT_RUB = 10;
+      if (isAgent && commissionType && commissionValue != null) {
+        const retained = commissionType === 'percent' ? total * (Number(commissionValue) / 100) : Number(commissionValue);
+        const net = total - retained;
+        if (!(net >= MIN_AMOUNT_RUB)) return NextResponse.json({ error: 'MIN_NET_10' }, { status: 400 });
+      } else {
+        if (!(total >= MIN_AMOUNT_RUB)) return NextResponse.json({ error: 'MIN_10' }, { status: 400 });
+      }
       const updated = await updatePaymentLink(userId, code, { title, cartItems: normalized as any, allowCartAdjust, amountRub: total, method, isAgent, commissionType: commissionType as any, commissionValue: commissionValue ?? undefined, partnerPhone, cartDisplay: cartDisplay as any });
       if (!updated) return NextResponse.json({ error: 'NOT_FOUND' }, { status: 404 });
       return NextResponse.json({ ok: true, item: updated });

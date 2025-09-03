@@ -117,6 +117,23 @@ export async function POST(req: Request) {
     if (!Number.isFinite(amountRub) || amountRub <= 0) {
       return NextResponse.json({ error: 'Некорректная сумма' }, { status: 400 });
     }
+    // Global business rule: минимальная сумма оплаты — 10 ₽
+    const MIN_AMOUNT_RUB = 10;
+    if (body.agentSale) {
+      const cType = body.commissionType as 'percent' | 'fixed' | undefined;
+      const cVal = typeof body.commissionValue === 'number' ? Number(body.commissionValue) : undefined;
+      if (cType && typeof cVal === 'number' && Number.isFinite(cVal)) {
+        const retainedRub = cType === 'percent' ? amountRub * (cVal / 100) : cVal;
+        const netRub = amountRub - retainedRub;
+        if (!(netRub >= MIN_AMOUNT_RUB)) {
+          return NextResponse.json({ error: 'Сумма оплаты за вычетом комиссии должна быть не менее 10 рублей' }, { status: 400 });
+        }
+      }
+    } else {
+      if (!(amountRub >= MIN_AMOUNT_RUB)) {
+        return NextResponse.json({ error: 'Сумма должна быть не менее 10 рублей' }, { status: 400 });
+      }
+    }
     // Cart mode: when positions are provided, description is not required
     const rawCart: Array<{ id?: string | null; title: string; price: number; qty: number }> | null = Array.isArray((body as any)?.cartItems) ? (body as any).cartItems : null;
     if (rawCart && rawCart.length > 0) {
