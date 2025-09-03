@@ -660,7 +660,7 @@ function AcceptPaymentContent() {
   }, [qrDataUrl]);
 
   return (
-    <div className="max-w-2xl mx-auto">
+    <div className="max-w-3xl mx-auto">
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-2xl font-bold">Принять оплату</h1>
         <a href="/dashboard" className="rounded hover:bg-gray-50 dark:hover:bg-gray-900" aria-label="Закрыть">✕</a>
