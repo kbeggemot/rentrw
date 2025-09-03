@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getCurrentUserId, getSelectedOrgInn } from '@/server/orgContext';
 import { writeBinary } from '@/server/storage';
+import sharp from 'sharp';
 
 export const runtime = 'nodejs';
 
@@ -21,11 +22,17 @@ export async function POST(req: Request) {
     if (!allowed.includes(file.type)) return NextResponse.json({ error: 'BAD_TYPE' }, { status: 400 });
     const max = 5 * 1024 * 1024; // 5MB per file
     if (file.size > max) return NextResponse.json({ error: 'TOO_LARGE' }, { status: 400 });
-    const buf = Buffer.from(await file.arrayBuffer());
-    const ext = file.type === 'image/png' ? 'png' : (file.type === 'image/webp' ? 'webp' : 'jpg');
+    const input = Buffer.from(await file.arrayBuffer());
+    // Convert HDR/unknown profiles to SDR sRGB and clamp brightness; output webp (smaller, widely supported)
+    const webp = await sharp(input, { failOn: false })
+      .withMetadata({ icc: 'sRGB IEC61966-2.1' })
+      .toColorspace('srgb')
+      .modulate({ brightness: 1, saturation: 1, hue: 0 })
+      .webp({ quality: 85 })
+      .toBuffer();
     const id = Math.random().toString(36).slice(2) + Date.now().toString(36);
-    const rel = `.data/uploads/products/${orgInn}/${id}.${ext}`;
-    await writeBinary(rel, buf, file.type);
+    const rel = `.data/uploads/products/${orgInn}/${id}.webp`;
+    await writeBinary(rel, webp, 'image/webp');
     return NextResponse.json({ path: rel });
   } catch {
     return NextResponse.json({ error: 'INTERNAL' }, { status: 500 });
