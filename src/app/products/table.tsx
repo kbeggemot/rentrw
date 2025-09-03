@@ -47,10 +47,10 @@ export default function ProductsTable({ initialItems }: { initialItems: Item[] }
           <div className="text-center text-gray-500 border rounded-lg p-4 bg-white dark:bg-gray-950">Пока пусто</div>
         ) : (
           items.map((p) => (
-            <div key={p.id} className="border border-gray-200 dark:border-gray-800 rounded-lg bg-white dark:bg-gray-950 p-3">
-              <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-[13px] leading-tight">
-                <div className="grid grid-cols-[7.5rem_1fr] gap-x-2 gap-y-1">
-                  <div className="text-xs text-gray-500">Тип</div>
+            <div key={p.id} className="border border-gray-200 dark:border-gray-800 rounded-lg bg-white dark:bg-gray-950 p-2">
+              <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-[12px] leading-tight">
+                <div className="grid grid-cols-[5.5rem_1fr] gap-x-2 gap-y-1">
+                  <div className="text-xs text-gray-500 whitespace-nowrap">Тип</div>
                   <div>{p.kind === 'service' ? 'Услуга' : 'Товар'}</div>
                   <div className="text-xs text-gray-500">Наименование</div>
                   <div className="font-medium break-words">{p.title}</div>
@@ -59,16 +59,16 @@ export default function ProductsTable({ initialItems }: { initialItems: Item[] }
                   <div className="text-xs text-gray-500 whitespace-nowrap">Цена, {'\u00A0'}₽</div>
                   <div>{fmtPrice(p.price)}</div>
                 </div>
-                <div className="grid grid-cols-[7.5rem_1fr] gap-x-2 gap-y-1">
-                  <div className="text-xs text-gray-500">Ед.</div>
+                <div className="grid grid-cols-[5.5rem_1fr] gap-x-2 gap-y-1">
+                  <div className="text-xs text-gray-500 whitespace-nowrap">Ед.</div>
                   <div>{p.unit}</div>
-                  <div className="text-xs text-gray-500">НДС</div>
+                  <div className="text-xs text-gray-500 whitespace-nowrap">НДС</div>
                   <div>{p.vat === 'none' ? 'Без НДС' : `${p.vat}%`}</div>
-                  <div className="text-xs text-gray-500">Артикул</div>
+                  <div className="text-xs text-gray-500 whitespace-nowrap">Артикул</div>
                   <div>{p.sku || '-'}</div>
                 </div>
               </div>
-              <div className="mt-3 grid grid-cols-2 items-center">
+              <div className="mt-2 grid grid-cols-2 items-center">
                 <a href={`/products/edit/${encodeURIComponent(p.id)}`} className="inline-flex items-center justify-center rounded-lg bg-gray-200 dark:bg-gray-800 hover:bg-gray-300 dark:hover:bg-gray-700 h-9 px-3 text-sm text-black dark:text-white" aria-label="Редактировать">Редактировать</a>
                 <div className="justify-self-end">
                   <Button variant="secondary" size="icon" aria-label="Удалить" onClick={() => onDelete(p.id)}>×</Button>
