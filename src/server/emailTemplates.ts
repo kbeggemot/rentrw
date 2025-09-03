@@ -8,9 +8,19 @@ export function getBrandLogoUrl(): string {
   return absoluteUrl('/logo.png');
 }
 
+function pluralRu(n: number, one: string, few: string, many: string): string {
+  const abs = Math.abs(n) % 100;
+  const d = abs % 10;
+  if (abs > 10 && abs < 20) return many;
+  if (d > 1 && d < 5) return few;
+  if (d === 1) return one;
+  return many;
+}
+
 export function renderRegistrationCodeEmail(params: { code: string; confirmUrl?: string; expiresMin?: number; brandLogoUrl?: string }): string {
   const { code, confirmUrl = absoluteUrl('/auth'), expiresMin = 15 } = params;
   const brandLogoUrl = params.brandLogoUrl || getBrandLogoUrl();
+  const minWord = pluralRu(expiresMin, 'минута', 'минуты', 'минут');
   return `<!doctype html>
 <html lang="ru">
 <head>
@@ -30,9 +40,9 @@ export function renderRegistrationCodeEmail(params: { code: string; confirmUrl?:
       <p>Введите код для завершения регистрации в YPLA.</p>
       <div class="box"><b>${code}</b></div>
       <p style="margin:20px 0;">
-        <a class="btn" href="${confirmUrl}">Ввести код</a>
+        <a class="btn" href="${confirmUrl}" style="display:inline-block;padding:12px 16px;border-radius:6px;background:#111;color:#fff !important;text-decoration:none;">Ввести код</a>
       </p>
-      <p class="muted">Код действует ${expiresMin} минут. Если вы не запрашивали регистрацию — просто игнорируйте это письмо.</p>
+      <p class="muted">Код действует ${expiresMin} ${minWord}. Если вы не запрашивали регистрацию — просто игнорируйте это письмо.</p>
       <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0;">
       <p class="muted"><img src="${brandLogoUrl}" alt="YPLA" height="16" style="height:16px;vertical-align:middle;"></p>
     </div>
@@ -43,6 +53,7 @@ export function renderRegistrationCodeEmail(params: { code: string; confirmUrl?:
 export function renderSettingsEmailVerification(params: { code: string; settingsUrl?: string; expiresMin?: number; brandLogoUrl?: string }): string {
   const { code, settingsUrl = absoluteUrl('/settings'), expiresMin = 15 } = params;
   const brandLogoUrl = params.brandLogoUrl || getBrandLogoUrl();
+  const minWord = pluralRu(expiresMin, 'минута', 'минуты', 'минут');
   return `<!doctype html>
 <html lang="ru">
 <head>
@@ -62,9 +73,9 @@ export function renderSettingsEmailVerification(params: { code: string; settings
       <p>Вы запросили привязку/смену email для вашего аккаунта YPLA.</p>
       <div class="box"><b>${code}</b></div>
       <p style="margin:20px 0;">
-        <a class="btn" href="${settingsUrl}">Перейти в настройки</a>
+        <a class="btn" href="${settingsUrl}" style="display:inline-block;padding:12px 16px;border-radius:6px;background:#111;color:#fff !important;text-decoration:none;">Перейти в настройки</a>
       </p>
-      <p class="muted">Код действует ${expiresMin} минут. Если вы не запрашивали изменение email — проигнорируйте письмо.</p>
+      <p class="muted">Код действует ${expiresMin} ${minWord}. Если вы не запрашивали изменение email — проигнорируйте письмо.</p>
       <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0;">
       <p class="muted"><img src="${brandLogoUrl}" alt="YPLA" height="16" style="height:16px;vertical-align:middle;"></p>
     </div>
@@ -75,6 +86,7 @@ export function renderSettingsEmailVerification(params: { code: string; settings
 export function renderPasswordResetEmail(params: { resetUrl: string; expiresHours?: number; brandLogoUrl?: string }): string {
   const { resetUrl, expiresHours = 24 } = params;
   const brandLogoUrl = params.brandLogoUrl || getBrandLogoUrl();
+  const hourWord = pluralRu(expiresHours, 'час', 'часа', 'часов');
   return `<!doctype html>
 <html lang="ru">
 <head>
@@ -93,9 +105,9 @@ export function renderPasswordResetEmail(params: { resetUrl: string; expiresHour
       <h2>Смена пароля</h2>
       <p>Вы запросили смену пароля для аккаунта YPLA.</p>
       <p style="margin:20px 0;">
-        <a class="btn" href="${resetUrl}">Задать новый пароль</a>
+        <a class="btn" href="${resetUrl}" style="display:inline-block;padding:12px 16px;border-radius:6px;background:#111;color:#fff !important;text-decoration:none;">Задать новый пароль</a>
       </p>
-      <p class="muted">Ссылка действует ${expiresHours} часов. Если вы не запрашивали смену пароля — проигнорируйте это письмо.</p>
+      <p class="muted">Ссылка действует ${expiresHours} ${hourWord}. Если вы не запрашивали смену пароля — проигнорируйте это письмо.</p>
       <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0;">
       <p class="muted"><img src="${brandLogoUrl}" alt="YPLA" height="16" style="height:16px;vertical-align:middle;"></p>
     </div>
