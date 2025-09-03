@@ -774,7 +774,7 @@ function AcceptPaymentContent() {
                         <input className="w-full rounded border px-2 h-9 text-sm bg-gray-100" value={agentDesc || 'Услуги агента'} readOnly disabled />
                       </div>
                       <div>
-                        <input className="w-16 sm:w-20 rounded border px-2 h-9 text-sm bg-gray-100" value="1" readOnly disabled />
+                        <input className="w-20 sm:w-24 rounded border px-2 h-9 text-sm bg-gray-100" value="1" readOnly disabled />
                       </div>
                       <div>
                         <input className="w-24 sm:w-28 rounded border px-2 h-9 text-sm bg-gray-100" value={agentAmount.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2, useGrouping: false })} readOnly disabled />
