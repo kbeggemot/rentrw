@@ -53,7 +53,9 @@ export default function NewProductPage() {
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     // Guard: do not allow submit while any photo upload/processing is in progress
-    if (uploading || previews.length < photos.length) {
+    // previews is incremented immediately, photos — после успешного аплоада
+    // Значит, пока аплоад не завершён, previews.length > photos.length
+    if (uploading || previews.length !== photos.length) {
       showToast('Дождитесь завершения загрузки фото', 'error');
       return;
     }
