@@ -21,7 +21,7 @@ export function Input({ label, hint, id, className = '', passwordToggle = false,
           {label}
         </label>
       ) : null}
-      <div className="relative">
+      <div className="relative min-w-0">
         <input
           id={inputId}
           className={`w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white text-black dark:bg-gray-800 dark:text-white px-3 h-9 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-foreground ${enableToggle ? 'pr-10' : ''}`}

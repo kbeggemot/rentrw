@@ -296,13 +296,13 @@ export default function SettingsClient({ initial, userId }: { initial: SettingsP
           <label className="block text-sm text-gray-700 dark:text-gray-300 mb-1">Токен Рокет Ворк</label>
           <div className="flex flex-col gap-3">
             {currentMasked ? (
-              <div className="flex items-center gap-3">
-                <Input type="text" value={currentMasked} readOnly className="min-w-[220px]" />
+              <div className="flex flex-wrap items-center gap-3">
+                <Input type="text" value={currentMasked} readOnly className="flex-1 min-w-0" />
                 <Button type="button" variant="secondary" loading={deletingToken} onClick={deleteToken}>Удалить токен</Button>
               </div>
             ) : null}
-            <div className="flex items-center gap-3">
-              <Input type="password" placeholder="Введите новый токен" value={token} onChange={(e) => setToken(e.target.value)} className="w-[320px] max-w-full" />
+            <div className="flex flex-wrap items-center gap-3">
+              <Input type="password" placeholder="Введите новый токен" value={token} onChange={(e) => setToken(e.target.value)} className="flex-1 min-w-0" />
               <Button type="submit" disabled={token.length === 0} loading={saving}>{saving ? 'Сохраняю' : 'Сохранить'}</Button>
             </div>
           </div>
@@ -311,8 +311,8 @@ export default function SettingsClient({ initial, userId }: { initial: SettingsP
         <div>
           <label className="block text-sm text-gray-700 dark:text-gray-300 mb-1">Email</label>
           {!emailEditing ? (
-            <div className="flex items-center gap-3">
-              <Input type="text" value={emailMasked ?? ''} readOnly placeholder="Не указан" />
+            <div className="flex flex-wrap items-center gap-3">
+              <Input type="text" value={emailMasked ?? ''} readOnly placeholder="Не указан" className="flex-1 min-w-0" />
               <Button type="button" variant="secondary" onClick={() => { setEmailEditing(true); setEmailValue(''); setMessage(null); }}>
                 Изменить email
               </Button>
@@ -343,7 +343,7 @@ export default function SettingsClient({ initial, userId }: { initial: SettingsP
               ) : null}
             </div>
           ) : (
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center gap-3">
               <Input
                 type="email"
                 inputMode="email"
@@ -352,6 +352,7 @@ export default function SettingsClient({ initial, userId }: { initial: SettingsP
                 value={emailValue}
                 onChange={(e) => setEmailValue(e.target.value)}
                 autoFocus
+                className="flex-1 min-w-0"
               />
               <Button
                 type="button"
@@ -403,13 +404,13 @@ export default function SettingsClient({ initial, userId }: { initial: SettingsP
         {emailMasked && (!emailVerified || emailPending) ? (
           <div className="mt-2">
             <label className="block text-sm text-gray-700 dark:text-gray-300 mb-1">Подтверждение email</label>
-            <div className="flex items-end gap-3">
+            <div className="flex flex-wrap items-end gap-3">
               <Input
                 type="text"
                 placeholder="Код из письма"
                 value={emailCode}
                 onChange={(e) => setEmailCode(e.target.value)}
-                className="w-48"
+                className="flex-1 min-w-[9rem] sm:w-48"
               />
               <Button
                 type="button"
@@ -482,7 +483,7 @@ export default function SettingsClient({ initial, userId }: { initial: SettingsP
 
         <div className="mt-8">
           <h2 className="text-lg font-semibold mb-2">Реквизиты для вывода</h2>
-          <div className="flex flex-col gap-3 max-w-md">
+          <div className="flex flex-col gap-3">
             <Input label="Наименование организации" value={orgName} readOnly placeholder="Будет заполнено автоматически после сохранения токена" />
             <Input label="БИК" placeholder="044525225" value={bik} onChange={(e) => setBik(e.target.value)} />
             <Input label="Номер счёта" placeholder="40702…" value={account} onChange={(e) => setAccount(e.target.value)} />
