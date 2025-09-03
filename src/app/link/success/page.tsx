@@ -201,7 +201,7 @@ export default function PublicSuccessUnifiedPage() {
 
       <div className="mt-4 space-y-3">
         <button
-          className={`inline-flex items-center justify-center rounded-lg ${canShowDetails ? 'bg-black text-white' : 'bg-gray-200 text-gray-600'} px-4 h-9 text-sm`}
+          className={`inline-flex items-center justify-center rounded-lg px-4 h-9 text-sm ${canShowDetails ? 'bg-gray-900 text-white dark:bg-white dark:text-black' : 'bg-gray-200 text-gray-600 dark:bg-gray-800 dark:text-gray-400'}`}
           onClick={() => setDetailsOpen((v) => !v)}
           disabled={!canShowDetails}
         >Показать чеки и детали платежа</button>
