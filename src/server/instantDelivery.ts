@@ -4,6 +4,7 @@ import { sendEmail } from './email';
 import type { SaleRecord } from './taskStore';
 import { listProductsForOrg } from './productsStore';
 import { readText, writeText as writeStoreText } from './storage';
+import { appendAdminEntityLog } from './adminAudit';
 
 export async function sendInstantDeliveryIfReady(userId: string, sale: SaleRecord): Promise<void> {
   try {
@@ -92,8 +93,11 @@ export async function sendInstantDeliveryIfReady(userId: string, sale: SaleRecor
 
     await sendEmail({ to, subject: `Оплата прошла — результат покупки и чеки (заказ №${orderId})`, html });
     await updateSaleEmailStatus(userId, sale.taskId, 'sent', null);
+    try { await appendAdminEntityLog('sale', [String(userId), String(sale.taskId)], { source: 'system', message: 'instant_email:sent', data: { to } }); } catch {}
   } catch (e) {
-    try { await updateSaleEmailStatus(userId, sale.taskId, 'failed', e instanceof Error ? e.message : String(e)); } catch {}
+    const msg = e instanceof Error ? e.message : String(e);
+    try { await updateSaleEmailStatus(userId, sale.taskId, 'failed', msg); } catch {}
+    try { await appendAdminEntityLog('sale', [String(userId), String(sale.taskId)], { source: 'system', message: 'instant_email:failed', data: { error: msg } }); } catch {}
   }
 }
 

@@ -174,8 +174,42 @@ export default async function AdminSaleEditor(props: { params: Promise<{ uid: st
             <h2 className="text-lg font-semibold mb-2">Логи</h2>
             <pre className="w-full border rounded p-2 text-xs whitespace-pre-wrap bg-gray-50 dark:bg-gray-950">{log || 'Пока нет событий'}</pre>
           </div>
+          <div className="mt-6">
+            <h2 className="text-lg font-semibold mb-2">Мгновенная выдача — попытки</h2>
+            <div className="text-xs text-gray-600 mb-2">Статус последней попытки: {(item as any).instantEmailStatus || '—'}</div>
+            <EmailAttempts uid={p.uid} taskId={p.task} />
+          </div>
         </div>
       )}
+    </div>
+  );
+}
+
+async function EmailAttempts({ uid, taskId }: { uid: string; taskId: string | number }) {
+  const raw = await readAdminEntityLog('sale', [String(uid), String(taskId)]);
+  const lines = (raw || '').trim().length ? raw.trim().split('\n') : [];
+  const attempts = lines
+    .map((l) => { try { return JSON.parse(l); } catch { return null; } })
+    .filter((e: any) => e && (e.message === 'instant_email:sent' || e.message === 'instant_email:failed')) as Array<{ ts: string; message: string; data?: any }>;
+  if (attempts.length === 0) {
+    return <div className="text-xs text-gray-600">Пока попыток нет</div>;
+  }
+  return (
+    <div className="text-xs">
+      <div className="border rounded">
+        <div className="grid grid-cols-[12rem_1fr_1fr] gap-2 p-2 border-b bg-gray-50">
+          <div>Время (МСК)</div>
+          <div>Статус</div>
+          <div>Детали</div>
+        </div>
+        {attempts.reverse().map((a, i) => (
+          <div key={i} className="grid grid-cols-[12rem_1fr_1fr] gap-2 p-2 border-b last:border-b-0">
+            <div>{new Date(a.ts).toLocaleString('ru-RU', { timeZone: 'Europe/Moscow' })}</div>
+            <div>{a.message === 'instant_email:sent' ? 'Отправлено' : 'Ошибка'}</div>
+            <div className="truncate">{a.message === 'instant_email:sent' ? (a as any)?.data?.to || '' : (a as any)?.data?.error || ''}</div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
