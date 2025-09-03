@@ -6,6 +6,13 @@ type SendEmailParams = {
   subject: string;
   text?: string;
   html?: string;
+  attachments?: Array<{
+    filename: string;
+    content: string; // base64 string
+    contentType: string;
+    cid?: string; // for inline images
+    disposition?: 'inline' | 'attachment';
+  }>;
 };
 
 /**
@@ -49,6 +56,15 @@ export async function sendEmail(params: SendEmailParams): Promise<void> {
           : { type: 'text/plain', value: params.text || '' },
       ],
     };
+    if (Array.isArray(params.attachments) && params.attachments.length > 0) {
+      payload.attachments = params.attachments.map(a => ({
+        content: a.content,
+        filename: a.filename,
+        type: a.contentType,
+        disposition: a.disposition || (a.cid ? 'inline' : 'attachment'),
+        content_id: a.cid,
+      }));
+    }
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), Number(process.env.SENDGRID_TIMEOUT || 15000));
     try {
@@ -156,6 +172,15 @@ export async function sendEmail(params: SendEmailParams): Promise<void> {
       subject: params.subject,
       text: params.text,
       html,
+      attachments: Array.isArray(params.attachments) && params.attachments.length > 0
+        ? params.attachments.map(a => ({
+            filename: a.filename,
+            content: Buffer.from(a.content, 'base64'),
+            contentType: a.contentType,
+            cid: a.cid,
+            contentDisposition: a.disposition || (a.cid ? 'inline' : 'attachment'),
+          }))
+        : undefined,
       envelope: { from, to: params.to },
     });
   } catch (e) {

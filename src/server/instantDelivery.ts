@@ -31,7 +31,16 @@ export async function sendInstantDeliveryIfReady(userId: string, sale: SaleRecor
     const hasAgent = sale.isAgent ? Boolean(sale.additionalCommissionOfdUrl) : true;
     if (!hasPurchase || !hasAgent) return;
 
-    // Avoid duplicate send
+    // Avoid duplicate send: check latest state and local flag
+    try {
+      const rawState = await readText('.data/tasks.json');
+      if (rawState) {
+        const data = JSON.parse(rawState);
+        const arr = Array.isArray((data as any)?.sales) ? (data as any).sales : [];
+        const cur = arr.find((s: any) => s.userId === userId && String(s.taskId) === String(sale.taskId));
+        if (cur && (cur.instantEmailStatus === 'sent' || cur.instantEmailStatus === 'pending')) return;
+      }
+    } catch {}
     if ((sale as any).instantEmailStatus === 'sent') return;
 
     // Show RW task id as public order number in email
@@ -42,17 +51,20 @@ export async function sendInstantDeliveryIfReady(userId: string, sale: SaleRecor
     try { const org = await findOrgByInn(inn); legalName = (org?.name || '') as string; } catch {}
     const seller_legal_name = legalName || 'Поставщик';
     let brand_name_img = 'YPLA';
+    let attachments: Array<{ filename: string; content: string; contentType: string; cid?: string; disposition?: 'inline' | 'attachment' }> = [];
     try {
       const pngPath = path.join(process.cwd(), 'public', 'logo.png');
       const png = await fs.readFile(pngPath);
       const b64p = Buffer.from(png).toString('base64');
-      brand_name_img = `<img src="data:image/png;base64,${b64p}" alt="YPLA" height="16" style="height:16px;vertical-align:middle;"/>`;
+      brand_name_img = `<img src="cid:brand_logo" alt="YPLA" height="16" style="height:16px;vertical-align:middle;"/>`;
+      attachments.push({ filename: 'logo.png', content: b64p, contentType: 'image/png', cid: 'brand_logo', disposition: 'inline' });
     } catch {
       try {
         const svgPath = path.join(process.cwd(), 'public', 'logo.svg');
         const svg = await fs.readFile(svgPath);
         const b64 = Buffer.from(svg).toString('base64');
-        brand_name_img = `<img src="data:image/svg+xml;base64,${b64}" alt="YPLA" height="16" style="height:16px;vertical-align:middle;"/>`;
+        brand_name_img = `<img src="cid:brand_logo" alt="YPLA" height="16" style="height:16px;vertical-align:middle;"/>`;
+        attachments.push({ filename: 'logo.svg', content: b64, contentType: 'image/svg+xml', cid: 'brand_logo', disposition: 'inline' });
       } catch {}
     }
 
@@ -104,12 +116,35 @@ export async function sendInstantDeliveryIfReady(userId: string, sale: SaleRecor
     const to = (sale.clientEmail || '').trim();
     if (!to) return;
 
-    // Persist status pending
-    await updateSaleEmailStatus(userId, sale.taskId, 'pending', null);
-
-    await sendEmail({ to, subject: `Оплата прошла — результат покупки и чеки (заказ №${orderId})`, html });
-    await updateSaleEmailStatus(userId, sale.taskId, 'sent', null);
-    try { await appendAdminEntityLog('sale', [String(userId), String(sale.taskId)], { source: 'system', message: 'instant_email:sent', data: { to } }); } catch {}
+    // Create a simple file lock to avoid duplicate sends across concurrent triggers
+    const locksDir = path.join(process.cwd(), '.data', 'locks');
+    try { await fs.mkdir(locksDir, { recursive: true }); } catch {}
+    const lockPath = path.join(locksDir, `instant_${String(userId)}_${String(sale.taskId)}.lock`);
+    let lockAcquired = false;
+    try {
+      await fs.writeFile(lockPath, String(Date.now()), { flag: 'wx' });
+      lockAcquired = true;
+    } catch {}
+    if (!lockAcquired) return;
+    try {
+      // Re-check after acquiring lock
+      try {
+        const raw2 = await readText('.data/tasks.json');
+        if (raw2) {
+          const data2 = JSON.parse(raw2);
+          const arr2 = Array.isArray((data2 as any)?.sales) ? (data2 as any).sales : [];
+          const cur2 = arr2.find((s: any) => s.userId === userId && String(s.taskId) === String(sale.taskId));
+          if (cur2 && (cur2.instantEmailStatus === 'sent' || cur2.instantEmailStatus === 'pending')) return;
+        }
+      } catch {}
+      // Persist status pending and send
+      await updateSaleEmailStatus(userId, sale.taskId, 'pending', null);
+      await sendEmail({ to, subject: `Оплата прошла — результат покупки и чеки (заказ №${orderId})`, html, attachments });
+      await updateSaleEmailStatus(userId, sale.taskId, 'sent', null);
+      try { await appendAdminEntityLog('sale', [String(userId), String(sale.taskId)], { source: 'system', message: 'instant_email:sent', data: { to } }); } catch {}
+    } finally {
+      try { await fs.unlink(lockPath); } catch {}
+    }
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     try { await updateSaleEmailStatus(userId, sale.taskId, 'failed', msg); } catch {}
