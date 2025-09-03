@@ -87,10 +87,10 @@ export default function ProductsTable({ initialItems }: { initialItems: Item[] }
             <tr>
               <th className="text-left p-2">Тип</th>
               <th className="text-left p-2">Наименование</th>
-              <th className="text-left p-2">Категория</th>
               <th className="text-left p-2">Цена</th>
               <th className="text-left p-2">Ед.</th>
               <th className="text-left p-2">НДС</th>
+              <th className="text-left p-2">Категория</th>
               <th className="text-left p-2">Артикул</th>
               <th className="text-left p-2">Автовыдача</th>
               <th className="text-left p-2 w-1 whitespace-nowrap">Действия</th>
@@ -101,10 +101,10 @@ export default function ProductsTable({ initialItems }: { initialItems: Item[] }
               <tr key={p.id} className="border-t border-gray-200 dark:border-gray-800">
                 <td className="p-2">{p.kind === 'service' ? 'Услуга' : 'Товар'}</td>
                 <td className="p-2">{p.title}</td>
-                <td className="p-2">{p.category || ''}</td>
                 <td className="p-2">{fmtPrice(p.price)}</td>
                 <td className="p-2">{p.unit}</td>
                 <td className="p-2">{p.vat === 'none' ? 'Без НДС' : `${p.vat}%`}</td>
+                <td className="p-2">{p.category || ''}</td>
                 <td className="p-2">{p.sku || ''}</td>
                 <td className="p-2">{p.instantResult ? 'Да' : ''}</td>
                 <td className="p-2">
