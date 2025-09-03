@@ -2,6 +2,7 @@ import { readText, writeText } from './storage';
 import { getHub } from './eventBus';
 import path from 'path';
 import { appendAdminEntityLog } from './adminAudit';
+import { sendInstantDeliveryIfReady } from './instantDelivery';
 
 // IMPORTANT: keep relative paths here so that S3 storage keys are correct
 const DATA_DIR = '.data';
@@ -237,6 +238,8 @@ export async function updateSaleFromStatus(userId: string, taskId: number | stri
     try {
       await appendAdminEntityLog('sale', [String(userId), String(taskId)], { source: 'system', message: 'status/update', data: update });
     } catch {}
+    // Fire-and-forget: try sending instant delivery email when receipts become available
+    try { sendInstantDeliveryIfReady(userId, store.sales[idx]).catch(() => {}); } catch {}
   }
 }
 
@@ -254,6 +257,8 @@ export async function updateSaleOfdUrls(userId: string, taskId: number | string,
     await writeTasks(store);
     try { getHub().publish(userId, 'sales:update'); } catch {}
     try { await appendAdminEntityLog('sale', [String(userId), String(taskId)], { source: 'system', message: 'ofd/update', data: patch }); } catch {}
+    // Fire-and-forget instant email attempt
+    try { sendInstantDeliveryIfReady(userId, store.sales[idx]).catch(() => {}); } catch {}
   }
 }
 
@@ -292,6 +297,8 @@ export async function updateSaleOfdUrlsByOrderId(userId: string, orderId: number
       }
     } catch {}
     try { await appendAdminEntityLog('sale', [String(userId), String(current.taskId)], { source: 'system', message: 'ofd/updateByOrder', data: { patch } }); } catch {}
+    // Fire-and-forget instant email attempt
+    try { sendInstantDeliveryIfReady(userId, store.sales[idx]).catch(() => {}); } catch {}
   }
 }
 
