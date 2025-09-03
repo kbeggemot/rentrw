@@ -187,7 +187,7 @@ export default function PublicSuccessUnifiedPage() {
   }, [taskId, info?.userId]);
 
   return (
-    <div className="max-w-xl mx-auto px-2">
+    <div className="max-w-xl mx-auto">
       <h1 className="text-xl font-semibold mb-1">Платёж успешно выполнен</h1>
       <div className="text-sm text-gray-600 dark:text-gray-300 mb-2">Спасибо! Мы сформируем чек(и) автоматически и отправим на почту.</div>
 

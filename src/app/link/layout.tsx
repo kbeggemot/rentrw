@@ -20,7 +20,7 @@ export default function LinksLayout({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState(false);
   if (isPublic) {
     return (
-      <main className="p-3 sm:p-6">{children}</main>
+      <main className="p-4 md:p-6">{children}</main>
     );
   }
   return (
@@ -50,7 +50,7 @@ export default function LinksLayout({ children }: { children: ReactNode }) {
           </div>
         </div>
       ) : null}
-      <main className="p-3 sm:p-6">{children}</main>
+      <main className="p-4 md:p-6">{children}</main>
     </div>
   );
 }

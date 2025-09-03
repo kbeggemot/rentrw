@@ -263,7 +263,7 @@ export default function NewLinkStandalonePage() {
   };
 
   return (
-    <div className="max-w-3xl mx-auto px-2 pt-0 pb-4">
+    <div className="max-w-3xl mx-auto pt-0 pb-4">
       <header className="mb-4" style={{minHeight: '40px'}}>
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-bold">Новая платёжная страница</h1>
