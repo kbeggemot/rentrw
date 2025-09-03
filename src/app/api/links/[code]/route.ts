@@ -141,6 +141,11 @@ export async function PUT(req: Request) {
         amountRub = Number.isFinite(n) ? n : NaN;
         if (!Number.isFinite(amountRub) || Number(amountRub) <= 0) return NextResponse.json({ error: 'INVALID_AMOUNT' }, { status: 400 });
       }
+      // Agent VAT rule: в режиме «свободная услуга» при агентской НДС должен быть only none
+      if (isAgent) {
+        const vr = String(body?.vatRate || 'none');
+        if (vr !== 'none') return NextResponse.json({ error: 'AGENT_VAT_FORBIDDEN' }, { status: 400 });
+      }
       // Business rule: минимальная сумма (после вычета комиссии при агентской) — 10 ₽
       const MIN_AMOUNT_RUB = 10;
       if (amountRub != null) {
@@ -188,6 +193,21 @@ export async function PUT(req: Request) {
       const allowCartAdjust = !!body?.allowCartAdjust;
       const cartDisplay = body?.cartDisplay === 'list' ? 'list' : (body?.cartDisplay === 'grid' ? 'grid' : undefined);
       const total = normalized.reduce((s: number, r: any) => s + r.price * r.qty, 0);
+      // Agent VAT rule: нельзя, если хоть у одной позиции НДС != none
+      if (isAgent) {
+        try {
+          const innRaw = (current.orgInn || '').toString();
+          const inn = innRaw.replace(/\D/g, '');
+          const catalog = inn ? await listProductsForOrg(inn) : [];
+          const hasVat = normalized.some((ci: any) => {
+            const id = ci?.id ? String(ci.id) : null;
+            const title = (ci?.title || '').toString().trim().toLowerCase();
+            const p = catalog.find((x) => (id && String(x.id) === id) || (title && x.title.toLowerCase() === title));
+            return p && p.vat !== 'none';
+          });
+          if (hasVat) return NextResponse.json({ error: 'AGENT_VAT_FORBIDDEN' }, { status: 400 });
+        } catch {}
+      }
       // Business rule: минимальная сумма (после комиссии) — 10 ₽
       const MIN_AMOUNT_RUB = 10;
       if (isAgent && commissionType && commissionValue != null) {

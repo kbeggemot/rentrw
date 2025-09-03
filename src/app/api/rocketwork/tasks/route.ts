@@ -18,6 +18,7 @@ import { headers as nextHeaders } from 'next/headers';
 import { readText } from '@/server/storage';
 import { listWithdrawals, startWithdrawalPoller } from '@/server/withdrawalStore';
 import { recordWithdrawalCreate } from '@/server/withdrawalStore';
+import { listProductsForOrg } from '@/server/productsStore';
 import { appendRwError, writeRwLastRequest } from '@/server/rwAudit';
 
 export const runtime = 'nodejs';
@@ -133,6 +134,29 @@ export async function POST(req: Request) {
       if (!(amountRub >= MIN_AMOUNT_RUB)) {
         return NextResponse.json({ error: 'Сумма должна быть не менее 10 рублей' }, { status: 400 });
       }
+    }
+
+    // Business rule: самозанятый не может реализовывать позиции с НДС (только Без НДС)
+    if (body.agentSale) {
+      const vr = typeof (body as any)?.vatRate === 'string' ? String((body as any).vatRate) : undefined;
+      if (vr && vr !== 'none') {
+        return NextResponse.json({ error: 'AGENT_VAT_FORBIDDEN' }, { status: 400 });
+      }
+      try {
+        const org = (orgInn as string | null) ? String(orgInn).replace(/\D/g, '') : null;
+        if (org && Array.isArray((body as any)?.cartItems) && (body as any).cartItems.length > 0) {
+          const catalog = await listProductsForOrg(org);
+          const hasVat = (body as any).cartItems.some((ci: any) => {
+            const id = ci?.id ? String(ci.id) : null;
+            const title = (ci?.title || '').toString().trim().toLowerCase();
+            const p = catalog.find((x) => (id && String(x.id) === id) || (title && x.title.toLowerCase() === title));
+            return p && p.vat !== 'none';
+          });
+          if (hasVat) {
+            return NextResponse.json({ error: 'AGENT_VAT_FORBIDDEN' }, { status: 400 });
+          }
+        }
+      } catch {}
     }
     // Cart mode: when positions are provided, description is not required
     const rawCart: Array<{ id?: string | null; title: string; price: number; qty: number }> | null = Array.isArray((body as any)?.cartItems) ? (body as any).cartItems : null;

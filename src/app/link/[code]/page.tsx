@@ -613,6 +613,7 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
         const code = d?.error;
         if (code === 'Сумма должна быть не менее 10 рублей' || code === 'MIN_10') { setMsg('Сумма должна быть ≥ 10 ₽'); setLoading(false); setStarted(false); setDetailsOpen(false); return; }
         if (code === 'Сумма оплаты за вычетом комиссии должна быть не менее 10 рублей' || code === 'MIN_NET_10') { setMsg('Сумма за вычетом комиссии должна быть ≥ 10 ₽'); setLoading(false); setStarted(false); setDetailsOpen(false); return; }
+        if (code === 'AGENT_VAT_FORBIDDEN') { setMsg('Самозанятый не может реализовывать позиции с НДС'); setLoading(false); setStarted(false); setDetailsOpen(false); return; }
         throw new Error(code || 'CREATE_FAILED');
       }
       const tId = d?.task_id;

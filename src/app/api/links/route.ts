@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createPaymentLink, listPaymentLinks, listPaymentLinksForOrg, listAllPaymentLinksForOrg, isCodeTaken } from '@/server/paymentLinkStore';
 import { resolveRwTokenWithFingerprint } from '@/server/rwToken';
+import { listProductsForOrg } from '@/server/productsStore';
 import { getSelectedOrgInn } from '@/server/orgContext';
 import { partnerExists, upsertPartnerFromValidation } from '@/server/partnerStore';
 import { applyAgentCommissionToCart } from '@/lib/pricing';
@@ -140,6 +141,26 @@ export async function POST(req: Request) {
       } catch (e) {
         const msg = e instanceof Error ? e.message : 'CHECK_ERROR';
         return NextResponse.json({ error: msg }, { status: 400 });
+      }
+    }
+    // Rule: self-employed cannot sell positions with VAT
+    if (isAgent) {
+      if (sumMode === 'fixed') {
+        const vr = String(body?.vatRate || 'none');
+        if (vr !== 'none') return NextResponse.json({ error: 'AGENT_VAT_FORBIDDEN' }, { status: 400 });
+      }
+      if (Array.isArray(cartItems) && cartItems.length > 0) {
+        try {
+          const inn = getSelectedOrgInn(req);
+          const catalog = inn ? await listProductsForOrg(inn) : [];
+          const hasVat = cartItems.some((ci: any) => {
+            const id = ci?.id ? String(ci.id) : null;
+            const title = (ci?.title || '').toString().trim().toLowerCase();
+            const p = catalog.find((x) => (id && String(x.id) === id) || (title && x.title.toLowerCase() === title));
+            return p && p.vat !== 'none';
+          });
+          if (hasVat) return NextResponse.json({ error: 'AGENT_VAT_FORBIDDEN' }, { status: 400 });
+        } catch {}
       }
     }
     // If cart + agent: avoid double-lowering.
