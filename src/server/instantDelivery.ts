@@ -32,7 +32,8 @@ export async function sendInstantDeliveryIfReady(userId: string, sale: SaleRecor
     // Avoid duplicate send
     if ((sale as any).instantEmailStatus === 'sent') return;
 
-    const orderId = String(sale.orderId);
+    // Show RW task id as public order number in email
+    const orderId = String(sale.taskId);
     const amount = Number(sale.amountGrossRub || 0).toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     const currency = '₽';
     let legalName: string = '';
@@ -69,8 +70,8 @@ export async function sendInstantDeliveryIfReady(userId: string, sale: SaleRecor
       ${purchase_result}
     </div>
 
-    <p style=\"margin:20px 0;\">${payment_receipt_url ? `<a class=\"btn\" href=\"${payment_receipt_url}\">Чек на оплату</a>` : ''}
-      ${fee_receipt_url ? `&nbsp;<a class=\"btn-ghost\" href=\"${fee_receipt_url}\">Чек на комиссию</a>` : ''}
+    <p style=\"margin:20px 0;\">${payment_receipt_url ? `<a class=\"btn\" href=\"${payment_receipt_url}\" style=\"display:inline-block;padding:12px 16px;border-radius:6px;background:#111;color:#fff !important;text-decoration:none;\">Чек на оплату</a>` : ''}
+      ${fee_receipt_url ? `&nbsp;<a class=\"btn-ghost\" href=\"${fee_receipt_url}\" style=\"display:inline-block;padding:12px 16px;border-radius:6px;background:#fff;color:#111 !important;text-decoration:none;border:1px solid #111;\">Чек на комиссию</a>` : ''}
     </p>
     <p class=\"muted\">
       Если кнопки не открываются, используйте ссылки:
