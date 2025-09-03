@@ -24,6 +24,8 @@ export default function NewProductPage() {
   const [fadeIn, setFadeIn] = useState(true);
   const [touchStartX, setTouchStartX] = useState<number | null>(null);
   const [touchDeltaX, setTouchDeltaX] = useState(0);
+  const [toast, setToast] = useState<{ msg: string; kind: 'success' | 'error' | 'info' } | null>(null);
+  const showToast = (msg: string, kind: 'success' | 'error' | 'info' = 'info') => { setToast({ msg, kind }); setTimeout(() => setToast(null), 2500); };
 
   const showPrev = () => { setFadeIn(false); setTimeout(() => setFadeIn(true), 20); setViewer((v) => ({ ...v, index: (v.index - 1 + v.photos.length) % v.photos.length })); };
   const showNext = () => { setFadeIn(false); setTimeout(() => setFadeIn(true), 20); setViewer((v) => ({ ...v, index: (v.index + 1) % v.photos.length })); };
@@ -234,6 +236,9 @@ export default function NewProductPage() {
         </div>
         </form>
       </div>
+      {toast ? (
+        <div className={`fixed bottom-4 right-4 z-50 px-4 py-3 rounded-md shadow-lg text-sm ${toast.kind === 'success' ? 'bg-green-600 text-white' : toast.kind === 'error' ? 'bg-red-600 text-white' : 'bg-gray-900 text-white'}`}>{toast.msg}</div>
+      ) : null}
     </div>
   );
 }
