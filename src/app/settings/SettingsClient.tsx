@@ -478,7 +478,13 @@ export default function SettingsClient({ initial, userId }: { initial: SettingsP
 
         <div>
           <label className="block text-sm text-gray-700 dark:text-gray-300 mb-1">Учётная запись</label>
-          <Input type="text" value={accountPhone ?? ''} readOnly placeholder="Нет данных" />
+          <input
+            type="text"
+            readOnly
+            value={accountPhone ?? ''}
+            placeholder="Нет данных"
+            className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-gray-100 dark:bg-gray-900 text-gray-500 dark:text-gray-400 px-3 h-9 text-sm placeholder-gray-400 cursor-not-allowed"
+          />
         </div>
 
         <div className="mt-8">
