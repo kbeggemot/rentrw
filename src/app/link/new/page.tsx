@@ -229,6 +229,8 @@ export default function NewLinkStandalonePage() {
       const d = await r.json();
       if (!r.ok) {
         const code = d?.error;
+        if (code === 'MIN_10') { showToast('Сумма должна быть ≥ 10 ₽', 'error'); return; }
+        if (code === 'MIN_NET_10') { showToast('Сумма за вычетом комиссии должна быть ≥ 10 ₽', 'error'); return; }
         if (code === 'TITLE_REQUIRED') showToast('Укажите название ссылки', 'error');
         else if (code === 'DESCRIPTION_REQUIRED') showToast('Укажите описание услуги', 'error');
         else if (code === 'INVALID_AMOUNT') showToast('Укажите корректную сумму', 'error');

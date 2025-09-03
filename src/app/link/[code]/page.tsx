@@ -609,7 +609,12 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
       const res = await fetch('/api/rocketwork/tasks', { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-user-id': data.userId }, body: JSON.stringify(body) });
       const txt = await res.text();
       const d = txt ? JSON.parse(txt) : {};
-      if (!res.ok) throw new Error(d?.error || 'CREATE_FAILED');
+      if (!res.ok) {
+        const code = d?.error;
+        if (code === 'Сумма должна быть не менее 10 рублей' || code === 'MIN_10') { setMsg('Сумма должна быть ≥ 10 ₽'); setLoading(false); setStarted(false); setDetailsOpen(false); return; }
+        if (code === 'Сумма оплаты за вычетом комиссии должна быть не менее 10 рублей' || code === 'MIN_NET_10') { setMsg('Сумма за вычетом комиссии должна быть ≥ 10 ₽'); setLoading(false); setStarted(false); setDetailsOpen(false); return; }
+        throw new Error(code || 'CREATE_FAILED');
+      }
       const tId = d?.task_id;
       setTaskId(tId || null);
       try {
