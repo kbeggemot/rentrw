@@ -356,6 +356,28 @@ export async function GET(req: Request) {
     const showAll = await getShowAllDataFlag(userId);
     const allSales = showAll && inn ? await listAllSalesForOrg(inn) : await listSales(userId);
     const sales = inn ? allSales.filter((s: any) => String((s as any).orgInn || 'неизвестно') === inn || (s as any).orgInn == null || String((s as any).orgInn) === 'неизвестно') : allSales;
+    try {
+      // Background: attempt instant email when receipts are ready
+      // Fire-and-forget; do not await to keep API fast
+      (async () => {
+        try {
+          const ready = sales.filter((s: any) => {
+            const want = Boolean((s as any).itemsSnapshot && (s as any).isAgent ? ((s as any).additionalCommissionOfdUrl) : true);
+            const hasPurchase = Boolean((s as any).ofdUrl || (s as any).ofdFullUrl);
+            const needAgent = Boolean((s as any).isAgent);
+            const hasAgent = needAgent ? Boolean((s as any).additionalCommissionOfdUrl) : true;
+            const notSent = (s as any).instantEmailStatus !== 'sent' && (s as any).instantEmailStatus !== 'failed';
+            return notSent && hasPurchase && hasAgent && want;
+          });
+          for (const s of ready) {
+            try {
+              const { sendInstantDeliveryIfReady } = await import('@/server/instantDelivery');
+              await sendInstantDeliveryIfReady(userId, s);
+            } catch {}
+          }
+        } catch {}
+      })();
+    } catch {}
     return NextResponse.json({ sales });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Server error';

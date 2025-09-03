@@ -48,6 +48,9 @@ export type SaleRecord = {
   // id is optional to allow mapping to product metadata (unit/kind/vat)
   itemsSnapshot?: Array<{ id?: string | null; title: string; price: number; qty: number }> | null;
   agentDescription?: string | null; // description text used for agent line
+  // Instant delivery email status
+  instantEmailStatus?: 'pending' | 'sent' | 'failed' | null;
+  instantEmailError?: string | null;
 };
 
 function normalizeOrderId(value: string | number): number {
@@ -171,6 +174,8 @@ export async function recordSaleOnCreate(params: {
     invoiceIdFull,
     itemsSnapshot: Array.isArray(cartItems) ? cartItems.map((i) => ({ id: (i as any)?.id ?? null, title: String(i.title || ''), price: Number(i.price || 0), qty: Number(i.qty || 1) })) : null,
     agentDescription: agentDescription ?? null,
+    instantEmailStatus: null,
+    instantEmailError: null,
   });
   await writeTasks(store);
   try { getHub().publish(userId, 'sales:update'); } catch {}
