@@ -130,57 +130,71 @@ export function Sidebar() {
 }
 
 function OrgSelectorWrapper() {
-  // Чтобы избежать расхождения SSR/CSR, до монтирования показываем стабильный плейсхолдер
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => { setMounted(true); }, []);
-  if (!mounted) {
-    return (
-      <div className="mb-2">
-        <label className="block text-xs text-gray-500 mb-1">Организация</label>
-        <select className="w-full px-2 h-9 rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-950 text-sm" disabled>
-          <option>Загрузка…</option>
-        </select>
-      </div>
-    );
-  }
+  // Показываем селектор только если уже есть добавленные организации
+  // (первичный вход без организаций — скрываем, даже если нет токена)
+  const [visible, setVisible] = useState<boolean | null>(null);
+  useEffect(() => {
+    let aborted = false;
+    (async () => {
+      try {
+        // 1) Проверим локальный кэш
+        try {
+          const raw = localStorage.getItem('orgs_cache_v1');
+          const arr = raw ? JSON.parse(raw) : null;
+          if (Array.isArray(arr) && arr.length > 0) { if (!aborted) setVisible(true); return; }
+        } catch {}
+        // 2) Если есть выбранная организация в cookie — тоже показываем
+        try {
+          const m = /(?:^|;\s*)org_inn=([^;]+)/.exec(document.cookie || '');
+          if (m && m[1]) { if (!aborted) setVisible(true); return; }
+        } catch {}
+        // 3) Иначе спросим у сервера
+        const r = await fetch('/api/organizations', { cache: 'no-store', credentials: 'include' });
+        const d = await r.json();
+        const items = Array.isArray(d?.items) ? d.items : [];
+        if (!aborted) setVisible(items.length > 0);
+      } catch {
+        if (!aborted) setVisible(false);
+      }
+    })();
+    return () => { aborted = true; };
+  }, []);
+  if (!visible) return null;
   return <OrgSelector />;
 }
 
 function OrgSelector() {
-  // Считываем cookie синхронно для начального значения, чтобы не мигать
-  let cookieInn: string | null = null;
-  try {
-    const m = /(?:^|;\s*)org_inn=([^;]+)/.exec(typeof document !== 'undefined' ? (document.cookie || '') : '');
-    cookieInn = m ? decodeURIComponent(m[1]) : null;
-  } catch {}
-  const [orgs, setOrgs] = useState<Array<{ inn: string; name: string | null; maskedToken?: string | null }>>(() => {
-    try { const raw = localStorage.getItem('orgs_cache_v1'); const arr = raw ? JSON.parse(raw) : null; return Array.isArray(arr) ? arr : []; } catch { return []; }
-  });
-  const [inn, setInn] = useState<string | null>(cookieInn);
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => { setMounted(true); }, []);
+  const [orgs, setOrgs] = useState<Array<{ inn: string; name: string | null; maskedToken?: string | null }>>([]);
+  const [inn, setInn] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
         const r = await fetch('/api/organizations', { cache: 'no-store', credentials: 'include' });
         const d = await r.json();
-        if (!cancelled && Array.isArray(d?.items)) {
-          setOrgs(d.items);
-          try { localStorage.setItem('orgs_cache_v1', JSON.stringify(d.items)); } catch {}
+        const items: Array<{ inn: string; name: string | null }> = Array.isArray(d?.items) ? d.items : [];
+        if (!cancelled) {
+          setOrgs(items);
+          // Постараемся выбрать org_inn из cookie, но только если он есть в списке items
+          try {
+            const m = /(?:^|;\s*)org_inn=([^;]+)/.exec(document.cookie || '');
+            const cookieInn = m ? decodeURIComponent(m[1]) : null;
+            const exists = cookieInn && items.some((o) => o.inn === cookieInn);
+            setInn(exists ? cookieInn : (items[0]?.inn || null));
+          } catch {
+            setInn(items[0]?.inn || null);
+          }
         }
-      } catch {}
-      if (inn == null) {
-        try {
-          const m = /(?:^|;\s*)org_inn=([^;]+)/.exec(document.cookie || '');
-          const val = m ? decodeURIComponent(m[1]) : null;
-          if (!cancelled) setInn(val);
-        } catch {}
+      } catch {
+        if (!cancelled) { setOrgs([]); setInn(null); }
+      } finally {
+        if (!cancelled) setLoading(false);
       }
     })();
     return () => { cancelled = true; };
-  }, [inn]);
-  if (!mounted) {
+  }, []);
+  if (loading) {
     return (
       <div className="mb-2">
         <label className="block text-xs text-gray-500 mb-1">Организация</label>
@@ -190,21 +204,21 @@ function OrgSelector() {
       </div>
     );
   }
+  if (orgs.length === 0) return null;
   return (
     <div className="mb-2">
       <label className="block text-xs text-gray-500 mb-1">Организация</label>
       <select
         className="w-full px-2 h-9 rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-950 text-sm"
-        value={inn ?? (orgs[0]?.inn || '')}
+        value={inn ?? ''}
         onChange={async (e) => {
           const next = e.target.value || '';
           setInn(next || null);
           try { await fetch('/api/organizations', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ inn: next }), credentials: 'include' }); } catch {}
-          // мягко перезагрузим страницу, чтобы применить контекст
           try { window.location.reload(); } catch {}
         }}
       >
-        {(orgs && orgs.length > 0 ? orgs : (inn ? [{ inn, name: null }] : [])).map((o) => (
+        {orgs.map((o) => (
           <option key={o.inn} value={o.inn}>{o.name ? `${o.name} (${o.inn})` : o.inn}</option>
         ))}
       </select>

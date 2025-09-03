@@ -5,6 +5,8 @@ import { applyAgentCommissionToCart } from '@/lib/pricing';
 import { Button } from '@/components/ui/Button';
 
 export default function EditLinkPage(props: { params: Promise<{ code: string }> }) {
+  const [hasToken, setHasToken] = useState<boolean | null>(null);
+  useEffect(() => { (async () => { try { const r = await fetch('/api/settings/token', { cache: 'no-store' }); const d = await r.json(); setHasToken(Boolean(d?.token)); } catch { setHasToken(false); } })(); }, []);
   const { code: rawCode } = use(props.params);
   const code = decodeURIComponent(rawCode);
   const [loading, setLoading] = useState(true);
@@ -259,6 +261,23 @@ export default function EditLinkPage(props: { params: Promise<{ code: string }> 
       showToast('Не удалось сохранить', 'error');
     }
   };
+
+  if (hasToken === false) {
+    return (
+      <div className="max-w-3xl mx-auto pt-0 pb-4">
+        <header className="mb-4" style={{minHeight: '40px'}}>
+          <h1 className="text-2xl font-bold">Редактирование платёжной страницы</h1>
+          <p className="text-sm text-gray-600 dark:text-gray-400">Тип и адрес страницы изменить нельзя</p>
+        </header>
+        <div className="bg-white dark:bg-gray-950 border border-gray-200 dark:border-gray-800 rounded-lg p-6 shadow-sm">
+          <p className="text-sm text-gray-700 dark:text-gray-300 mb-3">Для начала работы укажите токен своей организации, полученный в Рокет Ворк.</p>
+          <a href="/settings" className="inline-block">
+            <button className="px-3 py-2 rounded-md bg-foreground text-white text-sm">Перейти в настройки</button>
+          </a>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-3xl mx-auto pt-0 pb-4">

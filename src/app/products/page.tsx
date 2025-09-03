@@ -22,6 +22,10 @@ async function fetchProducts() {
 }
 
 export default async function ProductsPage() {
+  // SSR token check for banner
+  const h = await headers();
+  const tokenHeader = await fetch(await makeAbs('/api/settings/token'), { cache: 'no-store', headers: { cookie: h.get('cookie') || '' } });
+  let hasToken = false; try { const d = await tokenHeader.json(); hasToken = Boolean(d?.token); } catch {}
   const data = await fetchProducts();
   return (
     <div className="pt-0 pb-4">
@@ -29,6 +33,12 @@ export default async function ProductsPage() {
         <h1 className="hidden md:block text-2xl font-bold">Позиции витрины</h1>
         <Link href="/products/new" className="px-3 py-2 rounded-md bg-foreground text-white text-sm">Создать</Link>
       </div>
+      {!hasToken ? (
+        <div className="bg-white dark:bg-gray-950 border border-gray-200 dark:border-gray-800 rounded-lg p-6 shadow-sm mb-4">
+          <p className="text-sm text-gray-700 dark:text-gray-300 mb-3">Для начала работы укажите токен своей организации, полученный в Рокет Ворк.</p>
+          <a href="/settings" className="inline-block"><span className="px-3 py-2 rounded-md bg-foreground text-white text-sm">Перейти в настройки</span></a>
+        </div>
+      ) : null}
       <ProductsTable initialItems={data?.items || []} />
     </div>
   );

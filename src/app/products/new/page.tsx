@@ -5,6 +5,8 @@ import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 
 export default function NewProductPage() {
+  const [hasToken, setHasToken] = useState<boolean | null>(null);
+  useEffect(() => { (async () => { try { const r = await fetch('/api/settings/token', { cache: 'no-store' }); const d = await r.json(); setHasToken(Boolean(d?.token)); } catch { setHasToken(false); } })(); }, []);
   const [kind, setKind] = useState<'goods' | 'service'>('service');
   const [title, setTitle] = useState('');
   const [category, setCategory] = useState('');
@@ -84,6 +86,23 @@ export default function NewProductPage() {
       setLoading(false);
     }
   };
+
+  if (hasToken === false) {
+    return (
+      <div className="max-w-3xl mx-auto pt-0 pb-4">
+        <div className="flex items-center justify-between mb-4" style={{minHeight: '40px'}}>
+          <h1 className="text-2xl font-bold">Новая торговая позиция</h1>
+          <a href="/products" className="p-2 rounded hover:bg-gray-50 dark:hover:bg-gray-900" aria-label="Закрыть">✕</a>
+        </div>
+        <div className="bg-white dark:bg-gray-950 border border-gray-200 dark:border-gray-800 rounded-lg p-6 shadow-sm">
+          <p className="text-sm text-gray-700 dark:text-gray-300 mb-3">Для начала работы укажите токен своей организации, полученный в Рокет Ворк.</p>
+          <a href="/settings" className="inline-block">
+            <button className="px-3 py-2 rounded-md bg-foreground text-white text-sm">Перейти в настройки</button>
+          </a>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-3xl mx-auto pt-0 pb-4">
