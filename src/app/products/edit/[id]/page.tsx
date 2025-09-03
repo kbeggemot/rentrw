@@ -287,7 +287,7 @@ export default function EditProductPage(props: { params: Promise<{ id?: string }
             </div>
             {error ? <div className="text-sm text-red-600">{error}</div> : null}
             <div>
-              <Button onClick={onSave}>Сохранить</Button>
+              <Button onClick={onSave} disabled={uploading}>{uploading ? 'Дождитесь загрузки фото…' : 'Сохранить'}</Button>
             </div>
           </div>
         )}

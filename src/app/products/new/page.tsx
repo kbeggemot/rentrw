@@ -224,7 +224,7 @@ export default function NewProductPage() {
         </div>
         {error ? <div className="text-sm text-red-600">{error}</div> : null}
         <div className="flex gap-2">
-          <Button type="submit" disabled={loading}>{loading ? 'Сохранение…' : 'Сохранить'}</Button>
+          <Button type="submit" disabled={loading || uploading}>{loading ? 'Сохранение…' : (uploading ? 'Дождитесь загрузки фото…' : 'Сохранить')}</Button>
           <a href="/products" className="px-3 py-2 rounded-md border text-sm">Отмена</a>
         </div>
         </form>
