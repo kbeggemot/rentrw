@@ -187,9 +187,9 @@ export default function PublicSuccessUnifiedPage() {
   }, [taskId, info?.userId]);
 
   return (
-    <div className="max-w-xl mx-auto">
-      <h1 className="text-xl font-semibold mb-1">Платёж успешно выполнен</h1>
-      <div className="text-sm text-gray-600 dark:text-gray-300 mb-2">Спасибо! Мы сформируем чек(и) автоматически и отправим на почту.</div>
+    <div className="max-w-xl mx-auto pt-0 pb-6">
+      <h1 className="text-xl font-semibold mb-2">Платёж успешно выполнен</h1>
+      <div className="text-sm text-gray-600 dark:text-gray-300 mb-3">Спасибо! Мы сформируем чек(и) автоматически и отправим на почту.</div>
 
       {waiting ? (
         <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm mb-4">Ищем информацию о платеже{dots}</div>
@@ -201,12 +201,12 @@ export default function PublicSuccessUnifiedPage() {
 
       <div className="mt-4 space-y-3">
         <button
-          className={`inline-flex items-center justify-center rounded-lg px-4 h-9 text-sm ${canShowDetails ? 'bg-gray-900 text-white dark:bg-white dark:text-black' : 'bg-gray-200 text-gray-600 dark:bg-gray-800 dark:text-gray-400'}`}
+          className={`inline-flex items-center justify-center rounded-lg px-4 h-9 text-sm ${canShowDetails ? 'bg-foreground text-white dark:text-white' : 'bg-gray-200 text-gray-600 dark:bg-gray-800 dark:text-gray-400'}`}
           onClick={() => setDetailsOpen((v) => !v)}
           disabled={!canShowDetails}
         >Показать чеки и детали платежа</button>
         {detailsOpen ? (
-          <div className="mt-1 rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 p-3 text-sm">
+          <div className="mt-1 rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 p-3 text-sm shadow-sm">
             <div className="grid grid-cols-[9rem_1fr] gap-y-2 mb-2 text-gray-800 dark:text-gray-200">
               <div className="text-gray-500 dark:text-gray-400">За что платим</div>
               <div>{summary?.description || info?.title || '—'}</div>
