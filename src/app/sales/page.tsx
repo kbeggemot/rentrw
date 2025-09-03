@@ -25,7 +25,7 @@ export default async function SalesPage() {
         <h1 className="hidden md:block text-2xl font-bold">Продажи</h1>
       </header>
       {(!inn || !hasToken) ? (
-        <div className="mb-3 p-6 border rounded-lg text-sm bg-white dark:bg-gray-950 border-gray-200 dark:border-gray-800">
+        <div className="mb-3 p-6 border rounded-lg text-sm bg-white dark:bg-gray-950 border-gray-200 dark:border-gray-800 max-w-3xl">
           <p className="text-gray-700 dark:text-gray-300 mb-3">Для начала работы укажите токен своей организации, полученный в Рокет Ворк.</p>
           <a href="/settings" className="inline-block"><span className="px-3 py-2 rounded-md bg-foreground text-white text-sm">Перейти в настройки</span></a>
         </div>

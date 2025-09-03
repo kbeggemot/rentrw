@@ -31,10 +31,12 @@ export default async function ProductsPage() {
     <div className="pt-0 pb-4">
       <div className="flex items-center justify-between mb-4" style={{minHeight: '40px'}}>
         <h1 className="hidden md:block text-2xl font-bold">Позиции витрины</h1>
-        <Link href="/products/new" className="px-3 py-2 rounded-md bg-foreground text-white text-sm">Создать</Link>
+        {hasToken ? (
+          <Link href="/products/new" className="px-3 py-2 rounded-md bg-foreground text-white text-sm">Создать</Link>
+        ) : null}
       </div>
       {!hasToken ? (
-        <div className="bg-white dark:bg-gray-950 border border-gray-200 dark:border-gray-800 rounded-lg p-6 shadow-sm mb-4">
+        <div className="bg-white dark:bg-gray-950 border border-gray-200 dark:border-gray-800 rounded-lg p-6 shadow-sm mb-4 max-w-3xl">
           <p className="text-sm text-gray-700 dark:text-gray-300 mb-3">Для начала работы укажите токен своей организации, полученный в Рокет Ворк.</p>
           <a href="/settings" className="inline-block"><span className="px-3 py-2 rounded-md bg-foreground text-white text-sm">Перейти в настройки</span></a>
         </div>
