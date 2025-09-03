@@ -201,7 +201,7 @@ export default function PublicSuccessUnifiedPage() {
 
       <div className="mt-4 space-y-3">
         <button
-          className={`inline-flex items-center justify-center rounded-lg px-4 h-9 text-sm ${canShowDetails ? 'bg-blue-600 hover:bg-blue-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-950' : 'bg-gray-200 text-gray-700 dark:bg-gray-800 dark:text-gray-400'}`}
+          className={`inline-flex items-center justify-center rounded-lg px-4 h-9 text-sm ${canShowDetails ? 'bg-white text-black border border-gray-300 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-offset-2 dark:focus:ring-offset-gray-950' : 'bg-gray-200 text-gray-700 dark:bg-gray-800 dark:text-gray-400'}`}
           onClick={() => setDetailsOpen((v) => !v)}
           disabled={!canShowDetails}
         >Показать чеки и детали платежа</button>
