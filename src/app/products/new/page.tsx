@@ -261,7 +261,7 @@ export default function NewProductPage() {
             <input type="checkbox" checked={instant} onChange={(e) => setInstant(e.target.checked)} />
             <span>{kind === 'service' ? 'Это электронная услуга' : 'Это цифровой товар'}</span>
           </label>
-          <div className="text-xs text-gray-500 mb-2">Покупатель получит результат сразу после оплаты — на e-mail, указанный при покупке</div>
+          <div className="text-xs text-gray-500 mb-2">Покупатель получит результат сразу после оплаты — на email, указанный при покупке.</div>
           {instant ? (
             <div>
               <label className="block text-sm text-gray-700 dark:text-gray-300 mb-1">Результат покупки</label>
