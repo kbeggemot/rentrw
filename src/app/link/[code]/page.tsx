@@ -158,7 +158,15 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
           const cached = sessionStorage.getItem(`fio.g.${digits}`);
           if (cached && cached.trim().length > 0) setPartnerFio(cached);
         } catch {}
-        const r = await fetch(`/api/partners?phone=${encodeURIComponent(digits)}`, { cache: 'no-store' });
+        const headers: Record<string, string> = data?.userId ? { 'x-user-id': data.userId } as any : {};
+        // Передадим выбранную организацию, если есть (в веб‑вью cookie может не прийти)
+        try {
+          if (data?.orgName) {
+            const cookieInn = document.cookie.split('; ').find((c) => c.startsWith('org_inn='))?.split('=')[1];
+            if (cookieInn) headers['x-org-inn'] = decodeURIComponent(cookieInn);
+          }
+        } catch {}
+        const r = await fetch(`/api/partners?phone=${encodeURIComponent(digits)}`, { cache: 'no-store', headers, credentials: 'include' as RequestCredentials });
         const d = await r.json().catch(() => ({}));
         const found = Array.isArray(d?.partners) ? (d.partners as any[]).find((p) => String(p.phone || '').replace(/\D/g, '') === digits) : null;
         const fioN = (found?.fio && String(found.fio).trim().length > 0) ? String(found.fio).trim() : null;
