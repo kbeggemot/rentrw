@@ -16,7 +16,7 @@ export function middleware(req: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  const protectedPaths = ['/dashboard', '/settings', '/sales', '/partners', '/link'];
+  const protectedPaths = ['/dashboard', '/settings', '/sales', '/partners', '/link', '/products'];
   const isProtected = protectedPaths.some((p) => pathname.startsWith(p));
   // Public link pages that must be accessible without auth
   const isPublicLink = (
@@ -52,7 +52,7 @@ export function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/', '/auth', '/dashboard/:path*', '/settings/:path*', '/sales/:path*', '/partners/:path*', '/link/:path*', '/admin/:path*'],
+  matcher: ['/', '/auth', '/dashboard/:path*', '/settings/:path*', '/sales/:path*', '/partners/:path*', '/link/:path*', '/products/:path*', '/admin/:path*'],
 };
 
 
