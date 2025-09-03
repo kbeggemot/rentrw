@@ -627,7 +627,7 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
 
   if (!data) {
     return (
-      <div className="max-w-xl mx-auto px-4">
+      <div className="max-w-xl mx-auto px-2">
         <h1 className="text-xl font-semibold mb-2">Оплата</h1>
         <div className="text-gray-600">{msg || 'Загрузка…'}</div>
       </div>
@@ -638,7 +638,7 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
   const actionBtnClasses = `inline-flex items-center justify-center rounded-lg ${canStart ? 'bg-black text-white' : 'bg-gray-200 text-gray-600'} px-4 h-9 text-sm`;
 
   return (
-    <div className="max-w-xl mx-auto px-4">
+    <div className="max-w-xl mx-auto px-2">
       <h1 className="text-xl font-semibold mb-1">{data.title}</h1>
       {data.orgName ? (
         <div className="text-sm text-gray-600 mb-4">
@@ -649,7 +649,7 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
           )}
         </div>
       ) : null}
-      <div className="bg-white dark:bg-gray-950 border border-gray-200 dark:border-gray-800 rounded-lg p-4">
+      <div className="bg-white dark:bg-gray-950 border border-gray-200 dark:border-gray-800 rounded-lg p-3 sm:p-4">
         {toast ? (<div className="fixed top-3 left-1/2 -translate-x-1/2 z-50 bg-black text-white text-sm px-3 py-2 rounded shadow">{toast}</div>) : null}
         {payLocked ? (
           <div className="text-sm text-gray-700">{msg || 'Оплата временно недоступна. Пожалуйста, уточните детали у продавца.'}</div>
