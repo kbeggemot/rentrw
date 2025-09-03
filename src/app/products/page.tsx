@@ -28,7 +28,7 @@ export default async function ProductsPage() {
   let hasToken = false; try { const d = await tokenHeader.json(); hasToken = Boolean(d?.token); } catch {}
   const data = await fetchProducts();
   return (
-    <div className="max-w-3xl mx-auto pt-0 pb-4">
+    <div className="mx-auto w-full max-w-3xl md:max-w-4xl lg:max-w-5xl xl:max-w-6xl 2xl:max-w-7xl pt-0 pb-4">
       <div className="flex items-center justify-between mb-4" style={{minHeight: '40px'}}>
         <h1 className="hidden md:block text-2xl font-bold">Позиции витрины</h1>
         {hasToken ? (

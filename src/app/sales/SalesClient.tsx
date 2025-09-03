@@ -417,7 +417,7 @@ export default function SalesClient({ initial, hasTokenInitial }: { initial: Sal
 
 
   return (
-    <div className="max-w-5xl mx-auto">
+    <div className="mx-auto w-full max-w-3xl md:max-w-4xl lg:max-w-5xl xl:max-w-6xl 2xl:max-w-7xl">
       <div className="mb-3 flex flex-col gap-3">
         <div className="flex flex-wrap gap-3 items-end text-sm">
           <div>

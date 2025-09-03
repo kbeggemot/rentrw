@@ -80,7 +80,7 @@ export default function ProductsTable({ initialItems }: { initialItems: Item[] }
       </div>
 
       {/* Desktop table */}
-      <div className="hidden md:block overflow-x-auto border border-gray-200 dark:border-gray-800 rounded-lg">
+      <div className="hidden md:block overflow-x-auto border border-gray-200 dark:border-gray-800 rounded-lg mx-auto w-full max-w-3xl md:max-w-4xl lg:max-w-5xl xl:max-w-6xl 2xl:max-w-7xl">
         <table className="w-full text-sm">
           <thead className="bg-gray-50 dark:bg-gray-900">
             <tr>
