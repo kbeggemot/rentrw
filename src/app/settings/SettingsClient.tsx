@@ -288,7 +288,7 @@ export default function SettingsClient({ initial, userId }: { initial: SettingsP
   };
 
   return (
-    <div className="max-w-2xl mx-auto px-4 pt-0 pb-4">
+    <div className="max-w-2xl mx-auto pt-0 pb-4">
       <h1 className="hidden md:block text-2xl font-bold mb-4">Настройки</h1>
       <div className="bg-white dark:bg-gray-950 border border-gray-200 dark:border-gray-800 rounded-lg p-4 shadow-sm">
       <form onSubmit={submit} className="space-y-4">

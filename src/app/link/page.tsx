@@ -40,7 +40,7 @@ export default function LinksStandalonePage() {
   }, []);
 
   return (
-    <div className="max-w-3xl mx-auto px-4 pt-0 pb-4">
+    <div className="max-w-3xl mx-auto pt-0 pb-4">
       <header className="mb-4" style={{minHeight: '40px'}}>
         <h1 className="hidden md:block text-2xl font-bold">Платежные страницы</h1>
         <p className="text-sm text-gray-600 dark:text-gray-400">Создание и управление платёжными ссылками</p>
