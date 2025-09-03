@@ -21,13 +21,19 @@ export default async function SalesPage() {
   } catch {}
   return (
     <div className="relative">
-      {!inn ? (
-        <div className="mb-3 p-3 border rounded text-sm bg-white dark:bg-gray-950">Выберите организацию и укажите токен в настройках, чтобы видеть продажи.</div>
+      <header className="mb-4">
+        <h1 className="hidden md:block text-2xl font-bold">Продажи</h1>
+      </header>
+      {(!inn || !hasToken) ? (
+        <div className="mb-3 p-6 border rounded-lg text-sm bg-white dark:bg-gray-950 border-gray-200 dark:border-gray-800">
+          <p className="text-gray-700 dark:text-gray-300 mb-3">Для начала работы укажите токен своей организации, полученный в Рокет Ворк.</p>
+          <a href="/settings" className="inline-block"><span className="px-3 py-2 rounded-md bg-foreground text-white text-sm">Перейти в настройки</span></a>
+        </div>
       ) : null}
       <div className="absolute right-2 -top-12">
         {/* The actual button is rendered inside SalesClient to keep logic together; this placeholder keeps spacing */}
       </div>
-      <SalesClient initial={initial} hasTokenInitial={inn ? hasToken : false} />
+      {(inn && hasToken) ? <SalesClient initial={initial} hasTokenInitial={true} /> : null}
     </div>
   );
 }

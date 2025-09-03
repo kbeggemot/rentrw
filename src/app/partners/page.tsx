@@ -18,10 +18,18 @@ export default async function PartnersPage() {
   }
   const partners = (userId && hasToken) ? (inn ? await listPartnersForOrg(userId, inn) : await listPartnersStore(userId)) : [];
   return (
-    <>
-      <h1 className="md:hidden sr-only">Партнёры</h1>
-      <PartnersClient initial={partners} hasTokenInitial={hasToken} />
-    </>
+    <div className="max-w-4xl mx-auto">
+      <header className="mb-4">
+        <h1 className="hidden md:block text-2xl font-bold">Партнёры</h1>
+      </header>
+      {!hasToken ? (
+        <div className="mb-3 p-6 border rounded-lg text-sm bg-white dark:bg-gray-950 border-gray-200 dark:border-gray-800">
+          <p className="text-gray-700 dark:text-gray-300 mb-3">Для начала работы укажите токен своей организации, полученный в Рокет Ворк.</p>
+          <a href="/settings" className="inline-block"><span className="px-3 py-2 rounded-md bg-foreground text-white text-sm">Перейти в настройки</span></a>
+        </div>
+      ) : null}
+      {hasToken ? <PartnersClient initial={partners} hasTokenInitial={true} /> : null}
+    </div>
   );
 }
 

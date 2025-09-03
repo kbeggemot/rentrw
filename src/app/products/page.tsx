@@ -39,7 +39,7 @@ export default async function ProductsPage() {
           <a href="/settings" className="inline-block"><span className="px-3 py-2 rounded-md bg-foreground text-white text-sm">Перейти в настройки</span></a>
         </div>
       ) : null}
-      <ProductsTable initialItems={data?.items || []} />
+      {hasToken ? (<ProductsTable initialItems={data?.items || []} />) : null}
     </div>
   );
 }
