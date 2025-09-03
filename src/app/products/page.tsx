@@ -28,7 +28,7 @@ export default async function ProductsPage() {
   let hasToken = false; try { const d = await tokenHeader.json(); hasToken = Boolean(d?.token); } catch {}
   const data = await fetchProducts();
   return (
-    <div className="pt-0 pb-4">
+    <div className="max-w-3xl mx-auto pt-0 pb-4">
       <div className="flex items-center justify-between mb-4" style={{minHeight: '40px'}}>
         <h1 className="hidden md:block text-2xl font-bold">Позиции витрины</h1>
         {hasToken ? (
@@ -36,7 +36,7 @@ export default async function ProductsPage() {
         ) : null}
       </div>
       {!hasToken ? (
-        <div className="bg-white dark:bg-gray-950 border border-gray-200 dark:border-gray-800 rounded-lg p-6 shadow-sm mb-4 max-w-3xl">
+        <div className="bg-white dark:bg-gray-950 border border-gray-200 dark:border-gray-800 rounded-lg p-6 shadow-sm mb-4">
           <p className="text-sm text-gray-700 dark:text-gray-300 mb-3">Для начала работы укажите токен своей организации, полученный в Рокет Ворк.</p>
           <a href="/settings" className="inline-block"><span className="px-3 py-2 rounded-md bg-foreground text-white text-sm">Перейти в настройки</span></a>
         </div>

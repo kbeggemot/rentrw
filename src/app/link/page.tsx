@@ -48,7 +48,7 @@ export default function LinksStandalonePage() {
           <h1 className="text-2xl font-bold">Платежные страницы</h1>
           <p className="text-sm text-gray-600 dark:text-gray-400">Создание и управление платёжными ссылками</p>
         </header>
-        <div className="bg-white dark:bg-gray-950 border border-gray-200 dark:border-gray-800 rounded-lg p-6 shadow-sm max-w-3xl">
+        <div className="bg-white dark:bg-gray-950 border border-gray-200 dark:border-gray-800 rounded-lg p-6 shadow-sm">
           <p className="text-sm text-gray-700 dark:text-gray-300 mb-3">Для начала работы укажите токен своей организации, полученный в Рокет Ворк.</p>
           <a href="/settings" className="inline-block">
             <button className="px-3 py-2 rounded-md bg-foreground text-white text-sm">Перейти в настройки</button>
