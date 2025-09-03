@@ -296,14 +296,25 @@ export default function SettingsClient({ initial, userId }: { initial: SettingsP
           <label className="block text-sm text-gray-700 dark:text-gray-300 mb-1">Токен Рокет Ворк</label>
           <div className="flex flex-col gap-3">
             {currentMasked ? (
-              <div className="flex flex-wrap items-center gap-3">
-                <Input type="text" value={currentMasked} readOnly className="flex-1 min-w-0" />
-                <Button type="button" variant="secondary" loading={deletingToken} onClick={deleteToken}>Удалить токен</Button>
+              <div className="relative">
+                <input
+                  type="text"
+                  readOnly
+                  value={currentMasked}
+                  className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white text-black dark:bg-gray-800 dark:text-white px-3 h-9 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-foreground pr-40"
+                />
+                <Button type="button" variant="secondary" loading={deletingToken} onClick={deleteToken} className="absolute right-1 top-1/2 -translate-y-1/2">Удалить токен</Button>
               </div>
             ) : null}
-            <div className="flex flex-wrap items-center gap-3">
-              <Input type="password" placeholder="Введите новый токен" value={token} onChange={(e) => setToken(e.target.value)} className="flex-1 min-w-0" />
-              <Button type="submit" disabled={token.length === 0} loading={saving}>{saving ? 'Сохраняю' : 'Сохранить'}</Button>
+            <div className="relative">
+              <input
+                type="password"
+                placeholder="Введите новый токен"
+                value={token}
+                onChange={(e) => setToken(e.target.value)}
+                className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white text-black dark:bg-gray-800 dark:text-white px-3 h-9 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-foreground pr-32"
+              />
+              <Button type="submit" disabled={token.length === 0} loading={saving} className="absolute right-1 top-1/2 -translate-y-1/2">{saving ? 'Сохраняю' : 'Сохранить'}</Button>
             </div>
           </div>
         </div>
@@ -311,37 +322,44 @@ export default function SettingsClient({ initial, userId }: { initial: SettingsP
         <div>
           <label className="block text-sm text-gray-700 dark:text-gray-300 mb-1">Email</label>
           {!emailEditing ? (
-            <div className="flex flex-wrap items-center gap-3">
-              <Input type="text" value={emailMasked ?? ''} readOnly placeholder="Не указан" className="flex-1 min-w-0" />
-              <Button type="button" variant="secondary" onClick={() => { setEmailEditing(true); setEmailValue(''); setMessage(null); }}>
-                Изменить email
-              </Button>
+            <>
+              <div className="relative">
+                <input
+                  type="text"
+                  readOnly
+                  value={emailMasked ?? ''}
+                  placeholder="Не указан"
+                  className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white text-black dark:bg-gray-800 dark:text-white px-3 h-9 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-foreground pr-36"
+                />
+                <Button type="button" variant="secondary" onClick={() => { setEmailEditing(true); setEmailValue(''); setMessage(null); }} className="absolute right-1 top-1/2 -translate-y-1/2">Изменить email</Button>
+              </div>
               {emailMasked && !emailVerified ? (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  onClick={async () => {
-                    setSavingEmail(true);
-                    setMessage(null);
-                    setEmailMsg(null);
-                    try {
-                      // Re-send verification to saved full email on server (no masked email in payload)
-                      const r = await fetch('/api/settings/email', { method: 'POST' });
-                      if (!r.ok) throw new Error('SEND_FAILED');
-                      setEmailVerified(false);
-                      setEmailPending(true);
-                      setResendIn(60);
-                    } catch (e) {
-                      setEmailMsgKind('error');
-                      const msg = e instanceof Error ? e.message : 'SEND_FAILED';
-                      setEmailMsg(/MASKED_EMAIL/.test(msg) ? 'Email указан как маска. Нажмите “Изменить email” и введите полный адрес.' : 'Не удалось отправить код');
-                    } finally {
-                      setSavingEmail(false);
-                    }
-                  }}
-                >Отправить код</Button>
+                <div className="mt-2">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={async () => {
+                      setSavingEmail(true);
+                      setMessage(null);
+                      setEmailMsg(null);
+                      try {
+                        const r = await fetch('/api/settings/email', { method: 'POST' });
+                        if (!r.ok) throw new Error('SEND_FAILED');
+                        setEmailVerified(false);
+                        setEmailPending(true);
+                        setResendIn(60);
+                      } catch (e) {
+                        setEmailMsgKind('error');
+                        const msg = e instanceof Error ? e.message : 'SEND_FAILED';
+                        setEmailMsg(/MASKED_EMAIL/.test(msg) ? 'Email указан как маска. Нажмите “Изменить email” и введите полный адрес.' : 'Не удалось отправить код');
+                      } finally {
+                        setSavingEmail(false);
+                      }
+                    }}
+                  >Отправить код</Button>
+                </div>
               ) : null}
-            </div>
+            </>
           ) : (
             <div className="flex flex-wrap items-center gap-3">
               <Input
