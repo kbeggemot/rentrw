@@ -192,7 +192,7 @@ export default function PublicSuccessUnifiedPage() {
       <div className="text-sm text-gray-700 dark:text-gray-300 mb-3">Спасибо! Мы сформируем чек(и) автоматически и отправим на почту.</div>
 
       {waiting ? (
-        <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm mb-4">Ищем информацию о платеже{dots}</div>
+        <div className="rounded-lg p-3 text-sm mb-4 bg-gray-50 border border-gray-200 text-gray-700 dark:bg-gray-900 dark:border-gray-800 dark:text-gray-200">Ищем информацию о платеже{dots}</div>
       ) : null}
 
       {msg && !waiting ? (
@@ -201,7 +201,7 @@ export default function PublicSuccessUnifiedPage() {
 
       <div className="mt-4 space-y-3">
         <button
-          className={`inline-flex items-center justify-center rounded-lg px-4 h-9 text-sm ${canShowDetails ? 'bg-white text-black border border-gray-300 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-offset-2 dark:focus:ring-offset-gray-950' : 'bg-gray-200 text-gray-700 dark:bg-gray-800 dark:text-gray-400'}`}
+          className={`inline-flex items-center justify-center rounded-lg px-4 h-9 text-sm ${canShowDetails ? 'bg-white text-black border border-gray-300 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-offset-2 dark:focus:ring-offset-gray-950' : 'bg-gray-100 text-gray-500 border border-gray-200 dark:bg-gray-900 dark:text-gray-400 dark:border-gray-800'}`}
           onClick={() => setDetailsOpen((v) => !v)}
           disabled={!canShowDetails}
         >Показать чеки и детали платежа</button>
