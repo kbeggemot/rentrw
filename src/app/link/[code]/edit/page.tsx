@@ -248,8 +248,8 @@ export default function EditLinkPage(props: { params: Promise<{ code: string }> 
   };
 
   return (
-    <div className="max-w-3xl mx-auto p-4">
-      <header className="mb-4">
+    <div className="max-w-3xl mx-auto px-4 pt-0 pb-4">
+      <header className="mb-4" style={{minHeight: '40px'}}>
         <h1 className="text-2xl font-bold">Редактирование платёжной страницы</h1>
         <p className="text-sm text-gray-600 dark:text-gray-400">Тип и адрес страницы изменить нельзя</p>
       </header>

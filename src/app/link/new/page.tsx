@@ -263,8 +263,8 @@ export default function NewLinkStandalonePage() {
   };
 
   return (
-    <div className="max-w-3xl mx-auto p-4">
-      <header className="mb-4">
+    <div className="max-w-3xl mx-auto px-4 pt-0 pb-4">
+      <header className="mb-4" style={{minHeight: '40px'}}>
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-bold">Новая платёжная страница</h1>
           <a href="/link" className="p-2 rounded hover:bg-gray-50 dark:hover:bg-gray-900" aria-label="Закрыть">✕</a>
