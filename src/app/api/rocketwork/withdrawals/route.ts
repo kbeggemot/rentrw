@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { listWithdrawals, upsertWithdrawal, startWithdrawalPoller } from '@/server/withdrawalStore';
+import { listWithdrawals, upsertWithdrawal, startWithdrawalPoller, listAllWithdrawalsForOrg } from '@/server/withdrawalStore';
 import { resolveRwTokenWithFingerprint } from '@/server/rwToken';
 import { getSelectedOrgInn } from '@/server/orgContext';
 
@@ -17,9 +17,11 @@ export async function GET(req: Request) {
   try {
     const userId = getUserId(req);
     if (!userId) return NextResponse.json({ error: 'NO_USER' }, { status: 401 });
-    // 1) Read local filtered by selected org
+    // 1) Read local filtered by selected org, with showAll override
     const inn = getSelectedOrgInn(req);
-    let items = await listWithdrawals(userId, inn || undefined);
+    const { getShowAllDataFlag } = await import('@/server/userStore');
+    const showAll = await getShowAllDataFlag(userId);
+    let items = inn && showAll ? await listAllWithdrawalsForOrg(inn) : await listWithdrawals(userId, inn || undefined);
     // 2) If empty, try fetch last 50 RW tasks and backfill withdrawals
     if (items.length === 0) {
       try {
@@ -41,7 +43,7 @@ export async function GET(req: Request) {
             const createdAt = t?.created_at || t?.updated_at || new Date().toISOString();
             await upsertWithdrawal(userId, { taskId: id, amountRub: typeof amountRub === 'number' ? amountRub : undefined as any, status: status ?? null, createdAt, orgInn: inn || null });
           }
-          items = await listWithdrawals(userId, inn || undefined);
+          items = inn && showAll ? await listAllWithdrawalsForOrg(inn) : await listWithdrawals(userId, inn || undefined);
           // Arm pollers for any active withdrawals to keep status fresh even without UI
           try {
             for (const it of items) {

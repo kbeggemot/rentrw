@@ -60,6 +60,13 @@ export async function listWithdrawals(userId: string, orgInn?: string | null): P
   return arr.sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
 }
 
+export async function listAllWithdrawalsForOrg(orgInn: string): Promise<WithdrawalRecord[]> {
+  const store = await readStore();
+  const key = String(orgInn).replace(/\D/g, '');
+  const arr = store.items.filter((x) => (x.orgInn ? String(x.orgInn) === key : false));
+  return arr.sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
+}
+
 // Upsert helper for backfills (e.g., when reading from RW tasks list)
 export async function upsertWithdrawal(userId: string, payload: Partial<WithdrawalRecord> & { taskId: string | number }): Promise<void> {
   const store = await readStore();

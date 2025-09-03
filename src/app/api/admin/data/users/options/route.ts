@@ -33,6 +33,7 @@ export async function POST(req: Request) {
   // Support both JSON and form POSTs
   let id = '';
   let showAll = false;
+  let back: string | null = null;
   try {
     const ct = req.headers.get('content-type') || '';
     if (ct.includes('application/json')) {
@@ -44,6 +45,7 @@ export async function POST(req: Request) {
       id = String(fd.get('id') || '').trim();
       const v = String(fd.get('showAll') || '');
       showAll = v === 'true' || v === '1' || v === 'on';
+      back = String(fd.get('back') || '').trim() || null;
     }
   } catch {}
   if (!id) return NextResponse.json({ error: 'MISSING' }, { status: 400 });
@@ -51,7 +53,10 @@ export async function POST(req: Request) {
   // If called from form — redirect back to details page
   const accept = req.headers.get('accept') || '';
   if (!accept.includes('application/json')) {
-    return NextResponse.redirect(new URL(`/admin/lk-users/${encodeURIComponent(id)}`, req.url), 303);
+    const loc = back || `/admin/lk-users/${encodeURIComponent(id)}`;
+    const res = NextResponse.redirect(new URL(loc, req.url), 303);
+    try { res.headers.set('Set-Cookie', `flash=OK; Path=/; Max-Age=5; SameSite=Lax`); } catch {}
+    return res;
   }
   return NextResponse.json({ ok: true, showAll });
 }
