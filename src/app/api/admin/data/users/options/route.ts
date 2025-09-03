@@ -50,9 +50,9 @@ export async function POST(req: Request) {
   } catch {}
   if (!id) return NextResponse.json({ error: 'MISSING' }, { status: 400 });
   try { await setShowAllDataFlag(id, showAll); } catch {}
-  // If called from form — redirect back to details page
-  const accept = req.headers.get('accept') || '';
-  if (!accept.includes('application/json')) {
+  // Choose response type by Content-Type: forms => redirect with flash, JSON => JSON
+  const ct = (req.headers.get('content-type') || '').toLowerCase();
+  if (!ct.includes('application/json')) {
     const loc = back || `/admin/lk-users/${encodeURIComponent(id)}`;
     const res = NextResponse.redirect(new URL(loc, req.url), 303);
     try { res.headers.set('Set-Cookie', `flash=OK; Path=/; Max-Age=5; SameSite=Lax`); } catch {}
