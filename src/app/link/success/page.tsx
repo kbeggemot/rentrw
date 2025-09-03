@@ -189,7 +189,7 @@ export default function PublicSuccessUnifiedPage() {
   return (
     <div className="max-w-xl mx-auto pt-0 pb-6">
       <h1 className="text-xl font-semibold mb-2">Платёж успешно выполнен</h1>
-      <div className="text-sm text-gray-600 dark:text-gray-300 mb-3">Спасибо! Мы сформируем чек(и) автоматически и отправим на почту.</div>
+      <div className="text-sm text-gray-700 dark:text-gray-300 mb-3">Спасибо! Мы сформируем чек(и) автоматически и отправим на почту.</div>
 
       {waiting ? (
         <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm mb-4">Ищем информацию о платеже{dots}</div>
@@ -201,37 +201,37 @@ export default function PublicSuccessUnifiedPage() {
 
       <div className="mt-4 space-y-3">
         <button
-          className={`inline-flex items-center justify-center rounded-lg px-4 h-9 text-sm ${canShowDetails ? 'bg-foreground text-white dark:text-white' : 'bg-gray-200 text-gray-600 dark:bg-gray-800 dark:text-gray-400'}`}
+          className={`inline-flex items-center justify-center rounded-lg px-4 h-9 text-sm ${canShowDetails ? 'bg-blue-600 hover:bg-blue-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-950' : 'bg-gray-200 text-gray-700 dark:bg-gray-800 dark:text-gray-400'}`}
           onClick={() => setDetailsOpen((v) => !v)}
           disabled={!canShowDetails}
         >Показать чеки и детали платежа</button>
         {detailsOpen ? (
-          <div className="mt-1 rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 p-3 text-sm shadow-sm">
-            <div className="grid grid-cols-[9rem_1fr] gap-y-2 mb-2 text-gray-800 dark:text-gray-200">
-              <div className="text-gray-500 dark:text-gray-400">За что платим</div>
+          <div className="mt-1 rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-3 text-sm shadow-sm">
+            <div className="grid grid-cols-[9rem_1fr] gap-y-2 mb-2 text-gray-900 dark:text-gray-100">
+              <div className="text-gray-600 dark:text-gray-400">За что платим</div>
               <div>{summary?.description || info?.title || '—'}</div>
-              <div className="text-gray-500 dark:text-gray-400">Сумма</div>
+              <div className="text-gray-600 dark:text-gray-400">Сумма</div>
               <div>{typeof summary?.amountRub === 'number' ? new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB' }).format(summary!.amountRub!) : '—'}</div>
-              <div className="text-gray-500 dark:text-gray-400">Способ оплаты</div>
+              <div className="text-gray-600 dark:text-gray-400">Способ оплаты</div>
               <div>{payMethod || '—'}</div>
-              <div className="text-gray-500 dark:text-gray-400">Дата оплаты</div>
+              <div className="text-gray-600 dark:text-gray-400">Дата оплаты</div>
               <div>{summary?.createdAt ? new Date(summary.createdAt).toLocaleString('ru-RU', { timeZone: 'Europe/Moscow' }) : '—'}</div>
-              <div className="text-gray-500 dark:text-gray-400">Чек на покупку</div>
+              <div className="text-gray-600 dark:text-gray-400">Чек на покупку</div>
               <div>
                 {(receipts.full || receipts.prepay) ? (
-                  <a className="text-black dark:text-white font-semibold hover:underline" href={(receipts.full || receipts.prepay)!} target="_blank" rel="noreferrer">Открыть</a>
+                  <a className="text-blue-700 dark:text-blue-300 font-semibold hover:underline" href={(receipts.full || receipts.prepay)!} target="_blank" rel="noreferrer">Открыть</a>
                 ) : (
-                  <span className="text-gray-600 dark:text-gray-300">Подтягиваем данные{dots}</span>
+                  <span className="text-gray-700 dark:text-gray-300">Подтягиваем данные{dots}</span>
                 )}
               </div>
             </div>
             {isAgent ? (
-              <div className="grid grid-cols-[9rem_1fr] gap-y-2 text-gray-800 dark:text-gray-200">
-                <div className="text-gray-500 dark:text-gray-400">Чек на комиссию</div>
+              <div className="grid grid-cols-[9rem_1fr] gap-y-2 text-gray-900 dark:text-gray-100">
+                <div className="text-gray-600 dark:text-gray-400">Чек на комиссию</div>
                 {receipts.commission ? (
-                  <a className="text-black dark:text-white font-semibold hover:underline" href={receipts.commission!} target="_blank" rel="noreferrer">Открыть</a>
+                  <a className="text-blue-700 dark:text-blue-300 font-semibold hover:underline" href={receipts.commission!} target="_blank" rel="noreferrer">Открыть</a>
                 ) : (
-                  <span className="text-gray-600 dark:text-gray-300">Подтягиваем данные{dots}</span>
+                  <span className="text-gray-700 dark:text-gray-300">Подтягиваем данные{dots}</span>
                 )}
               </div>
             ) : null}

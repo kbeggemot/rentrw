@@ -32,7 +32,12 @@ export default async function ProductsPage() {
       <div className="flex items-center justify-between mb-4" style={{minHeight: '40px'}}>
         <h1 className="hidden md:block text-2xl font-bold">Позиции витрины</h1>
         {hasToken ? (
-          <Link href="/products/new" className="px-3 py-2 rounded-md bg-foreground text-white text-sm">Создать</Link>
+          <Link
+            href="/products/new"
+            className="px-3 py-2 rounded-md text-sm bg-blue-600 hover:bg-blue-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-950"
+          >
+            Создать
+          </Link>
         ) : null}
       </div>
       {!hasToken ? (
