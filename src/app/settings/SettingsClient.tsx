@@ -288,8 +288,9 @@ export default function SettingsClient({ initial, userId }: { initial: SettingsP
   };
 
   return (
-    <div className="max-w-2xl mx-auto">
+    <div className="max-w-2xl mx-auto px-4 pt-0 pb-4">
       <h1 className="hidden md:block text-2xl font-bold mb-4">Настройки</h1>
+      <div className="bg-white dark:bg-gray-950 border border-gray-200 dark:border-gray-800 rounded-lg p-4 shadow-sm">
       <form onSubmit={submit} className="space-y-4">
         <div>
           <label className="block text-sm text-gray-700 dark:text-gray-300 mb-1">Токен Рокет Ворк</label>
@@ -624,6 +625,7 @@ export default function SettingsClient({ initial, userId }: { initial: SettingsP
           )}
         </div>
       </form>
+      </div>
       {toast ? (
         <div className={`fixed bottom-4 right-4 z-50 px-4 py-3 rounded-md shadow-lg text-sm ${toast.kind === 'success' ? 'bg-green-600 text-white' : toast.kind === 'error' ? 'bg-red-600 text-white' : 'bg-gray-900 text-white'}`}>{toast.msg}</div>
       ) : null}

@@ -120,7 +120,7 @@ export default function EditProductPage(props: { params: Promise<{ id?: string }
 
   return (
     <div className="max-w-3xl mx-auto px-4 pt-0 pb-4">
-      <div className="flex items-center justify-between mb-4" style={{minHeight: '40px'}}>
+На      <div className="flex items-center justify-between mb-4" style={{minHeight: '40px'}}>
         <h1 className="text-2xl font-bold">Редактировать позицию</h1>
         <a href="/products" className="p-2 rounded hover:bg-gray-50 dark:hover:bg-gray-900" aria-label="Закрыть">✕</a>
       </div>
