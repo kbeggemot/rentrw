@@ -5,6 +5,8 @@ import type { SaleRecord } from './taskStore';
 import { listProductsForOrg } from './productsStore';
 import { readText, writeText as writeStoreText } from './storage';
 import { appendAdminEntityLog } from './adminAudit';
+import fs from 'fs/promises';
+import path from 'path';
 
 export async function sendInstantDeliveryIfReady(userId: string, sale: SaleRecord): Promise<void> {
   try {
@@ -39,7 +41,13 @@ export async function sendInstantDeliveryIfReady(userId: string, sale: SaleRecor
     let legalName: string = '';
     try { const org = await findOrgByInn(inn); legalName = (org?.name || '') as string; } catch {}
     const seller_legal_name = legalName || 'Поставщик';
-    const brand_name_img = `<img src="https://ypla.ru/logo.svg" alt="YPLA" height="16" style="height:16px;vertical-align:middle;"/>`;
+    let brand_name_img = 'YPLA';
+    try {
+      const filePath = path.join(process.cwd(), 'public', 'logo.svg');
+      const svg = await fs.readFile(filePath);
+      const b64 = Buffer.from(svg).toString('base64');
+      brand_name_img = `<img src="data:image/svg+xml;base64,${b64}" alt="YPLA" height="16" style="height:16px;vertical-align:middle;"/>`;
+    } catch {}
 
     const purchase_result = instantTexts.map((t) => `<div style=\"margin-bottom:8px\">${escapeHtml(t)}</div>`).join('');
     const payment_receipt_url = String(sale.ofdFullUrl || sale.ofdUrl || '');
