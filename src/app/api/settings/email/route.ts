@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getUserById, updateUserEmail } from '@/server/userStore';
 import { sendEmail } from '@/server/email';
+import { renderSettingsEmailVerification } from '@/server/emailTemplates';
 import { writeText } from '@/server/storage';
 
 export const runtime = 'nodejs';
@@ -63,11 +64,8 @@ export async function POST(req: Request) {
     const base = process.env.NEXT_PUBLIC_BASE_URL || '';
     const ui = base ? `${base}/settings` : '/settings';
     try {
-      await sendEmail({
-        to: targetEmail!,
-        subject: 'Подтверждение email в YPLA',
-        text: `Ваш код подтверждения: ${code}\n\nЕсли вы его не запрашивали, просто проигнорируйте это письмо.`,
-      });
+      const html = renderSettingsEmailVerification({ code, settingsUrl: ui, expiresMin: 15 });
+      await sendEmail({ to: targetEmail!, subject: 'Подтверждение email в YPLA', html });
     } catch (e) {
       return NextResponse.json({ error: 'EMAIL_SEND_FAILED', debug: {
         host: process.env.SMTP_HOST ? 'set' : 'missing',

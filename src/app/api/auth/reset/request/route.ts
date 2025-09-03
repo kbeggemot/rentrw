@@ -5,6 +5,7 @@ import { createResetToken } from '@/server/resetStore';
 import { sendEmail } from '@/server/email';
 import { promises as fs } from 'fs';
 import path from 'path';
+import { renderPasswordResetEmail } from '@/server/emailTemplates';
 
 export const runtime = 'nodejs';
 
@@ -26,12 +27,8 @@ export async function POST(req: Request) {
     const origin = process.env.NEXT_PUBLIC_BASE_URL || (hdrHost ? `${hdrProto}://${hdrHost}` : new URL(req.url).origin);
     const fullLink = `${origin}/auth/reset/${token}`;
     try {
-      await sendEmail({
-        to: user.email,
-        subject: 'Сброс пароля в YPLA',
-        text: `Вы запросили смену пароля. Перейдите по ссылке и задайте новый пароль: ${fullLink}`,
-        html: `<p>Вы запросили смену пароля.</p><p><a href="${fullLink}" target="_blank" rel="noopener noreferrer">Перейти</a></p>`,
-      });
+      const html = renderPasswordResetEmail({ resetUrl: fullLink, expiresHours: 24 });
+      await sendEmail({ to: user.email, subject: 'Сброс пароля в YPLA', html });
       // debug trail
       try {
         const dataDir = path.join(process.cwd(), '.data');

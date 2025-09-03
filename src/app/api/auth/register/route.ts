@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createUser, isEmailInUse } from '@/server/userStore';
 import { upsertPending } from '@/server/registrationStore';
 import { sendEmail } from '@/server/email';
+import { renderRegistrationCodeEmail } from '@/server/emailTemplates';
 
 export const runtime = 'nodejs';
 
@@ -35,7 +36,9 @@ export async function POST(req: Request) {
     const code = String(Math.floor(100000 + Math.random() * 900000));
     await upsertPending({ phone, email, password, code, expiresAt: Date.now() + 15 * 60 * 1000 });
     try {
-      await sendEmail({ to: email, subject: 'Подтверждение регистрации YPLA', text: `Код подтверждения: ${code}`, html: `<p>Код подтверждения: <b>${code}</b></p><p>Если вы не запрашивали регистрацию, проигнорируйте это письмо.</p>` });
+      const confirmUrl = (process.env.NEXT_PUBLIC_BASE_URL || '') + '/auth';
+      const html = renderRegistrationCodeEmail({ code, confirmUrl, expiresMin: 15 });
+      await sendEmail({ to: email, subject: 'Подтверждение регистрации YPLA', html });
       return NextResponse.json({ ok: true, step: 'confirm', phone, email });
     } catch {
       return NextResponse.json({ error: 'EMAIL_SEND_FAILED' }, { status: 502 });

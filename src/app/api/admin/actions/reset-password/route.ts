@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getUserById } from '@/server/userStore';
 import { createResetToken } from '@/server/resetStore';
 import { sendEmail } from '@/server/email';
+import { renderPasswordResetEmail } from '@/server/emailTemplates';
 import { writeText } from '@/server/storage';
 
 export const runtime = 'nodejs';
@@ -61,7 +62,8 @@ export async function POST(req: Request) {
     const origin = process.env.NEXT_PUBLIC_BASE_URL || (hdrHost ? `${hdrProto}://${hdrHost}` : new URL(req.url).origin);
     const fullLink = `${origin}/auth/reset/${token}`;
     await createResetToken({ userId: user.id, email: user.email, token, expiresAt: Date.now() + ttl });
-    await sendEmail({ to: user.email, subject: 'Сброс пароля в YPLA', text: `Перейдите по ссылке: ${fullLink}`, html: `<p>Перейдите по ссылке: <a href="${fullLink}" target="_blank" rel="noopener">сбросить пароль</a></p>` });
+    const html = renderPasswordResetEmail({ resetUrl: fullLink, expiresHours: 24 });
+    await sendEmail({ to: user.email, subject: 'Сброс пароля в YPLA', html });
     try { await writeText('.data/last_reset_email_admin.json', JSON.stringify({ userId: user.id, to: user.email, link: fullLink, ts: new Date().toISOString() }, null, 2)); } catch {}
     if (ct.includes('application/json')) return NextResponse.json({ ok: true });
     const r = NextResponse.redirect(makeBackUrl(req, back), 303);
