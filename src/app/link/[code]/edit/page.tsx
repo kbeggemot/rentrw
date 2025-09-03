@@ -41,6 +41,7 @@ export default function EditLinkPage(props: { params: Promise<{ code: string }> 
   const [cartDisplay, setCartDisplay] = useState<'grid' | 'list'>('list');
   const [baseUnits, setBaseUnits] = useState<number[]>([]); // исходные цены за единицу для пересчёта
   const [agentDesc, setAgentDesc] = useState<string | null>(null);
+  const [defaultComm, setDefaultComm] = useState<{ type: 'percent' | 'fixed'; value: number } | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -122,6 +123,9 @@ export default function EditLinkPage(props: { params: Promise<{ code: string }> 
         const r = await fetch('/api/settings/agent', { cache: 'no-store' });
         const j = await r.json();
         if (typeof j?.agentDescription === 'string') setAgentDesc(j.agentDescription);
+        if (j?.defaultCommission?.type && typeof j?.defaultCommission?.value === 'number') {
+          setDefaultComm({ type: j.defaultCommission.type, value: Number(j.defaultCommission.value) });
+        }
       } catch {}
     })();
   }, []);
@@ -184,6 +188,15 @@ export default function EditLinkPage(props: { params: Promise<{ code: string }> 
     const v = Number(commissionValue.replace(',', '.'));
     try { const res = applyAgentCommissionToCart(baseCart, commissionType, v); return { title: agentDesc || 'Услуги агента', price: res.agentAmount, qty: 1 }; } catch { return null; }
   }, [commissionValid, commissionType, commissionValue, baseCart, agentDesc]);
+
+  // When agent toggled on — fill defaults if empty
+  useEffect(() => {
+    if (!isAgent) return;
+    if ((commissionValue || '').trim().length > 0) return;
+    if (!defaultComm) return;
+    setCommissionType(defaultComm.type);
+    setCommissionValue(String(defaultComm.value));
+  }, [isAgent, defaultComm]);
 
   const totalCart = useMemo(() => {
     if (mode !== 'cart') return 0;

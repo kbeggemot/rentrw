@@ -62,6 +62,7 @@ function AcceptPaymentContent() {
   const [loading, setLoading] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const [agentDesc, setAgentDesc] = useState<string | null>(null);
+  const [defaultComm, setDefaultComm] = useState<{ type: 'percent' | 'fixed'; value: number } | null>(null);
   const [paymentUrl, setPaymentUrl] = useState<string | null>(null);
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
   const [lastTaskId, setLastTaskId] = useState<string | number | null>(null);
@@ -176,7 +177,10 @@ function AcceptPaymentContent() {
         const r = await fetch('/api/settings/agent', { cache: 'no-store' });
         const d = await r.json();
         if (aborted) return;
-        if (d?.defaultCommission?.type) setCommissionType(d.defaultCommission.type);
+        if (d?.defaultCommission?.type) {
+          setCommissionType(d.defaultCommission.type);
+          setDefaultComm({ type: d.defaultCommission.type, value: Number(d.defaultCommission.value || 0) });
+        }
         if (typeof d?.defaultCommission?.value === 'number') setCommission(String(d.defaultCommission.value));
         if (typeof d?.agentDescription === 'string') setAgentDesc(d.agentDescription);
       } catch {}
@@ -184,6 +188,15 @@ function AcceptPaymentContent() {
     loadDefaults();
     return () => { aborted = true; };
   }, []);
+
+  // When agent toggled on — fill defaults if empty
+  useEffect(() => {
+    if (!isAgentSale) return;
+    if ((commission || '').trim().length > 0) return;
+    if (!defaultComm) return;
+    setCommissionType(defaultComm.type);
+    setCommission(String(defaultComm.value));
+  }, [isAgentSale, defaultComm]);
 
   // Load products for cart selector
   useEffect(() => {
