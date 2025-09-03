@@ -22,7 +22,8 @@ export function middleware(req: NextRequest) {
   const isPublicLink = (
     pathname === '/link/success' ||
     /^\/link\/s\/[^/]+$/.test(pathname) ||
-    /^\/link\/[^/]+$/.test(pathname) // only direct /link/{code}
+    // /link/{code}, но исключаем зарезервированные сегменты: new, s, success
+    /^\/link\/(?!new$|s$|success$)[^/]+$/.test(pathname)
   );
   if (!isProtected) {
     // Protect admin area with separate cookie
