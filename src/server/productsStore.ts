@@ -67,6 +67,7 @@ export async function createProduct(userId: string, orgInn: string, data: Omit<P
     vat: data.vat,
     sku: data.sku?.trim() || null,
     description: data.description?.trim() || null,
+    photos: Array.isArray((data as any).photos) ? ((data as any).photos as string[]).slice(0, 5) : [],
     createdAt: now,
     updatedAt: now,
   };
