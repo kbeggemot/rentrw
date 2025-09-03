@@ -20,7 +20,7 @@ export default async function SalesPage() {
     }
   } catch {}
   return (
-    <div className="mx-auto w-full max-w-3xl md:max-w-4xl lg:max-w-5xl xl:max-w-6xl 2xl:max-w-7xl pt-0 pb-4">
+    <div className={(inn && hasToken) ? "mx-auto w-full max-w-3xl md:max-w-4xl lg:max-w-5xl xl:max-w-6xl 2xl:max-w-7xl pt-0 pb-4" : "max-w-3xl mx-auto pt-0 pb-4"}>
       <header className="mb-4">
         <h1 className="hidden md:block text-2xl font-bold">Продажи</h1>
       </header>
