@@ -23,11 +23,10 @@ export async function POST(req: Request) {
     const max = 5 * 1024 * 1024; // 5MB per file
     if (file.size > max) return NextResponse.json({ error: 'TOO_LARGE' }, { status: 400 });
     const input = Buffer.from(await file.arrayBuffer());
-    // Convert HDR/unknown profiles to SDR sRGB and clamp brightness; output webp (smaller, widely supported)
-    const webp = await sharp(input, { failOn: false })
-      .withMetadata({ icc: 'sRGB IEC61966-2.1' })
+    // Convert HDR/unknown profiles to SDR sRGB and output webp (smaller, widely supported)
+    const webp = await sharp(input)
       .toColorspace('srgb')
-      .modulate({ brightness: 1, saturation: 1, hue: 0 })
+      .withMetadata() // keep minimal metadata; output is sRGB
       .webp({ quality: 85 })
       .toBuffer();
     const id = Math.random().toString(36).slice(2) + Date.now().toString(36);
