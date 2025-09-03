@@ -587,7 +587,11 @@ function AcceptPaymentContent() {
       });
       const text = await res.text();
       const data = text ? JSON.parse(text) : {};
-      if (!res.ok) throw new Error(data?.error || text || 'Ошибка создания сделки');
+      if (!res.ok) {
+        const code = data?.error;
+        if (code === 'AGENT_VAT_FORBIDDEN') { showToast('Самозанятый не может реализовывать позиции с НДС', 'error'); setLoading(false); setCollapsed(false); return; }
+        throw new Error(code || text || 'Ошибка создания сделки');
+      }
 
       const taskId: string | number | undefined = data?.task_id ?? data?.data?.id ?? data?.data?.task?.id;
       if (taskId !== undefined) {
@@ -638,7 +642,8 @@ function AcceptPaymentContent() {
       } else { setLoading(false); showToast('Не удалось получить идентификатор задачи', 'error'); setCollapsed(false); }
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Ошибка';
-      showToast(msg, 'error');
+      if (msg === 'AGENT_VAT_FORBIDDEN') showToast('Самозанятый не может реализовывать позиции с НДС', 'error');
+      else showToast(msg, 'error');
       setLoading(false);
       setCollapsed(false);
     }
