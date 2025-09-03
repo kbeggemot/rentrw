@@ -43,11 +43,18 @@ export async function sendInstantDeliveryIfReady(userId: string, sale: SaleRecor
     const seller_legal_name = legalName || 'Поставщик';
     let brand_name_img = 'YPLA';
     try {
-      const filePath = path.join(process.cwd(), 'public', 'logo.svg');
-      const svg = await fs.readFile(filePath);
-      const b64 = Buffer.from(svg).toString('base64');
-      brand_name_img = `<img src="data:image/svg+xml;base64,${b64}" alt="YPLA" height="16" style="height:16px;vertical-align:middle;"/>`;
-    } catch {}
+      const pngPath = path.join(process.cwd(), 'public', 'logo.png');
+      const png = await fs.readFile(pngPath);
+      const b64p = Buffer.from(png).toString('base64');
+      brand_name_img = `<img src="data:image/png;base64,${b64p}" alt="YPLA" height="16" style="height:16px;vertical-align:middle;"/>`;
+    } catch {
+      try {
+        const svgPath = path.join(process.cwd(), 'public', 'logo.svg');
+        const svg = await fs.readFile(svgPath);
+        const b64 = Buffer.from(svg).toString('base64');
+        brand_name_img = `<img src="data:image/svg+xml;base64,${b64}" alt="YPLA" height="16" style="height:16px;vertical-align:middle;"/>`;
+      } catch {}
+    }
 
     const purchase_result = instantTexts.map((t) => `<div style=\"margin-bottom:8px\">${escapeHtml(t)}</div>`).join('');
     const payment_receipt_url = String(sale.ofdFullUrl || sale.ofdUrl || '');
