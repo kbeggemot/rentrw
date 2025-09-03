@@ -769,7 +769,7 @@ function AcceptPaymentContent() {
                 const agentAmount = Math.round((Math.min(Math.max(A, 0), T) + Number.EPSILON) * 100) / 100;
                 return (
                   <div className="overflow-x-auto sm:overflow-visible -mx-1 px-1 touch-pan-x">
-                    <div className="flex items-start gap-2 w-max opacity-90">
+                    <div className="flex items-center gap-2 w-max opacity-90">
                       <div className="relative flex-1 min-w-[8rem] sm:min-w-[14rem]">
                         <input className="w-full rounded border px-2 h-9 text-sm bg-gray-100" value={agentDesc || 'Услуги агента'} readOnly disabled />
                       </div>
@@ -779,8 +779,8 @@ function AcceptPaymentContent() {
                       <div>
                         <input className="w-24 sm:w-28 rounded border px-2 h-9 text-sm bg-gray-100" value={agentAmount.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2, useGrouping: false })} readOnly disabled />
                       </div>
-                      <div className="flex flex-col">
-                        <button type="button" aria-label="Удалить" className="w-9 h-9 rounded border text-gray-400 flex items-center justify-center" disabled>✕</button>
+                      <div className="flex">
+                        <button type="button" aria-label="Удалить" className="w-9 h-9 rounded border text-gray-400 flex items-center justify-center self-center" disabled>✕</button>
                       </div>
                     </div>
                   </div>
