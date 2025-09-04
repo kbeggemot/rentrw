@@ -763,7 +763,7 @@ export default function SalesClient({ initial, hasTokenInitial }: { initial: Sal
                 <td className="px-3 py-2">{s.serviceEndDate ? new Date(s.serviceEndDate).toLocaleDateString('ru-RU', { timeZone: 'Europe/Moscow' }) : '-'}</td>
                 <td className="px-1 py-2 text-center">
                   <div className="relative inline-block">
-                    <Button aria-label="Действия" variant="secondary" size="icon" onClick={(ev) => { if (!actionProbeRef.current) { try { actionProbeRef.current = ev.currentTarget as HTMLButtonElement; } catch {} } const r = (ev.currentTarget as HTMLElement).getBoundingClientRect(); setMenuPos({ top: r.bottom + window.scrollY + 8, left: r.right + window.scrollX - 192 }); setMenuOpenId((id) => (id === s.taskId ? null : s.taskId)); void ensurePageCode(s.orderId); }}><IconDotsHorizontal /></Button>
+                    <Button aria-label="Действия" variant="secondary" size="icon" onClick={(ev) => { if (!actionProbeRef.current) { try { actionProbeRef.current = ev.currentTarget as HTMLButtonElement; } catch {} } const r = (ev.currentTarget as HTMLElement).getBoundingClientRect(); setMenuPos({ top: r.bottom + 8, left: r.right - 192 }); setMenuOpenId((id) => (id === s.taskId ? null : s.taskId)); void ensurePageCode(s.orderId); }}><IconDotsHorizontal /></Button>
                   </div>
                 </td>
               </tr>
