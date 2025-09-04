@@ -225,8 +225,10 @@ export default function PublicSuccessUnifiedPage() {
                     return (
                       <div className="space-y-1">
                         {items.map((it, i) => (
-                          <div key={i} className="relative pl-6">
-                            <span className="absolute left-0">•</span>
+                          <div
+                            key={i}
+                            className="relative pl-6 before:content-['•'] before:absolute before:-left-4"
+                          >
                             {it.title} — {Number(it.qty||0)} шт.
                           </div>
                         ))}
