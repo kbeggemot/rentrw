@@ -225,7 +225,10 @@ export default function PublicSuccessUnifiedPage() {
                     return (
                       <div className="space-y-1">
                         {items.map((it, i) => (
-                          <div key={i} className="pl-5" style={{ textIndent: '-1.25rem' }}>• {it.title} — {Number(it.qty||0)} шт.</div>
+                          <div key={i} className="relative pl-6">
+                            <span className="absolute left-0">•</span>
+                            {it.title} — {Number(it.qty||0)} шт.
+                          </div>
                         ))}
                       </div>
                     );
