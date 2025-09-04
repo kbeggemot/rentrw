@@ -225,7 +225,7 @@ export default function PublicSuccessUnifiedPage() {
                     return (
                       <div className="space-y-1">
                         {items.map((it, i) => (
-                          <div key={i}>• {it.title} — {Number(it.qty||0)} шт.</div>
+                          <div key={i} className="pl-6 [text-indent:-1rem]">• {it.title} — {Number(it.qty||0)} шт.</div>
                         ))}
                       </div>
                     );
