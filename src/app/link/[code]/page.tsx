@@ -245,7 +245,14 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
                 if (ld?.sumMode === 'fixed' && typeof ld?.amountRub === 'number') setAmount(String(ld.amountRub));
                 if (ld?.method === 'card') setMethod('card'); else setMethod('qr');
                   if (Array.isArray(ld?.cartItems)) {
-                    try { setCart((ld.cartItems as any[]).map((c: any) => ({ id: c?.id ?? null, title: String(c?.title || ''), price: Number(c?.price || 0), qty: Number(c?.qty || 1) }))); } catch {}
+                    try {
+                      const startEmpty = !!(ld as any)?.startEmptyCart;
+                      if (startEmpty && ld?.allowCartAdjust) {
+                        setCart([]);
+                      } else {
+                        setCart((ld.cartItems as any[]).map((c: any) => ({ id: c?.id ?? null, title: String(c?.title || ''), price: Number(c?.price || 0), qty: Number(c?.qty || 1) })));
+                      }
+                    } catch {}
                   }
                 }
               }
@@ -287,7 +294,14 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
           if (d?.sumMode === 'fixed' && typeof d?.amountRub === 'number') setAmount(String(d.amountRub));
           if (d?.method === 'card') setMethod('card'); else setMethod('qr');
           if (Array.isArray(d?.cartItems)) {
-            try { setCart((d.cartItems as any[]).map((c: any) => ({ id: c?.id ?? null, title: String(c?.title || ''), price: Number(c?.price || 0), qty: Number(c?.qty || 1) }))); } catch {}
+            try {
+              const startEmpty = !!(d as any)?.startEmptyCart;
+              if (startEmpty && d?.allowCartAdjust) {
+                setCart([]);
+              } else {
+                setCart((d.cartItems as any[]).map((c: any) => ({ id: c?.id ?? null, title: String(c?.title || ''), price: Number(c?.price || 0), qty: Number(c?.qty || 1) })));
+              }
+            } catch {}
           }
         } catch (e) { if (!cancelled) setMsg('Ссылка не найдена'); }
       }

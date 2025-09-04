@@ -73,7 +73,7 @@ export async function GET(req: Request) {
         });
       }
     } catch {}
-    return NextResponse.json({ code, userId, title, description, sumMode, amountRub, vatRate, isAgent, commissionType, commissionValue, partnerPhone, method, orgName: orgName || null, orgInn: item.orgInn || null, cartItems, allowCartAdjust: !!item.allowCartAdjust, cartDisplay: item.cartDisplay || null, agentDescription: (item as any)?.agentDescription ?? null }, { status: 200 });
+    return NextResponse.json({ code, userId, title, description, sumMode, amountRub, vatRate, isAgent, commissionType, commissionValue, partnerPhone, method, orgName: orgName || null, orgInn: item.orgInn || null, cartItems, allowCartAdjust: !!item.allowCartAdjust, startEmptyCart: !!(item as any)?.startEmptyCart, cartDisplay: item.cartDisplay || null, agentDescription: (item as any)?.agentDescription ?? null }, { status: 200 });
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'Server error';
     return NextResponse.json({ error: msg }, { status: 500 });
@@ -217,7 +217,8 @@ export async function PUT(req: Request) {
       } else {
         if (!(total >= MIN_AMOUNT_RUB)) return NextResponse.json({ error: 'MIN_10' }, { status: 400 });
       }
-      const updated = await updatePaymentLink(userId, code, { title, cartItems: normalized as any, allowCartAdjust, amountRub: total, method, isAgent, commissionType: commissionType as any, commissionValue: commissionValue ?? undefined, partnerPhone, cartDisplay: cartDisplay as any });
+      const startEmptyCart = !!body?.startEmptyCart;
+      const updated = await updatePaymentLink(userId, code, { title, cartItems: normalized as any, allowCartAdjust, startEmptyCart, amountRub: total, method, isAgent, commissionType: commissionType as any, commissionValue: commissionValue ?? undefined, partnerPhone, cartDisplay: cartDisplay as any });
       if (!updated) return NextResponse.json({ error: 'NOT_FOUND' }, { status: 404 });
       return NextResponse.json({ ok: true, item: updated });
     }

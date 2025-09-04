@@ -201,7 +201,7 @@ export async function POST(req: Request) {
       if (!(totalRub >= MIN_AMOUNT_RUB)) return NextResponse.json({ error: 'MIN_10' }, { status: 400 });
     }
 
-    const item = await createPaymentLink(userId, { title, description, sumMode, amountRub: amountRub ?? undefined, vatRate, isAgent, commissionType: commissionType as any, commissionValue: commissionValue ?? undefined, partnerPhone, method, orgInn: inn ?? undefined, preferredCode: preferredCode ?? undefined, cartItems: cartItems ?? undefined, allowCartAdjust: Boolean(body?.allowCartAdjust), cartDisplay: (body?.cartDisplay === 'list' ? 'list' : (body?.cartDisplay === 'grid' ? 'grid' : undefined)), agentDescription: (typeof body?.agentDescription === 'string' ? body.agentDescription : undefined) } as any);
+    const item = await createPaymentLink(userId, { title, description, sumMode, amountRub: amountRub ?? undefined, vatRate, isAgent, commissionType: commissionType as any, commissionValue: commissionValue ?? undefined, partnerPhone, method, orgInn: inn ?? undefined, preferredCode: preferredCode ?? undefined, cartItems: cartItems ?? undefined, allowCartAdjust: Boolean(body?.allowCartAdjust), startEmptyCart: Boolean(body?.startEmptyCart), cartDisplay: (body?.cartDisplay === 'list' ? 'list' : (body?.cartDisplay === 'grid' ? 'grid' : undefined)), agentDescription: (typeof body?.agentDescription === 'string' ? body.agentDescription : undefined) } as any);
     const hostHdr = req.headers.get('x-forwarded-host') || req.headers.get('host') || 'localhost:3000';
     const protoHdr = req.headers.get('x-forwarded-proto') || (hostHdr.startsWith('localhost') ? 'http' : 'https');
     const url = `${protoHdr}://${hostHdr}/link/${encodeURIComponent(item.code)}`;

@@ -40,6 +40,7 @@ export default function EditLinkPage(props: { params: Promise<{ code: string }> 
   const [cartItems, setCartItems] = useState<Array<{ id?: string | null; title: string; price: string; qty: string }>>([]);
   const [editingPriceIdx, setEditingPriceIdx] = useState<number | null>(null);
   const [allowCartAdjust, setAllowCartAdjust] = useState(false);
+  const [startEmptyCart, setStartEmptyCart] = useState(false);
   const [cartDisplay, setCartDisplay] = useState<'grid' | 'list'>('list');
   const [baseUnits, setBaseUnits] = useState<number[]>([]); // исходные цены за единицу для пересчёта
   const [agentDesc, setAgentDesc] = useState<string | null>(null);
@@ -66,6 +67,7 @@ export default function EditLinkPage(props: { params: Promise<{ code: string }> 
           setMode('cart');
           setCartItems(d.cartItems.map((c: any) => ({ id: c?.id ?? null, title: String(c?.title || ''), price: String(c?.price ?? 0), qty: String(c?.qty ?? 1) })));
           setAllowCartAdjust(!!d.allowCartAdjust);
+          setStartEmptyCart(!!d.startEmptyCart);
           setCartDisplay(d.cartDisplay === 'grid' ? 'grid' : 'list');
           // восстановим исходные цены за единицу для пересчёта
           // если есть актуальная цена из витрины — используем её как исходную
@@ -248,6 +250,7 @@ export default function EditLinkPage(props: { params: Promise<{ code: string }> 
           body.cartItems = normalizedBase;
         }
         body.allowCartAdjust = allowCartAdjust;
+        body.startEmptyCart = allowCartAdjust ? startEmptyCart : false;
         body.amountRub = totalCart;
         body.cartDisplay = cartDisplay;
       }
@@ -471,8 +474,12 @@ export default function EditLinkPage(props: { params: Promise<{ code: string }> 
                 </div>
               </div>
               <label className="inline-flex items-center gap-2 text-sm mt-3">
-                <input type="checkbox" checked={allowCartAdjust} onChange={(e) => setAllowCartAdjust(e.target.checked)} />
+                <input type="checkbox" checked={allowCartAdjust} onChange={(e) => { const v = e.target.checked; setAllowCartAdjust(v); if (!v) setStartEmptyCart(false); }} />
                 <span>Разрешить покупателю изменять набор и количество позиций</span>
+              </label>
+              <label className="inline-flex items-center gap-2 text-sm mt-2">
+                <input type="checkbox" checked={startEmptyCart} onChange={(e) => setStartEmptyCart(e.target.checked)} disabled={!allowCartAdjust} />
+                <span>Начинать с пустой корзины</span>
               </label>
             </div>
           )}

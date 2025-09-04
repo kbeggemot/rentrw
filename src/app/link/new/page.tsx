@@ -18,6 +18,7 @@ export default function NewLinkStandalonePage() {
   const [mode, setMode] = useState<'service' | 'cart'>('service');
   const [cart, setCart] = useState<Array<{ id: string; title: string; price: string; qty: string }>>([]);
   const [allowCartAdjust, setAllowCartAdjust] = useState(false);
+  const [startEmptyCart, setStartEmptyCart] = useState(false);
   const [orgProducts, setOrgProducts] = useState<Array<{ id: string; title: string; price: number }>>([]);
   const [agentDesc, setAgentDesc] = useState<string | null>(null);
   const [defaultComm, setDefaultComm] = useState<{ type: 'percent' | 'fixed'; value: number } | null>(null);
@@ -220,6 +221,7 @@ export default function NewLinkStandalonePage() {
           payload.cartItems = normalized;
         }
         payload.allowCartAdjust = allowCartAdjust;
+        payload.startEmptyCart = allowCartAdjust ? startEmptyCart : false;
         payload.cartDisplay = cartDisplay;
         // Укажем исходную сумму для сервера (нормализуем в число с точкой)
         const total = normalized.reduce((sum, r) => sum + (r.price * r.qty), 0);
@@ -485,8 +487,12 @@ export default function NewLinkStandalonePage() {
                 </label>
               </div>
               <label className="inline-flex items-center gap-2 text-sm mt-3">
-                <input type="checkbox" checked={allowCartAdjust} onChange={(e)=> setAllowCartAdjust(e.target.checked)} />
+                <input type="checkbox" checked={allowCartAdjust} onChange={(e)=> { const v = e.target.checked; setAllowCartAdjust(v); if (!v) setStartEmptyCart(false); }} />
                 <span>Разрешить покупателю изменять набор и количество позиций</span>
+              </label>
+              <label className="inline-flex items-center gap-2 text-sm mt-2">
+                <input type="checkbox" checked={startEmptyCart} onChange={(e)=> setStartEmptyCart(e.target.checked)} disabled={!allowCartAdjust} />
+                <span>Начинать с пустой корзины</span>
               </label>
             </div>
           ) : null}

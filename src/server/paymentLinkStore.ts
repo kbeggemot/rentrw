@@ -16,6 +16,7 @@ export type PaymentLink = {
   method?: 'any' | 'qr' | 'card';
   cartItems?: Array<{ id?: string | null; title: string; price: number; qty: number }> | null;
   allowCartAdjust?: boolean;
+  startEmptyCart?: boolean;
   cartDisplay?: 'grid' | 'list' | null;
   agentDescription?: string | null;
   createdAt: string;
@@ -84,6 +85,7 @@ export async function createPaymentLink(userId: string, data: Omit<PaymentLink, 
       qty: Number(ci?.qty || 1),
     })) : null,
     allowCartAdjust: Boolean((data as any)?.allowCartAdjust),
+    startEmptyCart: Boolean((data as any)?.startEmptyCart),
     cartDisplay: (data as any)?.cartDisplay === 'list' ? 'list' : ((data as any)?.cartDisplay === 'grid' ? 'grid' : null),
     agentDescription: typeof (data as any)?.agentDescription === 'string' ? ((data as any).agentDescription as string) : null,
     createdAt: now,
@@ -165,6 +167,7 @@ export async function updatePaymentLink(userId: string, code: string, updates: P
       }));
     }
     if (typeof updates.allowCartAdjust === 'boolean') next.allowCartAdjust = updates.allowCartAdjust;
+    if (typeof (updates as any)?.startEmptyCart === 'boolean') (next as any).startEmptyCart = Boolean((updates as any).startEmptyCart);
     if (typeof updates.amountRub === 'number' && Number.isFinite(updates.amountRub)) next.amountRub = updates.amountRub;
     if (updates.cartDisplay === 'list' || updates.cartDisplay === 'grid') next.cartDisplay = updates.cartDisplay;
   }
