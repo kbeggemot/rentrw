@@ -46,6 +46,7 @@ export async function GET(req: Request) {
         ofdFullUrl: sale.ofdFullUrl ?? null,
         commissionUrl: sale.additionalCommissionOfdUrl ?? null,
         npdReceiptUri: sale.npdReceiptUri ?? null,
+        itemsSnapshot: Array.isArray((sale as any).itemsSnapshot) ? (sale as any).itemsSnapshot : null,
       };
     }
     // Try to enrich with payment method and created_at from RW

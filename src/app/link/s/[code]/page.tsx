@@ -11,7 +11,7 @@ export default function PermanentSaleRedirect(props: { params: Promise<{ code?: 
   const [userId, setUserId] = useState<string | null>(null);
   const [taskId, setTaskId] = useState<string | number | null>(null);
   const [receipts, setReceipts] = useState<Receipts>({});
-  const [summary, setSummary] = useState<{ amountRub?: number; description?: string | null; createdAt?: string | null } | null>(null);
+  const [summary, setSummary] = useState<{ amountRub?: number; description?: string | null; createdAt?: string | null; items?: Array<{ title: string; qty: number }> | null } | null>(null);
   const [isAgent, setIsAgent] = useState<boolean | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(true);
   const [dots, setDots] = useState('.');
@@ -40,7 +40,12 @@ export default function PermanentSaleRedirect(props: { params: Promise<{ code?: 
           if (d?.sale) {
             setTaskId(d.sale.taskId || null);
             setIsAgent(typeof d.sale.isAgent === 'boolean' ? Boolean(d.sale.isAgent) : null);
-            setSummary({ amountRub: d.sale.amountRub, description: d.sale.description, createdAt: d.sale.createdAt });
+            try {
+              const items = Array.isArray(d?.sale?.itemsSnapshot) ? (d.sale.itemsSnapshot as any[]).map((i: any) => ({ title: String(i?.title || ''), qty: Number(i?.qty || 1) })) : null;
+              setSummary({ amountRub: d.sale.amountRub, description: d.sale.description, createdAt: d.sale.createdAt, items });
+            } catch {
+              setSummary({ amountRub: d.sale.amountRub, description: d.sale.description, createdAt: d.sale.createdAt });
+            }
             setReceipts({ prepay: d.sale.ofdUrl || null, full: d.sale.ofdFullUrl || null, commission: d.sale.commissionUrl || null, npd: d.sale.npdReceiptUri || null });
           }
         } else {
@@ -70,6 +75,10 @@ export default function PermanentSaleRedirect(props: { params: Promise<{ code?: 
               commission: sl?.additionalCommissionOfdUrl ?? prev.commission ?? null,
               npd: sl?.npdReceiptUri ?? prev.npd ?? null,
             }));
+            try {
+              const items = Array.isArray(sl?.itemsSnapshot) ? (sl.itemsSnapshot as any[]).map((i: any) => ({ title: String(i?.title || ''), qty: Number(i?.qty || 1) })) : null;
+              if (items && items.length > 0) setSummary((prev) => ({ ...(prev || {}), items }));
+            } catch {}
             if (!summary) setSummary({ amountRub: sl.amountGrossRub, description: sl.description, createdAt: sl.createdAtRw || sl.createdAt });
           }
         }
@@ -87,7 +96,23 @@ export default function PermanentSaleRedirect(props: { params: Promise<{ code?: 
       <div className="mt-4 rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-3 text-sm">
         <div className="grid grid-cols-[9rem_1fr] gap-y-2 mb-2 text-gray-900 dark:text-gray-100">
           <div className="text-gray-600 dark:text-gray-400">За что платим</div>
-          <div>{summary?.description || '—'}</div>
+          <div>
+            {(() => {
+              const items = Array.isArray(summary?.items) ? summary!.items! : null;
+              if (items && items.length > 0) {
+                return (
+                  <div className="space-y-1">
+                    {items.map((it, i) => (
+                      <div key={i} className="relative before:content-['•'] before:absolute before:-left-5">
+                        {it.title} — {Number(it.qty || 0)} шт.
+                      </div>
+                    ))}
+                  </div>
+                );
+              }
+              return (summary?.description || '—');
+            })()}
+          </div>
           <div className="text-gray-600 dark:text-gray-400">Сумма</div>
           <div>{typeof summary?.amountRub === 'number' ? new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB' }).format(summary!.amountRub!) : '—'}</div>
           <div className="text-gray-600 dark:text-gray-400">Дата оплаты</div>

@@ -33,6 +33,7 @@ export async function GET(req: Request) {
           commissionUrl: s.additionalCommissionOfdUrl || null,
           npdReceiptUri: s.npdReceiptUri || null,
           orgInn: (s as any).orgInn || null,
+          itemsSnapshot: Array.isArray((s as any).itemsSnapshot) ? (s as any).itemsSnapshot : null,
         };
       }
     } catch {}
