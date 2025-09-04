@@ -362,7 +362,33 @@ export default function EditLinkPage(props: { params: Promise<{ code: string }> 
                         value={row.title}
                         onChange={(e)=>{
                           const title = e.target.value;
-                          const p = orgProducts.find((x)=> x.title.toLowerCase() === title.toLowerCase());
+                          const norm = String(title || '').trim().toLowerCase();
+                          if (norm === 'все позиции') {
+                            setCartItems((prev) => {
+                              const key = (id: string | null, t: string) => `${id||''}::${t.toLowerCase()}`;
+                              const existing = new Set(prev.map(r => key(r.id ?? null, r.title)));
+                              const toAdd = orgProducts.filter(p => !existing.has(key(p.id, p.title)));
+                              if (toAdd.length === 0) return prev;
+                              const out = [...prev];
+                              const first = toAdd[0];
+                              out[idx] = { id: first.id, title: first.title, price: String(first.price ?? 0), qty: '1' } as any;
+                              for (let j = 1; j < toAdd.length; j++) {
+                                const m = toAdd[j];
+                                out.push({ id: m.id, title: m.title, price: String(m.price ?? 0), qty: '1' } as any);
+                              }
+                              return out;
+                            });
+                            setBaseUnits((prev) => {
+                              const toAdd = orgProducts;
+                              const first = toAdd[0];
+                              const out = [...prev];
+                              out[idx] = Number(first?.price ?? 0);
+                              for (let j = 1; j < toAdd.length; j++) out.push(Number(toAdd[j].price ?? 0));
+                              return out;
+                            });
+                            return;
+                          }
+                          const p = orgProducts.find((x)=> x.title.toLowerCase() === norm);
                           setCartItems((prev)=> prev.map((r,i)=> i===idx ? {
                             id: p?.id || null,
                             title,
@@ -385,6 +411,7 @@ export default function EditLinkPage(props: { params: Promise<{ code: string }> 
                         }}
                       />
                       <datalist id={`products-list-${idx}`}>
+                        <option value="Все позиции" />
                         {orgProducts.map((p)=> (<option key={p.id} value={p.title} />))}
                       </datalist>
                     </div>
@@ -477,7 +504,7 @@ export default function EditLinkPage(props: { params: Promise<{ code: string }> 
                 <input type="checkbox" checked={allowCartAdjust} onChange={(e) => { const v = e.target.checked; setAllowCartAdjust(v); if (!v) setStartEmptyCart(false); }} />
                 <span>Разрешить покупателю изменять набор и количество позиций</span>
               </label>
-              <label className="inline-flex items-center gap-2 text-sm mt-2">
+              <label className="flex items-center gap-2 text-sm mt-2">
                 <input type="checkbox" checked={startEmptyCart} onChange={(e) => setStartEmptyCart(e.target.checked)} disabled={!allowCartAdjust} />
                 <span>Начинать с пустой корзины</span>
               </label>
