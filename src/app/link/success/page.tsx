@@ -13,7 +13,7 @@ export default function PublicSuccessUnifiedPage() {
   const [receipts, setReceipts] = useState<{ prepay?: string | null; full?: string | null; commission?: string | null; npd?: string | null }>({});
   const [msg, setMsg] = useState<string | null>(null);
   const [waiting, setWaiting] = useState(false);
-  const [summary, setSummary] = useState<{ amountRub?: number; description?: string | null; createdAt?: string | null } | null>(null);
+  const [summary, setSummary] = useState<{ amountRub?: number; description?: string | null; createdAt?: string | null; items?: Array<{ title: string; qty: number }> | null } | null>(null);
   const [payMethod, setPayMethod] = useState<string | null>(null);
   const [isAgent, setIsAgent] = useState<boolean | null>(null);
   const pollRef = useRef<number | null>(null);
@@ -63,7 +63,8 @@ export default function PublicSuccessUnifiedPage() {
                 setInfo({ code: '', userId: String(d.userId || ''), title: undefined, orgName: d?.orgName || null });
                 setOrderId(Number(d.orderId || 0) || null);
                 if (d?.sale) {
-                  setSummary({ amountRub: d.sale.amountRub, description: d.sale.description, createdAt: d.sale.createdAt ?? null });
+                  const items = Array.isArray(d.sale.itemsSnapshot) ? (d.sale.itemsSnapshot as any[]).map((i)=> ({ title: String(i?.title||''), qty: Number(i?.qty||1) })) : null;
+                  setSummary({ amountRub: d.sale.amountRub, description: d.sale.description, createdAt: d.sale.createdAt ?? null, items });
                   if (typeof d.sale.isAgent === 'boolean') setIsAgent(Boolean(d.sale.isAgent));
                 }
                 if (d?.sale) {
@@ -209,7 +210,21 @@ export default function PublicSuccessUnifiedPage() {
           <div className="mt-1 rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-3 text-sm shadow-sm">
             <div className="grid grid-cols-[9rem_1fr] gap-y-2 mb-2 text-gray-900 dark:text-gray-100">
               <div className="text-gray-600 dark:text-gray-400">За что платим</div>
-              <div>{summary?.description || info?.title || '—'}</div>
+              <div>
+                {(() => {
+                  const items = Array.isArray(summary?.items) ? summary!.items! : null;
+                  if (items && items.length > 0) {
+                    return (
+                      <ul className="list-disc pl-5">
+                        {items.map((it, i) => (
+                          <li key={i}>{it.title} — {Number(it.qty||0)} шт.</li>
+                        ))}
+                      </ul>
+                    );
+                  }
+                  return (summary?.description || info?.title || '—');
+                })()}
+              </div>
               <div className="text-gray-600 dark:text-gray-400">Сумма</div>
               <div>{typeof summary?.amountRub === 'number' ? new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB' }).format(summary!.amountRub!) : '—'}</div>
               <div className="text-gray-600 dark:text-gray-400">Способ оплаты</div>
