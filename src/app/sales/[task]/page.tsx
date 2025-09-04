@@ -1,6 +1,7 @@
 import { headers } from 'next/headers';
 import { findSaleByTaskId } from '@/server/taskStore';
 import { listProductsForOrg } from '@/server/productsStore';
+import InstantResendLink from '@/app/sales/InstantResendLink';
 
 export const runtime = 'nodejs';
 
@@ -182,39 +183,7 @@ export default async function SaleDetailsPage(props: { params: Promise<{ task: s
                           const text = map[st] || '—';
                           const dt = (sale as any)?.updatedAt || (sale as any)?.createdAt;
                           const when = dt ? `${new Date(dt).toLocaleDateString('ru-RU', { timeZone: 'Europe/Moscow' })} в ${new Date(dt).toLocaleTimeString('ru-RU', { timeZone: 'Europe/Moscow' })}` : '';
-                          return (
-                            <>
-                              {`${text}${when ? ' ' + when : ''}`} {hasInstant ? (
-                                <button
-                                  className="text-gray-500 hover:text-gray-700 underline ml-1"
-                                  onClick={async (e) => {
-                                    e.preventDefault();
-                                    if (!confirm('Переотправить письмо выдачи?')) return;
-                                    try {
-                                      const body = new URLSearchParams();
-                                      body.set('userId', String((sale as any).userId || ''));
-                                      body.set('taskId', String(sale.taskId || ''));
-                                      const res = await fetch('/api/admin/actions/instant-resend', { method: 'POST', body, headers: { 'Content-Type': 'application/x-www-form-urlencoded' } });
-                                      const ok = res.ok;
-                                      const el = document.createElement('div');
-                                      el.className = `fixed bottom-4 right-4 z-50 px-4 py-3 rounded-md shadow-lg text-sm ${ok ? 'bg-green-600 text-white' : 'bg-red-600 text-white'}`;
-                                      el.textContent = ok ? 'Письмо переотправлено' : 'Не удалось переотправить';
-                                      document.body.appendChild(el);
-                                      setTimeout(() => el.remove(), 3000);
-                                    } catch {
-                                      const el = document.createElement('div');
-                                      el.className = 'fixed bottom-4 right-4 z-50 px-4 py-3 rounded-md shadow-lg text-sm bg-red-600 text-white';
-                                      el.textContent = 'Не удалось переотправить';
-                                      document.body.appendChild(el);
-                                      setTimeout(() => el.remove(), 3000);
-                                    }
-                                  }}
-                                >
-                                  (переотправить)
-                                </button>
-                              ) : null}
-                            </>
-                          );
+                          return (<>{`${text}${when ? ' ' + when : ''}`} {hasInstant ? (<InstantResendLink userId={(sale as any).userId} taskId={sale.taskId} />) : null}</>);
                         })()}
                       </div>
                       {(sale as any).instantEmailError ? (<><div className="text-gray-500">Ошибка</div><div>{(sale as any).instantEmailError}</div></>) : null}
