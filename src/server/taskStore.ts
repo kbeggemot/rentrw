@@ -28,6 +28,7 @@ export type SaleRecord = {
   rwOrderId?: number | null;
   status?: string | null; // acquiring_order.status (оплата)
   rootStatus?: string | null; // корневой статус задачи (task.status)
+  paidAt?: string | null; // точное время перехода в paid/transfered в нашей системе
   ofdUrl?: string | null;
   ofdFullUrl?: string | null;
   ofdPrepayId?: string | null;
@@ -49,6 +50,8 @@ export type SaleRecord = {
   // id is optional to allow mapping to product metadata (unit/kind/vat)
   itemsSnapshot?: Array<{ id?: string | null; title: string; price: number; qty: number }> | null;
   agentDescription?: string | null; // description text used for agent line
+  partnerFio?: string | null;
+  partnerPhone?: string | null;
   // Instant delivery email status
   instantEmailStatus?: 'pending' | 'sent' | 'failed' | null;
   instantEmailError?: string | null;
@@ -103,8 +106,10 @@ export async function recordSaleOnCreate(params: {
   vatRate?: string;
   cartItems?: Array<{ id?: string | null; title: string; price: number; qty: number }> | null;
   agentDescription?: string | null;
+  partnerFio?: string | null;
+  partnerPhone?: string | null;
 }): Promise<void> {
-  const { userId, taskId, orderId, orgInn, rwTokenFp, clientEmail, description, amountGrossRub, isAgent, commissionType, commissionValue, serviceEndDate, vatRate, cartItems, agentDescription } = params;
+  const { userId, taskId, orderId, orgInn, rwTokenFp, clientEmail, description, amountGrossRub, isAgent, commissionType, commissionValue, serviceEndDate, vatRate, cartItems, agentDescription, partnerFio, partnerPhone } = params;
   // Try infer orgInn from fingerprint if missing or unknown
   let resolvedInn: string | null | undefined = orgInn;
   try {
@@ -157,6 +162,7 @@ export async function recordSaleOnCreate(params: {
     source: 'ui',
     rwOrderId: null,
     status: null,
+    paidAt: null,
     ofdUrl: null,
     ofdFullUrl: null,
     ofdPrepayId: null,
@@ -175,6 +181,8 @@ export async function recordSaleOnCreate(params: {
     invoiceIdFull,
     itemsSnapshot: Array.isArray(cartItems) ? cartItems.map((i) => ({ id: (i as any)?.id ?? null, title: String(i.title || ''), price: Number(i.price || 0), qty: Number(i.qty || 1) })) : null,
     agentDescription: agentDescription ?? null,
+    partnerFio: partnerFio ?? null,
+    partnerPhone: partnerPhone ?? null,
     instantEmailStatus: null,
     instantEmailError: null,
   });
@@ -212,7 +220,16 @@ export async function updateSaleFromStatus(userId: string, taskId: number | stri
         if (org?.inn) next.orgInn = org.inn;
       }
     } catch {}
-    if (typeof update.status !== 'undefined' && update.status !== null) next.status = update.status;
+    if (typeof update.status !== 'undefined' && update.status !== null) {
+      const prevStatus = String(next.status || '').toLowerCase();
+      const newStatus = String(update.status || '').toLowerCase();
+      next.status = update.status;
+      const wasPaid = prevStatus === 'paid' || prevStatus === 'transfered' || prevStatus === 'transferred';
+      const nowPaid = newStatus === 'paid' || newStatus === 'transfered' || newStatus === 'transferred';
+      if (!wasPaid && nowPaid && !next.paidAt) {
+        next.paidAt = new Date().toISOString();
+      }
+    }
     // Try to infer root status from textual payloads when available in update (duck-typing)
     try {
       const anyUpd = update as any;

@@ -618,12 +618,21 @@ export default function SalesClient({ initial, hasTokenInitial }: { initial: Sal
             {(() => {
               const fin = String(openSale.status || '').toLowerCase();
               const isFinal = fin === 'paid' || fin === 'transfered' || fin === 'transferred';
-              if (!isFinal) return null;
-              const code = pageCodes[openSale.orderId];
-              return code ? (
-                <a className="block px-3 py-2 text-sm font-medium text-left hover:bg-gray-50 dark:hover:bg-gray-900" href={`/link/s/${encodeURIComponent(code)}`} target="_blank" rel="noreferrer" onClick={() => setMenuOpenId(null)}>Страница продажи</a>
-              ) : (
-                <div className="px-3 py-2 text-sm text-gray-500">Готовим ссылку…</div>
+              return (
+                <>
+                  <a className="block px-3 py-2 text-sm font-medium text-left hover:bg-gray-50 dark:hover:bg-gray-900" href={`/sales/${encodeURIComponent(String(openSale.taskId))}`}>Подробнее</a>
+                  <div className="border-t border-gray-100 dark:border-gray-800" />
+                  {isFinal ? (
+                    (() => {
+                      const code = pageCodes[openSale.orderId];
+                      return code ? (
+                        <a className="block px-3 py-2 text-sm font-medium text-left hover:bg-gray-50 dark:hover:bg-gray-900" href={`/link/s/${encodeURIComponent(code)}`} target="_blank" rel="noreferrer" onClick={() => setMenuOpenId(null)}>Страница продажи</a>
+                      ) : (
+                        <div className="px-3 py-2 text-sm text-gray-500">Готовим ссылку…</div>
+                      );
+                    })()
+                  ) : null}
+                </>
               );
             })()}
             {openSale.hidden ? (
@@ -670,6 +679,8 @@ export default function SalesClient({ initial, hasTokenInitial }: { initial: Sal
                       <IconDotsHorizontal />
                     </Button>
                     <div className={`absolute right-0 mt-2 w-44 bg-white dark:bg-gray-950 border border-gray-200 dark:border-gray-800 rounded shadow-sm z-[9999] ${menuOpenId === s.taskId ? '' : 'hidden'}`}>
+                      <a className="block px-3 py-2 text-sm font-medium text-left hover:bg-gray-50 dark:hover:bg-gray-900" href={`/sales/${encodeURIComponent(String(s.taskId))}`}>Подробнее</a>
+                      <div className="border-t border-gray-100 dark:border-gray-800" />
                       {(() => {
                         const fin = String(s.status || '').toLowerCase();
                         const isFinal = fin === 'paid' || fin === 'transfered' || fin === 'transferred';

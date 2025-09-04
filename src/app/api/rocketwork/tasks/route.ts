@@ -455,6 +455,9 @@ export async function POST(req: Request) {
           return items;
         })(),
         agentDescription: (typeof (body as any)?.agentDescription === 'string' ? (body as any).agentDescription : null) ?? null,
+        partnerPhone: (body.agentSale && typeof (body as any)?.agentPhone === 'string' && (body as any).agentPhone.trim().length > 0) ? String((body as any).agentPhone).trim() : null,
+        // сейчас ФИО не передаётся — оставляем null (можем расширить форму и API позднее)
+        partnerFio: null,
       });
 
       // Removed: prepayment receipt creation and offset scheduling at creation time

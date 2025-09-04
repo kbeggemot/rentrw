@@ -4,29 +4,27 @@ import Link from 'next/link';
 import ProductsTable from './table';
 import { headers } from 'next/headers';
 
-async function makeAbs(path: string): Promise<string> {
+function makeAbs(h: Headers, path: string): string {
   if (/^https?:\/\//i.test(path)) return path;
   const env = process.env.NEXT_PUBLIC_BASE_URL || process.env.API_BASE_URL;
   if (env) return `${env.replace(/\/?$/, '')}${path.startsWith('/') ? path : `/${path}`}`;
-  const h = await headers();
   const host = h.get('x-forwarded-host') || h.get('host') || 'localhost:3000';
-  const proto = h.get('x-forwarded-proto') || 'http';
+  const proto = (h.get('x-forwarded-proto') || 'http').toString();
   return `${proto}://${host}${path.startsWith('/') ? path : `/${path}`}`;
 }
 
-async function fetchProducts() {
-  const h = await headers();
+async function fetchProducts(h: Headers) {
   const cookie = h.get('cookie') || '';
-  const r = await fetch(await makeAbs('/api/products'), { cache: 'no-store', headers: { cookie } });
+  const r = await fetch(makeAbs(h, '/api/products'), { cache: 'no-store', headers: { cookie } });
   try { const j = await r.json(); return j; } catch { return { items: [], categories: [] }; }
 }
 
 export default async function ProductsPage() {
   // SSR token check for banner
   const h = await headers();
-  const tokenHeader = await fetch(await makeAbs('/api/settings/token'), { cache: 'no-store', headers: { cookie: h.get('cookie') || '' } });
+  const tokenHeader = await fetch(makeAbs(h, '/api/settings/token'), { cache: 'no-store', headers: { cookie: h.get('cookie') || '' } });
   let hasToken = false; try { const d = await tokenHeader.json(); hasToken = Boolean(d?.token); } catch {}
-  const data = await fetchProducts();
+  const data = await fetchProducts(h);
   return (
     <div className={hasToken ? "mx-auto w-full max-w-3xl md:max-w-4xl lg:max-w-5xl xl:max-w-6xl 2xl:max-w-7xl pt-0 pb-4" : "max-w-3xl mx-auto pt-0 pb-4"}>
       <div className="flex items-center justify-between mb-4" style={{minHeight: '40px'}}>
