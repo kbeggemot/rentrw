@@ -117,6 +117,10 @@ export default function PublicSuccessUnifiedPage() {
                 const sj = await sres.json();
                 const sl = sj?.sale;
                 if (typeof sl?.isAgent === 'boolean') setIsAgent(Boolean(sl.isAgent));
+                try {
+                  const items = Array.isArray(sl?.itemsSnapshot) ? (sl.itemsSnapshot as any[]).map((i:any)=> ({ title: String(i?.title||''), qty: Number(i?.qty||1) })) : null;
+                  if (items && items.length > 0) setSummary((prev)=> ({ ...(prev||{}), items }));
+                } catch {}
                 setReceipts((prev) => ({
                   prepay: (sl?.ofdUrl ?? prev.prepay) || null,
                   full: (sl?.ofdFullUrl ?? prev.full) || null,
@@ -130,6 +134,10 @@ export default function PublicSuccessUnifiedPage() {
                 const sj = await sres.json();
                 const sl = sj?.sale;
                 if (typeof sl?.isAgent === 'boolean') setIsAgent(Boolean(sl.isAgent));
+                try {
+                  const items = Array.isArray(sl?.itemsSnapshot) ? (sl.itemsSnapshot as any[]).map((i:any)=> ({ title: String(i?.title||''), qty: Number(i?.qty||1) })) : null;
+                  if (items && items.length > 0) setSummary((prev)=> ({ ...(prev||{}), items }));
+                } catch {}
                 setReceipts((prev) => ({
                   prepay: (sl?.ofdUrl ?? prev.prepay) || null,
                   full: (sl?.ofdFullUrl ?? prev.full) || null,
