@@ -69,7 +69,7 @@ export async function GET(req: Request) {
           const cooked = rawPhotos.map((ph) => (typeof ph === 'string' && ph.startsWith('.data/'))
             ? `/api/products/${encodeURIComponent(p?.id || '')}?path=${encodeURIComponent(ph)}`
             : ph);
-          return { ...c, photos: cooked, priceCurrent: (p as any)?.price ?? null };
+          return { ...c, photos: cooked, priceCurrent: (p as any)?.price ?? null, instantResult: (p as any)?.instantResult ?? null };
         });
       }
     } catch {}

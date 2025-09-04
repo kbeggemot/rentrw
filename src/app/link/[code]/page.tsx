@@ -874,7 +874,7 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
         <div className="mb-3">
           <label className="block text-sm text-gray-600 mb-1">Ваш email</label>
           <input className="w-full sm:w-80 rounded-lg border px-2 h-9 text-sm bg-white text-black dark:bg-gray-800 dark:text-white placeholder-gray-400 dark:placeholder-gray-400" type="email" inputMode="email" pattern="^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="name@example.com" />
-          <div className="text-xs text-gray-500 mt-1">Отправим чек на эту почту</div>
+          <div className="text-xs text-gray-500 mt-1">{(() => { try { const hasInstant = Array.isArray(data?.cartItems) && (data.cartItems as any[]).some((i: any) => typeof (i as any)?.instantResult === 'string' && (i as any).instantResult.trim().length > 0); if (hasInstant) return (<span>Отправим чек и <b>вашу покупку</b> на эту почту</span>); } catch {} return 'Отправим чек на эту почту'; })()}</div>
         </div>
         <div className="mb-4">
           <label className="block text-sm text-gray-600 mb-1">Способ оплаты</label>
