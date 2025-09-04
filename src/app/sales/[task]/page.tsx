@@ -190,26 +190,23 @@ export default async function SaleDetailsPage(props: { params: Promise<{ task: s
                       <div className="text-gray-500">Почта покупателя</div>
                       <div>{sale.clientEmail || '—'}</div>
                       <div className="text-gray-500"> </div>
-                      <div className="text-gray-500"> </div>
-                      <div className="justify-self-start">
-                        <details>
-                          <summary className="inline-flex items-center justify-start rounded border px-3 h-9 cursor-pointer select-none bg-white text-black border-gray-300 hover:bg-gray-50 dark:bg-gray-950 dark:text-white dark:border-gray-800 [list-style:none] mt-2 w-fit">
-                            Показать результаты
-                          </summary>
-                          <div className="mt-2 rounded border border-gray-200 dark:border-gray-800 p-2 w-full col-span-2">
-                            <div className="grid grid-cols-[12rem_1fr] gap-y-2">
-                              {items
-                                .filter((it:any)=> (typeof it?.instantResult === 'string' && it.instantResult.trim().length>0))
-                                .map((it:any, idx:number)=> (
-                                  <div className="contents" key={idx}>
-                                    <div className="text-gray-500">{it.title || 'Позиция'}</div>
-                                    <div className="whitespace-pre-wrap">{it.instantResult}</div>
-                                  </div>
-                                ))}
-                            </div>
+                      <details className="col-span-2">
+                        <summary className="inline-flex items-center justify-start rounded border px-3 h-9 cursor-pointer select-none bg-white text-black border-gray-300 hover:bg-gray-50 dark:bg-gray-950 dark:text-white dark:border-gray-800 [list-style:none] mt-2 w-fit">
+                          Показать результаты
+                        </summary>
+                        <div className="mt-2 rounded border border-gray-200 dark:border-gray-800 p-2 w-full">
+                          <div className="grid grid-cols-[12rem_1fr] gap-y-2">
+                            {items
+                              .filter((it:any)=> (typeof it?.instantResult === 'string' && it.instantResult.trim().length>0))
+                              .map((it:any, idx:number)=> (
+                                <div className="contents" key={idx}>
+                                  <div className="text-gray-500">{it.title || 'Позиция'}</div>
+                                  <div className="whitespace-pre-wrap">{it.instantResult}</div>
+                                </div>
+                              ))}
                           </div>
-                        </details>
-                      </div>
+                        </div>
+                      </details>
                     </>
                   ) : null}
                 </div>
