@@ -181,16 +181,49 @@ export default async function SaleDetailsPage(props: { params: Promise<{ task: s
                           const map: Record<string, string> = { pending: 'в очереди', sent: 'отправлено', failed: 'ошибка' };
                           const text = map[st] || '—';
                           const dt = (sale as any)?.updatedAt || (sale as any)?.createdAt;
-                          return dt ? `${text} ${new Date(dt).toLocaleDateString('ru-RU', { timeZone: 'Europe/Moscow' })} в ${new Date(dt).toLocaleTimeString('ru-RU', { timeZone: 'Europe/Moscow' })}` : text;
+                          const when = dt ? `${new Date(dt).toLocaleDateString('ru-RU', { timeZone: 'Europe/Moscow' })} в ${new Date(dt).toLocaleTimeString('ru-RU', { timeZone: 'Europe/Moscow' })}` : '';
+                          return (
+                            <>
+                              {`${text}${when ? ' ' + when : ''}`} {hasInstant ? (
+                                <button
+                                  className="text-gray-500 hover:text-gray-700 underline ml-1"
+                                  onClick={async (e) => {
+                                    e.preventDefault();
+                                    if (!confirm('Переотправить письмо выдачи?')) return;
+                                    try {
+                                      const body = new URLSearchParams();
+                                      body.set('userId', String((sale as any).userId || ''));
+                                      body.set('taskId', String(sale.taskId || ''));
+                                      const res = await fetch('/api/admin/actions/instant-resend', { method: 'POST', body, headers: { 'Content-Type': 'application/x-www-form-urlencoded' } });
+                                      const ok = res.ok;
+                                      const el = document.createElement('div');
+                                      el.className = `fixed bottom-4 right-4 z-50 px-4 py-3 rounded-md shadow-lg text-sm ${ok ? 'bg-green-600 text-white' : 'bg-red-600 text-white'}`;
+                                      el.textContent = ok ? 'Письмо переотправлено' : 'Не удалось переотправить';
+                                      document.body.appendChild(el);
+                                      setTimeout(() => el.remove(), 3000);
+                                    } catch {
+                                      const el = document.createElement('div');
+                                      el.className = 'fixed bottom-4 right-4 z-50 px-4 py-3 rounded-md shadow-lg text-sm bg-red-600 text-white';
+                                      el.textContent = 'Не удалось переотправить';
+                                      document.body.appendChild(el);
+                                      setTimeout(() => el.remove(), 3000);
+                                    }
+                                  }}
+                                >
+                                  (переотправить)
+                                </button>
+                              ) : null}
+                            </>
+                          );
                         })()}
                       </div>
                       {(sale as any).instantEmailError ? (<><div className="text-gray-500">Ошибка</div><div>{(sale as any).instantEmailError}</div></>) : null}
                       <div className="text-gray-500">Почта покупателя</div>
                       <div>{sale.clientEmail || '—'}</div>
-                      <div className="text-gray-500">Результат покупки</div>
+                      <div className="text-gray-500"> </div>
                       <div>
                         <details>
-                          <summary className="inline-flex items-center justify-center rounded border px-3 h-9 cursor-pointer select-none bg-white text-black border-gray-300 hover:bg-gray-50 dark:bg-gray-950 dark:text-white dark:border-gray-800 [list-style:none]">
+                          <summary className="inline-flex items-center justify-start rounded border px-3 h-9 cursor-pointer select-none bg-white text-black border-gray-300 hover:bg-gray-50 dark:bg-gray-950 dark:text-white dark:border-gray-800 [list-style:none]">
                             Показать результаты
                           </summary>
                           <div className="mt-2 rounded border border-gray-200 dark:border-gray-800 p-2">
@@ -205,15 +238,7 @@ export default async function SaleDetailsPage(props: { params: Promise<{ task: s
                     </>
                   ) : null}
                 </div>
-                {hasInstant ? (
-                  <div className="mt-2">
-                    <form action={`${typeof window !== 'undefined' ? '' : ''}/api/admin/actions/instant-resend`} method="post">
-                      <input type="hidden" name="userId" defaultValue={(sale as any).userId || ''} />
-                      <input type="hidden" name="taskId" defaultValue={String(sale.taskId || '')} />
-                      <button className="px-3 py-2 border rounded" type="submit">Переотправить письмо выдачи</button>
-                    </form>
-                  </div>
-                ) : null}
+                {/* кнопка переотправки убрана, замена рядом со статусом */}
               </div>
             );
           })()}
