@@ -192,15 +192,20 @@ export default async function SaleDetailsPage(props: { params: Promise<{ task: s
                       <div className="text-gray-500"> </div>
                       <div>
                         <details>
-                          <summary className="inline-flex items-center justify-start rounded border px-3 h-9 cursor-pointer select-none bg-white text-black border-gray-300 hover:bg-gray-50 dark:bg-gray-950 dark:text-white dark:border-gray-800 [list-style:none]">
+                          <summary className="inline-flex items-center justify-start rounded border px-3 h-9 cursor-pointer select-none bg-white text-black border-gray-300 hover:bg-gray-50 dark:bg-gray-950 dark:text-white dark:border-gray-800 [list-style:none] mt-2 w-fit">
                             Показать результаты
                           </summary>
                           <div className="mt-2 rounded border border-gray-200 dark:border-gray-800 p-2">
-                            <ul className="pl-6 [list-style:disc] [text-indent:-1rem]">
-                              {items.filter((it:any)=> (typeof it?.instantResult === 'string' && it.instantResult.trim().length>0)).map((it:any, idx:number)=> (
-                                <li key={idx}><span className="text-gray-500 mr-2">{it.title || 'Позиция'} —</span><span className="whitespace-pre-wrap">{it.instantResult}</span></li>
-                              ))}
-                            </ul>
+                            <div className="grid grid-cols-[12rem_1fr] gap-y-2">
+                              {items
+                                .filter((it:any)=> (typeof it?.instantResult === 'string' && it.instantResult.trim().length>0))
+                                .map((it:any, idx:number)=> (
+                                  <div className="contents" key={idx}>
+                                    <div className="text-gray-500">{it.title || 'Позиция'}</div>
+                                    <div className="whitespace-pre-wrap">{it.instantResult}</div>
+                                  </div>
+                                ))}
+                            </div>
                           </div>
                         </details>
                       </div>
