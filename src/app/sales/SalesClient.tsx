@@ -49,6 +49,26 @@ export default function SalesClient({ initial, hasTokenInitial }: { initial: Sal
     );
   }
 
+  function IconDotsVertical() {
+    return (
+      <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden>
+        <circle cx="8" cy="3" r="1.5" fill="currentColor" />
+        <circle cx="8" cy="8" r="1.5" fill="currentColor" />
+        <circle cx="8" cy="13" r="1.5" fill="currentColor" />
+      </svg>
+    );
+  }
+
+  function IconDotsHorizontal() {
+    return (
+      <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden>
+        <circle cx="3" cy="8" r="1.5" fill="currentColor" />
+        <circle cx="8" cy="8" r="1.5" fill="currentColor" />
+        <circle cx="13" cy="8" r="1.5" fill="currentColor" />
+      </svg>
+    );
+  }
+
   function IconArrowDown() {
     return (
       <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
@@ -647,8 +667,8 @@ export default function SalesClient({ initial, hasTokenInitial }: { initial: Sal
                 <div className="justify-self-end">
                   <div className="relative" data-menu-root>
                     <Button aria-label="Действия" variant="secondary" size="icon" onClick={() => setMenuOpenId((id) => (id === s.taskId ? null : s.taskId))}>
-                      <IconEdit />
-          </Button>
+                      <IconDotsHorizontal />
+                    </Button>
                     <div className={`absolute right-0 mt-2 w-44 bg-white dark:bg-gray-950 border border-gray-200 dark:border-gray-800 rounded shadow-sm z-[9999] ${menuOpenId === s.taskId ? '' : 'hidden'}`}>
                       {(() => {
                         const fin = String(s.status || '').toLowerCase();
@@ -732,7 +752,7 @@ export default function SalesClient({ initial, hasTokenInitial }: { initial: Sal
                 <td className="px-3 py-2">{s.serviceEndDate ? new Date(s.serviceEndDate).toLocaleDateString('ru-RU', { timeZone: 'Europe/Moscow' }) : '-'}</td>
                 <td className="px-1 py-2 text-center">
                   <div className="relative inline-block">
-                    <Button aria-label="Действия" variant="secondary" size="icon" onClick={(ev) => { if (!actionProbeRef.current) { try { actionProbeRef.current = ev.currentTarget as HTMLButtonElement; } catch {} } const r = (ev.currentTarget as HTMLElement).getBoundingClientRect(); setMenuPos({ top: r.bottom + window.scrollY + 8, left: r.right + window.scrollX - 192 }); setMenuOpenId((id) => (id === s.taskId ? null : s.taskId)); void ensurePageCode(s.orderId); }}><IconEdit /></Button>
+                    <Button aria-label="Действия" variant="secondary" size="icon" onClick={(ev) => { if (!actionProbeRef.current) { try { actionProbeRef.current = ev.currentTarget as HTMLButtonElement; } catch {} } const r = (ev.currentTarget as HTMLElement).getBoundingClientRect(); setMenuPos({ top: r.bottom + window.scrollY + 8, left: r.right + window.scrollX - 192 }); setMenuOpenId((id) => (id === s.taskId ? null : s.taskId)); void ensurePageCode(s.orderId); }}><IconDotsHorizontal /></Button>
                   </div>
                 </td>
               </tr>
