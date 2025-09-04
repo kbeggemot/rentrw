@@ -175,18 +175,37 @@ export default async function SaleDetailsPage(props: { params: Promise<{ task: s
                   {hasInstant ? (
                     <>
                       <div className="text-gray-500">Статус письма</div>
-                      <div>{(sale as any).instantEmailStatus || '—'}</div>
+                      <div>
+                        {(() => {
+                          const st = String((sale as any).instantEmailStatus || '').toLowerCase();
+                          const map: Record<string, string> = { pending: 'в очереди', sent: 'отправлено', failed: 'ошибка' };
+                          const text = map[st] || '—';
+                          const dt = (sale as any)?.updatedAt || (sale as any)?.createdAt;
+                          return dt ? `${text} ${new Date(dt).toLocaleDateString('ru-RU', { timeZone: 'Europe/Moscow' })} в ${new Date(dt).toLocaleTimeString('ru-RU', { timeZone: 'Europe/Moscow' })}` : text;
+                        })()}
+                      </div>
                       {(sale as any).instantEmailError ? (<><div className="text-gray-500">Ошибка</div><div>{(sale as any).instantEmailError}</div></>) : null}
                       <div className="text-gray-500">Почта покупателя</div>
                       <div>{sale.clientEmail || '—'}</div>
                       <div className="text-gray-500">Результат покупки</div>
-                      <div className="whitespace-pre-wrap">{items.map((it: any) => (it?.instantResult ? `• ${it.title || 'Позиция'}: ${it.instantResult}` : null)).filter(Boolean).join('\n') || '—'}</div>
+                      <div>
+                        <div className="mt-1 rounded border border-gray-200 dark:border-gray-800 p-2">
+                          <div className="grid grid-cols-[12rem_1fr] gap-y-2">
+                            {items.filter((it:any)=> (typeof it?.instantResult === 'string' && it.instantResult.trim().length>0)).map((it:any, idx:number)=> (
+                              <>
+                                <div key={`t-${idx}`} className="text-gray-500">{it.title || 'Позиция'}</div>
+                                <div key={`v-${idx}`} className="whitespace-pre-wrap">{it.instantResult}</div>
+                              </>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
                     </>
                   ) : null}
                 </div>
                 {hasInstant ? (
                   <div className="mt-2">
-                    <form action="/api/admin/actions/instant-resend" method="post">
+                    <form action={`${typeof window !== 'undefined' ? '' : ''}/api/admin/actions/instant-resend`} method="post">
                       <input type="hidden" name="userId" defaultValue={(sale as any).userId || ''} />
                       <input type="hidden" name="taskId" defaultValue={String(sale.taskId || '')} />
                       <button className="px-3 py-2 border rounded" type="submit">Переотправить письмо выдачи</button>
