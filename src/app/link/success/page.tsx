@@ -223,7 +223,7 @@ export default function PublicSuccessUnifiedPage() {
                   const items = Array.isArray(summary?.items) ? summary!.items! : null;
                   if (items && items.length > 0) {
                     return (
-                      <ul className="list-disc pl-5">
+                      <ul className="pl-6 [list-style:disc] [text-indent:-1rem]">
                         {items.map((it, i) => (
                           <li key={i}>{it.title} — {Number(it.qty||0)} шт.</li>
                         ))}

@@ -190,14 +190,11 @@ export default async function SaleDetailsPage(props: { params: Promise<{ task: s
                       <div className="text-gray-500">Результат покупки</div>
                       <div>
                         <div className="mt-1 rounded border border-gray-200 dark:border-gray-800 p-2">
-                          <div className="grid grid-cols-[12rem_1fr] gap-y-2">
+                          <ul className="pl-6 [list-style:disc] [text-indent:-1rem]">
                             {items.filter((it:any)=> (typeof it?.instantResult === 'string' && it.instantResult.trim().length>0)).map((it:any, idx:number)=> (
-                              <>
-                                <div key={`t-${idx}`} className="text-gray-500">{it.title || 'Позиция'}</div>
-                                <div key={`v-${idx}`} className="whitespace-pre-wrap">{it.instantResult}</div>
-                              </>
+                              <li key={idx}><span className="text-gray-500 mr-2">{it.title || 'Позиция'} —</span><span className="whitespace-pre-wrap">{it.instantResult}</span></li>
                             ))}
-                          </div>
+                          </ul>
                         </div>
                       </div>
                     </>
