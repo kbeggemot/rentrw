@@ -223,11 +223,11 @@ export default function PublicSuccessUnifiedPage() {
                   const items = Array.isArray(summary?.items) ? summary!.items! : null;
                   if (items && items.length > 0) {
                     return (
-                      <ul className="list-disc pl-5">
+                      <div className="space-y-1">
                         {items.map((it, i) => (
-                          <li key={i} className="pl-5 [text-indent:-1rem]">{it.title} — {Number(it.qty||0)} шт.</li>
+                          <div key={i} className="pl-5" style={{ textIndent: '-1.25rem' }}>• {it.title} — {Number(it.qty||0)} шт.</div>
                         ))}
-                      </ul>
+                      </div>
                     );
                   }
                   return (summary?.description || info?.title || '—');
