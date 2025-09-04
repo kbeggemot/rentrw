@@ -833,7 +833,23 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
         <>
         <div className="mb-3">
           <div className="text-sm text-gray-600">За что платим</div>
-          <div className="text-sm">{data.description}</div>
+          <div className="text-sm">
+            {(() => {
+              const items = Array.isArray(data.cartItems) ? (data.cartItems as any[]) : null;
+              if (items && items.length > 0) {
+                return (
+                  <div className="space-y-1">
+                    {items.map((it: any, i: number) => (
+                      <div key={i} className="relative before:content-['•'] before:absolute before:-left-5">
+                        {String(it?.title || '')} — {Number(it?.qty || 0)} шт.
+                      </div>
+                    ))}
+                  </div>
+                );
+              }
+              return (data.description || '—');
+            })()}
+          </div>
         </div>
         <div className="mb-3">
           <label className="block text-sm text-gray-600 mb-1">Сумма, ₽</label>
