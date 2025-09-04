@@ -185,7 +185,8 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
   const [receipts, setReceipts] = useState<{ prepay?: string | null; full?: string | null; commission?: string | null; npd?: string | null }>({});
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [isFinal, setIsFinal] = useState(false);
-  const [summary, setSummary] = useState<{ amountRub?: number; description?: string | null; createdAt?: string | null } | null>(null);
+  const [summary, setSummary] = useState<{ amountRub?: number; description?: string | null; createdAt?: string | null; items?: Array<{ title: string; qty: number }> | null } | null>(null);
+  const [isSalePage, setIsSalePage] = useState(false);
 
   const pollRef = useRef<number | null>(null);
   const payUrlPollRef = useRef<number | null>(null);
@@ -219,6 +220,7 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
           const d = await r1.json();
           const userId: string | undefined = d?.userId;
           const sale = d?.sale;
+          setIsSalePage(true);
           if (userId) {
             setData((prev) => (prev || { code, userId, title: '', description: '' } as any));
             // Проверяем наличие активного токена организации для оплаты
@@ -264,6 +266,22 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
             setSummaryFromSale(sale);
             // Open details automatically for sale pages to show success-like panel
             setDetailsOpen(true);
+            try {
+              const st = String(sale?.status || '').toLowerCase();
+              if (st && ['paid','transfered','transferred'].includes(st)) setIsFinal(true);
+            } catch {}
+            // Подтянем itemsSnapshot из локального стора продаж
+            try {
+              if (userId && sale.taskId != null) {
+                const sres = await fetch(`/api/sales/by-task/${encodeURIComponent(String(sale.taskId))}`, { cache: 'no-store', headers: { 'x-user-id': userId } as any });
+                if (sres.ok) {
+                  const sj = await sres.json();
+                  const sl = sj?.sale;
+                  const items = Array.isArray(sl?.itemsSnapshot) ? (sl.itemsSnapshot as any[]).map((i: any) => ({ title: String(i?.title || ''), qty: Number(i?.qty || 1) })) : null;
+                  if (items && items.length > 0) setSummary((prev) => ({ ...(prev || {}), items }));
+                }
+              }
+            } catch {}
           }
         } else {
           throw new Error('not_sale_page');
@@ -311,7 +329,8 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
 
   function setSummaryFromSale(sale: any) {
     try {
-      setSummary({ amountRub: sale.amountRub, description: sale.description, createdAt: sale.createdAt });
+      const items = Array.isArray(sale?.itemsSnapshot) ? (sale.itemsSnapshot as any[]).map((i: any) => ({ title: String(i?.title || ''), qty: Number(i?.qty || 1) })) : null;
+      setSummary({ amountRub: sale.amountRub, description: sale.description, createdAt: sale.createdAt, items });
       setReceipts({ prepay: sale.ofdUrl || null, full: sale.ofdFullUrl || null, commission: sale.commissionUrl || null, npd: sale.npdReceiptUri || null });
       if (typeof sale?.isAgent === 'boolean') setData((prev) => (prev ? { ...prev, isAgent: Boolean(sale.isAgent) } as any : prev));
     } catch {}
@@ -475,6 +494,10 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
             saleFull = sl?.ofdFullUrl ?? null;
             saleCom = sl?.additionalCommissionOfdUrl ?? null;
             saleNpd = sl?.npdReceiptUri ?? null;
+            try {
+              const items = Array.isArray(sl?.itemsSnapshot) ? (sl.itemsSnapshot as any[]).map((i: any) => ({ title: String(i?.title || ''), qty: Number(i?.qty || 1) })) : null;
+              if (items && items.length > 0) setSummary((prev) => ({ ...(prev || {}), items }));
+            } catch {}
           }
         } catch {}
         const pre = (salePre ?? rwPre ?? null) as string | null;
@@ -903,6 +926,28 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
                   <div className="mt-1 p-2">
                     <div className="text-green-700 font-medium mb-2">Успешно оплачено</div>
                     <div className="grid grid-cols-[9rem_1fr] gap-y-2">
+                      {isSalePage ? (
+                        <>
+                          <div className="text-gray-500">За что платим</div>
+                          <div>
+                            {(() => {
+                              const items = Array.isArray(summary?.items) ? summary!.items! : null;
+                              if (items && items.length > 0) {
+                                return (
+                                  <div className="space-y-1">
+                                    {items.map((it, i) => (
+                                      <div key={i} className="relative before:content-['•'] before:absolute before:-left-5">
+                                        {it.title} — {Number(it.qty || 0)} шт.
+                                      </div>
+                                    ))}
+                                  </div>
+                                );
+                              }
+                              return (summary?.description || data?.title || '—');
+                            })()}
+                          </div>
+                        </>
+                      ) : null}
                       {/* Покупка: всегда показываем строку, пока нет ссылки — «Подгружаем…» */}
                       <>
                         <div className="text-gray-500">Чек на покупку</div>
