@@ -48,7 +48,8 @@ export type SaleRecord = {
   invoiceIdFull?: string | null;
   // Snapshot of items at creation (prices already adjusted if agent commission applies)
   // id is optional to allow mapping to product metadata; vat is stored to freeze tax at sale time
-  itemsSnapshot?: Array<{ id?: string | null; title: string; price: number; qty: number; vat?: 'none' | '0' | '5' | '7' | '10' | '20' }> | null;
+  // instantResult is captured to reflect instant delivery status in UI at the time of sale
+  itemsSnapshot?: Array<{ id?: string | null; title: string; price: number; qty: number; vat?: 'none' | '0' | '5' | '7' | '10' | '20'; instantResult?: string | null }> | null;
   agentDescription?: string | null; // description text used for agent line
   partnerFio?: string | null;
   partnerPhone?: string | null;
@@ -180,10 +181,12 @@ export async function recordSaleOnCreate(params: {
     invoiceIdOffset,
     invoiceIdFull,
     itemsSnapshot: Array.isArray(cartItems) ? cartItems.map((i) => {
-      const raw = (i as any)?.vat;
-      const v = typeof raw === 'string' ? raw : undefined;
+      const rawVat = (i as any)?.vat;
+      const v = typeof rawVat === 'string' ? rawVat : undefined;
       const vatSanitized = (v && ['none','0','5','7','10','20'].includes(v)) ? (v as any) : undefined;
-      return { id: (i as any)?.id ?? null, title: String(i.title || ''), price: Number(i.price || 0), qty: Number(i.qty || 1), ...(vatSanitized ? { vat: vatSanitized as any } : {}) };
+      const iraw = (i as any)?.instantResult;
+      const instant = typeof iraw === 'string' && iraw.trim().length > 0 ? iraw : null;
+      return { id: (i as any)?.id ?? null, title: String(i.title || ''), price: Number(i.price || 0), qty: Number(i.qty || 1), ...(vatSanitized ? { vat: vatSanitized as any } : {}), ...(instant ? { instantResult: String(instant) } : {}) };
     }) : null,
     agentDescription: agentDescription ?? null,
     partnerFio: partnerFio ?? null,
