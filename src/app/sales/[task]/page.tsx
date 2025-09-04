@@ -190,7 +190,7 @@ export default async function SaleDetailsPage(props: { params: Promise<{ task: s
                       <div className="text-gray-500">Почта покупателя</div>
                       <div>{sale.clientEmail || '—'}</div>
                       <div className="text-gray-500"> </div>
-                      <div className="place-self-start">
+                      <div className="justify-self-start col-start-2">
                         <details>
                           <summary className="inline-flex items-center justify-start rounded border px-3 h-9 cursor-pointer select-none bg-white text-black border-gray-300 hover:bg-gray-50 dark:bg-gray-950 dark:text-white dark:border-gray-800 [list-style:none] mt-2 w-fit">
                             Показать результаты
