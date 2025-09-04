@@ -227,7 +227,7 @@ export default function PublicSuccessUnifiedPage() {
                         {items.map((it, i) => (
                           <div
                             key={i}
-                            className="relative pl-6 before:content-['•'] before:absolute before:-left-4"
+                            className="relative before:content-['•'] before:absolute before:-left-5"
                           >
                             {it.title} — {Number(it.qty||0)} шт.
                           </div>
