@@ -94,7 +94,7 @@ export default function PermanentSaleRedirect(props: { params: Promise<{ code?: 
           <div>{summary?.createdAt ? new Date(summary.createdAt).toLocaleString('ru-RU', { timeZone: 'Europe/Moscow' }) : '—'}</div>
           <div className="text-gray-600 dark:text-gray-400">Чек на покупку</div>
           {(receipts.full || receipts.prepay) ? (
-            <a className="text-blue-700 dark:text-blue-300 font-semibold hover:underline" href={(receipts.full || receipts.prepay)!} target="_blank" rel="noreferrer">Открыть</a>
+            <a className="text-black dark:text-white font-semibold hover:underline" href={(receipts.full || receipts.prepay)!} target="_blank" rel="noreferrer">Открыть</a>
           ) : (
             <div className="text-gray-700 dark:text-gray-300">Подтягиваем данные{dots}</div>
           )}
@@ -103,7 +103,7 @@ export default function PermanentSaleRedirect(props: { params: Promise<{ code?: 
           <div className="grid grid-cols-[9rem_1fr] gap-y-2 text-gray-900 dark:text-gray-100">
             <div className="text-gray-600 dark:text-gray-400">Чек на комиссию</div>
             {receipts.commission ? (
-              <a className="text-blue-700 dark:text-blue-300 font-semibold hover:underline" href={receipts.commission!} target="_blank" rel="noreferrer">Открыть</a>
+              <a className="text-black dark:text-white font-semibold hover:underline" href={receipts.commission!} target="_blank" rel="noreferrer">Открыть</a>
             ) : (
               <div className="text-gray-700 dark:text-gray-300">Подтягиваем данные{dots}</div>
             )}
