@@ -36,7 +36,7 @@ type BodyIn = {
   commissionType?: 'percent' | 'fixed';
   commissionValue?: number; // percent or fixed rubles depending on commissionType
   serviceEndDate?: string; // YYYY-MM-DD
-  cartItems?: Array<{ id?: string | null; title: string; price: number; qty: number }> | null;
+  cartItems?: Array<{ id?: string | null; title: string; price: number; qty: number; vat?: string }> | null;
   agentDescription?: string | null;
 };
 
@@ -159,13 +159,32 @@ export async function POST(req: Request) {
       } catch {}
     }
     // Cart mode: when positions are provided, description is not required
-    const rawCart: Array<{ id?: string | null; title: string; price: number; qty: number }> | null = Array.isArray((body as any)?.cartItems) ? (body as any).cartItems : null;
+    const rawCart: Array<{ id?: string | null; title: string; price: number; qty: number; vat?: string }> | null = Array.isArray((body as any)?.cartItems) ? (body as any).cartItems : null;
     if (rawCart && rawCart.length > 0) {
-      const normalized = rawCart
-        .map((c: any) => ({ id: c?.id ?? null, title: String(c?.title || ''), price: Number(c?.price || 0), qty: Number(c?.qty || 0) }))
+      let normalized = rawCart
+        .map((c: any) => ({ id: c?.id ?? null, title: String(c?.title || ''), price: Number(c?.price || 0), qty: Number(c?.qty || 0), vat: (['none','0','5','7','10','20'].includes(String(c?.vat)) ? String(c?.vat) : undefined) }))
         .filter((c) => c.title.trim().length > 0 && Number.isFinite(c.price) && Number.isFinite(c.qty) && c.price > 0 && c.qty > 0);
       if (normalized.length === 0) {
         return NextResponse.json({ error: 'CART_EMPTY' }, { status: 400 });
+      }
+      // Enrich with instantResult from product catalog at the moment of sale
+      try {
+        const inn = orgInn && String(orgInn).replace(/\D/g, '');
+        if (inn) {
+          const catalog = await listProductsForOrg(inn);
+          normalized = normalized.map((it) => {
+            const prod = catalog.find((p) => (it.id && String(p.id) === String(it.id)) || (p.title && String(p.title).toLowerCase() === it.title.toLowerCase())) as any || null;
+            const instant = (prod?.instantResult && String(prod.instantResult).trim().length > 0) ? String(prod.instantResult).trim() : undefined;
+            return instant ? { ...it, instantResult: instant } : it;
+          }) as any;
+        }
+      } catch {}
+      // If agent sale with commission: adjust prices but keep metadata (vat, id, instantResult)
+      if (body.agentSale && body.commissionType && typeof body.commissionValue === 'number') {
+        try {
+          const adjusted = applyAgentCommissionToCart(normalized.map((n:any)=>({ title: n.title, price: n.price, qty: n.qty })), body.commissionType, Number(body.commissionValue)).adjusted;
+          normalized = normalized.map((n, i) => ({ ...n, price: adjusted[i]?.price ?? n.price }));
+        } catch {}
       }
       (body as any).cartItems = normalized;
     } else {
@@ -446,14 +465,7 @@ export async function POST(req: Request) {
         commissionValue: commissionValueForRecord,
         serviceEndDate: typeof (body as any)?.serviceEndDate === 'string' ? (body as any).serviceEndDate : undefined,
         vatRate: vatRate || undefined,
-        cartItems: (() => {
-          const items = Array.isArray((body as any)?.cartItems) ? (body as any).cartItems : null;
-          if (!items) return null;
-          if (body.agentSale && body.commissionType && typeof body.commissionValue === 'number') {
-            try { return applyAgentCommissionToCart(items, body.commissionType, Number(body.commissionValue)).adjusted; } catch { return items; }
-          }
-          return items;
-        })(),
+        cartItems: (Array.isArray((body as any)?.cartItems) ? (body as any).cartItems : null) as any,
         agentDescription: (typeof (body as any)?.agentDescription === 'string' ? (body as any).agentDescription : null) ?? null,
         partnerPhone: (body.agentSale && typeof (body as any)?.agentPhone === 'string' && (body as any).agentPhone.trim().length > 0) ? String((body as any).agentPhone).trim() : null,
         // сейчас ФИО не передаётся — оставляем null (можем расширить форму и API позднее)

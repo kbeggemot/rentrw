@@ -1,5 +1,6 @@
 import { headers } from 'next/headers';
 import { findSaleByTaskId } from '@/server/taskStore';
+import { listProductsForOrg } from '@/server/productsStore';
 
 export const runtime = 'nodejs';
 
@@ -35,6 +36,14 @@ async function fetchSale(task: string) {
 export default async function SaleDetailsPage(props: { params: Promise<{ task: string }> }) {
   const p = await props.params;
   const sale = await fetchSale(p.task);
+  // Preload products for VAT resolution if we have orgInn
+  let productsForVat: Array<{ id: string; title: string; vat: any }> = [];
+  try {
+    const inn = sale && (sale as any).orgInn ? String((sale as any).orgInn).replace(/\D/g, '') : '';
+    if (inn) {
+      productsForVat = await listProductsForOrg(inn);
+    }
+  } catch {}
 
   return (
     <div className="max-w-3xl mx-auto pt-0 pb-4">
@@ -96,12 +105,26 @@ export default async function SaleDetailsPage(props: { params: Promise<{ task: s
               const rows: Array<{ title: string; qty: number; price: number; vat: string }> = (() => {
                 const snapshot = Array.isArray(sale.itemsSnapshot) ? sale.itemsSnapshot : null;
                 if (snapshot && snapshot.length > 0) {
-                  return snapshot.map((it: any) => ({
-                    title: String(it?.title || ''),
-                    qty: Number(it?.qty || 1),
-                    price: Number(it?.price || 0),
-                    vat: '—',
-                  }));
+                  const saleVat = String(((sale as any).vatRate ?? 'none'));
+                  const fmtVat = (code: string | null | undefined) => {
+                    const c = String(code ?? '').trim();
+                    if (c === 'none') return 'Без НДС';
+                    return /^\d+$/.test(c) ? `${c}%` : '—';
+                  };
+                  return snapshot.map((it: any) => {
+                    const title = String(it?.title || '');
+                    const id = (it as any)?.id != null ? String((it as any).id) : null;
+                    // Prefer VAT captured at sale time in snapshot; fallback to product VAT, else to saleVat
+                    const snapVat = (['none','0','5','7','10','20'].includes(String((it as any)?.vat)) ? String((it as any).vat) : undefined) as any;
+                    const prod = productsForVat.find((p) => (id && String(p.id) === id) || (p.title && title && String(p.title).toLowerCase() === title.toLowerCase())) as any || null;
+                    const vatCode = (sale as any).isAgent ? 'none' : (snapVat || (prod?.vat as any) || saleVat);
+                    return {
+                      title,
+                      qty: Number(it?.qty || 1),
+                      price: Number(it?.price || 0),
+                      vat: fmtVat(vatCode as any),
+                    };
+                  });
                 }
                 const title = String((sale as any).description || 'Свободная услуга');
                 const gross = Number((sale as any).amountGrossRub || 0);

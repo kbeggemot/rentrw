@@ -47,8 +47,8 @@ export type SaleRecord = {
   invoiceIdOffset?: string | null;
   invoiceIdFull?: string | null;
   // Snapshot of items at creation (prices already adjusted if agent commission applies)
-  // id is optional to allow mapping to product metadata (unit/kind/vat)
-  itemsSnapshot?: Array<{ id?: string | null; title: string; price: number; qty: number }> | null;
+  // id is optional to allow mapping to product metadata; vat is stored to freeze tax at sale time
+  itemsSnapshot?: Array<{ id?: string | null; title: string; price: number; qty: number; vat?: 'none' | '0' | '5' | '7' | '10' | '20' }> | null;
   agentDescription?: string | null; // description text used for agent line
   partnerFio?: string | null;
   partnerPhone?: string | null;
@@ -104,7 +104,7 @@ export async function recordSaleOnCreate(params: {
   commissionValue?: number;
   serviceEndDate?: string;
   vatRate?: string;
-  cartItems?: Array<{ id?: string | null; title: string; price: number; qty: number }> | null;
+  cartItems?: Array<{ id?: string | null; title: string; price: number; qty: number; vat?: string }> | null;
   agentDescription?: string | null;
   partnerFio?: string | null;
   partnerPhone?: string | null;
@@ -179,7 +179,12 @@ export async function recordSaleOnCreate(params: {
     invoiceIdPrepay,
     invoiceIdOffset,
     invoiceIdFull,
-    itemsSnapshot: Array.isArray(cartItems) ? cartItems.map((i) => ({ id: (i as any)?.id ?? null, title: String(i.title || ''), price: Number(i.price || 0), qty: Number(i.qty || 1) })) : null,
+    itemsSnapshot: Array.isArray(cartItems) ? cartItems.map((i) => {
+      const raw = (i as any)?.vat;
+      const v = typeof raw === 'string' ? raw : undefined;
+      const vatSanitized = (v && ['none','0','5','7','10','20'].includes(v)) ? (v as any) : undefined;
+      return { id: (i as any)?.id ?? null, title: String(i.title || ''), price: Number(i.price || 0), qty: Number(i.qty || 1), ...(vatSanitized ? { vat: vatSanitized as any } : {}) };
+    }) : null,
     agentDescription: agentDescription ?? null,
     partnerFio: partnerFio ?? null,
     partnerPhone: partnerPhone ?? null,
