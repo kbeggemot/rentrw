@@ -432,6 +432,73 @@ export async function POST(req: Request) {
         updatedAt: new Date().toISOString(),
       };
       await upsertPartner(userId, next);
+
+      // Дополнительный триггер: если у агента INN появился позже, попробуем создать чеки по уже оплаченным продажам
+      try {
+        const phoneDigits = String(phone || '').replace(/\D/g, '');
+        const innNow = typeof inn === 'string' && inn.trim().length > 0 ? inn.trim() : null;
+        if (innNow) {
+          const { listSales, updateSaleOfdUrlsByOrderId } = await import('@/server/taskStore');
+          const sales = await listSales(userId);
+          const targets = sales.filter((s: any) => {
+            const sPhone = String(s?.partnerPhone || '').replace(/\D/g, '');
+            const st = String(s?.status || '').toLowerCase();
+            const fin = st === 'paid' || st === 'transfered' || st === 'transferred';
+            // ещё не создан ни предоплатный, ни полный чек для партнёра
+            const noUrls = !(s?.ofdUrl) && !(s?.ofdFullUrl);
+            return Boolean(s?.isAgent) && sPhone && sPhone === phoneDigits && fin && noUrls;
+          });
+          if (targets.length > 0) {
+            const baseUrl = process.env.FERMA_BASE_URL || 'https://ferma.ofd.ru/';
+            const tokenOfd = await fermaGetAuthTokenCached(process.env.FERMA_LOGIN || '', process.env.FERMA_PASSWORD || '', { baseUrl });
+            const rawProto = req.headers.get('x-forwarded-proto') || 'http';
+            const hostHdr = req.headers.get('x-forwarded-host') || req.headers.get('host') || 'localhost:3000';
+            const isPublicHost = !/localhost|127\.0\.0\.1|(^10\.)|(^192\.168\.)/.test(hostHdr);
+            const protoHdr = (rawProto === 'http' && isPublicHost) ? 'https' : rawProto;
+            const secret = process.env.OFD_CALLBACK_SECRET || '';
+            const callbackBase = `${protoHdr}://${hostHdr}`;
+            for (const sale of targets) {
+              try {
+                const amountRub = Number(sale.amountGrossRub || 0);
+                const retained = Number(sale.retainedCommissionRub || 0);
+                const amountNet = Math.max(0, amountRub - retained);
+                const usedVat = (sale.vatRate || 'none') as any;
+                const createdAt = (sale as any).createdAtRw || (sale as any).createdAt;
+                const createdDate = createdAt ? String(createdAt).slice(0, 10) : null;
+                const endDate = sale.serviceEndDate || null;
+                const isToday = Boolean(createdDate && endDate && createdDate === endDate);
+                const callbackUrl = `${callbackBase}/api/ofd/ferma/callback${secret ? `?secret=${encodeURIComponent(secret)}&` : '?'}uid=${encodeURIComponent(userId)}`;
+                const itemsParam = await (async ()=>{ try { const snap = (sale as any)?.itemsSnapshot as any[] | null; if (!Array.isArray(snap) || snap.length === 0) return undefined; const orgInn = (sale as any)?.orgInn ? String((sale as any).orgInn).replace(/\D/g,'') : undefined; const products = orgInn ? await listProductsForOrg(orgInn) : []; return snap.map((it:any)=>{ const prod = products.find((p)=> (p.id && it?.id && String(p.id)===String(it.id)) || (p.title && it?.title && String(p.title).toLowerCase()===String(it.title).toLowerCase())) || null; const snapVat = (['none','0','5','7','10','20'].includes(String(it?.vat)) ? String(it.vat) : undefined) as any; return { label: String(it.title||''), price: Number(it.price||0), qty: Number(it.qty||1), vatRate: (snapVat || (prod?.vat as any) || (usedVat as any)), unit: (prod?.unit as any), kind: (prod?.kind as any) } as any; }); } catch { return undefined; } })();
+                const defaultEmail = process.env.OFD_DEFAULT_EMAIL || process.env.DEFAULT_RECEIPT_EMAIL || 'ofd@rockethumans.com';
+                if (isToday) {
+                  let invoiceIdFull = (sale as any).invoiceIdFull || null;
+                  if (!invoiceIdFull) {
+                    try { const num = Number(String(sale.orderId).match(/(\d+)/g)?.slice(-1)[0] || NaN); invoiceIdFull = await getInvoiceIdForFull(num); } catch {}
+                  }
+                  if (invoiceIdFull) {
+                    const payload = buildFermaReceiptPayload({ party: 'partner', partyInn: innNow, description: 'Оплата услуг', amountRub: amountNet, vatRate: usedVat, methodCode: PAYMENT_METHOD_FULL_PAYMENT, orderId: sale.orderId, docType: 'Income', buyerEmail: sale.clientEmail || defaultEmail, invoiceId: invoiceIdFull, callbackUrl, paymentAgentInfo: { AgentType: 'AGENT', SupplierInn: innNow, SupplierName: 'Исполнитель' }, items: itemsParam });
+                    const created = await fermaCreateReceipt(payload, { baseUrl, authToken: tokenOfd });
+                    const numOrder = Number(String(sale.orderId).match(/(\d+)/g)?.slice(-1)[0] || NaN);
+                    await updateSaleOfdUrlsByOrderId(userId, numOrder, { ofdFullId: created.id || null });
+                  }
+                } else {
+                  let invoiceIdPrepay = (sale as any).invoiceIdPrepay || null;
+                  if (!invoiceIdPrepay) {
+                    try { const num = Number(String(sale.orderId).match(/(\d+)/g)?.slice(-1)[0] || NaN); invoiceIdPrepay = await getInvoiceIdForPrepay(num); } catch {}
+                  }
+                  if (invoiceIdPrepay) {
+                    const payload = buildFermaReceiptPayload({ party: 'partner', partyInn: innNow, description: 'Оплата услуг', amountRub: amountNet, vatRate: usedVat, methodCode: PAYMENT_METHOD_PREPAY_FULL, orderId: sale.orderId, docType: 'IncomePrepayment', buyerEmail: sale.clientEmail || defaultEmail, invoiceId: invoiceIdPrepay, callbackUrl, withPrepaymentItem: true, paymentAgentInfo: { AgentType: 'AGENT', SupplierInn: innNow, SupplierName: 'Исполнитель' }, items: itemsParam });
+                    const created = await fermaCreateReceipt(payload, { baseUrl, authToken: tokenOfd });
+                    const numOrder = Number(String(sale.orderId).match(/(\d+)/g)?.slice(-1)[0] || NaN);
+                    await updateSaleOfdUrlsByOrderId(userId, numOrder, { ofdPrepayId: created.id || null });
+                  }
+                }
+              } catch {}
+            }
+          }
+        }
+      } catch {}
+
       return NextResponse.json({ ok: true });
     }
 
