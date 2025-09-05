@@ -83,6 +83,8 @@ export default async function SaleDetailsPage(props: { params: Promise<{ task: s
               <div>{sale.serviceEndDate ? new Date(sale.serviceEndDate).toLocaleDateString('ru-RU', { timeZone: 'Europe/Moscow' }) : '-'}</div>
               <div className="text-gray-500">Почта покупателя</div>
               <div>{sale.clientEmail || '-'}</div>
+              <div className="text-gray-500">Продажа в telegram</div>
+              <div>{(sale as any).payerTgId ? String((sale as any).payerTgId) : '—'}</div>
             </div>
           </div>
 

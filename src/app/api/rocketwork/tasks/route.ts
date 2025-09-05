@@ -457,6 +457,7 @@ export async function POST(req: Request) {
         orderId,
         orgInn: orgInn ?? null,
         rwTokenFp: fingerprint ?? null,
+        payerTgId: (typeof (body as any)?.payerTgId === 'string' && (body as any).payerTgId.trim().length > 0) ? String((body as any).payerTgId).trim() : null,
         clientEmail,
         description,
         amountGrossRub: amountRub,
