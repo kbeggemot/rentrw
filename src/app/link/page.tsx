@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Button } from '@/components/ui/Button';
 
 export default function LinksStandalonePage() {
@@ -14,6 +15,24 @@ export default function LinksStandalonePage() {
 
   const [links, setLinks] = useState<Array<{ code: string; title: string; createdAt?: string }>>([]);
   const [linksOpen, setLinksOpen] = useState(true);
+  const [menuOpenCode, setMenuOpenCode] = useState<string | null>(null);
+  const [menuPos, setMenuPos] = useState<{ top: number; left: number } | null>(null);
+
+  // Глобальное закрытие контекстного меню по клику вне
+  useEffect(() => {
+    const close = (e: Event) => {
+      const target = e.target as HTMLElement | null;
+      if (target && target.closest('[data-menu-root]')) return;
+      setMenuOpenCode(null);
+      setMenuPos(null);
+    };
+    document.addEventListener('mousedown', close, true);
+    document.addEventListener('touchstart', close, true);
+    return () => {
+      document.removeEventListener('mousedown', close, true);
+      document.removeEventListener('touchstart', close, true);
+    };
+  }, []);
 
   const refreshLinks = async () => {
     try {
@@ -86,28 +105,33 @@ export default function LinksStandalonePage() {
                   {links.map((l) => (
                     <div key={l.code} className="flex items-center justify-between px-3 py-2">
                       <div className="text-sm"><a className="text-black dark:text-white font-semibold hover:underline" href={`/link/${encodeURIComponent(l.code)}`} target="_blank" rel="noreferrer">{l.title || l.code}</a></div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 relative">
                         {/* tail preview of the URL as plain text */}
                         <div className="text-sm text-gray-600 dark:text-gray-400">/{l.code}</div>
-                        {/* edit icon styled like neighbors */}
-                        <a href={`/link/${encodeURIComponent(l.code)}/edit`} className="inline-flex items-center justify-center rounded-lg text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 p-1 h-9 w-9 bg-gray-200 text-gray-900 hover:bg-gray-300 dark:bg-gray-800 dark:text-gray-100 dark:hover:bg-gray-700 focus:ring-gray-400" aria-label="Редактировать">
-                          <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                            <path d="M3 10l7-7 3 3-7 7H3v-3z" />
-                          </svg>
-                        </a>
                         <Button variant="secondary" size="icon" aria-label="Скопировать ссылку" onClick={async () => { try { await navigator.clipboard.writeText(new URL(`/link/${encodeURIComponent(l.code)}`, window.location.origin).toString()); showToast('Ссылка скопирована', 'success'); } catch {} }}>
                           <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
                             <rect x="6" y="3" width="7" height="9" rx="1" />
                             <rect x="3" y="6" width="7" height="9" rx="1" />
                           </svg>
                         </Button>
-                        <Button variant="secondary" size="icon" aria-label="Удалить ссылку" onClick={async () => { if (!confirm('Удалить ссылку?')) return; try { await fetch(`/api/links/${encodeURIComponent(l.code)}`, { method: 'DELETE' }); setLinks((prev) => prev.filter((x) => x.code !== l.code)); } catch {} }}>
+                        <Button asChild variant="secondary" size="icon" aria-label="Открыть в Telegram">
+                          <a href={`https://t.me/yplaru_bot/link?startapp=${encodeURIComponent(l.code)}`} target="_blank" rel="noreferrer">
+                            {/* paper plane icon */}
+                            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                              <path d="M22 2L11 13" />
+                              <path d="M22 2l-7 20-4-9-9-4 20-7z" />
+                            </svg>
+                          </a>
+                        </Button>
+                        {/* kebab menu for edit/delete */}
+                        <Button variant="secondary" size="icon" aria-label="Действия" onClick={(ev) => { const r = (ev.currentTarget as HTMLElement).getBoundingClientRect(); setMenuPos({ top: r.bottom + 8, left: r.right - 192 }); setMenuOpenCode((prev) => (prev === l.code ? null : l.code)); }}>
                           <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                            <path d="M3 5l1 9h8l1-9" />
-                            <path d="M2 5h12" />
-                            <path d="M6 5V3h4v2" />
+                            <circle cx="3" cy="8" r="1" />
+                            <circle cx="8" cy="8" r="1" />
+                            <circle cx="13" cy="8" r="1" />
                           </svg>
                         </Button>
+                        {/* Меню рендерим через портал, чтобы не обрезалось контейнером */}
                       </div>
                     </div>
                   ))}
@@ -117,6 +141,25 @@ export default function LinksStandalonePage() {
           ) : null}
         </div>
       </div>
+      {/* Портал для выпадающего меню, как на продажах */}
+      {menuOpenCode && menuPos ? createPortal(
+        <div className="fixed z-[10000]" style={{ top: menuPos.top, left: menuPos.left, width: 192 }} data-menu-root>
+          <div className="w-48 bg-white dark:bg-gray-950 border border-gray-200 dark:border-gray-800 rounded shadow-sm">
+            <a
+              href={`/link/${encodeURIComponent(menuOpenCode)}/edit`}
+              className="block px-3 py-2 text-sm font-medium text-left hover:bg-gray-50 dark:hover:bg-gray-900"
+              onClick={() => setMenuOpenCode(null)}
+            >Редактировать</a>
+            <button
+              className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 dark:hover:bg-gray-900"
+              onClick={async () => {
+                const code = menuOpenCode; setMenuOpenCode(null);
+                if (!confirm('Удалить ссылку?')) return;
+                try { await fetch(`/api/links/${encodeURIComponent(code)}`, { method: 'DELETE' }); setLinks((prev) => prev.filter((x) => x.code !== code)); } catch {}
+              }}
+            >Удалить</button>
+          </div>
+        </div>, document.body) : null}
       {toast ? (
         <div className={`fixed bottom-4 right-4 z-50 px-4 py-3 rounded-md shadow-lg text-sm flex items-center gap-3 ${toast.kind === 'success' ? 'bg-green-600 text-white' : toast.kind === 'error' ? 'bg-red-600 text-white' : 'bg-gray-900 text-white'}`}>
           <div>{toast.msg}</div>
