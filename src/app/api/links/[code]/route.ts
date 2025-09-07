@@ -218,7 +218,7 @@ export async function PUT(req: Request) {
         if (!(total >= MIN_AMOUNT_RUB)) return NextResponse.json({ error: 'MIN_10' }, { status: 400 });
       }
       const startEmptyCart = !!body?.startEmptyCart;
-      const updated = await updatePaymentLink(userId, code, { title, cartItems: normalized as any, allowCartAdjust, startEmptyCart, amountRub: total, method, isAgent, commissionType: commissionType as any, commissionValue: commissionValue ?? undefined, partnerPhone, cartDisplay: cartDisplay as any });
+      const updated = await updatePaymentLink(userId, code, { title, cartItems: normalized as any, allowCartAdjust, startEmptyCart, amountRub: total, method, isAgent, commissionType: commissionType as any, commissionValue: commissionValue ?? undefined, partnerPhone, cartDisplay: cartDisplay as any, disabled: typeof (body as any)?.disabled === 'boolean' ? Boolean((body as any).disabled) : undefined });
       if (!updated) return NextResponse.json({ error: 'NOT_FOUND' }, { status: 404 });
       return NextResponse.json({ ok: true, item: updated });
     }
