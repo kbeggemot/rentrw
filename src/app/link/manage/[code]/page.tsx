@@ -15,13 +15,15 @@ async function getLink(code: string) {
   return d;
 }
 
-async function getSales(code: string, page: number) {
+async function getSales(code: string, page: number, userId?: string) {
   const h = await headers();
   const cookie = h.get('cookie') || '';
   const host = h.get('x-forwarded-host') || h.get('host') || '';
   const proto = h.get('x-forwarded-proto') || 'http';
   const base = `${proto}://${host}`;
-  const r = await fetch(new URL(`/api/sales?link=${encodeURIComponent(code)}&success=1`, base).toString(), { cache: 'no-store', headers: { cookie } });
+  const hdrs: Record<string, string> = { cookie } as any;
+  if (userId) hdrs['x-user-id'] = userId;
+  const r = await fetch(new URL(`/api/sales?link=${encodeURIComponent(code)}&success=1`, base).toString(), { cache: 'no-store', headers: hdrs });
   const d = await r.json().catch(() => ({}));
   const all = r.ok && Array.isArray(d?.sales) ? d.sales : [];
   const start = (page - 1) * 20;
@@ -32,7 +34,7 @@ export default async function ManageLinkPage(props: { params: Promise<{ code: st
   const p = await props.params;
   const code = String(p.code || '');
   const link = await getLink(code);
-  const { items, total } = await getSales(code, 1);
+  const { items, total } = await getSales(code, 1, link?.userId);
   const tg = `https://t.me/yplaru_bot/link?startapp=${encodeURIComponent(code)}`;
   const url = `https://ypla.ru/link/${encodeURIComponent(code)}`;
   if (!link) {
