@@ -43,6 +43,8 @@ type BodyIn = {
 export async function POST(req: Request) {
   try {
     const cookie = req.headers.get('cookie') || '';
+    const tgCookieMatch = /(?:^|;\s*)tg_uid=([^;]+)/.exec(cookie || '');
+    const tgUserFromCookie = tgCookieMatch ? decodeURIComponent(tgCookieMatch[1]) : null;
     const mc = /(?:^|;\s*)session_user=([^;]+)/.exec(cookie);
     const userId = (mc ? decodeURIComponent(mc[1]) : undefined) || req.headers.get('x-user-id') || 'default';
     const { token, orgInn, fingerprint } = await resolveRwToken(req, userId);
@@ -458,7 +460,7 @@ export async function POST(req: Request) {
         linkCode: (typeof (body as any)?.linkCode === 'string' && (body as any).linkCode.trim().length > 0) ? String((body as any).linkCode).trim() : undefined,
         orgInn: orgInn ?? null,
         rwTokenFp: fingerprint ?? null,
-        payerTgId: (typeof (body as any)?.payerTgId === 'string' && (body as any).payerTgId.trim().length > 0) ? String((body as any).payerTgId).trim() : null,
+        payerTgId: (() => { const v = (body as any)?.payerTgId; const b = (typeof v === 'string' && v.trim().length > 0) ? String(v).trim() : null; return b || (tgUserFromCookie && tgUserFromCookie.trim().length > 0 ? tgUserFromCookie : null); })(),
         clientEmail,
         description,
         amountGrossRub: amountRub,
