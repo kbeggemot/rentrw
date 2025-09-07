@@ -175,6 +175,7 @@ export async function updatePaymentLink(userId: string, code: string, updates: P
   }
   if (typeof updates.method === 'string' && (updates.method === 'any' || updates.method === 'qr' || updates.method === 'card')) next.method = updates.method;
   if (typeof updates.isAgent === 'boolean') next.isAgent = updates.isAgent;
+  if (typeof (updates as any)?.disabled === 'boolean') next.disabled = Boolean((updates as any).disabled);
   if (next.isAgent) {
     if (updates.commissionType === 'percent' || updates.commissionType === 'fixed') next.commissionType = updates.commissionType;
     if (typeof updates.commissionValue === 'number' && Number.isFinite(updates.commissionValue)) next.commissionValue = updates.commissionValue;
