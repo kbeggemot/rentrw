@@ -494,7 +494,7 @@ export async function setSaleHidden(userId: string, taskId: number | string, hid
 }
 
 
-export async function updateSaleMeta(userId: string, taskId: number | string, meta: { payerTgId?: string | null; linkCode?: string | null }): Promise<void> {
+export async function updateSaleMeta(userId: string, taskId: number | string, meta: { payerTgId?: string | null; linkCode?: string | null; payerTgFirstName?: string | null; payerTgLastName?: string | null; payerTgUsername?: string | null }): Promise<void> {
   const store = await readTasks();
   if (!store.sales) store.sales = [];
   const idx = store.sales.findIndex((s) => s.userId === userId && s.taskId == taskId);
