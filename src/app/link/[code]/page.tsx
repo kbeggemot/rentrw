@@ -104,6 +104,7 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
   const [partnerFio, setPartnerFio] = useState<string | null>(null);
   const [agentDesc, setAgentDesc] = useState<string | null>(null);
   const orgNameGen = useMemo(() => declineOrgNameGenitive(data?.orgName || null), [data?.orgName]);
+  const metaSentRef = useRef(false);
 
   function getTelegramUserId(): string | null {
     try {
@@ -114,6 +115,21 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
       const init: string | undefined = (window as any)?.Telegram?.WebApp?.initData;
       if (typeof init === 'string' && init.includes('user=')) {
         const sp = new URLSearchParams(init);
+        const userStr = sp.get('user');
+        if (userStr) {
+          const obj = JSON.parse(userStr);
+          const id = obj?.id;
+          if (typeof id === 'number' || typeof id === 'string') return String(id);
+        }
+      }
+    } catch {}
+    // Desktop Telegram may pass tgWebAppData in URL (search or hash). Try to parse
+    try {
+      const url = new URL(window.location.href);
+      const param = url.searchParams.get('tgWebAppData') || (url.hash ? new URLSearchParams(url.hash.replace(/^#/, '')).get('tgWebAppData') : null);
+      if (param) {
+        const decoded = decodeURIComponent(param);
+        const sp = new URLSearchParams(decoded);
         const userStr = sp.get('user');
         if (userStr) {
           const obj = JSON.parse(userStr);
@@ -320,7 +336,7 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
             setData(null);
             setMsg('Ссылка не найдена');
           } else {
-            setData(d);
+          setData(d);
           }
           }
           // Проверяем наличие токена и для режима оплаты по ссылке, если есть владелец
@@ -698,6 +714,7 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
         if (tId && data?.userId) {
           const tgId = getTelegramUserId();
           await fetch('/api/sales/meta', { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-user-id': data.userId }, body: JSON.stringify({ taskId: tId, payerTgId: tgId, linkCode: code }) });
+          metaSentRef.current = true;
         }
       } catch {}
       const url = d?.data?.acquiring_order?.url || d?.data?.acquiring_order?.payment_url || null;
@@ -709,6 +726,22 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
       setPayError(true);
     } finally { setLoading(false); }
   };
+
+  // Fallback: if we got taskId later (e.g., resumed or post-init), ensure meta is saved once
+  useEffect(() => {
+    try { (window as any)?.Telegram?.WebApp?.ready?.(); } catch {}
+    if (!metaSentRef.current && taskId && data?.userId) {
+      const id = getTelegramUserId();
+      if (id) {
+        metaSentRef.current = true;
+        fetch('/api/sales/meta', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-user-id': data.userId as any },
+          body: JSON.stringify({ taskId, payerTgId: id, linkCode: code }),
+        }).catch(() => {});
+      }
+    }
+  }, [taskId, data?.userId, code]);
 
   if (!data) {
     return (
