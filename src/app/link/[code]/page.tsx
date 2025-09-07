@@ -390,6 +390,11 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
     const fromFn = getTelegramUserId();
     if (fromFn) return fromFn;
     try { const v = sessionStorage.getItem('tg_user_id'); if (v) return v; } catch {}
+    try {
+      // cookie from Mini App entry
+      const m = document.cookie.split('; ').find((c)=>c.startsWith('tg_uid='));
+      if (m) { const v = decodeURIComponent(m.split('=')[1]); if (v) return v; }
+    } catch {}
     try { const url = new URL(window.location.href); const tgu = url.searchParams.get('tgu'); if (tgu) return tgu; } catch {}
     return null;
   }

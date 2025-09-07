@@ -48,6 +48,7 @@ export default function TgLinkEntry() {
       };
       const uid = getUid();
       try { if (uid) sessionStorage.setItem('tg_user_id', uid); } catch {}
+      try { if (uid) document.cookie = `tg_uid=${encodeURIComponent(uid)}; Path=/; Max-Age=1800`; } catch {}
       // stay inside mini app webview, client-side navigation and pass uid
       const url = `/link/${encodeURIComponent(code)}?tg=1${uid ? `&tgu=${encodeURIComponent(uid)}` : ''}`;
       router.replace(url);
