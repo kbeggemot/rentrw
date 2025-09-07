@@ -30,8 +30,27 @@ export default function TgLinkEntry() {
     try { (window as any)?.Telegram?.WebApp?.expand?.(); } catch {}
     const code = getStartParam();
     if (code) {
-      // stay inside mini app webview, client-side navigation
-      router.replace(`/link/${encodeURIComponent(code)}?tg=1`);
+      // Extract Telegram user id if available and pass forward
+      const getUid = (): string | null => {
+        try {
+          const raw = (window as any)?.Telegram?.WebApp?.initDataUnsafe?.user?.id;
+          if (typeof raw === 'number' || typeof raw === 'string') return String(raw);
+        } catch {}
+        try {
+          const init: string | undefined = (window as any)?.Telegram?.WebApp?.initData;
+          if (typeof init === 'string' && init.includes('user=')) {
+            const sp = new URLSearchParams(init);
+            const userStr = sp.get('user');
+            if (userStr) { const obj = JSON.parse(userStr); const id = obj?.id; if (typeof id === 'number' || typeof id === 'string') return String(id); }
+          }
+        } catch {}
+        return null;
+      };
+      const uid = getUid();
+      try { if (uid) sessionStorage.setItem('tg_user_id', uid); } catch {}
+      // stay inside mini app webview, client-side navigation and pass uid
+      const url = `/link/${encodeURIComponent(code)}?tg=1${uid ? `&tgu=${encodeURIComponent(uid)}` : ''}`;
+      router.replace(url);
       return;
     }
     setMsg('Не удалось определить код страницы');

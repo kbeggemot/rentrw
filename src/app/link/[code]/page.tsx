@@ -377,6 +377,23 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
     } catch {}
   }
 
+  // Accept tgu from URL or session and use as fallback for payerTgId
+  useEffect(() => {
+    try {
+      const url = new URL(window.location.href);
+      const tgu = url.searchParams.get('tgu');
+      if (tgu) sessionStorage.setItem('tg_user_id', tgu);
+    } catch {}
+  }, []);
+
+  function getTelegramUserIdStrong(): string | null {
+    const fromFn = getTelegramUserId();
+    if (fromFn) return fromFn;
+    try { const v = sessionStorage.getItem('tg_user_id'); if (v) return v; } catch {}
+    try { const url = new URL(window.location.href); const tgu = url.searchParams.get('tgu'); if (tgu) return tgu; } catch {}
+    return null;
+  }
+
   // If returned from bank (?paid=1), try to restore last taskId from localStorage and resume polling
   useEffect(() => {
     try {
@@ -684,7 +701,7 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
         orgInn: (data as any)?.orgInn ? String((data as any).orgInn).replace(/\D/g,'') : undefined,
         cartItems: isCartMode ? baseCart : undefined,
         linkCode: code,
-        payerTgId: (() => { const id = getTelegramUserId(); return id ?? undefined; })(),
+        payerTgId: (() => { const id = getTelegramUserIdStrong(); return id ?? undefined; })(),
       };
       const res = await fetch('/api/rocketwork/tasks', { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-user-id': data.userId }, body: JSON.stringify(body) });
       const txt = await res.text();
@@ -712,7 +729,7 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
       // Fire-and-forget: обновим мету сделки (payerTgId, linkCode) на сервере, чтобы гарантировать сохранение
       try {
         if (tId && data?.userId) {
-          const tgId = getTelegramUserId();
+          const tgId = getTelegramUserIdStrong();
           await fetch('/api/sales/meta', { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-user-id': data.userId }, body: JSON.stringify({ taskId: tId, payerTgId: tgId, linkCode: code }) });
           metaSentRef.current = true;
         }
@@ -731,7 +748,7 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
   useEffect(() => {
     try { (window as any)?.Telegram?.WebApp?.ready?.(); } catch {}
     if (!metaSentRef.current && taskId && data?.userId) {
-      const id = getTelegramUserId();
+      const id = getTelegramUserIdStrong();
       if (id) {
         metaSentRef.current = true;
         fetch('/api/sales/meta', {
