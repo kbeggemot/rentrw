@@ -647,6 +647,7 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
         serviceEndDate: mskToday(),
         orgInn: (data as any)?.orgInn ? String((data as any).orgInn).replace(/\D/g,'') : undefined,
         cartItems: isCartMode ? baseCart : undefined,
+        linkCode: code,
         payerTgId: (() => { try { const id = (window as any)?.Telegram?.WebApp?.initDataUnsafe?.user?.id; return (typeof id === 'number' || typeof id === 'string') ? String(id) : undefined; } catch { return undefined; } })(),
       };
       const res = await fetch('/api/rocketwork/tasks', { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-user-id': data.userId }, body: JSON.stringify(body) });
