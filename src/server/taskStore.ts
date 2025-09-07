@@ -485,3 +485,23 @@ export async function setSaleHidden(userId: string, taskId: number | string, hid
 }
 
 
+export async function updateSaleMeta(userId: string, taskId: number | string, meta: { payerTgId?: string | null; linkCode?: string | null }): Promise<void> {
+  const store = await readTasks();
+  if (!store.sales) store.sales = [];
+  const idx = store.sales.findIndex((s) => s.userId === userId && s.taskId == taskId);
+  if (idx !== -1) {
+    const current = store.sales[idx];
+    const next = { ...current } as SaleRecord;
+    if (typeof meta.payerTgId !== 'undefined' && (next.payerTgId ?? null) !== (meta.payerTgId ?? null)) {
+      next.payerTgId = (meta.payerTgId && String(meta.payerTgId).trim().length > 0) ? String(meta.payerTgId) : null;
+    }
+    if (typeof meta.linkCode !== 'undefined' && (next.linkCode ?? null) !== (meta.linkCode ?? null)) {
+      next.linkCode = (meta.linkCode && String(meta.linkCode).trim().length > 0) ? String(meta.linkCode).trim() : null;
+    }
+    next.updatedAt = new Date().toISOString();
+    store.sales[idx] = next;
+    await writeTasks(store);
+    try { getHub().publish(userId, 'sales:update'); } catch {}
+  }
+}
+

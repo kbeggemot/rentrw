@@ -673,6 +673,13 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
           localStorage.setItem(`lastPay:${code}`, JSON.stringify({ taskId: tId, ts: Date.now(), sid: String(sid) }));
         }
       } catch {}
+      // Fire-and-forget: обновим мету сделки (payerTgId, linkCode) на сервере, чтобы гарантировать сохранение
+      try {
+        if (tId && data?.userId) {
+          const tgId = (() => { try { const id = (window as any)?.Telegram?.WebApp?.initDataUnsafe?.user?.id; return (typeof id === 'number' || typeof id === 'string') ? String(id) : null; } catch { return null; } })();
+          await fetch('/api/sales/meta', { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-user-id': data.userId }, body: JSON.stringify({ taskId: tId, payerTgId: tgId, linkCode: code }) });
+        }
+      } catch {}
       const url = d?.data?.acquiring_order?.url || d?.data?.acquiring_order?.payment_url || null;
       if (url) setPayUrl(url); else startPayUrlPoll(tId);
       setAwaitingPay(false);
