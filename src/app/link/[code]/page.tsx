@@ -105,6 +105,26 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
   const [agentDesc, setAgentDesc] = useState<string | null>(null);
   const orgNameGen = useMemo(() => declineOrgNameGenitive(data?.orgName || null), [data?.orgName]);
 
+  function getTelegramUserId(): string | null {
+    try {
+      const raw = (window as any)?.Telegram?.WebApp?.initDataUnsafe?.user?.id;
+      if (typeof raw === 'number' || typeof raw === 'string') return String(raw);
+    } catch {}
+    try {
+      const init: string | undefined = (window as any)?.Telegram?.WebApp?.initData;
+      if (typeof init === 'string' && init.includes('user=')) {
+        const sp = new URLSearchParams(init);
+        const userStr = sp.get('user');
+        if (userStr) {
+          const obj = JSON.parse(userStr);
+          const id = obj?.id;
+          if (typeof id === 'number' || typeof id === 'string') return String(id);
+        }
+      }
+    } catch {}
+    return null;
+  }
+
   const showPrev = () => {
     setFadeIn(false);
     setTimeout(() => setFadeIn(true), 20);
@@ -648,7 +668,7 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
         orgInn: (data as any)?.orgInn ? String((data as any).orgInn).replace(/\D/g,'') : undefined,
         cartItems: isCartMode ? baseCart : undefined,
         linkCode: code,
-        payerTgId: (() => { try { const id = (window as any)?.Telegram?.WebApp?.initDataUnsafe?.user?.id; return (typeof id === 'number' || typeof id === 'string') ? String(id) : undefined; } catch { return undefined; } })(),
+        payerTgId: (() => { const id = getTelegramUserId(); return id ?? undefined; })(),
       };
       const res = await fetch('/api/rocketwork/tasks', { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-user-id': data.userId }, body: JSON.stringify(body) });
       const txt = await res.text();
@@ -676,7 +696,7 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
       // Fire-and-forget: обновим мету сделки (payerTgId, linkCode) на сервере, чтобы гарантировать сохранение
       try {
         if (tId && data?.userId) {
-          const tgId = (() => { try { const id = (window as any)?.Telegram?.WebApp?.initDataUnsafe?.user?.id; return (typeof id === 'number' || typeof id === 'string') ? String(id) : null; } catch { return null; } })();
+          const tgId = getTelegramUserId();
           await fetch('/api/sales/meta', { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-user-id': data.userId }, body: JSON.stringify({ taskId: tId, payerTgId: tgId, linkCode: code }) });
         }
       } catch {}
