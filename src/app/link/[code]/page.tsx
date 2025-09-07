@@ -296,7 +296,12 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
             setData(null);
             setMsg('Ссылка не найдена');
           } else {
-          setData(d);
+          if (d?.disabled) {
+            setData(null);
+            setMsg('Ссылка не найдена');
+          } else {
+            setData(d);
+          }
           }
           // Проверяем наличие токена и для режима оплаты по ссылке, если есть владелец
           try {

@@ -18,6 +18,7 @@ export type SaleRecord = {
   taskId: number | string;
   orderId: number | string;
   userId: string;
+  linkCode?: string | null;
   // Telegram user id of the payer (stringified)
   payerTgId?: string | null;
   orgInn?: string | null; // digits-only INN; 'неизвестно' if unknown
@@ -97,6 +98,7 @@ export async function recordSaleOnCreate(params: {
   userId: string;
   taskId: number | string;
   orderId: number;
+  linkCode?: string | null;
   orgInn?: string | null;
   rwTokenFp?: string | null;
   payerTgId?: string | null;
@@ -113,7 +115,7 @@ export async function recordSaleOnCreate(params: {
   partnerFio?: string | null;
   partnerPhone?: string | null;
 }): Promise<void> {
-  const { userId, taskId, orderId, orgInn, rwTokenFp, payerTgId, clientEmail, description, amountGrossRub, isAgent, commissionType, commissionValue, serviceEndDate, vatRate, cartItems, agentDescription, partnerFio, partnerPhone } = params;
+  const { userId, taskId, orderId, linkCode, orgInn, rwTokenFp, payerTgId, clientEmail, description, amountGrossRub, isAgent, commissionType, commissionValue, serviceEndDate, vatRate, cartItems, agentDescription, partnerFio, partnerPhone } = params;
   // Try infer orgInn from fingerprint if missing or unknown
   let resolvedInn: string | null | undefined = orgInn;
   try {
@@ -157,6 +159,7 @@ export async function recordSaleOnCreate(params: {
     taskId,
     orderId: storedOrderId,
     userId,
+    linkCode: (typeof linkCode === 'string' && linkCode.trim().length > 0) ? linkCode.trim() : null,
     payerTgId: (typeof payerTgId === 'string' && payerTgId.trim().length > 0) ? payerTgId.trim() : null,
     orgInn: (resolvedInn && String(resolvedInn).trim().length > 0) ? String(resolvedInn).replace(/\D/g, '') : 'неизвестно',
     clientEmail: (clientEmail ?? null),

@@ -355,7 +355,12 @@ export async function GET(req: Request) {
     const { getShowAllDataFlag } = await import('@/server/userStore');
     const showAll = await getShowAllDataFlag(userId);
     const allSales = showAll && inn ? await listAllSalesForOrg(inn) : await listSales(userId);
-    const sales = inn ? allSales.filter((s: any) => String((s as any).orgInn || 'неизвестно') === inn || (s as any).orgInn == null || String((s as any).orgInn) === 'неизвестно') : allSales;
+    let sales = inn ? allSales.filter((s: any) => String((s as any).orgInn || 'неизвестно') === inn || (s as any).orgInn == null || String((s as any).orgInn) === 'неизвестно') : allSales;
+    // Optional filters
+    const linkCode = urlObj.searchParams.get('link');
+    const onlySuccess = urlObj.searchParams.get('success') === '1';
+    if (linkCode) sales = sales.filter((s: any) => (s as any).linkCode === linkCode);
+    if (onlySuccess) sales = sales.filter((s: any) => { const st = String((s as any)?.status || '').toLowerCase(); return st === 'paid' || st === 'transfered' || st === 'transferred'; });
     try {
       // Background: attempt instant email when receipts are ready
       // Fire-and-forget; do not await to keep API fast

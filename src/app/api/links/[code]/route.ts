@@ -73,7 +73,7 @@ export async function GET(req: Request) {
         });
       }
     } catch {}
-    return NextResponse.json({ code, userId, title, description, sumMode, amountRub, vatRate, isAgent, commissionType, commissionValue, partnerPhone, method, orgName: orgName || null, orgInn: item.orgInn || null, cartItems, allowCartAdjust: !!item.allowCartAdjust, startEmptyCart: !!(item as any)?.startEmptyCart, cartDisplay: item.cartDisplay || null, agentDescription: (item as any)?.agentDescription ?? null }, { status: 200 });
+    return NextResponse.json({ code, userId, title, description, sumMode, amountRub, vatRate, isAgent, commissionType, commissionValue, partnerPhone, method, orgName: orgName || null, orgInn: item.orgInn || null, cartItems, allowCartAdjust: !!item.allowCartAdjust, startEmptyCart: !!(item as any)?.startEmptyCart, cartDisplay: item.cartDisplay || null, agentDescription: (item as any)?.agentDescription ?? null, disabled: !!(item as any)?.disabled }, { status: 200 });
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'Server error';
     return NextResponse.json({ error: msg }, { status: 500 });
@@ -158,7 +158,7 @@ export async function PUT(req: Request) {
         }
       }
       const vatRate = (['none','0','5','7','10','20'].includes(String(body?.vatRate)) ? String(body?.vatRate) : 'none') as 'none'|'0'|'5'|'7'|'10'|'20';
-      const updated = await updatePaymentLink(userId, code, { title, description, sumMode, amountRub: amountRub ?? undefined, vatRate, method, isAgent, commissionType: commissionType as any, commissionValue: commissionValue ?? undefined, partnerPhone });
+      const updated = await updatePaymentLink(userId, code, { title, description, sumMode, amountRub: amountRub ?? undefined, vatRate, method, isAgent, commissionType: commissionType as any, commissionValue: commissionValue ?? undefined, partnerPhone, disabled: typeof (body as any)?.disabled === 'boolean' ? Boolean((body as any).disabled) : undefined });
       if (!updated) return NextResponse.json({ error: 'NOT_FOUND' }, { status: 404 });
       return NextResponse.json({ ok: true, item: updated });
     } else {

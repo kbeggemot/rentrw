@@ -455,6 +455,7 @@ export async function POST(req: Request) {
         userId,
         taskId,
         orderId,
+        linkCode: (typeof (body as any)?.linkCode === 'string' && (body as any).linkCode.trim().length > 0) ? String((body as any).linkCode).trim() : undefined,
         orgInn: orgInn ?? null,
         rwTokenFp: fingerprint ?? null,
         payerTgId: (typeof (body as any)?.payerTgId === 'string' && (body as any).payerTgId.trim().length > 0) ? String((body as any).payerTgId).trim() : null,

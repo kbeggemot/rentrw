@@ -104,7 +104,7 @@ export default function LinksStandalonePage() {
                 <div className="divide-y divide-gray-100 dark:divide-gray-800">
                   {links.map((l) => (
                     <div key={l.code} className="flex items-center justify-between px-3 py-2">
-                      <div className="text-sm"><a className="text-black dark:text-white font-semibold hover:underline" href={`/link/${encodeURIComponent(l.code)}`} target="_blank" rel="noreferrer">{l.title || l.code}</a></div>
+                      <div className="text-sm"><a className="text-black dark:text-white font-semibold hover:underline" href={`/link/manage/${encodeURIComponent(l.code)}`}>{l.title || l.code}</a></div>
                       <div className="flex items-center gap-2 relative">
                         {/* tail preview of the URL as plain text */}
                         <div className="text-sm text-gray-600 dark:text-gray-400">/{l.code}</div>

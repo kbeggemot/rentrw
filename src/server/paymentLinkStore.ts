@@ -19,6 +19,7 @@ export type PaymentLink = {
   startEmptyCart?: boolean;
   cartDisplay?: 'grid' | 'list' | null;
   agentDescription?: string | null;
+  disabled?: boolean; // if true, hidden from public
   createdAt: string;
   hits?: number;
   lastAccessAt?: string | null;
@@ -88,6 +89,7 @@ export async function createPaymentLink(userId: string, data: Omit<PaymentLink, 
     startEmptyCart: Boolean((data as any)?.startEmptyCart),
     cartDisplay: (data as any)?.cartDisplay === 'list' ? 'list' : ((data as any)?.cartDisplay === 'grid' ? 'grid' : null),
     agentDescription: typeof (data as any)?.agentDescription === 'string' ? ((data as any).agentDescription as string) : null,
+    disabled: false,
     createdAt: now,
     hits: 0,
     lastAccessAt: null,
