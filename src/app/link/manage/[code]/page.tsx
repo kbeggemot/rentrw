@@ -51,7 +51,8 @@ export default async function ManageLinkPage(props: { params: Promise<{ code: st
   }
   return (
     <div className="max-w-3xl mx-auto pt-0 pb-4">
-      <div className="flex items-center justify-end mb-3">
+      <div className="flex items-center justify-between mb-3">
+        <div className="text-xl font-semibold">Мгновенная оплата</div>
         <a href="/link" className="p-2 rounded hover:bg-gray-50 dark:hover:bg-gray-900" aria-label="Закрыть">✕</a>
       </div>
       <ManageLinkClient code={code} link={link} items={items} total={total} url={url} tg={tg} />
