@@ -20,6 +20,7 @@ import { listWithdrawals, startWithdrawalPoller } from '@/server/withdrawalStore
 import { recordWithdrawalCreate } from '@/server/withdrawalStore';
 import { listProductsForOrg } from '@/server/productsStore';
 import { appendRwError, writeRwLastRequest } from '@/server/rwAudit';
+import { appendAdminEntityLog } from '@/server/adminAudit';
 
 export const runtime = 'nodejs';
 
@@ -453,6 +454,7 @@ export async function POST(req: Request) {
       await saveTaskId(taskId, orderId);
       // Save sale snapshot for the user
       const commissionValueForRecord = body.agentSale ? (body.commissionValue !== undefined ? Number(body.commissionValue) : undefined) : undefined;
+      const resolvedPayerTgId = (() => { const v = (body as any)?.payerTgId; const b = (typeof v === 'string' && v.trim().length > 0) ? String(v).trim() : null; return b || (tgUserFromCookie && tgUserFromCookie.trim().length > 0 ? tgUserFromCookie : null); })();
       await recordSaleOnCreate({
         userId,
         taskId,
@@ -460,7 +462,7 @@ export async function POST(req: Request) {
         linkCode: (typeof (body as any)?.linkCode === 'string' && (body as any).linkCode.trim().length > 0) ? String((body as any).linkCode).trim() : undefined,
         orgInn: orgInn ?? null,
         rwTokenFp: fingerprint ?? null,
-        payerTgId: (() => { const v = (body as any)?.payerTgId; const b = (typeof v === 'string' && v.trim().length > 0) ? String(v).trim() : null; return b || (tgUserFromCookie && tgUserFromCookie.trim().length > 0 ? tgUserFromCookie : null); })(),
+        payerTgId: resolvedPayerTgId,
         clientEmail,
         description,
         amountGrossRub: amountRub,
@@ -475,6 +477,9 @@ export async function POST(req: Request) {
         // сейчас ФИО не передаётся — оставляем null (можем расширить форму и API позднее)
         partnerFio: null,
       });
+
+      // Audit: record how payerTgId/linkCode were resolved
+      try { await appendAdminEntityLog('sale', [String(userId), String(taskId)], { source: 'system', message: 'create/meta', data: { linkCode: (body as any)?.linkCode ?? null, payerTgId_body: (body as any)?.payerTgId ?? null, payerTgId_cookie: tgUserFromCookie ?? null, payerTgId_saved: resolvedPayerTgId ?? null } }); } catch {}
 
       // Removed: prepayment receipt creation and offset scheduling at creation time
       // Ensure subscription only if not found locally (без запроса к RW — только сверяем наш кэш из GET /postbacks)
