@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { updateSaleMeta } from '@/server/taskStore';
+import { appendAdminEntityLog } from '@/server/adminAudit';
 
 export const runtime = 'nodejs';
 
@@ -21,6 +22,7 @@ export async function POST(req: Request) {
     const payerTgId = typeof body?.payerTgId === 'string' && body.payerTgId.trim().length > 0 ? String(body.payerTgId).trim() : null;
     const linkCode = typeof body?.linkCode === 'string' && body.linkCode.trim().length > 0 ? String(body.linkCode).trim() : null;
     await updateSaleMeta(userId, taskId, { payerTgId, linkCode });
+    try { await appendAdminEntityLog('sale', [String(userId), String(taskId)], { source: 'web', message: 'meta/update', data: { payerTgId, linkCode, ua: req.headers.get('user-agent') || null } }); } catch {}
     return NextResponse.json({ ok: true });
   } catch (e) {
     const message = e instanceof Error ? e.message : 'Server error';
