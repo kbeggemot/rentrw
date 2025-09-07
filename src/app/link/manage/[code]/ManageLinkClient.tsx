@@ -25,7 +25,6 @@ export default function ManageLinkClient(props: Props) {
   return (
     <div className="max-w-3xl mx-auto pt-0 pb-4">
       <div className="mb-4">
-        <h1 className="text-xl font-semibold mb-1">{link?.title}</h1>
         <div className="text-sm text-gray-600">Код: <span className="font-mono">/{code}</span></div>
       </div>
       <div className="rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 p-4 space-y-4">
