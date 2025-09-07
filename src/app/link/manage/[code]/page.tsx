@@ -40,8 +40,7 @@ export default async function ManageLinkPage(props: { params: Promise<{ code: st
   if (!link) {
     return (
       <div className="max-w-3xl mx-auto pt-0 pb-4">
-        <div className="flex items-center justify-between mb-3">
-          <div className="text-xl font-semibold">Мгновенная оплата</div>
+        <div className="flex items-center justify-end mb-3">
           <a href="/link" className="p-2 rounded hover:bg-gray-50 dark:hover:bg-gray-900" aria-label="Закрыть">✕</a>
         </div>
         <div className="rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 p-4">
@@ -52,8 +51,7 @@ export default async function ManageLinkPage(props: { params: Promise<{ code: st
   }
   return (
     <div className="max-w-3xl mx-auto pt-0 pb-4">
-      <div className="flex items-center justify-between mb-3">
-        <div className="text-xl font-semibold">Мгновенная оплата</div>
+      <div className="flex items-center justify-end mb-3">
         <a href="/link" className="p-2 rounded hover:bg-gray-50 dark:hover:bg-gray-900" aria-label="Закрыть">✕</a>
       </div>
       <ManageLinkClient code={code} link={link} items={items} total={total} url={url} tg={tg} />
