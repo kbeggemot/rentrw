@@ -448,6 +448,11 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
     return null;
   }
 
+  function getTelegramUserMetaFromCookies(): { first_name?: string | null; last_name?: string | null; username?: string | null } {
+    const read = (k: string) => { try { const m = document.cookie.split('; ').find((c)=>c.startsWith(`${k}=`)); return m ? decodeURIComponent(m.split('=')[1]) : null; } catch { return null; } };
+    return { first_name: read('tg_fn'), last_name: read('tg_ln'), username: read('tg_un') };
+  }
+
   // If returned from bank (?paid=1), try to restore last taskId from localStorage and resume polling
   useEffect(() => {
     try {
@@ -741,7 +746,7 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
       const amountNum = isCartMode ? Number(cartAdjustedSum + (agentLine ? agentLine.price : 0)) : (data.sumMode === 'fixed' ? (data.amountRub || 0) : Number(amount.replace(',', '.')));
       // Build cart for server: always use ORIGINAL unit prices (baseUnits) + current qty
       const baseCart = isCartMode ? cart.map((i, idx) => ({ id: i.id || null, title: i.title, price: Number((baseUnits[idx] ?? i.price) || 0), qty: Number(i.qty || 0) })) : [];
-      const tgMeta = getTelegramUserMeta();
+      const tgMeta = { ...getTelegramUserMeta(), ...getTelegramUserMetaFromCookies() };
       const body: any = {
         amountRub: amountNum,
         description: data.description,

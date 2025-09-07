@@ -57,8 +57,24 @@ export default function TgLinkEntry() {
         return null;
       };
       const uid = getUid();
+      // Try capture full user meta
+      const getUser = (): any => {
+        try { const u = (window as any)?.Telegram?.WebApp?.initDataUnsafe?.user; if (u) return u; } catch {}
+        try { const init: string | undefined = (window as any)?.Telegram?.WebApp?.initData; if (typeof init === 'string' && init.includes('user=')) { const sp = new URLSearchParams(init); const s = sp.get('user'); if (s) return JSON.parse(s); } } catch {}
+        try { const url = new URL(window.location.href); const packed = url.searchParams.get('tgWebAppData') || (url.hash ? new URLSearchParams(url.hash.replace(/^#/, '')).get('tgWebAppData') : null); if (packed) { const decoded = decodeURIComponent(packed); const sp = new URLSearchParams(decoded); const s = sp.get('user'); if (s) return JSON.parse(s); } } catch {}
+        return null;
+      };
+      const u = getUser();
       try { if (uid) sessionStorage.setItem('tg_user_id', uid); } catch {}
       try { if (uid) document.cookie = `tg_uid=${encodeURIComponent(uid)}; Path=/; Max-Age=1800`; } catch {}
+      try {
+        const fn = u?.first_name ? String(u.first_name) : '';
+        const ln = u?.last_name ? String(u.last_name) : '';
+        const un = u?.username ? String(u.username) : '';
+        if (fn) document.cookie = `tg_fn=${encodeURIComponent(fn)}; Path=/; Max-Age=1800`;
+        if (ln) document.cookie = `tg_ln=${encodeURIComponent(ln)}; Path=/; Max-Age=1800`;
+        if (un) document.cookie = `tg_un=${encodeURIComponent(un)}; Path=/; Max-Age=1800`;
+      } catch {}
       // stay inside mini app webview, client-side navigation and pass uid
       const url = `/link/${encodeURIComponent(code)}?tg=1${uid ? `&tgu=${encodeURIComponent(uid)}` : ''}`;
       router.replace(url);
