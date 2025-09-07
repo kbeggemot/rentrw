@@ -21,6 +21,9 @@ export type SaleRecord = {
   linkCode?: string | null;
   // Telegram user id of the payer (stringified)
   payerTgId?: string | null;
+  payerTgFirstName?: string | null;
+  payerTgLastName?: string | null;
+  payerTgUsername?: string | null;
   orgInn?: string | null; // digits-only INN; 'неизвестно' if unknown
   clientEmail?: string | null;
   description?: string | null;
@@ -498,6 +501,11 @@ export async function updateSaleMeta(userId: string, taskId: number | string, me
     if (typeof meta.linkCode !== 'undefined' && (next.linkCode ?? null) !== (meta.linkCode ?? null)) {
       next.linkCode = (meta.linkCode && String(meta.linkCode).trim().length > 0) ? String(meta.linkCode).trim() : null;
     }
+    // Optional: attach tele user meta if provided
+    const anyMeta: any = meta as any;
+    if (typeof anyMeta.payerTgFirstName !== 'undefined') next.payerTgFirstName = (anyMeta.payerTgFirstName || null);
+    if (typeof anyMeta.payerTgLastName !== 'undefined') next.payerTgLastName = (anyMeta.payerTgLastName || null);
+    if (typeof anyMeta.payerTgUsername !== 'undefined') next.payerTgUsername = (anyMeta.payerTgUsername || null);
     next.updatedAt = new Date().toISOString();
     store.sales[idx] = next;
     await writeTasks(store);

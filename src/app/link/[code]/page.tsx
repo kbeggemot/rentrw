@@ -141,6 +141,55 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
     return null;
   }
 
+  function getTelegramUserMeta(): { id?: string | null; first_name?: string | null; last_name?: string | null; username?: string | null } {
+    try {
+      const u = (window as any)?.Telegram?.WebApp?.initDataUnsafe?.user;
+      if (u && (typeof u === 'object')) {
+        return {
+          id: (typeof u.id === 'number' || typeof u.id === 'string') ? String(u.id) : null,
+          first_name: typeof u.first_name === 'string' ? u.first_name : null,
+          last_name: typeof u.last_name === 'string' ? u.last_name : null,
+          username: typeof u.username === 'string' ? u.username : null,
+        };
+      }
+    } catch {}
+    try {
+      const init: string | undefined = (window as any)?.Telegram?.WebApp?.initData;
+      if (typeof init === 'string' && init.includes('user=')) {
+        const sp = new URLSearchParams(init);
+        const userStr = sp.get('user');
+        if (userStr) {
+          const obj = JSON.parse(userStr);
+          return {
+            id: (typeof obj?.id === 'number' || typeof obj?.id === 'string') ? String(obj.id) : null,
+            first_name: typeof obj?.first_name === 'string' ? obj.first_name : null,
+            last_name: typeof obj?.last_name === 'string' ? obj.last_name : null,
+            username: typeof obj?.username === 'string' ? obj.username : null,
+          };
+        }
+      }
+    } catch {}
+    try {
+      const url = new URL(window.location.href);
+      const packed = url.searchParams.get('tgWebAppData') || (url.hash ? new URLSearchParams(url.hash.replace(/^#/, '')).get('tgWebAppData') : null);
+      if (packed) {
+        const decoded = decodeURIComponent(packed);
+        const sp = new URLSearchParams(decoded);
+        const userStr = sp.get('user');
+        if (userStr) {
+          const obj = JSON.parse(userStr);
+          return {
+            id: (typeof obj?.id === 'number' || typeof obj?.id === 'string') ? String(obj.id) : null,
+            first_name: typeof obj?.first_name === 'string' ? obj.first_name : null,
+            last_name: typeof obj?.last_name === 'string' ? obj.last_name : null,
+            username: typeof obj?.username === 'string' ? obj.username : null,
+          };
+        }
+      }
+    } catch {}
+    return {};
+  }
+
   const showPrev = () => {
     setFadeIn(false);
     setTimeout(() => setFadeIn(true), 20);
@@ -692,6 +741,7 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
       const amountNum = isCartMode ? Number(cartAdjustedSum + (agentLine ? agentLine.price : 0)) : (data.sumMode === 'fixed' ? (data.amountRub || 0) : Number(amount.replace(',', '.')));
       // Build cart for server: always use ORIGINAL unit prices (baseUnits) + current qty
       const baseCart = isCartMode ? cart.map((i, idx) => ({ id: i.id || null, title: i.title, price: Number((baseUnits[idx] ?? i.price) || 0), qty: Number(i.qty || 0) })) : [];
+      const tgMeta = getTelegramUserMeta();
       const body: any = {
         amountRub: amountNum,
         description: data.description,
@@ -707,6 +757,9 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
         cartItems: isCartMode ? baseCart : undefined,
         linkCode: code,
         payerTgId: (() => { const id = getTelegramUserIdStrong(); return id ?? undefined; })(),
+        payerTgFirstName: (tgMeta.first_name ?? undefined),
+        payerTgLastName: (tgMeta.last_name ?? undefined),
+        payerTgUsername: (tgMeta.username ?? undefined),
       };
       const res = await fetch('/api/rocketwork/tasks', { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-user-id': data.userId }, body: JSON.stringify(body) });
       const txt = await res.text();
@@ -735,7 +788,8 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
       try {
         if (tId && data?.userId) {
           const tgId = getTelegramUserIdStrong();
-          await fetch('/api/sales/meta', { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-user-id': data.userId }, body: JSON.stringify({ taskId: tId, payerTgId: tgId, linkCode: code }) });
+          const meta = getTelegramUserMeta();
+          await fetch('/api/sales/meta', { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-user-id': data.userId }, body: JSON.stringify({ taskId: tId, payerTgId: tgId, linkCode: code, payerTgFirstName: meta.first_name ?? null, payerTgLastName: meta.last_name ?? null, payerTgUsername: meta.username ?? null }) });
           metaSentRef.current = true;
         }
       } catch {}

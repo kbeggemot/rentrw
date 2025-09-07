@@ -89,8 +89,16 @@ export default async function SaleDetailsPage(props: { params: Promise<{ task: s
                   const id = (sale as any)?.payerTgId ? String((sale as any).payerTgId) : '';
                   if (!id) return '—';
                   const href = `tg://user?id=${encodeURIComponent(id)}`;
+                  const fn = (sale as any)?.payerTgFirstName ? String((sale as any).payerTgFirstName) : null;
+                  const ln = (sale as any)?.payerTgLastName ? String((sale as any).payerTgLastName) : null;
+                  const un = (sale as any)?.payerTgUsername ? String((sale as any).payerTgUsername) : null;
+                  const name = [fn, ln].filter(Boolean).join(' ').trim();
                   return (
-                    <a className="text-black dark:text-white font-semibold hover:underline" href={href} target="_blank" rel="noreferrer">Открыть</a>
+                    <div className="space-y-0.5">
+                      <a className="text-black dark:text-white font-semibold hover:underline" href={href} target="_blank" rel="noreferrer">{`user id ${id}`}</a>
+                      {name ? (<div className="text-gray-600 dark:text-gray-300">{name}</div>) : null}
+                      {un ? (<div className="text-gray-600 dark:text-gray-300">@{un}</div>) : null}
+                    </div>
                   );
                 })()}
               </div>
