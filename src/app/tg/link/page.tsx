@@ -44,6 +44,16 @@ export default function TgLinkEntry() {
             if (userStr) { const obj = JSON.parse(userStr); const id = obj?.id; if (typeof id === 'number' || typeof id === 'string') return String(id); }
           }
         } catch {}
+        try {
+          const url = new URL(window.location.href);
+          const packed = url.searchParams.get('tgWebAppData') || (url.hash ? new URLSearchParams(url.hash.replace(/^#/, '')).get('tgWebAppData') : null);
+          if (packed) {
+            const decoded = decodeURIComponent(packed);
+            const sp = new URLSearchParams(decoded);
+            const userStr = sp.get('user');
+            if (userStr) { const obj = JSON.parse(userStr); const id = obj?.id; if (typeof id === 'number' || typeof id === 'string') return String(id); }
+          }
+        } catch {}
         return null;
       };
       const uid = getUid();

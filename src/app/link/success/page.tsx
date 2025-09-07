@@ -18,6 +18,7 @@ export default function PublicSuccessUnifiedPage() {
   const [isAgent, setIsAgent] = useState<boolean | null>(null);
   const pollRef = useRef<number | null>(null);
   const [dots, setDots] = useState(".");
+  const metaSentRef = useRef(false);
 
   useEffect(() => {
     let t: number | null = null;
@@ -193,6 +194,23 @@ export default function PublicSuccessUnifiedPage() {
         if (typ) setPayMethod(typ === 'QR' ? 'СБП' : typ === 'CARD' ? 'Карта' : typ);
       } catch {}
     })();
+  }, [taskId, info?.userId]);
+
+  // Post-factum: try to attach Telegram user id from cookie if available
+  useEffect(() => {
+    if (!taskId || !info?.userId || metaSentRef.current) return;
+    try {
+      const ck = document.cookie.split('; ').find((c)=>c.startsWith('tg_uid='));
+      const uid = ck ? decodeURIComponent(ck.split('=')[1]) : '';
+      if (uid) {
+        metaSentRef.current = true;
+        fetch('/api/sales/meta', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-user-id': info.userId as any },
+          body: JSON.stringify({ taskId, payerTgId: uid })
+        }).catch(()=>{});
+      }
+    } catch {}
   }, [taskId, info?.userId]);
 
   return (
