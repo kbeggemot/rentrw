@@ -105,6 +105,9 @@ export async function recordSaleOnCreate(params: {
   orgInn?: string | null;
   rwTokenFp?: string | null;
   payerTgId?: string | null;
+  payerTgFirstName?: string | null;
+  payerTgLastName?: string | null;
+  payerTgUsername?: string | null;
   clientEmail?: string | null;
   description?: string;
   amountGrossRub: number;
@@ -118,7 +121,7 @@ export async function recordSaleOnCreate(params: {
   partnerFio?: string | null;
   partnerPhone?: string | null;
 }): Promise<void> {
-  const { userId, taskId, orderId, linkCode, orgInn, rwTokenFp, payerTgId, clientEmail, description, amountGrossRub, isAgent, commissionType, commissionValue, serviceEndDate, vatRate, cartItems, agentDescription, partnerFio, partnerPhone } = params;
+  const { userId, taskId, orderId, linkCode, orgInn, rwTokenFp, payerTgId, payerTgFirstName, payerTgLastName, payerTgUsername, clientEmail, description, amountGrossRub, isAgent, commissionType, commissionValue, serviceEndDate, vatRate, cartItems, agentDescription, partnerFio, partnerPhone } = params;
   // Try infer orgInn from fingerprint if missing or unknown
   let resolvedInn: string | null | undefined = orgInn;
   try {
@@ -164,6 +167,9 @@ export async function recordSaleOnCreate(params: {
     userId,
     linkCode: (typeof linkCode === 'string' && linkCode.trim().length > 0) ? linkCode.trim() : null,
     payerTgId: (typeof payerTgId === 'string' && payerTgId.trim().length > 0) ? payerTgId.trim() : null,
+    payerTgFirstName: (typeof payerTgFirstName === 'string' && payerTgFirstName.trim().length > 0) ? payerTgFirstName : null,
+    payerTgLastName: (typeof payerTgLastName === 'string' && payerTgLastName.trim().length > 0) ? payerTgLastName : null,
+    payerTgUsername: (typeof payerTgUsername === 'string' && payerTgUsername.trim().length > 0) ? payerTgUsername : null,
     orgInn: (resolvedInn && String(resolvedInn).trim().length > 0) ? String(resolvedInn).replace(/\D/g, '') : 'неизвестно',
     clientEmail: (clientEmail ?? null),
     description: description ?? null,
