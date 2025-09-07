@@ -84,7 +84,16 @@ export default async function SaleDetailsPage(props: { params: Promise<{ task: s
               <div className="text-gray-500">Почта покупателя</div>
               <div>{sale.clientEmail || '-'}</div>
               <div className="text-gray-500">Продажа в telegram</div>
-              <div>{(sale as any).payerTgId ? String((sale as any).payerTgId) : '—'}</div>
+              <div>
+                {(() => {
+                  const id = (sale as any)?.payerTgId ? String((sale as any).payerTgId) : '';
+                  if (!id) return '—';
+                  const href = `tg://user?id=${encodeURIComponent(id)}`;
+                  return (
+                    <a className="text-black dark:text-white font-semibold hover:underline" href={href} target="_blank" rel="noreferrer">Открыть</a>
+                  );
+                })()}
+              </div>
             </div>
           </div>
 
