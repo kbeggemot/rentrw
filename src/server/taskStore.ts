@@ -474,20 +474,21 @@ export async function setSaleCreatedAtRw(userId: string, taskId: number | string
 }
 
 export async function listSales(userId: string): Promise<SaleRecord[]> {
-  // Prefer by_user index when available
+  // Merge multiple sources to avoid empty results if one index is incomplete
+  const map = new Map<string, SaleRecord>();
+  // 1) by_user index (fast path)
   try {
     const rows = await readUserIndex(userId);
     if (Array.isArray(rows) && rows.length > 0) {
-      const out: SaleRecord[] = [];
       for (const r of rows) {
-        const s = await readSaleByInnTask(r.inn, r.taskId);
-        if (s && s.userId === userId) out.push(s);
+        try {
+          const s = await readSaleByInnTask(r.inn, r.taskId);
+          if (s && s.userId === userId) map.set(String(s.taskId), s);
+        } catch {}
       }
-      if (out.length > 0) return out.sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
     }
   } catch {}
-  // Read from sharded org indexes and merge с legacy
-  const out: SaleRecord[] = [];
+  // 2) Sharded org indexes
   try {
     const orgPaths = (await list('.data/sales').catch(() => [] as string[])).filter((p) => /\.data\/sales\/[^/]+\/index\.json$/.test(p));
     for (const idxPath of orgPaths) {
@@ -496,19 +497,22 @@ export async function listSales(userId: string): Promise<SaleRecord[]> {
         const idxRaw = await readText(idxPath);
         const rows: OrgIndexRow[] = idxRaw ? JSON.parse(idxRaw) : [];
         for (const r of rows) {
-          // lazy read individual sale and filter by userId
+          const key = String(r.taskId);
+          if (map.has(key)) continue;
           const s = await readSaleByInnTask(inn, r.taskId);
-          if (s && s.userId === userId) out.push(s);
+          if (s && s.userId === userId) map.set(key, s);
         }
       } catch {}
     }
   } catch {}
-  // Merge with legacy to avoid пропусков (на случай частичной миграции)
-  const seen = new Set(out.map((s) => String(s.taskId)));
-  const store = await readTasks();
-  for (const s of (store.sales ?? [])) {
-    if (s.userId === userId && !seen.has(String(s.taskId))) out.push(s);
-  }
+  // 3) Legacy tasks.json (backward compatibility)
+  try {
+    const store = await readTasks();
+    for (const s of (store.sales ?? [])) {
+      if (s.userId === userId && !map.has(String(s.taskId))) map.set(String(s.taskId), s);
+    }
+  } catch {}
+  const out = Array.from(map.values());
   return out.sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
 }
 
