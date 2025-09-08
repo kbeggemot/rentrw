@@ -944,7 +944,7 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
               <div className="relative flex-1">
                 <input
                   className="w-full rounded border px-2 h-9 text-sm bg-white text-black dark:bg-gray-800 dark:text-white placeholder-gray-400 dark:placeholder-gray-400"
-                  placeholder="Найти ещё на витрине…"
+                  placeholder="Найти на витрине…"
                   value={addQuery}
                   onFocus={() => setAddOpen(true)}
                   onChange={(e) => { setAddQuery(e.target.value); setAddHint(null); setAddOpen(true); }}
