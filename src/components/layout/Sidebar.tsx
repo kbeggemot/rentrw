@@ -142,14 +142,17 @@ function OrgSelectorWrapper() {
         try {
           const raw = localStorage.getItem('orgs_cache_v1');
           const arr = raw ? JSON.parse(raw) : null;
-          if (Array.isArray(arr) && arr.length > 0) { if (!aborted) { setVisible(true); setPrefetched(arr); } return; }
+          if (Array.isArray(arr) && arr.length > 0) {
+            if (!aborted) { setVisible(true); setPrefetched(arr); }
+            // Не выходим: продолжаем делать сетевой запрос, чтобы обновить кэш
+          }
         } catch {}
         // 2) Если есть выбранная организация в cookie — тоже показываем
         try {
           const m = /(?:^|;\s*)org_inn=([^;]+)/.exec(document.cookie || '');
           if (m && m[1]) { if (!aborted) setVisible(true); /* нет данных для префетча */ }
         } catch {}
-        // 3) Иначе спросим у сервера
+        // 3) Спросим у сервера (всегда, чтобы обновить кэш)
         const r = await fetch('/api/organizations', { cache: 'no-store', credentials: 'include' });
         const d = await r.json();
         const items = Array.isArray(d?.items) ? d.items : [];

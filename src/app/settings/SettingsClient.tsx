@@ -195,6 +195,7 @@ export default function SettingsClient({ initial, userId }: { initial: SettingsP
       try { showToast('Токен сохранён', 'success'); } catch {}
       // Переключение на новую организацию — сервер уже выставил cookie; обновим страницу
       if (data?.inn) {
+        try { localStorage.removeItem('orgs_cache_v1'); } catch {}
         try { window.location.reload(); } catch {}
       }
       // refresh payout org name after token save
