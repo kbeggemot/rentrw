@@ -95,6 +95,7 @@ async function readTasks(): Promise<TaskStoreData> {
 }
 
 async function writeTasks(data: TaskStoreData): Promise<void> {
+  if (process.env.USE_LEGACY_TASKS_WRITE === '0') return;
   await writeText(TASKS_FILE, JSON.stringify(data, null, 2));
 }
 
