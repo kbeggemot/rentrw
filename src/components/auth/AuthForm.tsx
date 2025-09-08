@@ -171,7 +171,7 @@ export function AuthForm() {
     <div className="w-full max-w-sm bg-white dark:bg-gray-950 border border-gray-200 dark:border-gray-800 rounded-lg p-6 shadow-sm">
       <BrandMark size={160} />
       <h1 className="text-xl font-semibold mt-4 mb-1">{isRegister ? 'Регистрация' : 'Вход'}</h1>
-      <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">Введите номер телефона и пароль</p>
+      {/* helper text removed by request */}
       <form className="flex flex-col gap-3" onSubmit={handleSubmit}>
         {(!isRegister || (isRegister && !awaitCode)) ? (
           <Input
