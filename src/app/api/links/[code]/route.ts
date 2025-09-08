@@ -107,6 +107,16 @@ export async function PUT(req: Request) {
     if (current.userId !== userId) return NextResponse.json({ error: 'FORBIDDEN' }, { status: 403 });
 
     const body = await req.json().catch(() => null);
+
+    // Minimal update: only change termsDocHash without revalidating other fields
+    // Triggered when client explicitly sets onlyTerms=true
+    if (body && typeof (body as any)?.termsDocHash !== 'undefined' && (body as any)?.onlyTerms === true) {
+      const updated = await updatePaymentLink(userId, code, {
+        termsDocHash: (body as any).termsDocHash ? String((body as any).termsDocHash) : null,
+      } as any);
+      if (!updated) return NextResponse.json({ error: 'NOT_FOUND' }, { status: 404 });
+      return NextResponse.json({ ok: true, item: updated });
+    }
     // Determine mode from incoming payload (allows switching between modes)
     const isCart = Array.isArray(body?.cartItems) && body.cartItems.length > 0;
 

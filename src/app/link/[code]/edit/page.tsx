@@ -159,26 +159,7 @@ export default function EditLinkPage(props: { params: Promise<{ code: string }> 
   // Helper: save only termsDocHash (but API requires full payload) — so send minimal valid payload based on current UI state
   const saveTermsDoc = async (hash: string | null) => {
     try {
-      const body: any = { title, method, isAgent, termsDocHash: hash };
-      if (mode === 'service') {
-        body.description = description;
-        body.sumMode = sumMode;
-        if (sumMode === 'fixed') body.amountRub = Number(String(amount).replace(',', '.'));
-        body.vatRate = vatRate;
-      } else {
-        const normalizedBase = cartItems.map((c, i) => ({ id: c.id ?? null, title: c.title, price: Number.isFinite(Number(baseUnits[i])) ? Number(baseUnits[i]) : Number(String(c.price).replace(',', '.')), qty: Number(String(c.qty).replace(',', '.')) }));
-        const v = Number(commissionValue.replace(',', '.'));
-        const agentValid = isAgent && ((commissionType === 'percent' && Number.isFinite(v)) || (commissionType === 'fixed' && Number.isFinite(v) && v > 0));
-        if (agentValid) {
-          try { const adj = applyAgentCommissionToCart(normalizedBase.map(x=>({ title:x.title, price:x.price, qty:x.qty })), commissionType, v); body.cartItems = adj.adjusted.map((a, idx) => ({ id: normalizedBase[idx].id, title: normalizedBase[idx].title, price: a.price, qty: a.qty })); } catch { body.cartItems = normalizedBase; }
-        } else {
-          body.cartItems = normalizedBase;
-        }
-        body.allowCartAdjust = allowCartAdjust;
-        body.startEmptyCart = allowCartAdjust ? startEmptyCart : false;
-        body.amountRub = totalCart;
-        body.cartDisplay = cartDisplay;
-      }
+      const body: any = { termsDocHash: hash, onlyTerms: true };
       const r = await fetch(`/api/links/${encodeURIComponent(code)}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
       const d = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(d?.error || 'SAVE_ERROR');
