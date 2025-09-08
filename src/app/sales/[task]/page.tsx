@@ -216,7 +216,11 @@ export default async function SaleDetailsPage(props: { params: Promise<{ task: s
 
           {(() => {
             const items = Array.isArray((sale as any).itemsSnapshot) ? (sale as any).itemsSnapshot : [];
-            const hasInstant = items.some((it: any) => typeof it?.instantResult === 'string' ? it.instantResult.trim().length > 0 : false);
+            const fromSnapshot = items.some((it: any) => (typeof it?.instantResult === 'string') ? it.instantResult.trim().length > 0 : false);
+            const emailStRaw = String((sale as any).instantEmailStatus || '').toLowerCase();
+            // Fallback: если письмо было (или пытались отправить), считаем, что мгновенная выдача включена
+            const fromEmailStatus = emailStRaw === 'pending' || emailStRaw === 'sent' || emailStRaw === 'failed';
+            const hasInstant = fromSnapshot || fromEmailStatus;
             return (
               <div className="rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 p-3 text-sm">
                 <div className="font-semibold mb-2">Мгновенная выдача</div>
