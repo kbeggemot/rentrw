@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/Button';
 
 type Item = {
@@ -17,6 +17,27 @@ type Item = {
 
 export default function ProductsTable({ initialItems }: { initialItems: Item[] }) {
   const [items, setItems] = useState<Item[]>(Array.isArray(initialItems) ? initialItems : []);
+  // SWR-lite: hydrate from localStorage cache first, then revalidate in background
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem('products_cache_v1');
+      const arr = raw ? JSON.parse(raw) : null;
+      if (Array.isArray(arr) && arr.length > 0) setItems(arr);
+    } catch {}
+  }, []);
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const r = await fetch('/api/products', { next: { revalidate: 5 } as any });
+        const d = await r.json();
+        const arr: Item[] = Array.isArray(d?.items) ? d.items : [];
+        if (!cancelled) setItems(arr);
+        try { localStorage.setItem('products_cache_v1', JSON.stringify(arr)); } catch {}
+      } catch {}
+    })();
+    return () => { cancelled = true; };
+  }, []);
   const [toast, setToast] = useState<{ msg: string; kind: 'success' | 'error' } | null>(null);
   const showToast = (msg: string, kind: 'success' | 'error') => {
     setToast({ msg, kind });

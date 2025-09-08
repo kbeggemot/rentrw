@@ -133,6 +133,7 @@ function OrgSelectorWrapper() {
   // Показываем селектор только если уже есть добавленные организации
   // (первичный вход без организаций — скрываем, даже если нет токена)
   const [visible, setVisible] = useState<boolean | null>(null);
+  const [prefetched, setPrefetched] = useState<Array<{ inn: string; name: string | null; maskedToken?: string | null }> | null>(null);
   useEffect(() => {
     let aborted = false;
     (async () => {
@@ -141,18 +142,19 @@ function OrgSelectorWrapper() {
         try {
           const raw = localStorage.getItem('orgs_cache_v1');
           const arr = raw ? JSON.parse(raw) : null;
-          if (Array.isArray(arr) && arr.length > 0) { if (!aborted) setVisible(true); return; }
+          if (Array.isArray(arr) && arr.length > 0) { if (!aborted) { setVisible(true); setPrefetched(arr); } return; }
         } catch {}
         // 2) Если есть выбранная организация в cookie — тоже показываем
         try {
           const m = /(?:^|;\s*)org_inn=([^;]+)/.exec(document.cookie || '');
-          if (m && m[1]) { if (!aborted) setVisible(true); return; }
+          if (m && m[1]) { if (!aborted) setVisible(true); /* нет данных для префетча */ }
         } catch {}
         // 3) Иначе спросим у сервера
         const r = await fetch('/api/organizations', { cache: 'no-store', credentials: 'include' });
         const d = await r.json();
         const items = Array.isArray(d?.items) ? d.items : [];
-        if (!aborted) setVisible(items.length > 0);
+        if (!aborted) { setVisible(items.length > 0); setPrefetched(items); }
+        try { localStorage.setItem('orgs_cache_v1', JSON.stringify(items)); } catch {}
       } catch {
         if (!aborted) setVisible(false);
       }
@@ -160,10 +162,10 @@ function OrgSelectorWrapper() {
     return () => { aborted = true; };
   }, []);
   if (!visible) return null;
-  return <OrgSelector />;
+  return <OrgSelector prefetched={prefetched || undefined} />;
 }
 
-function OrgSelector() {
+function OrgSelector({ prefetched }: { prefetched?: Array<{ inn: string; name: string | null; maskedToken?: string | null }> }) {
   const [orgs, setOrgs] = useState<Array<{ inn: string; name: string | null; maskedToken?: string | null }>>([]);
   const [inn, setInn] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -171,12 +173,27 @@ function OrgSelector() {
     let cancelled = false;
     (async () => {
       try {
+        if (prefetched && Array.isArray(prefetched)) {
+          const items = prefetched;
+          if (!cancelled) {
+            setOrgs(items);
+            try {
+              const m = /(?:^|;\s*)org_inn=([^;]+)/.exec(document.cookie || '');
+              const cookieInn = m ? decodeURIComponent(m[1]) : null;
+              const exists = cookieInn && items.some((o) => o.inn === cookieInn);
+              setInn(exists ? cookieInn : (items[0]?.inn || null));
+            } catch {
+              setInn(items[0]?.inn || null);
+            }
+            setLoading(false);
+            return;
+          }
+        }
         const r = await fetch('/api/organizations', { cache: 'no-store', credentials: 'include' });
         const d = await r.json();
         const items: Array<{ inn: string; name: string | null }> = Array.isArray(d?.items) ? d.items : [];
         if (!cancelled) {
           setOrgs(items);
-          // Постараемся выбрать org_inn из cookie, но только если он есть в списке items
           try {
             const m = /(?:^|;\s*)org_inn=([^;]+)/.exec(document.cookie || '');
             const cookieInn = m ? decodeURIComponent(m[1]) : null;
@@ -185,6 +202,7 @@ function OrgSelector() {
           } catch {
             setInn(items[0]?.inn || null);
           }
+          try { localStorage.setItem('orgs_cache_v1', JSON.stringify(items)); } catch {}
         }
       } catch {
         if (!cancelled) { setOrgs([]); setInn(null); }

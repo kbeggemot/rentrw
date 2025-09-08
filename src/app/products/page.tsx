@@ -16,7 +16,7 @@ function makeAbs(h: Headers, path: string): string {
 async function fetchProducts(h: Headers) {
   const cookie = h.get('cookie') || '';
   try {
-    const r = await fetch(makeAbs(h, '/api/products'), { cache: 'no-store', headers: { cookie } });
+    const r = await fetch(makeAbs(h, '/api/products'), { next: { revalidate: 5 }, headers: { cookie } });
     try { const j = await r.json(); return j; } catch { return { items: [], categories: [] }; }
   } catch {
     // Network failure — return empty dataset to avoid SSR crash
