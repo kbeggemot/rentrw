@@ -89,8 +89,19 @@ export async function GET(req: Request) {
             // Classify RW ofd_url using creation date vs service end date
             const patch: any = { status: normalized?.acquiring_order?.status, additionalCommissionOfdUrl: addOfd, npdReceiptUri: npdReceipt };
             if (ofdUrl) {
+              const toMskDate = (iso: string | null | undefined): string | null => {
+                if (!iso) return null;
+                const d = new Date(iso);
+                if (!Number.isFinite(d.getTime())) return null;
+                const fmt = new Intl.DateTimeFormat('ru-RU', { timeZone: 'Europe/Moscow', year: 'numeric', month: '2-digit', day: '2-digit' });
+                const parts = fmt.formatToParts(d);
+                const dd = parts.find((p) => p.type === 'day')?.value || '';
+                const mm = parts.find((p) => p.type === 'month')?.value || '';
+                const yy = parts.find((p) => p.type === 'year')?.value || '';
+                return (yy && mm && dd) ? `${yy}-${mm}-${dd}` : null;
+              };
               const createdAt = (normalized as any)?.created_at || s.createdAtRw || s.createdAt;
-              const createdDate = createdAt ? String(createdAt).slice(0, 10) : null;
+              const createdDate = toMskDate(createdAt);
               const endStr = (s.serviceEndDate || '') as string;
               if (createdDate && endStr && createdDate === endStr) patch.ofdFullUrl = ofdUrl; else patch.ofdUrl = ofdUrl;
             }
@@ -99,8 +110,19 @@ export async function GET(req: Request) {
             if (ofdUrl) {
               try { (global as any).__OFD_SOURCE__ = 'refresh'; } catch {}
               try {
+                const toMskDate = (iso: string | null | undefined): string | null => {
+                  if (!iso) return null;
+                  const d = new Date(iso);
+                  if (!Number.isFinite(d.getTime())) return null;
+                  const fmt = new Intl.DateTimeFormat('ru-RU', { timeZone: 'Europe/Moscow', year: 'numeric', month: '2-digit', day: '2-digit' });
+                  const parts = fmt.formatToParts(d);
+                  const dd = parts.find((p) => p.type === 'day')?.value || '';
+                  const mm = parts.find((p) => p.type === 'month')?.value || '';
+                  const yy = parts.find((p) => p.type === 'year')?.value || '';
+                  return (yy && mm && dd) ? `${yy}-${mm}-${dd}` : null;
+                };
                 const createdAt = (normalized as any)?.created_at || s.createdAtRw || s.createdAt;
-                const createdDate = createdAt ? String(createdAt).slice(0, 10) : null;
+                const createdDate = toMskDate(createdAt);
                 const endStr = (s.serviceEndDate || '') as string;
                 if (createdDate && endStr && createdDate === endStr) {
                   { const numOrder = Number(String(s.orderId).match(/(\d+)/g)?.slice(-1)[0] || NaN); await updateSaleOfdUrlsByOrderId(userId, numOrder, { ofdFullUrl: ofdUrl }); }

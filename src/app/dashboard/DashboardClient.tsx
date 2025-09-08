@@ -107,7 +107,7 @@ export default function DashboardClient({ hasTokenInitial }: { hasTokenInitial: 
 
   const refreshLinks = async () => {
     try {
-      const r = await fetch('/api/links?limit=50&sort=code_asc', { cache: 'no-store' });
+      const r = await fetch('/api/links?limit=50', { cache: 'no-store' });
       const d = await r.json();
       const list = Array.isArray(d?.items) ? d.items.map((x: any) => ({ code: x.code, title: x.title, createdAt: x.createdAt })) : [];
       const nc = typeof d?.nextCursor === 'string' && d.nextCursor.length > 0 ? String(d.nextCursor) : null;
@@ -121,7 +121,7 @@ export default function DashboardClient({ hasTokenInitial }: { hasTokenInitial: 
     if (!linksNextCursor) return;
     setLinksLoading(true);
     try {
-      const r = await fetch(`/api/links?limit=50&sort=code_asc&cursor=${encodeURIComponent(linksNextCursor)}`, { cache: 'no-store' });
+      const r = await fetch(`/api/links?limit=50&cursor=${encodeURIComponent(linksNextCursor)}`, { cache: 'no-store' });
       const d = await r.json();
       const list = Array.isArray(d?.items) ? d.items.map((x: any) => ({ code: x.code, title: x.title, createdAt: x.createdAt })) : [];
       const nc = typeof d?.nextCursor === 'string' && d.nextCursor.length > 0 ? String(d.nextCursor) : null;
@@ -186,7 +186,7 @@ export default function DashboardClient({ hasTokenInitial }: { hasTokenInitial: 
     } catch {}
     (async () => {
       try {
-        const r = await fetch('/api/links?limit=50&sort=code_asc', { cache: 'no-store' });
+        const r = await fetch('/api/links?limit=50', { cache: 'no-store' });
         const d = await r.json();
         const list = Array.isArray(d?.items) ? d.items.map((x: any) => ({ code: x.code, title: x.title, createdAt: x.createdAt })) : [];
         const nc = typeof d?.nextCursor === 'string' && d.nextCursor.length > 0 ? String(d.nextCursor) : null;
