@@ -34,8 +34,72 @@ export async function GET(req: Request) {
     const inn = getSelectedOrgInn(req);
     const { getShowAllDataFlag } = await import('@/server/userStore');
     const showAll = await getShowAllDataFlag(userId);
-    const items = inn ? (showAll ? await listAllPaymentLinksForOrg(inn) : await listPaymentLinksForOrg(userId, inn)) : await listPaymentLinks(userId);
-    return NextResponse.json({ items });
+    const itemsRaw = inn ? (showAll ? await listAllPaymentLinksForOrg(inn) : await listPaymentLinksForOrg(userId, inn)) : await listPaymentLinks(userId);
+    // Pagination: limit + cursor (supports created_desc and code_* sorts)
+    const limitParam = Number(url.searchParams.get('limit') || '');
+    const limit = Number.isFinite(limitParam) && limitParam > 0 && limitParam <= 200 ? limitParam : 50;
+    const cursor = url.searchParams.get('cursor');
+    const sortParam = String(url.searchParams.get('sort') || '');
+    const sortMode: 'created_desc' | 'code_asc' | 'code_desc' = (sortParam === 'code_asc' || sortParam === 'code_desc') ? (sortParam as any) : 'created_desc';
+
+    const safeCode = (v: any) => String(v || '');
+    const sorted = sortMode === 'created_desc'
+      ? [...itemsRaw].sort((a: any, b: any) => {
+          const at = Date.parse(a?.createdAt || 0);
+          const bt = Date.parse(b?.createdAt || 0);
+          if (!Number.isFinite(at) && !Number.isFinite(bt)) return 0;
+          if (!Number.isFinite(at)) return 1;
+          if (!Number.isFinite(bt)) return -1;
+          if (bt !== at) return bt - at; // latest first
+          return safeCode(b.code).localeCompare(safeCode(a.code));
+        })
+      : (sortMode === 'code_asc'
+        ? [...itemsRaw].sort((a: any, b: any) => safeCode(a.code).localeCompare(safeCode(b.code)))
+        : [...itemsRaw].sort((a: any, b: any) => safeCode(b.code).localeCompare(safeCode(a.code))));
+
+    let startIndex = 0;
+    if (cursor) {
+      if (sortMode === 'created_desc') {
+        const [curIso, curCode] = String(cursor).split('|');
+        const curTs = Date.parse(curIso || '') || 0;
+        let i = 0;
+        while (i < sorted.length) {
+          const it = sorted[i];
+          const ts = Date.parse((it as any)?.createdAt || 0) || 0;
+          if (ts < curTs || (ts === curTs && safeCode((it as any)?.code) < safeCode(curCode))) break;
+          i += 1;
+        }
+        startIndex = i;
+      } else if (sortMode === 'code_asc') {
+        const cur = safeCode(cursor);
+        let i = 0;
+        while (i < sorted.length) {
+          const it = sorted[i];
+          if (safeCode((it as any)?.code) > cur) break;
+          i += 1;
+        }
+        startIndex = i;
+      } else if (sortMode === 'code_desc') {
+        const cur = safeCode(cursor);
+        let i = 0;
+        while (i < sorted.length) {
+          const it = sorted[i];
+          if (safeCode((it as any)?.code) < cur) break;
+          i += 1;
+        }
+        startIndex = i;
+      }
+    }
+    const pageItems = sorted.slice(startIndex, startIndex + limit);
+    let nextCursor: string | null = null;
+    if ((startIndex + limit) < sorted.length && pageItems.length > 0) {
+      if (sortMode === 'created_desc') {
+        nextCursor = `${pageItems[pageItems.length - 1].createdAt}|${pageItems[pageItems.length - 1].code}`;
+      } else {
+        nextCursor = safeCode(pageItems[pageItems.length - 1].code);
+      }
+    }
+    return NextResponse.json({ items: pageItems, nextCursor });
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'Server error';
     return NextResponse.json({ error: msg }, { status: 500 });

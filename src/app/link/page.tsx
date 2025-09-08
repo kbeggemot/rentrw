@@ -14,6 +14,8 @@ export default function LinksStandalonePage() {
   };
 
   const [links, setLinks] = useState<Array<{ code: string; title: string; createdAt?: string }>>([]);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
   const [linksOpen, setLinksOpen] = useState(true);
   const [menuOpenCode, setMenuOpenCode] = useState<string | null>(null);
   const [menuPos, setMenuPos] = useState<{ top: number; left: number } | null>(null);
@@ -36,13 +38,52 @@ export default function LinksStandalonePage() {
 
   const refreshLinks = async () => {
     try {
-      const r = await fetch('/api/links', { cache: 'no-store' });
+      const r = await fetch('/api/links?limit=50&sort=code_asc', { cache: 'no-store' });
       const d = await r.json();
-      if (Array.isArray(d?.items)) setLinks(d.items.map((x: any) => ({ code: x.code, title: x.title, createdAt: x.createdAt })));
+      const list = Array.isArray(d?.items) ? d.items.map((x: any) => ({ code: x.code, title: x.title, createdAt: x.createdAt })) : [];
+      const nc = typeof d?.nextCursor === 'string' && d.nextCursor.length > 0 ? String(d.nextCursor) : null;
+      setNextCursor(nc);
+      setLinks((prev) => (JSON.stringify(prev) === JSON.stringify(list) ? prev : list));
+      try { localStorage.setItem('links_cache_v1', JSON.stringify({ items: list })); } catch {}
     } catch {}
   };
 
-  useEffect(() => { (async () => { await refreshLinks(); })(); }, []);
+  const loadMore = async () => {
+    if (!nextCursor) return;
+    setLoading(true);
+    try {
+      const r = await fetch(`/api/links?limit=50&sort=code_asc&cursor=${encodeURIComponent(nextCursor)}`, { cache: 'no-store' });
+      const d = await r.json();
+      const list = Array.isArray(d?.items) ? d.items.map((x: any) => ({ code: x.code, title: x.title, createdAt: x.createdAt })) : [];
+      const nc = typeof d?.nextCursor === 'string' && d.nextCursor.length > 0 ? String(d.nextCursor) : null;
+      setNextCursor(nc);
+      setLinks((prev) => {
+        const map = new Map<string, { code: string; title: string; createdAt?: string }>();
+        for (const it of prev) map.set(it.code, it);
+        for (const it of list) map.set(it.code, it);
+        const merged = Array.from(map.values());
+        try { localStorage.setItem('links_cache_v1', JSON.stringify({ items: merged })); } catch {}
+        return merged;
+      });
+    } catch {}
+    finally { setLoading(false); }
+  };
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem('links_cache_v1');
+      if (raw) {
+        try {
+          const parsed = JSON.parse(raw);
+          const list = Array.isArray(parsed?.items) ? parsed.items : (Array.isArray(parsed) ? parsed : []);
+          if (Array.isArray(list) && list.length > 0) {
+            setLinks((prev) => (JSON.stringify(prev) === JSON.stringify(list) ? prev : list));
+          }
+        } catch {}
+      }
+    } catch {}
+    (async () => { await refreshLinks(); })();
+  }, []);
   // Flash success after redirect from creation
   useEffect(() => {
     try {
@@ -140,6 +181,11 @@ export default function LinksStandalonePage() {
             </div>
           ) : null}
         </div>
+        {nextCursor ? (
+          <div className="mt-3">
+            <Button variant="secondary" fullWidth onClick={loadMore} disabled={loading}>{loading ? 'Загрузка…' : 'Показать ещё'}</Button>
+          </div>
+        ) : null}
       </div>
       {/* Портал для выпадающего меню, как на продажах */}
       {menuOpenCode && menuPos ? createPortal(
@@ -155,7 +201,14 @@ export default function LinksStandalonePage() {
               onClick={async () => {
                 const code = menuOpenCode; setMenuOpenCode(null);
                 if (!confirm('Удалить ссылку?')) return;
-                try { await fetch(`/api/links/${encodeURIComponent(code)}`, { method: 'DELETE' }); setLinks((prev) => prev.filter((x) => x.code !== code)); } catch {}
+                try {
+                  await fetch(`/api/links/${encodeURIComponent(code)}`, { method: 'DELETE' });
+                  setLinks((prev) => {
+                    const next = prev.filter((x) => x.code !== code);
+                    try { localStorage.setItem('links_cache_v1', JSON.stringify({ items: next })); } catch {}
+                    return next;
+                  });
+                } catch {}
               }}
             >Удалить</button>
           </div>

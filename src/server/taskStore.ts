@@ -1,4 +1,5 @@
 import { readText, writeText, list } from './storage';
+import { upsertUserIndex, upsertOrderIndex, readUserIndex, readOrderIndexMapping, type SaleIndexRow } from './salesIndex';
 import { getHub } from './eventBus';
 import path from 'path';
 import { appendAdminEntityLog } from './adminAudit';
@@ -150,6 +151,11 @@ async function writeSaleAndIndexes(sale: SaleRecord): Promise<void> {
   await writeOrgIndex(inn, idx);
   // 3) upsert by-task index
   await writeText(byTaskIndexPath(sale.taskId), JSON.stringify({ inn, userId: sale.userId }, null, 2));
+  // 4) upsert by-user index
+  const row: SaleIndexRow = { inn, userId: sale.userId, taskId: sale.taskId, orderId: sale.orderId, createdAt: sale.createdAt, updatedAt: sale.updatedAt, status: sale.status ?? null };
+  try { await upsertUserIndex(row); } catch {}
+  // 5) upsert by-order mapping
+  try { await upsertOrderIndex(sale.orderId, { inn, userId: sale.userId, taskId: sale.taskId }); } catch {}
 }
 
 async function readByTask(taskId: number | string): Promise<{ inn: string; userId: string } | null> {
@@ -468,6 +474,18 @@ export async function setSaleCreatedAtRw(userId: string, taskId: number | string
 }
 
 export async function listSales(userId: string): Promise<SaleRecord[]> {
+  // Prefer by_user index when available
+  try {
+    const rows = await readUserIndex(userId);
+    if (Array.isArray(rows) && rows.length > 0) {
+      const out: SaleRecord[] = [];
+      for (const r of rows) {
+        const s = await readSaleByInnTask(r.inn, r.taskId);
+        if (s && s.userId === userId) out.push(s);
+      }
+      if (out.length > 0) return out.sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
+    }
+  } catch {}
   // Read from sharded org indexes and merge с legacy
   const out: SaleRecord[] = [];
   try {
@@ -524,6 +542,14 @@ export async function findSaleByTaskId(userId: string, taskId: number | string):
     const s = await readSaleByInnTask(mapped.inn, taskId);
     if (s && s.userId === userId) return s;
   }
+    // Try by_order index
+  try {
+    const map = await readOrderIndexMapping(String(taskId));
+    if (map) {
+      const s2 = await readSaleByInnTask(map.inn, map.taskId);
+      if (s2 && s2.userId === userId) return s2;
+    }
+  } catch {}
   // Fallback legacy
   const store = await readTasks();
   const arr = (store.sales ?? []).filter((s) => s.userId === userId && s.taskId == taskId);

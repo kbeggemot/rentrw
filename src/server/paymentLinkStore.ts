@@ -1,4 +1,5 @@
 import { readText, writeText } from './storage';
+import { upsertLinkByCode } from './linksIndex';
 
 export type PaymentLink = {
   code: string;
@@ -98,6 +99,7 @@ export async function createPaymentLink(userId: string, data: Omit<PaymentLink, 
   };
   store.items.push(item);
   await writeStore(store);
+  try { await upsertLinkByCode(item.code, { userId, orgInn: item.orgInn || null, code: item.code }); } catch {}
   return item;
 }
 
@@ -130,6 +132,7 @@ export async function deletePaymentLink(userId: string, code: string): Promise<b
   if (idx === -1) return false;
   store.items.splice(idx, 1);
   await writeStore(store);
+  try { const { deleteLinkByCode } = await import('./linksIndex'); await deleteLinkByCode(code); } catch {}
   return true;
 }
 
@@ -209,6 +212,7 @@ export async function updatePaymentLink(userId: string, code: string, updates: P
 
   store.items[idx] = next;
   await writeStore(store);
+  try { await upsertLinkByCode(next.code, { userId, orgInn: next.orgInn || null, code: next.code }); } catch {}
   return next;
 }
 

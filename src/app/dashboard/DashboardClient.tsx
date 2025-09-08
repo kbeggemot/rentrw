@@ -34,6 +34,8 @@ export default function DashboardClient({ hasTokenInitial }: { hasTokenInitial: 
 
   // Permalinks state
   const [links, setLinks] = useState<Array<{ code: string; title: string; createdAt?: string }>>([]);
+  const [linksNextCursor, setLinksNextCursor] = useState<string | null>(null);
+  const [linksLoading, setLinksLoading] = useState(false);
   const [linkOpen, setLinkOpen] = useState(false);
   const [linksOpen, setLinksOpen] = useState(false);
   const [linkTitle, setLinkTitle] = useState('');
@@ -105,10 +107,35 @@ export default function DashboardClient({ hasTokenInitial }: { hasTokenInitial: 
 
   const refreshLinks = async () => {
     try {
-      const r = await fetch('/api/links', { cache: 'no-store' });
+      const r = await fetch('/api/links?limit=50&sort=code_asc', { cache: 'no-store' });
       const d = await r.json();
-      if (Array.isArray(d?.items)) setLinks(d.items.map((x: any) => ({ code: x.code, title: x.title, createdAt: x.createdAt })));
+      const list = Array.isArray(d?.items) ? d.items.map((x: any) => ({ code: x.code, title: x.title, createdAt: x.createdAt })) : [];
+      const nc = typeof d?.nextCursor === 'string' && d.nextCursor.length > 0 ? String(d.nextCursor) : null;
+      setLinksNextCursor(nc);
+      setLinks((prev) => (JSON.stringify(prev) === JSON.stringify(list) ? prev : list));
+      try { localStorage.setItem('links_cache_v1', JSON.stringify({ items: list })); } catch {}
     } catch {}
+  };
+
+  const loadMoreLinks = async () => {
+    if (!linksNextCursor) return;
+    setLinksLoading(true);
+    try {
+      const r = await fetch(`/api/links?limit=50&sort=code_asc&cursor=${encodeURIComponent(linksNextCursor)}`, { cache: 'no-store' });
+      const d = await r.json();
+      const list = Array.isArray(d?.items) ? d.items.map((x: any) => ({ code: x.code, title: x.title, createdAt: x.createdAt })) : [];
+      const nc = typeof d?.nextCursor === 'string' && d.nextCursor.length > 0 ? String(d.nextCursor) : null;
+      setLinksNextCursor(nc);
+      setLinks((prev) => {
+        const map = new Map<string, { code: string; title: string; createdAt?: string }>();
+        for (const it of prev) map.set(it.code, it);
+        for (const it of list) map.set(it.code, it);
+        const merged = Array.from(map.values());
+        try { localStorage.setItem('links_cache_v1', JSON.stringify({ items: merged })); } catch {}
+        return merged;
+      });
+    } catch {}
+    finally { setLinksLoading(false); }
   };
 
   // On mount: load history and restore pending task (for spinner) if any
@@ -143,13 +170,29 @@ export default function DashboardClient({ hasTokenInitial }: { hasTokenInitial: 
     })();
   }, []);
 
-  // Load permanent links on mount
+  // Load permanent links on mount with SWR-lite (hydrate from cache, then fetch fresh)
   useEffect(() => {
+    try {
+      const raw = localStorage.getItem('links_cache_v1');
+      if (raw) {
+        try {
+          const parsed = JSON.parse(raw);
+          const list = Array.isArray(parsed?.items) ? parsed.items : (Array.isArray(parsed) ? parsed : []);
+          if (Array.isArray(list) && list.length > 0) {
+            setLinks((prev) => (JSON.stringify(prev) === JSON.stringify(list) ? prev : list));
+          }
+        } catch {}
+      }
+    } catch {}
     (async () => {
       try {
-        const r = await fetch('/api/links', { cache: 'no-store' });
+        const r = await fetch('/api/links?limit=50&sort=code_asc', { cache: 'no-store' });
         const d = await r.json();
-        if (Array.isArray(d?.items)) setLinks(d.items.map((x: any) => ({ code: x.code, title: x.title, createdAt: x.createdAt })));
+        const list = Array.isArray(d?.items) ? d.items.map((x: any) => ({ code: x.code, title: x.title, createdAt: x.createdAt })) : [];
+        const nc = typeof d?.nextCursor === 'string' && d.nextCursor.length > 0 ? String(d.nextCursor) : null;
+        setLinksNextCursor(nc);
+        setLinks((prev) => (JSON.stringify(prev) === JSON.stringify(list) ? prev : list));
+        try { localStorage.setItem('links_cache_v1', JSON.stringify({ items: list })); } catch {}
       } catch {}
     })();
   }, []);
@@ -461,6 +504,11 @@ export default function DashboardClient({ hasTokenInitial }: { hasTokenInitial: 
                     ))}
                   </div>
                 )}
+              </div>
+            ) : null}
+            {linksOpen && linksNextCursor ? (
+              <div className="mt-3">
+                <Button variant="secondary" onClick={loadMoreLinks} disabled={linksLoading}>{linksLoading ? 'Загрузка…' : 'Показать ещё'}</Button>
               </div>
             ) : null}
           </div>

@@ -61,6 +61,22 @@ export default function PartnersClient({ initial, hasTokenInitial }: { initial: 
   }
 
 
+  // SWR-lite: hydrate from local cache first for instant paint
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem('partners_cache_v1');
+      if (raw) {
+        try {
+          const parsed = JSON.parse(raw);
+          const list = Array.isArray(parsed?.items) ? parsed.items : (Array.isArray(parsed) ? parsed : []);
+          if (Array.isArray(list) && list.length > 0) {
+            setPartners((prev) => (JSON.stringify(prev) === JSON.stringify(list) ? prev : list));
+          }
+        } catch {}
+      }
+    } catch {}
+  }, []);
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return partners;
@@ -79,6 +95,7 @@ export default function PartnersClient({ initial, hasTokenInitial }: { initial: 
       const data = await res.json();
       const list = Array.isArray(data?.partners) ? data.partners : [];
       setPartners((prev) => (JSON.stringify(prev) === JSON.stringify(list) ? prev : list));
+      try { localStorage.setItem('partners_cache_v1', JSON.stringify({ items: list })); } catch {}
     } catch {
       // keep previous list on error to avoid flicker
     } finally {

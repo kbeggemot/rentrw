@@ -24,6 +24,7 @@ type Sale = {
 
 export default function SalesClient({ initial, hasTokenInitial }: { initial: Sale[]; hasTokenInitial?: boolean }) {
   const [sales, setSales] = useState<Sale[]>(initial);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [hasToken, setHasToken] = useState<boolean | null>(typeof hasTokenInitial === 'boolean' ? hasTokenInitial : null);
   const [loading, setLoading] = useState(false);
   const [page, setPage] = useState(1);
@@ -154,9 +155,10 @@ export default function SalesClient({ initial, hasTokenInitial }: { initial: Sal
         // fire-and-forget sync for the interim list as well
         void syncMissing(listOld);
       } else {
-        const res = await fetch('/api/sales', { cache: 'no-store', credentials: 'include' });
+        const res = await fetch('/api/sales?limit=50', { cache: 'no-store', credentials: 'include' });
         const data = await res.json();
         const list = Array.isArray(data?.sales) ? data.sales : [];
+        setNextCursor(typeof data?.nextCursor === 'string' && data.nextCursor.length > 0 ? String(data.nextCursor) : null);
         setSales((prev) => (JSON.stringify(prev) === JSON.stringify(list) ? prev : list));
         void syncMissing(list);
       }
@@ -167,6 +169,25 @@ export default function SalesClient({ initial, hasTokenInitial }: { initial: Sal
     }
   };
 
+
+  const loadMore = async () => {
+    if (!nextCursor) return;
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/sales?limit=50&cursor=${encodeURIComponent(nextCursor)}`, { cache: 'no-store', credentials: 'include' });
+      const data = await res.json();
+      const list: Sale[] = Array.isArray(data?.sales) ? data.sales : [];
+      const nc = typeof data?.nextCursor === 'string' && data.nextCursor.length > 0 ? String(data.nextCursor) : null;
+      setNextCursor(nc);
+      setSales((prev) => {
+        const map = new Map<string, Sale>();
+        for (const s of prev) map.set(String(s.taskId), s);
+        for (const s of list) map.set(String((s as any).taskId), s as Sale);
+        return Array.from(map.values());
+      });
+    } catch {
+    } finally { setLoading(false); }
+  };
   // Подписка на серверные события (прод) и мягкое обновление
   useEffect(() => {
     if (sseOn) return;

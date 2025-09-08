@@ -383,7 +383,31 @@ export async function GET(req: Request) {
         } catch {}
       })();
     } catch {}
-    return NextResponse.json({ sales });
+    // Pagination: limit & cursor (createdAt|taskId)
+    const limitRaw = urlObj.searchParams.get('limit');
+    const limit = (() => { const n = Number(limitRaw); return Number.isFinite(n) && n > 0 ? Math.min(100, Math.max(1, Math.floor(n))) : 0; })();
+    const cursorRaw = urlObj.searchParams.get('cursor');
+    let page = sales;
+    let nextCursor: string | null = null;
+    if (limit > 0) {
+      // ensure desc by createdAt then taskId desc
+      const sorted = [...sales].sort((a: any, b: any) => {
+        if (a.createdAt === b.createdAt) return String(a.taskId) < String(b.taskId) ? 1 : -1;
+        return a.createdAt < b.createdAt ? 1 : -1;
+      });
+      let start = 0;
+      if (cursorRaw) {
+        const [ts, tid] = cursorRaw.split('|');
+        const idx = sorted.findIndex((s: any) => String(s.createdAt) === ts && String(s.taskId) === String(tid));
+        if (idx >= 0) start = idx + 1;
+      }
+      page = sorted.slice(start, start + limit);
+      if (start + limit < sorted.length && page.length > 0) {
+        const last = page[page.length - 1] as any;
+        nextCursor = `${String(last.createdAt)}|${String(last.taskId)}`;
+      }
+    }
+    return NextResponse.json({ sales: page, nextCursor });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Server error';
     return NextResponse.json({ error: message }, { status: 500 });
