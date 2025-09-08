@@ -15,15 +15,25 @@ function makeAbs(h: Headers, path: string): string {
 
 async function fetchProducts(h: Headers) {
   const cookie = h.get('cookie') || '';
-  const r = await fetch(makeAbs(h, '/api/products'), { cache: 'no-store', headers: { cookie } });
-  try { const j = await r.json(); return j; } catch { return { items: [], categories: [] }; }
+  try {
+    const r = await fetch(makeAbs(h, '/api/products'), { cache: 'no-store', headers: { cookie } });
+    try { const j = await r.json(); return j; } catch { return { items: [], categories: [] }; }
+  } catch {
+    // Network failure — return empty dataset to avoid SSR crash
+    return { items: [], categories: [] } as any;
+  }
 }
 
 export default async function ProductsPage() {
   // SSR token check for banner
   const h = await headers();
-  const tokenHeader = await fetch(makeAbs(h, '/api/settings/token'), { cache: 'no-store', headers: { cookie: h.get('cookie') || '' } });
-  let hasToken = false; try { const d = await tokenHeader.json(); hasToken = Boolean(d?.token); } catch {}
+  let hasToken = false;
+  try {
+    const tokenHeader = await fetch(makeAbs(h, '/api/settings/token'), { cache: 'no-store', headers: { cookie: h.get('cookie') || '' } });
+    try { const d = await tokenHeader.json(); hasToken = Boolean(d?.token); } catch {}
+  } catch {
+    hasToken = false;
+  }
   const data = await fetchProducts(h);
   return (
     <div className={hasToken ? "mx-auto w-full max-w-3xl md:max-w-4xl lg:max-w-5xl xl:max-w-6xl 2xl:max-w-7xl pt-0 pb-4" : "max-w-3xl mx-auto pt-0 pb-4"}>

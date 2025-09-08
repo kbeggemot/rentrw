@@ -62,6 +62,10 @@ export type SaleRecord = {
   // Instant delivery email status
   instantEmailStatus?: 'pending' | 'sent' | 'failed' | null;
   instantEmailError?: string | null;
+  // Terms document accepted by payer at payment start
+  termsDocHash?: string | null;
+  termsDocName?: string | null;
+  termsAcceptedAt?: string | null; // ISO
 };
 
 function normalizeOrderId(value: string | number): number {
@@ -120,8 +124,10 @@ export async function recordSaleOnCreate(params: {
   agentDescription?: string | null;
   partnerFio?: string | null;
   partnerPhone?: string | null;
+  termsDocHash?: string | null;
+  termsDocName?: string | null;
 }): Promise<void> {
-  const { userId, taskId, orderId, linkCode, orgInn, rwTokenFp, payerTgId, payerTgFirstName, payerTgLastName, payerTgUsername, clientEmail, description, amountGrossRub, isAgent, commissionType, commissionValue, serviceEndDate, vatRate, cartItems, agentDescription, partnerFio, partnerPhone } = params;
+  const { userId, taskId, orderId, linkCode, orgInn, rwTokenFp, payerTgId, payerTgFirstName, payerTgLastName, payerTgUsername, clientEmail, description, amountGrossRub, isAgent, commissionType, commissionValue, serviceEndDate, vatRate, cartItems, agentDescription, partnerFio, partnerPhone, termsDocHash, termsDocName } = params;
   // Try infer orgInn from fingerprint if missing or unknown
   let resolvedInn: string | null | undefined = orgInn;
   try {
@@ -209,6 +215,9 @@ export async function recordSaleOnCreate(params: {
     partnerPhone: partnerPhone ?? null,
     instantEmailStatus: null,
     instantEmailError: null,
+    termsDocHash: (termsDocHash ?? null) as any,
+    termsDocName: (termsDocName ?? null) as any,
+    termsAcceptedAt: (termsDocHash ? now : null) as any,
   });
   await writeTasks(store);
   try { getHub().publish(userId, 'sales:update'); } catch {}

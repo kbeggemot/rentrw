@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 type Props = {
   code: string;
@@ -10,10 +10,11 @@ type Props = {
   total: number;
   url: string;
   tg: string;
+  showDocs?: boolean;
 };
 
 export default function ManageLinkClient(props: Props) {
-  const { code, link, items, total, url, tg } = props;
+  const { code, link, items, total, url, tg, showDocs } = props;
   const router = useRouter();
   const [isEnabled, setIsEnabled] = useState(!link?.disabled);
   const [toast, setToast] = useState<{ msg: string; kind: 'success' | 'error' | 'info' } | null>(null);
@@ -21,6 +22,11 @@ export default function ManageLinkClient(props: Props) {
     setToast({ msg, kind });
     setTimeout(() => setToast(null), 2500);
   };
+  const [docs, setDocs] = useState<Array<{ hash: string; name?: string | null; size?: number }>>([]);
+  const [uploading, setUploading] = useState(false);
+
+  // Load existing docs for user (to reuse)
+  useEffect(() => { (async () => { try { const r = await fetch('/api/docs', { cache: 'no-store' }); const d = await r.json(); if (Array.isArray(d?.items)) setDocs(d.items); } catch {} })(); }, []);
 
   return (
     <div className="max-w-3xl mx-auto pt-0 pb-4">
@@ -28,6 +34,56 @@ export default function ManageLinkClient(props: Props) {
         <div className="text-sm text-gray-600">Код: <span className="font-mono">/{code}</span></div>
       </div>
       <div className="rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 p-4 space-y-4">
+        {/* Document for payment (only in edit) */}
+        {showDocs ? (<div>
+          <div className="text-sm font-semibold mb-1">Документ для оплаты (необязательно)</div>
+          <div className="text-xs text-gray-600 mb-2">Загрузите PDF-документ с условиями продажи/оказания услуг. На платёжной странице мы покажем ссылку на файл и чекбокс “Я принимаю условия”. Без согласия оплатить нельзя.</div>
+          {docs.length > 0 ? (
+            <div className="mb-2">
+              <div className="text-xs text-gray-600 mb-1">Использовать ранее загруженный:</div>
+              <div className="flex flex-wrap gap-2">
+                {docs.map((d) => (
+                  <button key={d.hash} className="px-2 h-8 border rounded text-sm" onClick={async()=>{
+                    const body = { title: link.title, description: link.description, sumMode: link.sumMode, amountRub: link.amountRub, vatRate: link.vatRate, method: link.method, isAgent: link.isAgent, commissionType: link.commissionType, commissionValue: link.commissionValue, partnerPhone: link.partnerPhone, disabled: link.disabled, cartItems: link.cartItems, allowCartAdjust: link.allowCartAdjust, startEmptyCart: link.startEmptyCart, cartDisplay: link.cartDisplay, termsDocHash: d.hash } as any;
+                    await fetch(`/api/links/${encodeURIComponent(code)}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+                    showToast('Документ выбран', 'success');
+                  }}>{d.name || `${d.hash.slice(0,8)}…`}</button>
+                ))}
+              </div>
+            </div>
+          ) : null}
+          <div className="border rounded p-3">
+            <div className="text-sm mb-1">Файл</div>
+            <label className={`flex items-center justify-center border-2 border-dashed rounded h-24 text-sm ${uploading ? 'opacity-60' : ''}`}>
+              <input type="file" accept="application/pdf" className="hidden" onChange={async (e)=>{
+                const f = e.currentTarget.files && e.currentTarget.files[0];
+                if (!f) return;
+                if (f.type !== 'application/pdf') { showToast('Загрузите файл в формате PDF', 'error'); return; }
+                if (f.size > 5*1024*1024) { showToast('Файл слишком большой. Загрузите файл размером до 5 МБ', 'error'); return; }
+                try {
+                  setUploading(true);
+                  const buf = await f.arrayBuffer();
+                  const res = await fetch('/api/docs', { method: 'POST', headers: { 'Content-Type': 'application/pdf' }, body: buf });
+                  const d = await res.json();
+                  if (!res.ok) {
+                    const code = d?.error; if (code === 'INVALID_FORMAT') showToast('Загрузите файл в формате PDF', 'error'); else if (code === 'TOO_LARGE') showToast('Файл слишком большой. Загрузите файл размером до 5 МБ', 'error'); else showToast('Не удалось открыть файл. Попробуйте другой PDF', 'error');
+                    return;
+                  }
+                  const hash = d?.item?.hash;
+                  if (hash) {
+                    setDocs((prev)=> [{ hash, name: f.name, size: f.size }, ...prev]);
+                    const body = { title: link.title, description: link.description, sumMode: link.sumMode, amountRub: link.amountRub, vatRate: link.vatRate, method: link.method, isAgent: link.isAgent, commissionType: link.commissionType, commissionValue: link.commissionValue, partnerPhone: link.partnerPhone, disabled: link.disabled, cartItems: link.cartItems, allowCartAdjust: link.allowCartAdjust, startEmptyCart: link.startEmptyCart, cartDisplay: link.cartDisplay, termsDocHash: hash } as any;
+                    await fetch(`/api/links/${encodeURIComponent(code)}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+                    showToast('Документ загружен', 'success');
+                  }
+                } catch { showToast('Не удалось открыть файл. Попробуйте другой PDF', 'error'); }
+                finally { setUploading(false); e.currentTarget.value=''; }
+              }} />
+              <span>{uploading ? 'Загрузка…' : 'Выберите файл'}</span>
+            </label>
+            <div className="text-xs text-gray-600 mt-1">Только PDF. До 5 МБ на файл.</div>
+          </div>
+        </div>) : null}
         <div>
           <div className="text-sm text-gray-600 mb-1">Ссылка на страницу</div>
           <div className="flex items-center gap-2">
@@ -56,10 +112,10 @@ export default function ManageLinkClient(props: Props) {
         </div>
         <div className="flex items-center gap-2">
           <a href={`/link/${encodeURIComponent(code)}/edit`} className="rounded border px-3 h-9 text-sm inline-flex items-center bg-white dark:bg-gray-950 hover:bg-gray-50 dark:hover:bg-gray-900 active:translate-y-[1px] transition">Редактировать</a>
-          <a href={`/api/links/${encodeURIComponent(code)}`} className="rounded border px-3 h-9 text-sm inline-flex items-center bg-white dark:bg-gray-950 hover:bg-gray-50 dark:hover:bg-gray-900 active:translate-y-[1px] transition" onClick={(e)=>{ e.preventDefault(); if (!confirm('Удалить страницу?')) return; fetch(`/api/links/${encodeURIComponent(code)}`, { method: 'DELETE' }).then(()=>{ router.push('/link'); }); }}>Удалить</a>
+          <a href={`/api/links/${encodeURIComponent(code)}`} className={`rounded border px-3 h-9 text-sm inline-flex items-center ${uploading ? 'opacity-60 pointer-events-none' : 'bg-white dark:bg-gray-950 hover:bg-gray-50 dark:hover:bg-gray-900 active:translate-y-[1px] transition'}`} onClick={(e)=>{ e.preventDefault(); if (uploading) return; if (!confirm('Удалить страницу?')) return; fetch(`/api/links/${encodeURIComponent(code)}`, { method: 'DELETE' }).then(()=>{ router.push('/link'); }); }}>Удалить</a>
           <div className="ml-auto inline-flex items-center gap-2">
             <label className="text-sm">Доступна покупателям</label>
-            <input type="checkbox" checked={isEnabled} onChange={async (e)=>{
+            <input type="checkbox" checked={isEnabled} disabled={uploading} onChange={async (e)=>{
               const next = e.currentTarget.checked;
               setIsEnabled(next);
               const body = { title: link.title, description: link.description, sumMode: link.sumMode, amountRub: link.amountRub, vatRate: link.vatRate, method: link.method, isAgent: link.isAgent, commissionType: link.commissionType, commissionValue: link.commissionValue, partnerPhone: link.partnerPhone, disabled: !next, cartItems: link.cartItems, allowCartAdjust: link.allowCartAdjust, startEmptyCart: link.startEmptyCart, cartDisplay: link.cartDisplay };

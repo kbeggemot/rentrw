@@ -385,6 +385,17 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
             setData(null);
             setMsg('Ссылка не найдена');
           } else {
+          // Seed cart state BEFORE exposing data to UI to avoid initial flicker
+          try {
+            if (Array.isArray(d?.cartItems)) {
+              const startEmpty = !!(d as any)?.startEmptyCart;
+              if (startEmpty && d?.allowCartAdjust) {
+                setCart([]);
+              } else {
+                setCart((d.cartItems as any[]).map((c: any) => ({ id: c?.id ?? null, title: String(c?.title || ''), price: Number(c?.price || 0), qty: Number(c?.qty || 1) })));
+              }
+            }
+          } catch {}
           setData(d);
           }
           }
@@ -752,6 +763,8 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
         description: data.description,
         method: method === 'card' ? 'card' : 'qr',
         clientEmail: email.trim(),
+        termsDocHash: (data as any)?.termsDocHash ? String((data as any).termsDocHash) : undefined,
+        termsDocName: undefined,
         agentSale: !!data.isAgent,
         agentPhone: data.partnerPhone || undefined,
         commissionType: data.isAgent ? (data.commissionType || undefined) : undefined,
@@ -824,6 +837,12 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
     }
   }, [taskId, data?.userId, code]);
 
+  // Terms consent state — declare before any early return to keep Hooks order stable
+  const termsRequired = Boolean((data as any)?.termsDocHash);
+  const [termsAccepted, setTermsAccepted] = useState(false);
+  const canStart = canPay && !started && !loading && !payLocked && (!termsRequired || termsAccepted);
+  const actionBtnClasses = `inline-flex items-center justify-center rounded-lg ${canStart ? 'bg-black text-white' : 'bg-gray-200 text-gray-600'} px-4 h-9 text-sm`;
+
   if (!data) {
     return (
       <div className="max-w-xl mx-auto">
@@ -832,9 +851,6 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
       </div>
     );
   }
-
-  const canStart = canPay && !started && !loading && !payLocked;
-  const actionBtnClasses = `inline-flex items-center justify-center rounded-lg ${canStart ? 'bg-black text-white' : 'bg-gray-200 text-gray-600'} px-4 h-9 text-sm`;
 
   return (
     <div className="max-w-xl mx-auto">
@@ -1024,7 +1040,7 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
           <input className="w-full sm:w-80 rounded-lg border px-2 h-9 text-sm bg-white text-black dark:bg-gray-800 dark:text-white placeholder-gray-400 dark:placeholder-gray-400" type="email" inputMode="email" pattern="^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="name@example.com" />
           <div className="text-xs text-gray-500 mt-1">{(() => { try { const hasInstant = Array.isArray(data?.cartItems) && (data.cartItems as any[]).some((i: any) => typeof (i as any)?.instantResult === 'string' && (i as any).instantResult.trim().length > 0); if (hasInstant) return (<span>Отправим чек и <b>вашу покупку</b> на эту почту</span>); } catch {} return 'Отправим чек на эту почту'; })()}</div>
         </div>
-        <div className="mb-4">
+        <div className="mb-2">
           <label className="block text-sm text-gray-600 mb-1">Способ оплаты</label>
           {data.method === 'any' ? (
             <select className="border rounded-lg px-2 h-9 text-sm w-40" value={method} onChange={(e) => setMethod(e.target.value as any)}>
@@ -1035,6 +1051,18 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
             <input className="w-40 rounded-lg border px-2 h-9 text-sm bg-white text-black dark:bg-gray-800 dark:text-white" value={data.method === 'card' ? 'Карта' : 'СБП'} readOnly />
           )}
         </div>
+        {(() => {
+          const hash = (data as any)?.termsDocHash ? String((data as any).termsDocHash) : '';
+          if (!hash) return null;
+          return (
+            <div className="mb-4 text-sm">
+              <label className="inline-flex items-center gap-2">
+                <input type="checkbox" onChange={(e)=> setTermsAccepted(e.currentTarget.checked)} />
+                <span>Я принимаю <a className="underline" href={`/api/docs/${encodeURIComponent(hash)}`} target="_blank" rel="noreferrer">условия</a></span>
+              </label>
+            </div>
+          );
+        })()}
         <div className="flex gap-2">
         <button disabled={!canStart} onClick={goPay} className={actionBtnClasses}>
           Перейти к оплате

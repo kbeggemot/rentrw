@@ -46,6 +46,12 @@ export default function EditLinkPage(props: { params: Promise<{ code: string }> 
   const [agentDesc, setAgentDesc] = useState<string | null>(null);
   const [defaultComm, setDefaultComm] = useState<{ type: 'percent' | 'fixed'; value: number } | null>(null);
 
+  // Terms document (PDF)
+  const [docs, setDocs] = useState<Array<{ hash: string; name?: string | null; size?: number }>>([]);
+  const [selectedDoc, setSelectedDoc] = useState<string | null>(null);
+  const [termsUploading, setTermsUploading] = useState(false);
+  const [showTermsUpload, setShowTermsUpload] = useState(false);
+
   useEffect(() => {
     (async () => {
       try {
@@ -62,6 +68,7 @@ export default function EditLinkPage(props: { params: Promise<{ code: string }> 
         setCommissionType((d.commissionType === 'fixed' || d.commissionType === 'percent') ? d.commissionType : 'percent');
         setCommissionValue(d.commissionValue != null ? String(d.commissionValue) : '');
         setPartnerPhone(d.partnerPhone || '');
+        setSelectedDoc(typeof d?.termsDocHash === 'string' && d.termsDocHash ? String(d.termsDocHash) : null);
 
         if (Array.isArray(d.cartItems) && d.cartItems.length > 0) {
           setMode('cart');
@@ -134,6 +141,9 @@ export default function EditLinkPage(props: { params: Promise<{ code: string }> 
     })();
   }, []);
 
+  // Preload existing PDFs for reuse in dropdown
+  useEffect(() => { (async () => { try { const r = await fetch('/api/docs', { cache: 'no-store' }); const d = await r.json(); const arr = Array.isArray(d?.items) ? d.items : []; setDocs(arr); setShowTermsUpload(false); } catch {} })(); }, []);
+
   // Preload products for cart selector
   useEffect(() => {
     (async () => {
@@ -145,6 +155,38 @@ export default function EditLinkPage(props: { params: Promise<{ code: string }> 
       } catch {}
     })();
   }, []);
+
+  // Helper: save only termsDocHash (but API requires full payload) — so send minimal valid payload based on current UI state
+  const saveTermsDoc = async (hash: string | null) => {
+    try {
+      const body: any = { title, method, isAgent, termsDocHash: hash };
+      if (mode === 'service') {
+        body.description = description;
+        body.sumMode = sumMode;
+        if (sumMode === 'fixed') body.amountRub = Number(String(amount).replace(',', '.'));
+        body.vatRate = vatRate;
+      } else {
+        const normalizedBase = cartItems.map((c, i) => ({ id: c.id ?? null, title: c.title, price: Number.isFinite(Number(baseUnits[i])) ? Number(baseUnits[i]) : Number(String(c.price).replace(',', '.')), qty: Number(String(c.qty).replace(',', '.')) }));
+        const v = Number(commissionValue.replace(',', '.'));
+        const agentValid = isAgent && ((commissionType === 'percent' && Number.isFinite(v)) || (commissionType === 'fixed' && Number.isFinite(v) && v > 0));
+        if (agentValid) {
+          try { const adj = applyAgentCommissionToCart(normalizedBase.map(x=>({ title:x.title, price:x.price, qty:x.qty })), commissionType, v); body.cartItems = adj.adjusted.map((a, idx) => ({ id: normalizedBase[idx].id, title: normalizedBase[idx].title, price: a.price, qty: a.qty })); } catch { body.cartItems = normalizedBase; }
+        } else {
+          body.cartItems = normalizedBase;
+        }
+        body.allowCartAdjust = allowCartAdjust;
+        body.startEmptyCart = allowCartAdjust ? startEmptyCart : false;
+        body.amountRub = totalCart;
+        body.cartDisplay = cartDisplay;
+      }
+      const r = await fetch(`/api/links/${encodeURIComponent(code)}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(d?.error || 'SAVE_ERROR');
+      showToast('Документ выбран', 'success');
+    } catch (e) {
+      showToast('Не удалось сохранить документ', 'error');
+    }
+  };
 
   const numericCart = useMemo(() => cartItems.map((c) => ({ title: c.title, price: Number(String(c.price || '0').replace(',', '.')), qty: Number(String(c.qty || '1').replace(',', '.')) })), [cartItems]);
   const commissionValid = useMemo(() => isAgent && ((commissionType === 'percent' && Number(commissionValue.replace(',', '.')) >= 0) || (commissionType === 'fixed' && Number(commissionValue.replace(',', '.')) > 0)), [isAgent, commissionType, commissionValue]);
@@ -218,6 +260,7 @@ export default function EditLinkPage(props: { params: Promise<{ code: string }> 
   const onSave = async () => {
     try {
       const body: any = { title, method, isAgent };
+      if (selectedDoc) body.termsDocHash = selectedDoc;
       if (isAgent) {
         body.commissionType = commissionType;
         body.commissionValue = Number(commissionValue.replace(',', '.'));
@@ -257,7 +300,24 @@ export default function EditLinkPage(props: { params: Promise<{ code: string }> 
       if (isAgent) body.agentDescription = agentDesc || null;
       const r = await fetch(`/api/links/${encodeURIComponent(code)}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
       const d = await r.json();
-      if (!r.ok) throw new Error(d?.error || 'SAVE_ERROR');
+      if (!r.ok) {
+        const code = d?.error;
+        if (code === 'TITLE_REQUIRED') showToast('Укажите название страницы', 'error');
+        else if (code === 'DESCRIPTION_REQUIRED') showToast('Укажите описание услуги', 'error');
+        else if (code === 'INVALID_AMOUNT') showToast('Укажите корректную сумму', 'error');
+        else if (code === 'COMMISSION_TYPE_REQUIRED') showToast('Выберите тип комиссии', 'error');
+        else if (code === 'COMMISSION_VALUE_REQUIRED') showToast('Укажите комиссию агента', 'error');
+        else if (code === 'COMMISSION_PERCENT_RANGE') showToast('Комиссия должна быть 0–100%', 'error');
+        else if (code === 'COMMISSION_FIXED_POSITIVE') showToast('Укажите фиксированную комиссию (> 0)', 'error');
+        else if (code === 'PARTNER_PHONE_REQUIRED') showToast('Укажите телефон партнёра', 'error');
+        else if (code === 'CART_EMPTY') showToast('Добавьте хотя бы одну позицию в корзину', 'error');
+        else if (code === 'MIN_10') showToast('Сумма должна быть ≥ 10 ₽', 'error');
+        else if (code === 'MIN_NET_10') showToast('Сумма за вычетом комиссии должна быть ≥ 10 ₽', 'error');
+        else if (code === 'AGENT_VAT_FORBIDDEN') showToast('Самозанятый не может реализовывать позиции с НДС', 'error');
+        else if (code === 'NO_USER') showToast('Нет доступа: войдите заново', 'error');
+        else showToast('Не удалось сохранить', 'error');
+        return;
+      }
       try { sessionStorage.setItem('flash', 'UPDATED'); } catch {}
       window.location.href = '/link';
     } catch (e) {
@@ -511,8 +571,66 @@ export default function EditLinkPage(props: { params: Promise<{ code: string }> 
             </div>
           )}
 
+          {/* Terms document block */}
+          <div className="mt-3 text-sm">
+            <div className="font-semibold mb-1">Документ для оплаты</div>
+            <div className="text-xs text-gray-600 mb-2">Загрузите оферту с условиями: покажем ссылку и попросим согласие перед оплатой</div>
+            <div className="mb-2">
+              <select
+                className="w-full md:w-[28rem] rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-950 px-2 h-9 text-sm"
+                value={(showTermsUpload && !selectedDoc) ? '__upload_new__' : (selectedDoc ?? '')}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  if (v === '__upload_new__') {
+                    setSelectedDoc(null);
+                    setShowTermsUpload(true);
+                  } else {
+                    setShowTermsUpload(false);
+                    const h = v || null;
+                    setSelectedDoc(h);
+                    // сохраняем и null ("Не использовать"), чтобы убрать требование оферты
+                    saveTermsDoc(h);
+                  }
+                }}
+              >
+                <option value="">Не использовать</option>
+                {docs.map((d) => (
+                  <option key={d.hash} value={d.hash}>{d.name || `${d.hash.slice(0,8)}…`}</option>
+                ))}
+                <option value="__upload_new__">Добавить новый</option>
+              </select>
+            </div>
+            {showTermsUpload ? (
+              <div>
+                <div className="text-sm mb-1">Файл</div>
+                <label className={`w-28 h-28 border border-dashed border-gray-300 dark:border-gray-700 rounded-md flex items-center justify-center text-xs cursor-pointer bg-white dark:bg-gray-900 ${termsUploading ? 'opacity-60' : ''}`}>
+                  <input type="file" accept="application/pdf" className="hidden" disabled={termsUploading} onChange={async (e)=>{
+                    const inputEl = e.currentTarget as HTMLInputElement | null;
+                    const f = inputEl && inputEl.files ? inputEl.files[0] : null; if (!f) return;
+                    if (f.type !== 'application/pdf') { showToast('Загрузите файл в формате PDF', 'error'); return; }
+                    if (f.size > 5*1024*1024) { showToast('Файл слишком большой. Загрузите файл размером до 5 МБ', 'error'); return; }
+                    try {
+                      setTermsUploading(true);
+                      const body = await f.arrayBuffer();
+                      const res = await fetch('/api/docs', { method:'POST', headers: { 'Content-Type': 'application/pdf', 'x-file-name': encodeURIComponent(f.name) }, body });
+                      const d = await res.json();
+                      if (!res.ok) {
+                        const code = d?.error; if (code==='INVALID_FORMAT') showToast('Загрузите файл в формате PDF','error'); else if (code==='TOO_LARGE') showToast('Файл слишком большой. Загрузите файл размером до 5 МБ','error'); else showToast('Не удалось открыть файл. Попробуйте другой PDF','error');
+                        return;
+                      }
+                      const h = d?.item?.hash; if (h) { setSelectedDoc(h); setDocs((prev)=> { const exists = prev.some(x=> x.hash===h); return exists ? prev.map(x=> x.hash===h ? { ...x, name: f.name, size: f.size } : x) : [{ hash: h, name: f.name, size: f.size }, ...prev]; }); setShowTermsUpload(false); showToast('Документ загружен','success'); saveTermsDoc(h); }
+                    } catch { showToast('Не удалось открыть файл. Попробуйте другой PDF', 'error'); }
+                    finally { setTermsUploading(false); if (inputEl) inputEl.value=''; }
+                  }} />
+                  <span>{termsUploading ? 'Загрузка…' : 'Добавить'}</span>
+                </label>
+                <div className="text-xs text-gray-600 mt-1">Только PDF. До 5 МБ на файл.</div>
+              </div>
+            ) : null}
+          </div>
+
           <div className="mt-3">
-            <div className="mt-2 mb-1 text-sm font-semibold">Принимаете оплату как Агент?</div>
+            <div className="mt-2 mb-1 text-base font-semibold">Принимаете оплату как Агент?</div>
             <label className="inline-flex items-center gap-2 text-sm">
               <input type="checkbox" checked={isAgent} onChange={(e) => {
                 const checked = e.target.checked;

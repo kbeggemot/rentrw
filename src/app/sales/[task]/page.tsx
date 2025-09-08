@@ -183,6 +183,37 @@ export default async function SaleDetailsPage(props: { params: Promise<{ task: s
             })()}
           </div>
 
+          {/* Документ */}
+          <div className="rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 p-3 text-sm">
+            <div className="font-semibold mb-2">Документ</div>
+            {(() => {
+              const hash = (sale as any)?.termsDocHash ? String((sale as any).termsDocHash) : '';
+              const acceptedAt = (sale as any)?.termsAcceptedAt ? String((sale as any).termsAcceptedAt) : '';
+              if (!hash) return (
+                <div className="grid grid-cols-[12rem_1fr] gap-y-2">
+                  <div className="text-gray-500">Файл</div>
+                  <div>—</div>
+                </div>
+              );
+              const when = acceptedAt ? new Date(acceptedAt).toLocaleString('ru-RU', { timeZone: 'Europe/Moscow' }) : '';
+              const fileName = (sale as any)?.termsDocName && String((sale as any).termsDocName).trim().length > 0
+                ? String((sale as any).termsDocName)
+                : (async () => { try { const { findDocByHash } = await import('@/server/docsStore'); const meta = await findDocByHash(hash); return meta?.name || 'документ.pdf'; } catch { return 'документ.pdf'; } })();
+              return (
+                <div className="grid grid-cols-[12rem_1fr] gap-y-2">
+                  <div className="text-gray-500">Статус</div>
+                  <div>{when ? (`принят ${when}`) : 'принят'}</div>
+                  <div className="text-gray-500">Файл</div>
+                  <div>
+                    <a className="text-black dark:text-white font-semibold hover:underline" href={`/api/docs/${encodeURIComponent(hash)}`} target="_blank" rel="noreferrer">{String((sale as any)?.termsDocName || 'документ.pdf')}</a>
+                  </div>
+                  <div className="text-gray-500">Контрольная сумма</div>
+                  <div className="font-mono break-all">{hash}</div>
+                </div>
+              );
+            })()}
+          </div>
+
           {(() => {
             const items = Array.isArray((sale as any).itemsSnapshot) ? (sale as any).itemsSnapshot : [];
             const hasInstant = items.some((it: any) => typeof it?.instantResult === 'string' ? it.instantResult.trim().length > 0 : false);

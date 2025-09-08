@@ -186,6 +186,7 @@ export async function POST(req: Request) {
       } catch {}
     }
     // Business rule: минимальная сумма после вычета комиссии — не менее 10 ₽
+    // Применяем только если есть фиксированная сумма (sumMode='fixed') или режим корзины
     const MIN_AMOUNT_RUB = 10;
     const totalRub = (() => {
       if (Array.isArray(cartItems) && cartItems.length > 0) {
@@ -193,12 +194,15 @@ export async function POST(req: Request) {
       }
       return Number(amountRub || 0);
     })();
-    if (isAgent && commissionType && typeof commissionValue === 'number') {
-      const retained = commissionType === 'percent' ? totalRub * (commissionValue / 100) : commissionValue;
-      const net = totalRub - retained;
-      if (!(net >= MIN_AMOUNT_RUB)) return NextResponse.json({ error: 'MIN_NET_10' }, { status: 400 });
-    } else {
-      if (!(totalRub >= MIN_AMOUNT_RUB)) return NextResponse.json({ error: 'MIN_10' }, { status: 400 });
+    const enforceMin = (Array.isArray(cartItems) && cartItems.length > 0) || sumMode === 'fixed';
+    if (enforceMin) {
+      if (isAgent && commissionType && typeof commissionValue === 'number') {
+        const retained = commissionType === 'percent' ? totalRub * (commissionValue / 100) : commissionValue;
+        const net = totalRub - retained;
+        if (!(net >= MIN_AMOUNT_RUB)) return NextResponse.json({ error: 'MIN_NET_10' }, { status: 400 });
+      } else {
+        if (!(totalRub >= MIN_AMOUNT_RUB)) return NextResponse.json({ error: 'MIN_10' }, { status: 400 });
+      }
     }
 
     const item = await createPaymentLink(userId, { title, description, sumMode, amountRub: amountRub ?? undefined, vatRate, isAgent, commissionType: commissionType as any, commissionValue: commissionValue ?? undefined, partnerPhone, method, orgInn: inn ?? undefined, preferredCode: preferredCode ?? undefined, cartItems: cartItems ?? undefined, allowCartAdjust: Boolean(body?.allowCartAdjust), startEmptyCart: Boolean(body?.startEmptyCart), cartDisplay: (body?.cartDisplay === 'list' ? 'list' : (body?.cartDisplay === 'grid' ? 'grid' : undefined)), agentDescription: (typeof body?.agentDescription === 'string' ? body.agentDescription : undefined) } as any);

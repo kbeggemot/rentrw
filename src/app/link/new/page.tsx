@@ -37,6 +37,11 @@ export default function NewLinkStandalonePage() {
   const [vanityTaken, setVanityTaken] = useState<boolean | null>(null);
   const [cartDisplay, setCartDisplay] = useState<'grid' | 'list'>('list');
   const [editingPriceIdx, setEditingPriceIdx] = useState<number | null>(null);
+  // Terms document upload/select
+  const [docs, setDocs] = useState<Array<{ hash: string; name?: string | null; size?: number }>>([]);
+  const [selectedDoc, setSelectedDoc] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [showTermsUpload, setShowTermsUpload] = useState(false);
 
   const translitMap: Record<string, string> = { 'ё':'yo','й':'y','ц':'ts','у':'u','к':'k','е':'e','н':'n','г':'g','ш':'sh','щ':'sch','з':'z','х':'h','ъ':'','ф':'f','ы':'y','в':'v','а':'a','п':'p','р':'r','о':'o','л':'l','д':'d','ж':'zh','э':'e','я':'ya','ч':'ch','с':'s','м':'m','и':'i','т':'t','ь':'','б':'b','ю':'yu' };
   const normalizeVanity = (s: string) => s
@@ -103,6 +108,9 @@ export default function NewLinkStandalonePage() {
     }, 400);
     return () => clearTimeout(id);
   }, [vanity]);
+
+  // preload existing docs to reuse
+  useEffect(() => { (async () => { try { const r = await fetch('/api/docs', { cache: 'no-store' }); const d = await r.json(); const arr = Array.isArray(d?.items) ? d.items : []; setDocs(arr); setShowTermsUpload(false); } catch {} })(); }, []);
 
   // Toast for taken vanity code (no inline error)
   useEffect(() => {
@@ -199,6 +207,7 @@ export default function NewLinkStandalonePage() {
         method: linkMethod,
         preferredCode: vanity.trim() || undefined,
       };
+      if (selectedDoc) payload.termsDocHash = selectedDoc;
       if (mode === 'cart') {
         const normalized = cart.filter((c) => c.id).map((c) => ({
           id: c.id,
@@ -515,6 +524,63 @@ export default function NewLinkStandalonePage() {
               </label>
             </div>
           ) : null}
+          {/* Terms document block (placed before agent settings) */}
+          <div className="md:col-span-2 mt-2">
+            <div className="font-semibold mb-1">Документ для оплаты</div>
+            <div className="text-xs text-gray-600 mb-2">Загрузите оферту с условиями: покажем ссылку и попросим согласие перед оплатой</div>
+            <div className="mb-2">
+              <select
+                className="w-full md:w-[28rem] rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-950 px-2 h-9 text-sm"
+                value={(showTermsUpload && !selectedDoc) ? '__upload_new__' : (selectedDoc ?? '')}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  if (v === '__upload_new__') {
+                    setSelectedDoc(null);
+                    setShowTermsUpload(true);
+                  } else {
+                    setShowTermsUpload(false);
+                    setSelectedDoc(v || null);
+                  }
+                }}
+              >
+                <option value="">Не использовать</option>
+                {docs.map((d) => (
+                  <option key={d.hash} value={d.hash}>{d.name || `${d.hash.slice(0,8)}…`}</option>
+                ))}
+                <option value="__upload_new__">Добавить новый</option>
+              </select>
+            </div>
+
+            {/* Показ загрузки только при выборе "Добавить новый" */}
+            {showTermsUpload ? (
+              <div>
+                <div className="text-sm mb-1">Файл</div>
+                <label className={`w-28 h-28 border border-dashed border-gray-300 dark:border-gray-700 rounded-md flex items-center justify-center text-xs cursor-pointer bg-white dark:bg-gray-900 ${uploading ? 'opacity-60' : ''}`}>
+                  <input type="file" accept="application/pdf" className="hidden" disabled={uploading} onChange={async (e)=>{
+                    const inputEl = e.currentTarget as HTMLInputElement | null;
+                    const f = inputEl && inputEl.files ? inputEl.files[0] : null; if (!f) return;
+                    if (f.type !== 'application/pdf') { showToast('Загрузите файл в формате PDF', 'error'); return; }
+                    if (f.size > 5*1024*1024) { showToast('Файл слишком большой. Загрузите файл размером до 5 МБ', 'error'); return; }
+                    try {
+                      setUploading(true);
+                      const body = await f.arrayBuffer();
+                      const res = await fetch('/api/docs', { method:'POST', headers: { 'Content-Type': 'application/pdf', 'x-file-name': encodeURIComponent(f.name) }, body });
+                      const d = await res.json();
+                      if (!res.ok) {
+                        const code = d?.error; if (code==='INVALID_FORMAT') showToast('Загрузите файл в формате PDF','error'); else if (code==='TOO_LARGE') showToast('Файл слишком большой. Загрузите файл размером до 5 МБ','error'); else showToast('Не удалось открыть файл. Попробуйте другой PDF','error');
+                        return;
+                      }
+                      const h = d?.item?.hash; if (h) { setSelectedDoc(h); setDocs((prev)=> { const exists = prev.some(x=> x.hash===h); return exists ? prev.map(x=> x.hash===h ? { ...x, name: f.name, size: f.size } : x) : [{ hash: h, name: f.name, size: f.size }, ...prev]; }); setShowTermsUpload(false); showToast('Документ загружен','success'); }
+                    } catch { showToast('Не удалось открыть файл. Попробуйте другой PDF', 'error'); }
+                    finally { setUploading(false); if (inputEl) inputEl.value=''; }
+                  }} />
+                  <span>{uploading ? 'Загрузка…' : 'Добавить'}</span>
+                </label>
+                <div className="text-xs text-gray-600 mt-1">Только PDF. До 5 МБ на файл.</div>
+              </div>
+            ) : null}
+          </div>
+
           <div className="md:col-span-2">
             <div className="text-base font-semibold mb-1">Принимаете оплату как Агент?</div>
             <label className="inline-flex items-center gap-2 text-sm">
@@ -609,7 +675,7 @@ export default function NewLinkStandalonePage() {
           </div>
         </div>
         <div className="mt-3">
-          <Button onClick={onCreate}>Создать</Button>
+          <Button onClick={onCreate} disabled={uploading}>Создать</Button>
         </div>
       </div>
 

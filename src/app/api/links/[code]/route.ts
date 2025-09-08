@@ -73,7 +73,7 @@ export async function GET(req: Request) {
         });
       }
     } catch {}
-    return NextResponse.json({ code, userId, title, description, sumMode, amountRub, vatRate, isAgent, commissionType, commissionValue, partnerPhone, method, orgName: orgName || null, orgInn: item.orgInn || null, cartItems, allowCartAdjust: !!item.allowCartAdjust, startEmptyCart: !!(item as any)?.startEmptyCart, cartDisplay: item.cartDisplay || null, agentDescription: (item as any)?.agentDescription ?? null, disabled: !!(item as any)?.disabled }, { status: 200 });
+    return NextResponse.json({ code, userId, title, description, sumMode, amountRub, vatRate, isAgent, commissionType, commissionValue, partnerPhone, method, orgName: orgName || null, orgInn: item.orgInn || null, cartItems, allowCartAdjust: !!item.allowCartAdjust, startEmptyCart: !!(item as any)?.startEmptyCart, cartDisplay: item.cartDisplay || null, agentDescription: (item as any)?.agentDescription ?? null, disabled: !!(item as any)?.disabled, termsDocHash: (item as any)?.termsDocHash ?? null }, { status: 200 });
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'Server error';
     return NextResponse.json({ error: msg }, { status: 500 });
@@ -107,7 +107,8 @@ export async function PUT(req: Request) {
     if (current.userId !== userId) return NextResponse.json({ error: 'FORBIDDEN' }, { status: 403 });
 
     const body = await req.json().catch(() => null);
-    const isCart = Array.isArray(current.cartItems) && current.cartItems.length > 0;
+    // Determine mode from incoming payload (allows switching between modes)
+    const isCart = Array.isArray(body?.cartItems) && body.cartItems.length > 0;
 
     // Common editable fields
     const title = String(body?.title || '').trim();
@@ -158,7 +159,21 @@ export async function PUT(req: Request) {
         }
       }
       const vatRate = (['none','0','5','7','10','20'].includes(String(body?.vatRate)) ? String(body?.vatRate) : 'none') as 'none'|'0'|'5'|'7'|'10'|'20';
-      const updated = await updatePaymentLink(userId, code, { title, description, sumMode, amountRub: amountRub ?? undefined, vatRate, method, isAgent, commissionType: commissionType as any, commissionValue: commissionValue ?? undefined, partnerPhone, disabled: typeof (body as any)?.disabled === 'boolean' ? Boolean((body as any).disabled) : undefined });
+      const updated = await updatePaymentLink(userId, code, {
+        title,
+        description,
+        sumMode,
+        amountRub: amountRub ?? undefined,
+        vatRate,
+        method,
+        isAgent,
+        commissionType: commissionType as any,
+        commissionValue: commissionValue ?? undefined,
+        partnerPhone,
+        // propagate termsDocHash updates when provided
+        ...(typeof (body as any)?.termsDocHash !== 'undefined' ? { termsDocHash: (body as any).termsDocHash ? String((body as any).termsDocHash) : null } : {}),
+        disabled: typeof (body as any)?.disabled === 'boolean' ? Boolean((body as any).disabled) : undefined,
+      });
       if (!updated) return NextResponse.json({ error: 'NOT_FOUND' }, { status: 404 });
       return NextResponse.json({ ok: true, item: updated });
     } else {
@@ -218,7 +233,21 @@ export async function PUT(req: Request) {
         if (!(total >= MIN_AMOUNT_RUB)) return NextResponse.json({ error: 'MIN_10' }, { status: 400 });
       }
       const startEmptyCart = !!body?.startEmptyCart;
-      const updated = await updatePaymentLink(userId, code, { title, cartItems: normalized as any, allowCartAdjust, startEmptyCart, amountRub: total, method, isAgent, commissionType: commissionType as any, commissionValue: commissionValue ?? undefined, partnerPhone, cartDisplay: cartDisplay as any, disabled: typeof (body as any)?.disabled === 'boolean' ? Boolean((body as any).disabled) : undefined });
+      const updated = await updatePaymentLink(userId, code, {
+        title,
+        cartItems: normalized as any,
+        allowCartAdjust,
+        startEmptyCart,
+        amountRub: total,
+        method,
+        isAgent,
+        commissionType: commissionType as any,
+        commissionValue: commissionValue ?? undefined,
+        partnerPhone,
+        cartDisplay: cartDisplay as any,
+        ...(typeof (body as any)?.termsDocHash !== 'undefined' ? { termsDocHash: (body as any).termsDocHash ? String((body as any).termsDocHash) : null } : {}),
+        disabled: typeof (body as any)?.disabled === 'boolean' ? Boolean((body as any).disabled) : undefined,
+      });
       if (!updated) return NextResponse.json({ error: 'NOT_FOUND' }, { status: 404 });
       return NextResponse.json({ ok: true, item: updated });
     }

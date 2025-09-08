@@ -427,8 +427,9 @@ export async function POST(req: Request) {
         cache: 'no-store',
       });
     } catch (e) {
-      await appendRwError({ ts: new Date().toISOString(), scope: 'tasks:create', method: 'POST', url, status: null, requestBody: payload, error: e instanceof Error ? e.message : String(e), userId });
-      throw e;
+      const msg = e instanceof Error ? e.message : String(e);
+      try { await appendRwError({ ts: new Date().toISOString(), scope: 'tasks:create', method: 'POST', url, status: null, requestBody: payload, error: msg, userId }); } catch {}
+      return NextResponse.json({ error: `NETWORK_ERROR: ${msg}` }, { status: 502 });
     }
 
     const text = await res.text();
@@ -455,6 +456,17 @@ export async function POST(req: Request) {
       // Save sale snapshot for the user
       const commissionValueForRecord = body.agentSale ? (body.commissionValue !== undefined ? Number(body.commissionValue) : undefined) : undefined;
       const resolvedPayerTgId = (() => { const v = (body as any)?.payerTgId; const b = (typeof v === 'string' && v.trim().length > 0) ? String(v).trim() : null; return b || (tgUserFromCookie && tgUserFromCookie.trim().length > 0 ? tgUserFromCookie : null); })();
+      // Resolve document name by hash if provided
+      let resolvedDocName: string | null = null;
+      try {
+        const hash = (typeof (body as any)?.termsDocHash === 'string' && (body as any).termsDocHash.trim().length > 0) ? String((body as any).termsDocHash).trim() : '';
+        if (hash) {
+          const { findDocByHash } = await import('@/server/docsStore');
+          const meta = await findDocByHash(hash);
+          resolvedDocName = (meta?.name && String(meta.name).trim().length > 0) ? meta.name : null;
+        }
+      } catch {}
+
       await recordSaleOnCreate({
         userId,
         taskId,
@@ -479,6 +491,8 @@ export async function POST(req: Request) {
         partnerPhone: (body.agentSale && typeof (body as any)?.agentPhone === 'string' && (body as any).agentPhone.trim().length > 0) ? String((body as any).agentPhone).trim() : null,
         // сейчас ФИО не передаётся — оставляем null (можем расширить форму и API позднее)
         partnerFio: null,
+        termsDocHash: (typeof (body as any)?.termsDocHash === 'string' && (body as any).termsDocHash.trim().length > 0) ? String((body as any).termsDocHash).trim() : null,
+        termsDocName: (typeof (body as any)?.termsDocName === 'string' && (body as any).termsDocName.trim().length > 0) ? String((body as any).termsDocName).trim() : (resolvedDocName ?? null),
       });
 
       // Audit: record how payerTgId/linkCode were resolved

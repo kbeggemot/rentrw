@@ -19,6 +19,7 @@ export type PaymentLink = {
   startEmptyCart?: boolean;
   cartDisplay?: 'grid' | 'list' | null;
   agentDescription?: string | null;
+  termsDocHash?: string | null;
   disabled?: boolean; // if true, hidden from public
   createdAt: string;
   hits?: number;
@@ -90,6 +91,7 @@ export async function createPaymentLink(userId: string, data: Omit<PaymentLink, 
     cartDisplay: (data as any)?.cartDisplay === 'list' ? 'list' : ((data as any)?.cartDisplay === 'grid' ? 'grid' : null),
     agentDescription: typeof (data as any)?.agentDescription === 'string' ? ((data as any).agentDescription as string) : null,
     disabled: false,
+    termsDocHash: null,
     createdAt: now,
     hits: 0,
     lastAccessAt: null,
@@ -149,10 +151,30 @@ export async function updatePaymentLink(userId: string, code: string, updates: P
   if (idx === -1) return null;
   const current = store.items[idx];
   const isCart = Array.isArray(current.cartItems) && (current.cartItems as any[]).length > 0;
+  const targetIsCart = Array.isArray((updates as any)?.cartItems) && ((updates as any).cartItems as any[]).length > 0;
 
   const next: PaymentLink = { ...current };
   if (typeof updates.title === 'string') next.title = updates.title;
-  if (!isCart) {
+  // Decide destination mode based on incoming payload if present; fallback to current
+  if (targetIsCart) {
+    // Switch to cart mode or update cart
+    if (Array.isArray((updates as any).cartItems)) {
+      next.cartItems = ((updates as any).cartItems as any[]).map((ci: any) => ({
+        id: ci?.id ?? null,
+        title: String(ci?.title || ''),
+        price: Number(ci?.price || 0),
+        qty: Number(ci?.qty || 1),
+      }));
+    }
+    if (typeof (updates as any).allowCartAdjust === 'boolean') next.allowCartAdjust = Boolean((updates as any).allowCartAdjust);
+    if (typeof (updates as any).startEmptyCart === 'boolean') (next as any).startEmptyCart = Boolean((updates as any).startEmptyCart);
+    if (typeof updates.amountRub === 'number' && Number.isFinite(updates.amountRub)) next.amountRub = updates.amountRub;
+    if ((updates as any).cartDisplay === 'list' || (updates as any).cartDisplay === 'grid') next.cartDisplay = (updates as any).cartDisplay as any;
+    // When switching to cart, null out service-specific fields
+    next.description = next.description || '';
+    next.sumMode = 'fixed';
+    next.vatRate = next.vatRate ?? 'none';
+  } else if (!isCart) {
     if (typeof updates.description === 'string') next.description = updates.description;
     if (updates.sumMode === 'custom' || updates.sumMode === 'fixed') next.sumMode = updates.sumMode;
     if (typeof updates.amountRub === 'number' && Number.isFinite(updates.amountRub)) next.amountRub = updates.amountRub;
@@ -160,13 +182,9 @@ export async function updatePaymentLink(userId: string, code: string, updates: P
     next.cartItems = null;
     next.allowCartAdjust = false;
   } else {
+    // Current is cart and we're keeping cart mode (or switching back without payload)
     if (Array.isArray(updates.cartItems)) {
-      next.cartItems = updates.cartItems.map((ci: any) => ({
-        id: ci?.id ?? null,
-        title: String(ci?.title || ''),
-        price: Number(ci?.price || 0),
-        qty: Number(ci?.qty || 1),
-      }));
+      next.cartItems = updates.cartItems.map((ci: any) => ({ id: ci?.id ?? null, title: String(ci?.title || ''), price: Number(ci?.price || 0), qty: Number(ci?.qty || 1) }));
     }
     if (typeof updates.allowCartAdjust === 'boolean') next.allowCartAdjust = updates.allowCartAdjust;
     if (typeof (updates as any)?.startEmptyCart === 'boolean') (next as any).startEmptyCart = Boolean((updates as any).startEmptyCart);
@@ -176,6 +194,7 @@ export async function updatePaymentLink(userId: string, code: string, updates: P
   if (typeof updates.method === 'string' && (updates.method === 'any' || updates.method === 'qr' || updates.method === 'card')) next.method = updates.method;
   if (typeof updates.isAgent === 'boolean') next.isAgent = updates.isAgent;
   if (typeof (updates as any)?.disabled === 'boolean') next.disabled = Boolean((updates as any).disabled);
+  if (typeof (updates as any)?.termsDocHash !== 'undefined') next.termsDocHash = (updates as any).termsDocHash ? String((updates as any).termsDocHash) : null;
   if (next.isAgent) {
     if (updates.commissionType === 'percent' || updates.commissionType === 'fixed') next.commissionType = updates.commissionType;
     if (typeof updates.commissionValue === 'number' && Number.isFinite(updates.commissionValue)) next.commissionValue = updates.commissionValue;
