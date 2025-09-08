@@ -1,4 +1,4 @@
-import { readText, writeText } from './storage';
+import { readText, writeText, list } from './storage';
 import { getHub } from './eventBus';
 import path from 'path';
 import { appendAdminEntityLog } from './adminAudit';
@@ -7,6 +7,9 @@ import { sendInstantDeliveryIfReady } from './instantDelivery';
 // IMPORTANT: keep relative paths here so that S3 storage keys are correct
 const DATA_DIR = '.data';
 const TASKS_FILE = path.join(DATA_DIR, 'tasks.json');
+// New sharded sales storage (by organization INN)
+const SALES_DIR = path.join(DATA_DIR, 'sales'); // .data/sales/{inn}/sales/{taskId}.json
+const SALES_INDEX_DIR = path.join(DATA_DIR, 'sales_index'); // .data/sales_index/by_task/{taskId}.json
 
 export type StoredTask = {
   id: number | string;
@@ -95,6 +98,93 @@ async function writeTasks(data: TaskStoreData): Promise<void> {
   await writeText(TASKS_FILE, JSON.stringify(data, null, 2));
 }
 
+// ----- Sharded sales storage helpers (by orgInn) -----
+
+function sanitizeInn(inn: string | null | undefined): string {
+  const d = (inn || '').toString().replace(/\D/g, '');
+  return d || 'unknown';
+}
+
+function saleFilePath(inn: string, taskId: number | string): string {
+  return path.join(SALES_DIR, inn, 'sales', `${String(taskId)}.json`).replace(/\\/g, '/');
+}
+
+function orgIndexPath(inn: string): string {
+  return path.join(SALES_DIR, inn, 'index.json').replace(/\\/g, '/');
+}
+
+function byTaskIndexPath(taskId: number | string): string {
+  return path.join(SALES_INDEX_DIR, 'by_task', `${String(taskId)}.json`).replace(/\\/g, '/');
+}
+
+type OrgIndexRow = { taskId: number | string; orderId: number | string; userId: string; createdAt: string; updatedAt: string; status?: string | null; orgInn: string };
+
+async function readOrgIndex(inn: string): Promise<OrgIndexRow[]> {
+  const raw = await readText(orgIndexPath(inn));
+  if (!raw) return [];
+  try { const arr = JSON.parse(raw) as OrgIndexRow[]; return Array.isArray(arr) ? arr : []; } catch { return []; }
+}
+
+async function writeOrgIndex(inn: string, rows: OrgIndexRow[]): Promise<void> {
+  await writeText(orgIndexPath(inn), JSON.stringify(rows, null, 2));
+}
+
+async function readSaleByInnTask(inn: string, taskId: number | string): Promise<SaleRecord | null> {
+  const raw = await readText(saleFilePath(inn, taskId));
+  if (!raw) return null;
+  try { return JSON.parse(raw) as SaleRecord; } catch { return null; }
+}
+
+async function writeSaleAndIndexes(sale: SaleRecord): Promise<void> {
+  const inn = sanitizeInn(sale.orgInn || null);
+  // 1) write sale file
+  await writeText(saleFilePath(inn, sale.taskId), JSON.stringify(sale, null, 2));
+  // 2) update org index (upsert)
+  const idx = await readOrgIndex(inn);
+  const meta: OrgIndexRow = { taskId: sale.taskId, orderId: sale.orderId, userId: sale.userId, createdAt: sale.createdAt, updatedAt: sale.updatedAt, status: sale.status ?? null, orgInn: inn };
+  const pos = idx.findIndex((r) => String(r.taskId) === String(sale.taskId));
+  if (pos === -1) idx.push(meta); else idx[pos] = meta;
+  // keep newest first (optional)
+  idx.sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
+  await writeOrgIndex(inn, idx);
+  // 3) upsert by-task index
+  await writeText(byTaskIndexPath(sale.taskId), JSON.stringify({ inn, userId: sale.userId }, null, 2));
+}
+
+async function readByTask(taskId: number | string): Promise<{ inn: string; userId: string } | null> {
+  const raw = await readText(byTaskIndexPath(taskId));
+  if (!raw) return null;
+  try { const d = JSON.parse(raw); return (d && typeof d.inn === 'string' && typeof d.userId === 'string') ? d : null; } catch { return null; }
+}
+
+// Backward‑compat: try reading legacy sale from tasks.json if not in sharded store
+async function readLegacySale(userId: string, taskId: number | string): Promise<SaleRecord | null> {
+  try {
+    const store = await readTasks();
+    const arr = (store.sales ?? []).filter((s) => s.userId === userId && s.taskId == taskId);
+    return arr.length > 0 ? arr[0] : null;
+  } catch { return null; }
+}
+
+// Migration: copy all legacy sales from tasks.json to sharded structure (idempotent)
+let migrationStarted = false;
+export async function migrateLegacyTasksToOrgStore(): Promise<void> {
+  if (migrationStarted) return; migrationStarted = true;
+  try {
+    const store = await readTasks();
+    const sales = Array.isArray(store.sales) ? store.sales : [];
+    if (sales.length === 0) return;
+    for (const s of sales) {
+      const inn = sanitizeInn((s as any).orgInn || null);
+      // If sharded file already exists (checked via by-task index), skip
+      const mapped = await readByTask(s.taskId).catch(() => null);
+      if (mapped && mapped.inn) continue;
+      // write sale and indexes
+      try { await writeSaleAndIndexes(s); } catch {}
+    }
+  } catch {}
+}
+
 export async function saveTaskId(id: number | string, orderId: number): Promise<void> {
   const store = await readTasks();
   store.tasks.push({ id, orderId, createdAt: new Date().toISOString() });
@@ -167,7 +257,7 @@ export async function recordSaleOnCreate(params: {
     }
   } catch {}
   const storedOrderId: string | number = withLocalOrderPrefix(orderId);
-  store.sales.push({
+  const newSale: SaleRecord = {
     taskId,
     orderId: storedOrderId,
     userId,
@@ -218,8 +308,12 @@ export async function recordSaleOnCreate(params: {
     termsDocHash: (termsDocHash ?? null) as any,
     termsDocName: (termsDocName ?? null) as any,
     termsAcceptedAt: (termsDocHash ? now : null) as any,
-  });
+  } as SaleRecord;
+  // Legacy list append (backward compatibility for existing readers)
+  store.sales.push(newSale);
   await writeTasks(store);
+  // New sharded write by org
+  try { await writeSaleAndIndexes(newSale); } catch {}
   try { getHub().publish(userId, 'sales:update'); } catch {}
   try {
     await appendAdminEntityLog('sale', [String(userId), String(taskId)], {
@@ -284,6 +378,7 @@ export async function updateSaleFromStatus(userId: string, taskId: number | stri
     next.updatedAt = new Date().toISOString();
     store.sales[idx] = next;
     await writeTasks(store);
+    try { await writeSaleAndIndexes(next); } catch {}
     try { getHub().publish(userId, 'sales:update'); } catch {}
     try {
       await appendAdminEntityLog('sale', [String(userId), String(taskId)], { source: 'system', message: 'status/update', data: update });
@@ -305,6 +400,7 @@ export async function updateSaleOfdUrls(userId: string, taskId: number | string,
     next.updatedAt = new Date().toISOString();
     store.sales[idx] = next;
     await writeTasks(store);
+    try { await writeSaleAndIndexes(next); } catch {}
     try { getHub().publish(userId, 'sales:update'); } catch {}
     try { await appendAdminEntityLog('sale', [String(userId), String(taskId)], { source: 'system', message: 'ofd/update', data: patch }); } catch {}
     // Fire-and-forget instant email attempt
@@ -339,6 +435,7 @@ export async function updateSaleOfdUrlsByOrderId(userId: string, orderId: number
     next.updatedAt = new Date().toISOString();
     store.sales[idx] = next;
     await writeTasks(store);
+    try { await writeSaleAndIndexes(next); } catch {}
     try { getHub().publish(userId, 'sales:update'); } catch {}
     try {
       if (process.env.OFD_AUDIT === '1') {
@@ -364,14 +461,36 @@ export async function setSaleCreatedAtRw(userId: string, taskId: number | string
     next.updatedAt = new Date().toISOString();
     store.sales[idx] = next;
     await writeTasks(store);
+    try { await writeSaleAndIndexes(next); } catch {}
     try { getHub().publish(userId, 'sales:update'); } catch {}
   }
 }
 
 export async function listSales(userId: string): Promise<SaleRecord[]> {
+  // Read from sharded org indexes and merge с legacy
+  const out: SaleRecord[] = [];
+  try {
+    const orgPaths = (await list('.data/sales').catch(() => [] as string[])).filter((p) => /\.data\/sales\/[^/]+\/index\.json$/.test(p));
+    for (const idxPath of orgPaths) {
+      try {
+        const inn = idxPath.split('/')[2];
+        const idxRaw = await readText(idxPath);
+        const rows: OrgIndexRow[] = idxRaw ? JSON.parse(idxRaw) : [];
+        for (const r of rows) {
+          // lazy read individual sale and filter by userId
+          const s = await readSaleByInnTask(inn, r.taskId);
+          if (s && s.userId === userId) out.push(s);
+        }
+      } catch {}
+    }
+  } catch {}
+  // Merge with legacy to avoid пропусков (на случай частичной миграции)
+  const seen = new Set(out.map((s) => String(s.taskId)));
   const store = await readTasks();
-  const arr = (store.sales ?? []).filter((s) => s.userId === userId);
-  return arr.sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
+  for (const s of (store.sales ?? [])) {
+    if (s.userId === userId && !seen.has(String(s.taskId))) out.push(s);
+  }
+  return out.sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
 }
 
 export async function listAllSales(): Promise<SaleRecord[]> {
@@ -381,23 +500,50 @@ export async function listAllSales(): Promise<SaleRecord[]> {
 }
 
 export async function listAllSalesForOrg(orgInn: string): Promise<SaleRecord[]> {
-  const store = await readTasks();
   const inn = (orgInn || '').replace(/\D/g, '');
-  const arr = (store.sales ?? []).filter((s) => (s.orgInn || '') === inn);
-  return arr.sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
+  const idx = await readOrgIndex(inn);
+  const res: SaleRecord[] = [];
+  for (const r of idx) {
+    const s = await readSaleByInnTask(inn, r.taskId);
+    if (s) res.push(s);
+  }
+  // Merge с legacy (на случай неполной миграции)
+  const seen = new Set(res.map((s) => String(s.taskId)));
+  const store = await readTasks();
+  for (const s of (store.sales ?? [])) {
+    if ((s.orgInn || '') === inn && !seen.has(String(s.taskId))) res.push(s);
+  }
+  return res.sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
 }
 
 export async function findSaleByTaskId(userId: string, taskId: number | string): Promise<SaleRecord | null> {
+  // Try sharded by-task index
+  const mapped = await readByTask(taskId).catch(() => null);
+  if (mapped) {
+    const s = await readSaleByInnTask(mapped.inn, taskId);
+    if (s && s.userId === userId) return s;
+  }
+  // Fallback legacy
   const store = await readTasks();
   const arr = (store.sales ?? []).filter((s) => s.userId === userId && s.taskId == taskId);
   return arr.length > 0 ? arr[0] : null;
 }
 
 export async function listSalesForOrg(userId: string, orgInn: string): Promise<SaleRecord[]> {
-  const store = await readTasks();
   const inn = (orgInn || '').replace(/\D/g, '');
-  const arr = (store.sales ?? []).filter((s) => s.userId === userId && (s.orgInn || '') === inn);
-  return arr.sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
+  const idx = await readOrgIndex(inn);
+  const res: SaleRecord[] = [];
+  for (const r of idx) {
+    const s = await readSaleByInnTask(inn, r.taskId);
+    if (s && s.userId === userId) res.push(s);
+  }
+  // Merge с legacy
+  const seen = new Set(res.map((s) => String(s.taskId)));
+  const store = await readTasks();
+  for (const s of (store.sales ?? [])) {
+    if (s.userId === userId && (s.orgInn || '') === inn && !seen.has(String(s.taskId))) res.push(s);
+  }
+  return res.sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
 }
 
 
@@ -498,6 +644,7 @@ export async function setSaleHidden(userId: string, taskId: number | string, hid
     next.updatedAt = new Date().toISOString();
     store.sales[idx] = next;
     await writeTasks(store);
+    try { await writeSaleAndIndexes(next); } catch {}
     try { getHub().publish(userId, 'sales:update'); } catch {}
   }
 }
@@ -524,6 +671,7 @@ export async function updateSaleMeta(userId: string, taskId: number | string, me
     next.updatedAt = new Date().toISOString();
     store.sales[idx] = next;
     await writeTasks(store);
+    try { await writeSaleAndIndexes(next); } catch {}
     try { getHub().publish(userId, 'sales:update'); } catch {}
   }
 }

@@ -4,11 +4,14 @@
 import { startOfdScheduleWorker } from './ofdScheduleWorker';
 import { startOfdRepairWorker } from './ofdRepairWorker';
 import { startSalesRefreshWorker } from './salesRefreshWorker';
+import { migrateLegacyTasksToOrgStore } from './taskStore';
 
 try {
   startOfdScheduleWorker();
   startOfdRepairWorker();
   startSalesRefreshWorker();
+  // fire-and-forget migration to sharded sales store
+  migrateLegacyTasksToOrgStore();
 } catch {
   // ignore — environment may not support intervals, we'll try again on-demand
 }
