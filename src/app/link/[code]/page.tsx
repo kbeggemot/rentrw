@@ -896,7 +896,7 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
                   </div>
                 ))}
                 {agentLine ? (
-                  <div className="rounded border p-2 flex items-center gap-3 bg-gray-50">
+                  <div className="rounded border p-2 flex items-center gap-3 bg-gray-50 dark:bg-gray-900">
                     <div className="flex-1">
                       <div className="text-sm font-medium">{agentLine.title}</div>
                       <div className="text-xs text-gray-600">Цена: {Number(agentLine.price || 0).toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₽</div>
@@ -932,7 +932,7 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
                   </div>
                 ))}
                 {agentLine ? (
-                  <div className="rounded border p-2 bg-gray-50">
+                  <div className="rounded border p-2 bg-gray-50 dark:bg-gray-900">
                     <div className="text-sm font-medium">{agentLine.title}</div>
                     <div className="text-xs text-gray-600">Цена: {Number(agentLine.price || 0).toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₽</div>
                   </div>
