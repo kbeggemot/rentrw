@@ -376,17 +376,27 @@ export default function SalesClient({ initial, hasTokenInitial }: { initial: Sal
         if (Array.isArray(meta?.items)) {
           const rows = (meta.items as Array<{ taskId: string | number; createdAt: string }>);
           setIndexRows(rows);
-          // Загружаем только первую страницу (15 записей) — быстро и без «затыков»
-          const first = rows.slice(0, pageSize);
-          const qs = first.map((x) => encodeURIComponent(String(x.taskId))).join(',');
-          if (qs) {
+          // Грузим стартовый префикс до 15 видимых строк
+          const byId = new Map<string, Sale>();
+          let prefix = 0;
+          let cursor = 0;
+          const batchSize = 30;
+          const visibleCount = () => applyFiltersLocal(Array.from(byId.values())).length;
+          while (!aborted && visibleCount() < pageSize && cursor < rows.length) {
+            const slice = rows.slice(cursor, cursor + batchSize);
+            cursor += batchSize;
+            const qs = slice.map((x) => encodeURIComponent(String(x.taskId))).join(',');
+            if (!qs) break;
             try {
               const r = await fetch(`/api/sales?taskIds=${qs}`, { cache: 'no-store', credentials: 'include' });
               const d = await r.json();
               const list: Sale[] = Array.isArray(d?.sales) ? d.sales : [];
-              if (!aborted && list.length > 0) setSales(list);
+              for (const s of list) byId.set(String((s as any).taskId), s as Sale);
+              while (prefix < rows.length && byId.has(String(rows[prefix].taskId))) prefix += 1;
             } catch {}
           }
+          const ordered: Sale[] = rows.slice(0, prefix).map((r) => byId.get(String(r.taskId))).filter(Boolean) as Sale[];
+          if (!aborted && ordered.length > 0) setSales(ordered);
         }
         if (typeof meta?.total === 'number') setTotal(meta.total);
       } catch {}
