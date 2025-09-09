@@ -33,6 +33,7 @@ export default function SalesClient({ initial, hasTokenInitial }: { initial: Sal
   const [sseOn, setSseOn] = useState(false);
   const tableWrapRef = useRef<HTMLDivElement | null>(null);
   const actionProbeRef = useRef<HTMLButtonElement | null>(null);
+  const [indexRows, setIndexRows] = useState<Array<{ taskId: string | number; createdAt: string }>>([]);
 
   function IconChevronRight() {
     return (
@@ -276,7 +277,30 @@ export default function SalesClient({ initial, hasTokenInitial }: { initial: Sal
 
   const goNextPage = async () => {
     const targetPage = page + 1;
-    // Снимаем локальный слепок и догружаем по курсору, пока не хватит видимых записей
+    if (indexRows.length > 0) {
+      const start = (targetPage - 1) * pageSize;
+      const ids = indexRows.slice(start, start + pageSize).map((r) => String(r.taskId));
+      const have = new Set(sales.map((s) => String((s as any).taskId)));
+      const missing = ids.filter((id) => !have.has(id));
+      if (missing.length > 0) {
+        setLoading(true);
+        try {
+          const qs = missing.map((id) => encodeURIComponent(id)).join(',');
+          const r = await fetch(`/api/sales?taskIds=${qs}`, { cache: 'no-store', credentials: 'include' });
+          const d = await r.json();
+          const list: Sale[] = Array.isArray(d?.sales) ? d.sales : [];
+          setSales((prev) => {
+            const map = new Map<string, Sale>();
+            for (const s of prev) map.set(String((s as any).taskId), s as Sale);
+            for (const s of list) map.set(String((s as any).taskId), s as Sale);
+            return Array.from(map.values());
+          });
+        } finally { setLoading(false); }
+      }
+      setPage(targetPage);
+      return;
+    }
+    // Fallback: догрузка по cursor
     let map = new Map<string, Sale>();
     for (const s of sales) map.set(String(s.taskId), s);
     let localNext = nextCursor;
@@ -293,9 +317,7 @@ export default function SalesClient({ initial, hasTokenInitial }: { initial: Sal
       setSales((prev) => (JSON.stringify(prev) === JSON.stringify(combined) ? prev : combined));
       setNextCursor(localNext);
       if (visibleCount >= targetPage * pageSize) setPage(targetPage);
-    } finally {
-      setLoading(false);
-    }
+    } finally { setLoading(false); }
   };
   // Подписка на серверные события (прод) и мягкое обновление
   useEffect(() => {
@@ -325,23 +347,37 @@ export default function SalesClient({ initial, hasTokenInitial }: { initial: Sal
   // Обновление выполняется вручную кнопкой «Обновить» и по SSE-событиям.
   // useEffect(() => { /* intentionally disabled */ }, []);
 
-  // Подтянем total из индекса сразу после монтирования, чтобы пагинация знала реальное число записей
+  // Подтянем индекс сразу после монтирования и быстро отрисуем первую страницу по taskIds
   useEffect(() => {
     let aborted = false;
     (async () => {
       try {
         const meta = await fetch('/api/sales/meta', { cache: 'no-store', credentials: 'include' }).then((r)=>r.json());
-        if (!aborted && typeof meta?.total === 'number') setTotal(meta.total);
+        if (aborted) return;
+        if (Array.isArray(meta?.items)) {
+          const rows = (meta.items as Array<{ taskId: string | number; createdAt: string }>);
+          setIndexRows(rows);
+          const ids = rows.slice(0, pageSize).map((x) => encodeURIComponent(String(x.taskId))).join(',');
+          if (ids.length > 0) {
+            try {
+              const r = await fetch(`/api/sales?taskIds=${ids}`, { cache: 'no-store', credentials: 'include' });
+              const d = await r.json();
+              const list = Array.isArray(d?.sales) ? d.sales : [];
+              if (!aborted && list.length > 0) setSales(list);
+            } catch {}
+          }
+        }
+        if (typeof meta?.total === 'number') setTotal(meta.total);
       } catch {}
     })();
     return () => { aborted = true; };
   }, []);
 
-  // Гарантируем наличие nextCursor для постраничной догрузки (и при пустом SSR — списка первой страницы)
+  // Гарантируем наличие nextCursor для постраничной догрузки (если индекс уже есть — пропускаем)
   useEffect(() => {
     let aborted = false;
     (async () => {
-      if (nextCursor) return;
+      if (nextCursor || indexRows.length > 0) return;
       try {
         const r = await fetch('/api/sales?limit=50', { cache: 'no-store', credentials: 'include' });
         const d = await r.json();
