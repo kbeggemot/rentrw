@@ -203,12 +203,17 @@ export default function SalesClient({ initial, hasTokenInitial }: { initial: Sal
           = Array.isArray(meta?.items) ? meta.items : [];
         if (items.length > 0) setIndexRows(items);
         if (typeof meta?.total === 'number') setTotal(meta.total); else if (items.length > 0) setTotal(items.length);
-        // 2) загрузим текущую страницу продаж целиком по курсору
-        const res = await fetch('/api/sales?limit=50', { cache: 'no-store', credentials: 'include' });
-        const data = await res.json();
-        const list = Array.isArray(data?.sales) ? data.sales : [];
-        setNextCursor(typeof data?.nextCursor === 'string' && data.nextCursor.length > 0 ? String(data.nextCursor) : null);
-        setSales((prev) => (JSON.stringify(prev) === JSON.stringify(list) ? prev : list));
+        // 2) загрузим первую страницу по индексам, а не общим /api/sales?limit=50
+        const firstIds = items.slice(0, 50).map((x) => encodeURIComponent(String(x.taskId))).join(',');
+        if (firstIds) {
+          const r = await fetch(`/api/sales?taskIds=${firstIds}`, { cache: 'no-store', credentials: 'include' });
+          const d = await r.json();
+          const list = Array.isArray(d?.sales) ? d.sales : [];
+          setSales((prev) => (JSON.stringify(prev) === JSON.stringify(list) ? prev : list));
+        } else {
+          setSales([]);
+        }
+        // nextCursor не требуется при индексной пагинации; оставляем как есть
       }
     } catch {
       // keep previous data to avoid flicker
@@ -472,21 +477,7 @@ export default function SalesClient({ initial, hasTokenInitial }: { initial: Sal
 
   // Гарантируем наличие nextCursor для постраничной догрузки (если индекс уже есть — пропускаем)
   useEffect(() => {
-    let aborted = false;
-    (async () => {
-      if (nextCursor || indexRows.length > 0 || hasActiveFilter) return;
-      try {
-        const r = await fetch('/api/sales?limit=50', { cache: 'no-store', credentials: 'include' });
-        const d = await r.json();
-        const nc = typeof d?.nextCursor === 'string' && d.nextCursor.length > 0 ? String(d.nextCursor) : null;
-        if (!aborted && nc) setNextCursor(nc);
-        const list = Array.isArray(d?.sales) ? d.sales : [];
-        if (!aborted && sales.length === 0 && list.length > 0) setSales(list);
-      } catch {}
-    })();
-    return () => { aborted = true; };
-  // deliberately run only once on mount
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // Больше не дергаем общий `/api/sales?limit=50` на старте — загружаем по индексам
   }, []);
 
   // (moved below after `filtered` declaration)
