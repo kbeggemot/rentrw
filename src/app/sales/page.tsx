@@ -1,6 +1,7 @@
 import SalesClient from './SalesClient';
 import { cookies, headers } from 'next/headers';
 import { getTokenForOrg } from '@/server/orgStore';
+import { listSales, listAllSalesForOrg } from '@/server/taskStore';
 
 export default async function SalesPage() {
   const c = await cookies();
@@ -14,14 +15,11 @@ export default async function SalesPage() {
   let initial: any[] = [];
   try {
     if (hasToken) {
-      // Передаём куки вручную, чтобы API увидел пользователя и выбранную организацию
-      const cookieStr = [
-        userId ? `session_user=${encodeURIComponent(String(userId))}` : null,
-        inn ? `org_inn=${encodeURIComponent(String(inn))}` : null,
-      ].filter(Boolean).join('; ');
-      const res = await fetch('/api/sales?limit=50', { cache: 'no-store', headers: cookieStr ? { cookie: cookieStr } as any : undefined });
-      const d = await res.json().catch(() => ({} as any));
-      initial = Array.isArray(d?.sales) ? d.sales : [];
+      const { getShowAllDataFlag } = await import('@/server/userStore');
+      const showAll = await getShowAllDataFlag(userId);
+      const base = showAll && inn ? await listAllSalesForOrg(inn) : await listSales(userId);
+      const scoped = inn ? base.filter((s: any) => String((s as any).orgInn || 'неизвестно') === inn || (s as any).orgInn == null || String((s as any).orgInn) === 'неизвестно') : base;
+      initial = scoped.slice(0, 50);
     }
   } catch {}
   return (
