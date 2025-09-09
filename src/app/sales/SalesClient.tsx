@@ -453,7 +453,7 @@ export default function SalesClient({ initial, hasTokenInitial }: { initial: Sal
           // Грузим стартовый набор до 15 видимых строк, пропуская те, которые не проходят локальные фильтры
           const byId = new Map<string, Sale>();
           let cursor = 0;
-          const batchSize = 120;
+          const batchSize = 30;
           const pickVisible = (need: number): Sale[] => {
             const out: Sale[] = [];
             for (let i = 0; i < rows.length && out.length < need; i += 1) {
