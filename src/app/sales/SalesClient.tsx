@@ -279,25 +279,42 @@ export default function SalesClient({ initial, hasTokenInitial }: { initial: Sal
   const goNextPage = async () => {
     const targetPage = page + 1;
     if (indexRows.length > 0) {
-      // Требуемый диапазон: с начала до конца новой страницы
-      const wantIds = indexRows.slice(0, targetPage * pageSize).map((r) => String(r.taskId));
-      const have = new Set(sales.map((s) => String((s as any).taskId)));
-      const missing = wantIds.filter((id) => !have.has(id));
+      // Наращиваем непрерывный префикс из индекса, пока видимых записей не хватит на targetPage
       setLoading(true);
       try {
-        let fetched: Sale[] = [];
-        if (missing.length > 0) {
-          const qs = missing.map((id) => encodeURIComponent(id)).join(',');
-          const r = await fetch(`/api/sales?taskIds=${qs}`, { cache: 'no-store', credentials: 'include' });
-          const d = await r.json();
-          fetched = Array.isArray(d?.sales) ? d.sales : [];
-        }
-        // Собираем объединённый словарь и упорядочиваем по wantIds
         const byId = new Map<string, Sale>();
         for (const s of sales) byId.set(String((s as any).taskId), s as Sale);
-        for (const s of fetched) byId.set(String((s as any).taskId), s as Sale);
-        const ordered: Sale[] = wantIds.map((id) => byId.get(String(id))).filter(Boolean) as Sale[];
-        if (ordered.length > 0) setSales(ordered);
+        // длина непрерывного префикса, который уже загружен
+        let prefix = 0;
+        while (prefix < indexRows.length && byId.has(String(indexRows[prefix].taskId))) prefix += 1;
+        const needVisible = targetPage * pageSize;
+        const visibleCount = () => applyFiltersLocal(Array.from(byId.values())).length;
+        let currentVisible = visibleCount();
+        let cursor = prefix;
+        const batchSize = 30;
+        while (currentVisible < needVisible && cursor < indexRows.length) {
+          const sliceIds = indexRows.slice(cursor, cursor + batchSize).map((r) => String(r.taskId));
+          cursor += batchSize;
+          // отфильтруем те, которых ещё нет
+          const missing = sliceIds.filter((id) => !byId.has(id));
+          if (missing.length > 0) {
+            const qs = missing.map((id) => encodeURIComponent(id)).join(',');
+            const r = await fetch(`/api/sales?taskIds=${qs}`, { cache: 'no-store', credentials: 'include' });
+            const d = await r.json();
+            const list: Sale[] = Array.isArray(d?.sales) ? d.sales : [];
+            for (const s of list) byId.set(String((s as any).taskId), s as Sale);
+            // пересчитаем префикс
+            while (prefix < indexRows.length && byId.has(String(indexRows[prefix].taskId))) prefix += 1;
+            currentVisible = visibleCount();
+          } else {
+            // даже если все ids уже есть, увеличим префикс
+            while (prefix < indexRows.length && byId.has(String(indexRows[prefix].taskId))) prefix += 1;
+            currentVisible = visibleCount();
+          }
+        }
+        // сформируем sales как непрерывный префикс для корректной пагинации
+        const orderedPrefix: Sale[] = indexRows.slice(0, prefix).map((r) => byId.get(String(r.taskId))).filter(Boolean) as Sale[];
+        if (orderedPrefix.length > 0) setSales(orderedPrefix);
       } finally { setLoading(false); }
       setPage(targetPage);
       return;
