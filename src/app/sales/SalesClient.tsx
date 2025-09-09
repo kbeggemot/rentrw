@@ -450,13 +450,19 @@ export default function SalesClient({ initial, hasTokenInitial }: { initial: Sal
         if (Array.isArray(meta?.items)) {
           const rows = (meta.items as Array<{ taskId: string | number; createdAt: string }>);
           setIndexRows(rows);
-          // Грузим стартовый префикс до 15 видимых строк
+          // Грузим стартовый набор до 15 видимых строк, пропуская те, которые не проходят локальные фильтры
           const byId = new Map<string, Sale>();
-          let prefix = 0;
           let cursor = 0;
-          const batchSize = 30;
-          const visibleCount = () => applyFiltersLocal(Array.from(byId.values())).length;
-          while (!aborted && visibleCount() < pageSize && cursor < rows.length) {
+          const batchSize = 120;
+          const pickVisible = (need: number): Sale[] => {
+            const out: Sale[] = [];
+            for (let i = 0; i < rows.length && out.length < need; i += 1) {
+              const s = byId.get(String(rows[i].taskId));
+              if (s && applyFiltersLocal([s]).length > 0) out.push(s);
+            }
+            return out;
+          };
+          while (!aborted && pickVisible(pageSize).length < pageSize && cursor < rows.length) {
             const slice = rows.slice(cursor, cursor + batchSize);
             cursor += batchSize;
             const qs = slice.map((x) => encodeURIComponent(String(x.taskId))).join(',');
@@ -466,11 +472,9 @@ export default function SalesClient({ initial, hasTokenInitial }: { initial: Sal
               const d = await r.json();
               const list: Sale[] = Array.isArray(d?.sales) ? d.sales : [];
               for (const s of list) byId.set(String((s as any).taskId), s as Sale);
-              while (prefix < rows.length && byId.has(String(rows[prefix].taskId))) prefix += 1;
             } catch {}
           }
-          const ordered: Sale[] = rows.slice(0, prefix).map((r) => byId.get(String(r.taskId))).filter(Boolean) as Sale[];
-          // Не перезатираем список, если в процессе пользователь включил фильтр
+          const ordered: Sale[] = pickVisible(pageSize);
           if (!aborted && !hasFilterRef.current && ordered.length > 0) setSales(ordered);
         }
         if (typeof meta?.total === 'number') setTotal(meta.total);
