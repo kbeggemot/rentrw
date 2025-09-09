@@ -1,6 +1,5 @@
 import SalesClient from './SalesClient';
 import { cookies, headers } from 'next/headers';
-import { listSales, listSalesForOrg, listAllSalesForOrg } from '@/server/taskStore';
 import { getTokenForOrg } from '@/server/orgStore';
 
 export default async function SalesPage() {
@@ -15,10 +14,13 @@ export default async function SalesPage() {
   let initial: any[] = [];
   try {
     if (hasToken) {
-      const { getShowAllDataFlag } = await import('@/server/userStore');
-      const showAll = await getShowAllDataFlag(userId);
-      const base = showAll && inn ? await listAllSalesForOrg(inn) : await listSales(userId);
-      initial = inn ? base.filter((s: any) => String((s as any).orgInn || 'неизвестно') === inn || (s as any).orgInn == null || String((s as any).orgInn) === 'неизвестно') : base;
+      const h = await headers();
+      const hostHdr = h.get('x-forwarded-host') || h.get('host') || 'localhost:3000';
+      const protoHdr = h.get('x-forwarded-proto') || (hostHdr.startsWith('localhost') ? 'http' : 'https');
+      const url = `${protoHdr}://${hostHdr}/api/sales?limit=50`;
+      const r = await fetch(url, { cache: 'no-store' });
+      const d = await r.json().catch(() => ({} as any));
+      initial = Array.isArray(d?.sales) ? d.sales : [];
     }
   } catch {}
   return (
