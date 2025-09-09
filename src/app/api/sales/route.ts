@@ -430,6 +430,7 @@ export async function GET(req: Request) {
       if (filter.prepay === 'yes' && !hasPrepay) return false; if (filter.prepay === 'no' && hasPrepay) return false;
       if (filter.full === 'yes' && !hasFull) return false; if (filter.full === 'no' && hasFull) return false;
       if (filter.commission === 'yes' && !hasComm) return false; if (filter.commission === 'no' && hasComm) return false;
+      // Чек НПД: учитывать как поля на самой продаже, так и в связанных (на всякий случай)
       if (filter.npd === 'yes' && !hasNpd) return false; if (filter.npd === 'no' && hasNpd) return false;
       if (filter.saleFrom || filter.saleTo) {
         const base = s.createdAtRw || s.createdAt;

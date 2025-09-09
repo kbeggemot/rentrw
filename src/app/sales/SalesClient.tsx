@@ -135,7 +135,9 @@ export default function SalesClient({ initial, hasTokenInitial }: { initial: Sal
         if (fullReceipt && fullReceipt !== 'all') sp.set('full', fullReceipt);
         if (commissionReceipt && commissionReceipt !== 'all') sp.set('commission', commissionReceipt);
         if (npdReceipt && npdReceipt !== 'all') sp.set('npd', npdReceipt);
+        // При активных фильтрах показываем скрытые тоже, если пользователь явно не выбрал иначе
         if (showHidden && showHidden !== 'no') sp.set('showHidden', showHidden);
+        else if (hasActiveFilter) sp.set('showHidden', 'all');
         if (dateFrom) sp.set('saleFrom', dateFrom);
         if (dateTo) sp.set('saleTo', dateTo);
         if (endFrom) sp.set('endFrom', endFrom);
