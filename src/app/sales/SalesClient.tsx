@@ -279,22 +279,26 @@ export default function SalesClient({ initial, hasTokenInitial }: { initial: Sal
   const goNextPage = async () => {
     const targetPage = page + 1;
     if (indexRows.length > 0) {
-      const start = (targetPage - 1) * pageSize;
-      const ids = indexRows.slice(start, start + pageSize).map((r) => String(r.taskId));
-      // Всегда запрашиваем целевую страницу по индексу, чтобы избежать несинхронности с уже загруженными данными
+      // Требуемый диапазон: с начала до конца новой страницы
+      const wantIds = indexRows.slice(0, targetPage * pageSize).map((r) => String(r.taskId));
+      const have = new Set(sales.map((s) => String((s as any).taskId)));
+      const missing = wantIds.filter((id) => !have.has(id));
       setLoading(true);
       try {
-        const qs = ids.map((id) => encodeURIComponent(id)).join(',');
-        const r = await fetch(`/api/sales?taskIds=${qs}`, { cache: 'no-store', credentials: 'include' });
-        const d = await r.json();
-        const list: Sale[] = Array.isArray(d?.sales) ? d.sales : [];
-        // Порядок строго по индексу
+        let fetched: Sale[] = [];
+        if (missing.length > 0) {
+          const qs = missing.map((id) => encodeURIComponent(id)).join(',');
+          const r = await fetch(`/api/sales?taskIds=${qs}`, { cache: 'no-store', credentials: 'include' });
+          const d = await r.json();
+          fetched = Array.isArray(d?.sales) ? d.sales : [];
+        }
+        // Собираем объединённый словарь и упорядочиваем по wantIds
         const byId = new Map<string, Sale>();
-        for (const s of list) byId.set(String((s as any).taskId), s as Sale);
-        const ordered: Sale[] = ids.map((id) => byId.get(String(id))).filter(Boolean) as Sale[];
+        for (const s of sales) byId.set(String((s as any).taskId), s as Sale);
+        for (const s of fetched) byId.set(String((s as any).taskId), s as Sale);
+        const ordered: Sale[] = wantIds.map((id) => byId.get(String(id))).filter(Boolean) as Sale[];
         if (ordered.length > 0) setSales(ordered);
       } finally { setLoading(false); }
-      // если нет nextCursor (работаем по индексу), оставим его null — листаем по индексным страницам
       setPage(targetPage);
       return;
     }
