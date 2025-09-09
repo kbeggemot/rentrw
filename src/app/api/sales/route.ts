@@ -461,7 +461,8 @@ export async function GET(req: Request) {
     if (taskIdsRaw && taskIdsRaw.trim().length > 0) {
       // Fast lookup of specific tasks by IDs using indexes — читаем файлы параллельно
       let rows: any[] = [];
-      if (showAll && inn) {
+      // Если выбрана организация — используем её индекс всегда
+      if (inn) {
         try {
           const idxRaw = await readText(`.data/sales/${inn.replace(/\D/g,'')}/index.json`);
           rows = idxRaw ? JSON.parse(idxRaw) : [];
@@ -485,7 +486,8 @@ export async function GET(req: Request) {
             const raw = await readText(p);
             if (!raw) return null;
             const s = JSON.parse(raw);
-            if (!showAll && s.userId !== userId) return null;
+            // При выбранной организации показываем все её продажи, вне зависимости от userId
+            if (!showAll && !inn && s.userId !== userId) return null;
             return s;
           } catch { return null; }
         }));
@@ -519,7 +521,8 @@ export async function GET(req: Request) {
             const raw = await readText(p);
             if (!raw) continue;
             const s = JSON.parse(raw);
-            if (!showAll && s.userId !== userId) continue;
+            // При выбранной организации показываем все её продажи, вне зависимости от userId
+            if (!showAll && !inn && s.userId !== userId) continue;
             if (onlySuccess) {
               const st = String(s.status || '').toLowerCase();
               if (!(st === 'paid' || st === 'transfered' || st === 'transferred')) continue;
@@ -557,7 +560,7 @@ export async function GET(req: Request) {
             const raw = await readText(p);
             if (!raw) continue;
             const s = JSON.parse(raw);
-            if (!showAll && s.userId !== userId) continue;
+            if (!showAll && !inn && s.userId !== userId) continue;
             sales.push(s);
           } catch {}
         }
@@ -567,7 +570,8 @@ export async function GET(req: Request) {
     }
 
     // Fallback: full read then paginate/filter (legacy path)
-    const allSales = showAll && inn ? await listAllSalesForOrg(inn) : await listSales(userId);
+    // Если выбрана организация — читаем все её продажи, вне зависимости от флага showAll
+    const allSales = inn ? await listAllSalesForOrg(inn) : await listSales(userId);
     let sales = inn ? allSales.filter((s: any) => String((s as any).orgInn || 'неизвестно') === inn || (s as any).orgInn == null || String((s as any).orgInn) === 'неизвестно') : allSales;
     if (linkCode) sales = sales.filter((s: any) => (s as any).linkCode === linkCode);
     if (onlySuccess) sales = sales.filter((s: any) => { const st = String((s as any)?.status || '').toLowerCase(); return st === 'paid' || st === 'transfered' || st === 'transferred'; });
