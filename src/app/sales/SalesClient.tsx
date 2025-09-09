@@ -281,26 +281,19 @@ export default function SalesClient({ initial, hasTokenInitial }: { initial: Sal
     if (indexRows.length > 0) {
       const start = (targetPage - 1) * pageSize;
       const ids = indexRows.slice(start, start + pageSize).map((r) => String(r.taskId));
-      const have = new Set(sales.map((s) => String((s as any).taskId)));
-      const missing = ids.filter((id) => !have.has(id));
-      if (missing.length > 0) {
-        setLoading(true);
-        try {
-          const qs = missing.map((id) => encodeURIComponent(id)).join(',');
-          const r = await fetch(`/api/sales?taskIds=${qs}`, { cache: 'no-store', credentials: 'include' });
-          const d = await r.json();
-          const list: Sale[] = Array.isArray(d?.sales) ? d.sales : [];
-          setSales((prev) => {
-            const map = new Map<string, Sale>();
-            for (const s of prev) map.set(String((s as any).taskId), s as Sale);
-            // Сохраняем порядок как в индексе
-            const merged = new Map<string, Sale>(map);
-            for (const s of list) merged.set(String((s as any).taskId), s as Sale);
-            const ordered: Sale[] = ids.map((id) => merged.get(String(id))).filter(Boolean) as Sale[];
-            return ordered.length > 0 ? ordered : Array.from(merged.values());
-          });
-        } finally { setLoading(false); }
-      }
+      // Всегда запрашиваем целевую страницу по индексу, чтобы избежать несинхронности с уже загруженными данными
+      setLoading(true);
+      try {
+        const qs = ids.map((id) => encodeURIComponent(id)).join(',');
+        const r = await fetch(`/api/sales?taskIds=${qs}`, { cache: 'no-store', credentials: 'include' });
+        const d = await r.json();
+        const list: Sale[] = Array.isArray(d?.sales) ? d.sales : [];
+        // Порядок строго по индексу
+        const byId = new Map<string, Sale>();
+        for (const s of list) byId.set(String((s as any).taskId), s as Sale);
+        const ordered: Sale[] = ids.map((id) => byId.get(String(id))).filter(Boolean) as Sale[];
+        if (ordered.length > 0) setSales(ordered);
+      } finally { setLoading(false); }
       // если нет nextCursor (работаем по индексу), оставим его null — листаем по индексным страницам
       setPage(targetPage);
       return;
