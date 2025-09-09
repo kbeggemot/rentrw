@@ -14,11 +14,7 @@ export default async function SalesPage() {
   let initial: any[] = [];
   try {
     if (hasToken) {
-      const h = await headers();
-      const hostHdr = h.get('x-forwarded-host') || h.get('host') || 'localhost:3000';
-      const protoHdr = h.get('x-forwarded-proto') || (hostHdr.startsWith('localhost') ? 'http' : 'https');
-      const url = `${protoHdr}://${hostHdr}/api/sales?limit=50`;
-      const r = await fetch(url, { cache: 'no-store' });
+      const r = await fetch('/api/sales?limit=50', { cache: 'no-store' });
       const d = await r.json().catch(() => ({} as any));
       initial = Array.isArray(d?.sales) ? d.sales : [];
     }
