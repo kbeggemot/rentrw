@@ -14,7 +14,12 @@ export default async function SalesPage() {
   let initial: any[] = [];
   try {
     if (hasToken) {
-      const res = await fetch('/api/sales?limit=50', { cache: 'no-store' });
+      // Передаём куки вручную, чтобы API увидел пользователя и выбранную организацию
+      const cookieStr = [
+        userId ? `session_user=${encodeURIComponent(String(userId))}` : null,
+        inn ? `org_inn=${encodeURIComponent(String(inn))}` : null,
+      ].filter(Boolean).join('; ');
+      const res = await fetch('/api/sales?limit=50', { cache: 'no-store', headers: cookieStr ? { cookie: cookieStr } as any : undefined });
       const d = await res.json().catch(() => ({} as any));
       initial = Array.isArray(d?.sales) ? d.sales : [];
     }
