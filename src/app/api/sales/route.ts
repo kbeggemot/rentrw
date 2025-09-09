@@ -432,7 +432,8 @@ export async function GET(req: Request) {
 
     if (limit > 0 && !linkCode) {
       let rows: any[] = [];
-      if (showAll && inn) {
+      // Prefer org index when org is selected; fall back to user index
+      if (inn) {
         try {
           const idxRaw = await readText(`.data/sales/${inn.replace(/\D/g,'')}/index.json`);
           rows = idxRaw ? JSON.parse(idxRaw) : [];
@@ -441,6 +442,10 @@ export async function GET(req: Request) {
         try { rows = await readUserIndex(userId); } catch { rows = []; }
       }
       rows = Array.isArray(rows) ? rows.slice() : [];
+      // If using user index but org is selected, filter strictly by org
+      if (inn && rows.length > 0) {
+        rows = rows.filter((r) => String((r?.inn || '')).replace(/\D/g,'') === inn.replace(/\D/g,''));
+      }
       if (onlySuccess) rows = rows.filter((r) => { const st = String(r?.status || '').toLowerCase(); return st === 'paid' || st === 'transfered' || st === 'transferred'; });
       rows.sort(compareRows);
       let start = 0;
