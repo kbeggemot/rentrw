@@ -52,7 +52,7 @@ export async function GET(req: Request) {
     const total = rows.length;
     const prev = (offset > 0 && offset - 1 < rows.length) ? rows[offset - 1] : null;
     const prevCursor = prev ? `${prev.createdAt}|${prev.taskId}` : null;
-    const pageItems = limit > 0 ? rows.slice(offset, offset + limit) : [];
+    const pageItems = limit > 0 ? rows.slice(offset, offset + limit) : rows;
     const minimal = pageItems.map((r) => ({ taskId: r.taskId, createdAt: r.createdAt, status: (r as any)?.status ?? null, inn: r.inn }));
     return NextResponse.json({ total, prevCursor, items: minimal });
   } catch (e) {

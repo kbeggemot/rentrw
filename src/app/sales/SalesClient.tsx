@@ -232,6 +232,18 @@ export default function SalesClient({ initial, hasTokenInitial }: { initial: Sal
   // Обновление выполняется вручную кнопкой «Обновить» и по SSE-событиям.
   // useEffect(() => { /* intentionally disabled */ }, []);
 
+  // Подтянем total из индекса сразу после монтирования, чтобы пагинация знала реальное число записей
+  useEffect(() => {
+    let aborted = false;
+    (async () => {
+      try {
+        const meta = await fetch('/api/sales/meta', { cache: 'no-store', credentials: 'include' }).then((r)=>r.json());
+        if (!aborted && typeof meta?.total === 'number') setTotal(meta.total);
+      } catch {}
+    })();
+    return () => { aborted = true; };
+  }, []);
+
   // (moved below after `filtered` declaration)
 
   const filtered = useMemo(() => {
