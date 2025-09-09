@@ -292,8 +292,11 @@ export default function SalesClient({ initial, hasTokenInitial }: { initial: Sal
           setSales((prev) => {
             const map = new Map<string, Sale>();
             for (const s of prev) map.set(String((s as any).taskId), s as Sale);
-            for (const s of list) map.set(String((s as any).taskId), s as Sale);
-            return Array.from(map.values());
+            // Сохраняем порядок как в индексе
+            const merged = new Map<string, Sale>(map);
+            for (const s of list) merged.set(String((s as any).taskId), s as Sale);
+            const ordered: Sale[] = ids.map((id) => merged.get(String(id))).filter(Boolean) as Sale[];
+            return ordered.length > 0 ? ordered : Array.from(merged.values());
           });
         } finally { setLoading(false); }
       }
@@ -358,26 +361,17 @@ export default function SalesClient({ initial, hasTokenInitial }: { initial: Sal
         if (Array.isArray(meta?.items)) {
           const rows = (meta.items as Array<{ taskId: string | number; createdAt: string }>);
           setIndexRows(rows);
-          // Догружаем пакетами по 50, пока не соберём минимум 15 видимых записей
-          let loaded = 0;
-          let map = new Map<string, Sale>();
-          while (!aborted && applyFiltersLocal(Array.from(map.values())).length < pageSize && loaded < rows.length) {
-            const slice = rows.slice(loaded, loaded + 50);
-            loaded += slice.length;
-            const qs = slice.map((x) => encodeURIComponent(String(x.taskId))).join(',');
-            if (!qs) break;
+          // Загружаем только первую страницу (15 записей) — быстро и без «затыков»
+          const first = rows.slice(0, pageSize);
+          const qs = first.map((x) => encodeURIComponent(String(x.taskId))).join(',');
+          if (qs) {
             try {
               const r = await fetch(`/api/sales?taskIds=${qs}`, { cache: 'no-store', credentials: 'include' });
               const d = await r.json();
               const list: Sale[] = Array.isArray(d?.sales) ? d.sales : [];
-              for (const s of list) map.set(String((s as any).taskId), s as Sale);
-              // показываем прогрессивно, не ждём все батчи
-              const snap = Array.from(map.values());
-              if (!aborted && snap.length > 0) setSales(snap);
+              if (!aborted && list.length > 0) setSales(list);
             } catch {}
           }
-          const combined = Array.from(map.values());
-          if (!aborted && combined.length > 0) setSales(combined);
         }
         if (typeof meta?.total === 'number') setTotal(meta.total);
       } catch {}
