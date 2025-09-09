@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -203,6 +203,99 @@ export default function SalesClient({ initial, hasTokenInitial }: { initial: Sal
       });
     } catch {
     } finally { setLoading(false); }
+  };
+
+  // Локальный фильтр для произвольного массива, идентичен useMemo-фильтру ниже
+  const applyFiltersLocal = useCallback((arr: Sale[]): Sale[] => {
+    const q = query.trim();
+    const fromTs = dateFrom ? new Date(dateFrom).getTime() : null;
+    const toTs = dateTo ? new Date(dateTo).getTime() + 24 * 60 * 60 * 1000 - 1 : null;
+    const endFromTs = endFrom ? new Date(endFrom).getTime() : null;
+    const endToTs = endTo ? new Date(endTo).getTime() + 24 * 60 * 60 * 1000 - 1 : null;
+    const min = amountMin ? Number(amountMin.replace(',', '.')) : null;
+    const max = amountMax ? Number(amountMax.replace(',', '.')) : null;
+    return arr.filter((s) => {
+      if (q && !String(s.orderId).includes(q) && !String(s.taskId).includes(q)) return false;
+      if (showHidden !== 'all') {
+        const isHidden = Boolean(s.hidden);
+        if (showHidden === 'no' && isHidden) return false;
+        if (showHidden === 'yes' && !isHidden) return false;
+      }
+      if (status !== 'all') {
+        const st = String(s.status || '').toLowerCase();
+        if (st !== status) return false;
+      }
+      if (agent !== 'all') {
+        if (agent === 'yes' && !s.isAgent) return false;
+        if (agent === 'no' && s.isAgent) return false;
+      }
+      if (purchaseReceipt !== 'all') {
+        const has = Boolean(s.ofdUrl);
+        if (purchaseReceipt === 'yes' && !has) return false;
+        if (purchaseReceipt === 'no' && has) return false;
+      }
+      if (fullReceipt !== 'all') {
+        const has = Boolean(s.ofdFullUrl);
+        if (fullReceipt === 'yes' && !has) return false;
+        if (fullReceipt === 'no' && has) return false;
+      }
+      if (commissionReceipt !== 'all') {
+        const has = Boolean(s.additionalCommissionOfdUrl);
+        if (commissionReceipt === 'yes' && !has) return false;
+        if (commissionReceipt === 'no' && has) return false;
+      }
+      if (npdReceipt !== 'all') {
+        const has = Boolean(s.npdReceiptUri);
+        if (npdReceipt === 'yes' && !has) return false;
+        if (npdReceipt === 'no' && has) return false;
+      }
+      if (fromTs != null || toTs != null) {
+        const baseDate = (s as any).createdAtRw || (s as any).createdAt;
+        const ts = baseDate ? new Date(baseDate).getTime() : NaN;
+        if (fromTs != null && !(Number.isFinite(ts) && ts >= fromTs)) return false;
+        if (toTs != null && !(Number.isFinite(ts) && ts <= toTs)) return false;
+      }
+      if (endFromTs != null || endToTs != null) {
+        const eTs = s.serviceEndDate ? new Date(s.serviceEndDate).getTime() : NaN;
+        if (endFromTs != null && !(Number.isFinite(eTs) && eTs >= endFromTs)) return false;
+        if (endToTs != null && !(Number.isFinite(eTs) && eTs <= endToTs)) return false;
+      }
+      if (min != null && !(s.amountGrossRub >= min)) return false;
+      if (max != null && !(s.amountGrossRub <= max)) return false;
+      return true;
+    });
+  }, [query, dateFrom, dateTo, endFrom, endTo, amountMin, amountMax, showHidden, status, agent, purchaseReceipt, fullReceipt, commissionReceipt, npdReceipt]);
+
+  async function fetchMorePage(cursorStr: string): Promise<{ list: Sale[]; next: string | null }> {
+    const res = await fetch(`/api/sales?limit=50&cursor=${encodeURIComponent(cursorStr)}`, { cache: 'no-store', credentials: 'include' });
+    const data = await res.json();
+    const list: Sale[] = Array.isArray(data?.sales) ? data.sales : [];
+    const next = typeof data?.nextCursor === 'string' && data.nextCursor.length > 0 ? String(data.nextCursor) : null;
+    return { list, next };
+  }
+
+  const goNextPage = async () => {
+    const targetPage = page + 1;
+    // Снимаем локальный слепок и догружаем по курсору, пока не хватит видимых записей
+    let map = new Map<string, Sale>();
+    for (const s of sales) map.set(String(s.taskId), s);
+    let localNext = nextCursor;
+    let visibleCount = applyFiltersLocal(Array.from(map.values())).length;
+    setLoading(true);
+    try {
+      while (visibleCount < targetPage * pageSize && localNext) {
+        const { list, next } = await fetchMorePage(localNext);
+        for (const s of list) map.set(String((s as any).taskId), s as Sale);
+        visibleCount = applyFiltersLocal(Array.from(map.values())).length;
+        localNext = next;
+      }
+      const combined = Array.from(map.values());
+      setSales((prev) => (JSON.stringify(prev) === JSON.stringify(combined) ? prev : combined));
+      setNextCursor(localNext);
+      if (visibleCount >= targetPage * pageSize) setPage(targetPage);
+    } finally {
+      setLoading(false);
+    }
   };
   // Подписка на серверные события (прод) и мягкое обновление
   useEffect(() => {
@@ -845,13 +938,7 @@ export default function SalesClient({ initial, hasTokenInitial }: { initial: Sal
           <div className="flex items-center gap-2">
             <Button variant="ghost" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1}>Назад</Button>
             <div className="h-9 min-w-8 inline-flex items-center justify-center">{page}</div>
-            <Button variant="ghost" onClick={async () => {
-              // Если данных для следующей страницы в отфильтрованном списке не хватает — догружаем
-              if ((page * pageSize) >= filtered.length && nextCursor) {
-                await loadMore();
-              }
-              setPage((p) => (p * pageSize < (total ?? filtered.length) ? p + 1 : p));
-            }} disabled={page * pageSize >= (total ?? filtered.length)}>Вперёд</Button>
+            <Button variant="ghost" onClick={goNextPage} disabled={page * pageSize >= (total ?? filtered.length)}>Вперёд</Button>
           </div>
         </div>
       ) : null}
