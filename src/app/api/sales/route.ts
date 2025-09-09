@@ -486,8 +486,8 @@ export async function GET(req: Request) {
             const raw = await readText(p);
             if (!raw) return null;
             const s = JSON.parse(raw);
-            // При выбранной организации показываем все её продажи, вне зависимости от userId
-            if (!showAll && !inn && s.userId !== userId) return null;
+            // Если режим "все данные" не включен — фильтруем по userId
+            if (!showAll && s.userId !== userId) return null;
             return s;
           } catch { return null; }
         }));
@@ -521,8 +521,8 @@ export async function GET(req: Request) {
             const raw = await readText(p);
             if (!raw) continue;
             const s = JSON.parse(raw);
-            // При выбранной организации показываем все её продажи, вне зависимости от userId
-            if (!showAll && !inn && s.userId !== userId) continue;
+            // Если режим "все данные" не включен — фильтруем по userId
+            if (!showAll && s.userId !== userId) continue;
             if (onlySuccess) {
               const st = String(s.status || '').toLowerCase();
               if (!(st === 'paid' || st === 'transfered' || st === 'transferred')) continue;
@@ -560,7 +560,7 @@ export async function GET(req: Request) {
             const raw = await readText(p);
             if (!raw) continue;
             const s = JSON.parse(raw);
-            if (!showAll && !inn && s.userId !== userId) continue;
+            if (!showAll && s.userId !== userId) continue;
             sales.push(s);
           } catch {}
         }
@@ -570,9 +570,10 @@ export async function GET(req: Request) {
     }
 
     // Fallback: full read then paginate/filter (legacy path)
-    // Если выбрана организация — читаем все её продажи, вне зависимости от флага showAll
+    // Если выбрана организация — читаем все её продажи (для скорости), но ниже отфильтруем по userId при необходимости
     const allSales = inn ? await listAllSalesForOrg(inn) : await listSales(userId);
     let sales = inn ? allSales.filter((s: any) => String((s as any).orgInn || 'неизвестно') === inn || (s as any).orgInn == null || String((s as any).orgInn) === 'неизвестно') : allSales;
+    if (!showAll) sales = sales.filter((s: any) => (s as any).userId === userId);
     if (linkCode) sales = sales.filter((s: any) => (s as any).linkCode === linkCode);
     if (onlySuccess) sales = sales.filter((s: any) => { const st = String((s as any)?.status || '').toLowerCase(); return st === 'paid' || st === 'transfered' || st === 'transferred'; });
     try {
