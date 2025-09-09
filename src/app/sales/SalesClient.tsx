@@ -423,6 +423,8 @@ export default function SalesClient({ initial, hasTokenInitial }: { initial: Sal
     return filtered.slice(start, start + pageSize);
   }, [filtered, page]);
 
+  const filteredTotal = useMemo(() => filtered.length, [filtered]);
+
   useEffect(() => { setPage(1); }, [query, status, agent, showHidden, purchaseReceipt, fullReceipt, commissionReceipt, npdReceipt, dateFrom, dateTo, endFrom, endTo, amountMin, amountMax]);
 
   // export button is now in the toolbar; no floating positioning required
@@ -932,9 +934,9 @@ export default function SalesClient({ initial, hasTokenInitial }: { initial: Sal
           </tbody>
         </table>
       </div>
-      {((total != null ? total : filtered.length) > pageSize) ? (
+      {((filteredTotal > pageSize) ? true : false) ? (
         <div className="mt-3 flex items-center justify-between text-sm">
-          <div className="text-gray-600 dark:text-gray-400">Строк: {Math.min((total ?? filtered.length), page * pageSize)} из {total ?? filtered.length}</div>
+          <div className="text-gray-600 dark:text-gray-400">Строк: {Math.min(filteredTotal, page * pageSize)} из {filteredTotal}</div>
           <div className="flex items-center gap-2">
             <Button variant="ghost" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1}>Назад</Button>
             <div className="h-9 min-w-8 inline-flex items-center justify-center">{page}</div>

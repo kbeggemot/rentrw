@@ -384,6 +384,7 @@ export async function GET(req: Request) {
     const cursorRaw = urlObj.searchParams.get('cursor');
     const linkCode = urlObj.searchParams.get('link');
     const onlySuccess = urlObj.searchParams.get('success') === '1';
+    const taskIdsRaw = urlObj.searchParams.get('taskIds');
 
     function compareRows(a: any, b: any): number {
       const at = Date.parse(a?.createdAt || 0);
@@ -391,6 +392,36 @@ export async function GET(req: Request) {
       if (bt !== at) return bt - at;
       // tie-breaker by taskId desc
       return String(b.taskId || '').localeCompare(String(a.taskId || ''));
+    }
+
+    if (taskIdsRaw && taskIdsRaw.trim().length > 0) {
+      // Fast lookup of specific tasks by IDs using indexes
+      let rows: any[] = [];
+      if (showAll && inn) {
+        try {
+          const idxRaw = await readText(`.data/sales/${inn.replace(/\D/g,'')}/index.json`);
+          rows = idxRaw ? JSON.parse(idxRaw) : [];
+        } catch { rows = []; }
+      } else {
+        try { rows = await readUserIndex(userId); } catch { rows = []; }
+      }
+      const byTask = new Map<string, any>();
+      for (const r of Array.isArray(rows) ? rows : []) byTask.set(String(r?.taskId), r);
+      const ids = taskIdsRaw.split(',').map((s) => s.trim()).filter((s) => s.length > 0);
+      const sales: any[] = [];
+      for (const id of ids) {
+        const meta = byTask.get(String(id));
+        if (!meta) continue;
+        try {
+          const p = `.data/sales/${String(meta.inn||'').replace(/\D/g,'')}/sales/${String(meta.taskId)}.json`;
+          const raw = await readText(p);
+          if (!raw) continue;
+          const s = JSON.parse(raw);
+          if (!showAll && s.userId !== userId) continue;
+          sales.push(s);
+        } catch {}
+      }
+      return NextResponse.json({ sales, nextCursor: null });
     }
 
     if (limit > 0 && !linkCode) {
