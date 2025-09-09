@@ -99,8 +99,8 @@ async function writeTasks(data: TaskStoreData): Promise<void> {
   if (process.env.USE_LEGACY_TASKS_WRITE === '0') return;
   try {
     await writeText(TASKS_FILE, JSON.stringify(data, null, 2));
-  } catch (e) {
-    const msg = String((e && e.message) || e || );
+  } catch (e: any) {
+    const msg = String(((e as any) && (e as any).message) || e || '');
     if (msg.includes('TASKS_WRITE_BLOCKED_SHRINK') || msg.includes('TASKS_WRITE_BLOCKED_BACKEND_MISMATCH')) {
       return;
     }
