@@ -846,12 +846,12 @@ export default function SalesClient({ initial, hasTokenInitial }: { initial: Sal
             <Button variant="ghost" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1}>Назад</Button>
             <div className="h-9 min-w-8 inline-flex items-center justify-center">{page}</div>
             <Button variant="ghost" onClick={async () => {
-              // Если следующая страница ещё не загружена, дернём loadMore
-              if ((page * pageSize) >= sales.length && nextCursor) {
+              // Если данных для следующей страницы в отфильтрованном списке не хватает — догружаем
+              if ((page * pageSize) >= filtered.length && nextCursor) {
                 await loadMore();
               }
-              setPage((p) => (p * pageSize < (total ?? sales.length) ? p + 1 : p));
-            }} disabled={page * pageSize >= (total ?? sales.length)}>Вперёд</Button>
+              setPage((p) => (p * pageSize < (total ?? filtered.length) ? p + 1 : p));
+            }} disabled={page * pageSize >= (total ?? filtered.length)}>Вперёд</Button>
           </div>
         </div>
       ) : null}
