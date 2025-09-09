@@ -297,6 +297,7 @@ export default function SalesClient({ initial, hasTokenInitial }: { initial: Sal
           });
         } finally { setLoading(false); }
       }
+      // если нет nextCursor (работаем по индексу), оставим его null — листаем по индексным страницам
       setPage(targetPage);
       return;
     }
@@ -370,6 +371,9 @@ export default function SalesClient({ initial, hasTokenInitial }: { initial: Sal
               const d = await r.json();
               const list: Sale[] = Array.isArray(d?.sales) ? d.sales : [];
               for (const s of list) map.set(String((s as any).taskId), s as Sale);
+              // показываем прогрессивно, не ждём все батчи
+              const snap = Array.from(map.values());
+              if (!aborted && snap.length > 0) setSales(snap);
             } catch {}
           }
           const combined = Array.from(map.values());
