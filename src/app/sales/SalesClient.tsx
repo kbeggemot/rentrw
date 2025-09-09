@@ -34,6 +34,8 @@ export default function SalesClient({ initial, hasTokenInitial }: { initial: Sal
   const tableWrapRef = useRef<HTMLDivElement | null>(null);
   const actionProbeRef = useRef<HTMLButtonElement | null>(null);
   const [indexRows, setIndexRows] = useState<Array<{ taskId: string | number; createdAt: string }>>([]);
+  // Актуальное значение наличия активных фильтров, чтобы не перезатирать результаты сервера
+  const hasFilterRef = useRef<boolean>(false);
 
   function IconChevronRight() {
     return (
@@ -441,6 +443,7 @@ export default function SalesClient({ initial, hasTokenInitial }: { initial: Sal
   useEffect(() => {
     let aborted = false;
     (async () => {
+      if (hasFilterRef.current) return; // не запускаем прелоадер, если включены фильтры
       try {
         const meta = await fetch('/api/sales/meta', { cache: 'no-store', credentials: 'include' }).then((r)=>r.json());
         if (aborted) return;
@@ -467,7 +470,8 @@ export default function SalesClient({ initial, hasTokenInitial }: { initial: Sal
             } catch {}
           }
           const ordered: Sale[] = rows.slice(0, prefix).map((r) => byId.get(String(r.taskId))).filter(Boolean) as Sale[];
-          if (!aborted && ordered.length > 0) setSales(ordered);
+          // Не перезатираем список, если в процессе пользователь включил фильтр
+          if (!aborted && !hasFilterRef.current && ordered.length > 0) setSales(ordered);
         }
         if (typeof meta?.total === 'number') setTotal(meta.total);
       } catch {}
@@ -557,6 +561,8 @@ export default function SalesClient({ initial, hasTokenInitial }: { initial: Sal
       !!dateFrom || !!dateTo || !!endFrom || !!endTo || !!amountMin || !!amountMax
     );
   }, [query, status, agent, purchaseReceipt, fullReceipt, commissionReceipt, npdReceipt, showHidden, dateFrom, dateTo, endFrom, endTo, amountMin, amountMax]);
+  // следим за активностью фильтров, чтобы не затирать результаты серверной выборки прелоадером
+  useEffect(() => { hasFilterRef.current = hasActiveFilter; }, [hasActiveFilter]);
   const totalFromIndex = useMemo(() => (indexRows.length > 0 ? indexRows.length : (typeof total === 'number' ? total : 0)), [indexRows.length, total]);
   const displayTotal = hasActiveFilter ? filteredTotal : (totalFromIndex || filteredTotal);
 
