@@ -3,6 +3,8 @@ import { listSales, listSalesForOrg, updateSaleFromStatus, updateSaleOfdUrlsByOr
 import { getSelectedOrgInn } from '@/server/orgContext';
 import type { RocketworkTask } from '@/types/rocketwork';
 import { getDecryptedApiToken } from '@/server/secureStore';
+import { readUserIndex } from '@/server/salesIndex';
+import { readText } from '@/server/storage';
 import { fermaGetAuthTokenCached, fermaGetReceiptStatus, buildReceiptViewUrl } from '@/server/ofdFerma';
 import { startOfdScheduleWorker } from '@/server/ofdScheduleWorker';
 
@@ -376,11 +378,60 @@ export async function GET(req: Request) {
     const inn = getSelectedOrgInn(req);
     const { getShowAllDataFlag } = await import('@/server/userStore');
     const showAll = await getShowAllDataFlag(userId);
-    const allSales = showAll && inn ? await listAllSalesForOrg(inn) : await listSales(userId);
-    let sales = inn ? allSales.filter((s: any) => String((s as any).orgInn || 'неизвестно') === inn || (s as any).orgInn == null || String((s as any).orgInn) === 'неизвестно') : allSales;
-    // Optional filters
+    // Fast-path pagination via indexes: when limit is provided and no link filter
+    const limitRaw = urlObj.searchParams.get('limit');
+    const limit = (() => { const n = Number(limitRaw); return Number.isFinite(n) && n > 0 ? Math.min(100, Math.max(1, Math.floor(n))) : 0; })();
+    const cursorRaw = urlObj.searchParams.get('cursor');
     const linkCode = urlObj.searchParams.get('link');
     const onlySuccess = urlObj.searchParams.get('success') === '1';
+
+    function compareRows(a: any, b: any): number {
+      const at = Date.parse(a?.createdAt || 0);
+      const bt = Date.parse(b?.createdAt || 0);
+      if (bt !== at) return bt - at;
+      // tie-breaker by taskId desc
+      return String(b.taskId || '').localeCompare(String(a.taskId || ''));
+    }
+
+    if (limit > 0 && !linkCode) {
+      let rows: any[] = [];
+      if (showAll && inn) {
+        try {
+          const idxRaw = await readText(`.data/sales/${inn.replace(/\D/g,'')}/index.json`);
+          rows = idxRaw ? JSON.parse(idxRaw) : [];
+        } catch { rows = []; }
+      } else {
+        try { rows = await readUserIndex(userId); } catch { rows = []; }
+      }
+      rows = Array.isArray(rows) ? rows.slice() : [];
+      if (onlySuccess) rows = rows.filter((r) => { const st = String(r?.status || '').toLowerCase(); return st === 'paid' || st === 'transfered' || st === 'transferred'; });
+      rows.sort(compareRows);
+      let start = 0;
+      if (cursorRaw) {
+        const [ts, tid] = String(cursorRaw).split('|');
+        const idx = rows.findIndex((r) => String(r?.createdAt||'') === ts && String(r?.taskId||'') === String(tid));
+        if (idx >= 0) start = idx + 1;
+      }
+      const pageRows = rows.slice(start, start + limit);
+      // Read only page items
+      const sales: any[] = [];
+      for (const r of pageRows) {
+        try {
+          const p = `.data/sales/${String(r.inn||'').replace(/\D/g,'')}/sales/${String(r.taskId)}.json`;
+          const raw = await readText(p);
+          if (!raw) continue;
+          const s = JSON.parse(raw);
+          if (!showAll && s.userId !== userId) continue;
+          sales.push(s);
+        } catch {}
+      }
+      const nextCursor = (start + limit) < rows.length && pageRows.length > 0 ? `${String(pageRows[pageRows.length-1].createdAt)}|${String(pageRows[pageRows.length-1].taskId)}` : null;
+      return NextResponse.json({ sales, nextCursor });
+    }
+
+    // Fallback: full read then paginate/filter (legacy path)
+    const allSales = showAll && inn ? await listAllSalesForOrg(inn) : await listSales(userId);
+    let sales = inn ? allSales.filter((s: any) => String((s as any).orgInn || 'неизвестно') === inn || (s as any).orgInn == null || String((s as any).orgInn) === 'неизвестно') : allSales;
     if (linkCode) sales = sales.filter((s: any) => (s as any).linkCode === linkCode);
     if (onlySuccess) sales = sales.filter((s: any) => { const st = String((s as any)?.status || '').toLowerCase(); return st === 'paid' || st === 'transfered' || st === 'transferred'; });
     try {
@@ -406,9 +457,7 @@ export async function GET(req: Request) {
       })();
     } catch {}
     // Pagination: limit & cursor (createdAt|taskId)
-    const limitRaw = urlObj.searchParams.get('limit');
-    const limit = (() => { const n = Number(limitRaw); return Number.isFinite(n) && n > 0 ? Math.min(100, Math.max(1, Math.floor(n))) : 0; })();
-    const cursorRaw = urlObj.searchParams.get('cursor');
+    // These were already parsed above as limit/cursorRaw
     let page = sales;
     let nextCursor: string | null = null;
     if (limit > 0) {
