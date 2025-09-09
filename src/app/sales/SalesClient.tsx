@@ -24,6 +24,7 @@ type Sale = {
 
 export default function SalesClient({ initial, hasTokenInitial }: { initial: Sale[]; hasTokenInitial?: boolean }) {
   const [sales, setSales] = useState<Sale[]>(initial);
+  const [total, setTotal] = useState<number | null>(null);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [hasToken, setHasToken] = useState<boolean | null>(typeof hasTokenInitial === 'boolean' ? hasTokenInitial : null);
   const [loading, setLoading] = useState(false);
@@ -160,6 +161,12 @@ export default function SalesClient({ initial, hasTokenInitial }: { initial: Sal
         // fire-and-forget sync for the interim list as well
         void syncMissing(listOld);
       } else {
+        // 1) спросим метаданные по индексу (общее кол-во и ключи текущей страницы)
+        const meta = await fetch('/api/sales/meta?limit=50', { cache: 'no-store', credentials: 'include' }).then((r) => r.json()).catch(() => ({} as any));
+        const items: Array<{ taskId: string | number; createdAt: string }>
+          = Array.isArray(meta?.items) ? meta.items : [];
+        if (typeof meta?.total === 'number') setTotal(meta.total);
+        // 2) загрузим текущую страницу продаж целиком по курсору
         const res = await fetch('/api/sales?limit=50', { cache: 'no-store', credentials: 'include' });
         const data = await res.json();
         const list = Array.isArray(data?.sales) ? data.sales : [];
@@ -178,6 +185,11 @@ export default function SalesClient({ initial, hasTokenInitial }: { initial: Sal
     if (!nextCursor) return;
     setLoading(true);
     try {
+      // Сначала возьмём минимальные ключи следующей страницы — пригодится для total и прелоада
+      try {
+        const meta = await fetch(`/api/sales/meta?limit=50&offset=${sales.length}`, { cache: 'no-store', credentials: 'include' }).then((r)=>r.json());
+        if (typeof meta?.total === 'number') setTotal(meta.total);
+      } catch {}
       const res = await fetch(`/api/sales?limit=50&cursor=${encodeURIComponent(nextCursor)}`, { cache: 'no-store', credentials: 'include' });
       const data = await res.json();
       const list: Sale[] = Array.isArray(data?.sales) ? data.sales : [];
@@ -796,13 +808,19 @@ export default function SalesClient({ initial, hasTokenInitial }: { initial: Sal
           </tbody>
         </table>
       </div>
-      {filtered.length > pageSize ? (
+      {((total != null ? total : filtered.length) > pageSize) ? (
         <div className="mt-3 flex items-center justify-between text-sm">
-          <div className="text-gray-600 dark:text-gray-400">Строк: {Math.min(filtered.length, page * pageSize)} из {filtered.length}</div>
+          <div className="text-gray-600 dark:text-gray-400">Строк: {Math.min((total ?? filtered.length), page * pageSize)} из {total ?? filtered.length}</div>
           <div className="flex items-center gap-2">
             <Button variant="ghost" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1}>Назад</Button>
             <div className="h-9 min-w-8 inline-flex items-center justify-center">{page}</div>
-            <Button variant="ghost" onClick={() => setPage((p) => (p * pageSize < filtered.length ? p + 1 : p))} disabled={page * pageSize >= filtered.length}>Вперёд</Button>
+            <Button variant="ghost" onClick={async () => {
+              // Если следующая страница ещё не загружена, дернём loadMore
+              if ((page * pageSize) >= sales.length && nextCursor) {
+                await loadMore();
+              }
+              setPage((p) => (p * pageSize < (total ?? sales.length) ? p + 1 : p));
+            }} disabled={page * pageSize >= (total ?? sales.length)}>Вперёд</Button>
           </div>
         </div>
       ) : null}
