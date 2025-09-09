@@ -125,6 +125,25 @@ export default function SalesClient({ initial, hasTokenInitial }: { initial: Sal
   const load = async (refresh = false, onlyOrders?: number[]) => {
     setLoading(true);
     try {
+      const buildFilterQuery = () => {
+        const sp = new URLSearchParams();
+        sp.set('limit', '50');
+        if (query && query.trim().length > 0) sp.set('q', query.trim());
+        if (status && status !== 'all') sp.set('status', status);
+        if (agent && agent !== 'all') sp.set('agent', agent);
+        if (purchaseReceipt && purchaseReceipt !== 'all') sp.set('prepay', purchaseReceipt);
+        if (fullReceipt && fullReceipt !== 'all') sp.set('full', fullReceipt);
+        if (commissionReceipt && commissionReceipt !== 'all') sp.set('commission', commissionReceipt);
+        if (npdReceipt && npdReceipt !== 'all') sp.set('npd', npdReceipt);
+        if (showHidden && showHidden !== 'no') sp.set('showHidden', showHidden);
+        if (dateFrom) sp.set('saleFrom', dateFrom);
+        if (dateTo) sp.set('saleTo', dateTo);
+        if (endFrom) sp.set('endFrom', endFrom);
+        if (endTo) sp.set('endTo', endTo);
+        if (amountMin) sp.set('amountMin', amountMin);
+        if (amountMax) sp.set('amountMax', amountMax);
+        return sp;
+      };
       const syncMissing = async (arr: Sale[]) => {
         try {
           const ordersSet = new Set((onlyOrders || []).map((n) => Number(n)));
@@ -143,7 +162,21 @@ export default function SalesClient({ initial, hasTokenInitial }: { initial: Sal
           setSales((prev) => (JSON.stringify(prev) === JSON.stringify(list2) ? prev : list2));
         } catch {}
       };
-      if (refresh) {
+      if (refresh || hasActiveFilter) {
+        // Серверная фильтрация + пагинация
+        try {
+          const sp = buildFilterQuery();
+          const r = await fetch(`/api/sales?${sp.toString()}`, { cache: 'no-store', credentials: 'include' });
+          const d = await r.json();
+          const list = Array.isArray(d?.sales) ? d.sales : [];
+          setSales(list);
+          const nc = typeof d?.nextCursor === 'string' && d.nextCursor.length > 0 ? String(d.nextCursor) : null;
+          setNextCursor(nc);
+        } finally {
+          setLoading(false);
+        }
+        return;
+      } else if (refresh) {
         const qs = onlyOrders && onlyOrders.length > 0 ? `&orders=${encodeURIComponent(onlyOrders.join(','))}` : '';
         void fetch(`/api/sales?refresh=1${qs}`, { cache: 'no-store', credentials: 'include' })
           .then(() => fetch('/api/sales?limit=50', { cache: 'no-store', credentials: 'include' }))
@@ -192,17 +225,48 @@ export default function SalesClient({ initial, hasTokenInitial }: { initial: Sal
         const meta = await fetch(`/api/sales/meta?limit=50&offset=${sales.length}`, { cache: 'no-store', credentials: 'include' }).then((r)=>r.json());
         if (typeof meta?.total === 'number') setTotal(meta.total);
       } catch {}
-      const res = await fetch(`/api/sales?limit=50&cursor=${encodeURIComponent(nextCursor)}`, { cache: 'no-store', credentials: 'include' });
-      const data = await res.json();
-      const list: Sale[] = Array.isArray(data?.sales) ? data.sales : [];
-      const nc = typeof data?.nextCursor === 'string' && data.nextCursor.length > 0 ? String(data.nextCursor) : null;
-      setNextCursor(nc);
-      setSales((prev) => {
-        const map = new Map<string, Sale>();
-        for (const s of prev) map.set(String(s.taskId), s);
-        for (const s of list) map.set(String((s as any).taskId), s as Sale);
-        return Array.from(map.values());
-      });
+      if (hasActiveFilter) {
+        const sp = new URLSearchParams();
+        sp.set('limit', '50');
+        sp.set('cursor', nextCursor);
+        if (query && query.trim().length > 0) sp.set('q', query.trim());
+        if (status && status !== 'all') sp.set('status', status);
+        if (agent && agent !== 'all') sp.set('agent', agent);
+        if (purchaseReceipt && purchaseReceipt !== 'all') sp.set('prepay', purchaseReceipt);
+        if (fullReceipt && fullReceipt !== 'all') sp.set('full', fullReceipt);
+        if (commissionReceipt && commissionReceipt !== 'all') sp.set('commission', commissionReceipt);
+        if (npdReceipt && npdReceipt !== 'all') sp.set('npd', npdReceipt);
+        if (showHidden && showHidden !== 'no') sp.set('showHidden', showHidden);
+        if (dateFrom) sp.set('saleFrom', dateFrom);
+        if (dateTo) sp.set('saleTo', dateTo);
+        if (endFrom) sp.set('endFrom', endFrom);
+        if (endTo) sp.set('endTo', endTo);
+        if (amountMin) sp.set('amountMin', amountMin);
+        if (amountMax) sp.set('amountMax', amountMax);
+        const res = await fetch(`/api/sales?${sp.toString()}`, { cache: 'no-store', credentials: 'include' });
+        const data = await res.json();
+        const list: Sale[] = Array.isArray(data?.sales) ? data.sales : [];
+        const nc = typeof data?.nextCursor === 'string' && data.nextCursor.length > 0 ? String(data.nextCursor) : null;
+        setNextCursor(nc);
+        setSales((prev) => {
+          const map = new Map<string, Sale>();
+          for (const s of prev) map.set(String(s.taskId), s);
+          for (const s of list) map.set(String((s as any).taskId), s as Sale);
+          return Array.from(map.values());
+        });
+      } else {
+        const res = await fetch(`/api/sales?limit=50&cursor=${encodeURIComponent(nextCursor)}`, { cache: 'no-store', credentials: 'include' });
+        const data = await res.json();
+        const list: Sale[] = Array.isArray(data?.sales) ? data.sales : [];
+        const nc = typeof data?.nextCursor === 'string' && data.nextCursor.length > 0 ? String(data.nextCursor) : null;
+        setNextCursor(nc);
+        setSales((prev) => {
+          const map = new Map<string, Sale>();
+          for (const s of prev) map.set(String(s.taskId), s);
+          for (const s of list) map.set(String((s as any).taskId), s as Sale);
+          return Array.from(map.values());
+        });
+      }
     } catch {
     } finally { setLoading(false); }
   };
@@ -408,7 +472,7 @@ export default function SalesClient({ initial, hasTokenInitial }: { initial: Sal
   useEffect(() => {
     let aborted = false;
     (async () => {
-      if (nextCursor || indexRows.length > 0) return;
+      if (nextCursor || indexRows.length > 0 || hasActiveFilter) return;
       try {
         const r = await fetch('/api/sales?limit=50', { cache: 'no-store', credentials: 'include' });
         const d = await r.json();

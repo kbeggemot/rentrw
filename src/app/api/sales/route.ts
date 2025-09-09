@@ -386,6 +386,69 @@ export async function GET(req: Request) {
     const onlySuccess = urlObj.searchParams.get('success') === '1';
     const taskIdsRaw = urlObj.searchParams.get('taskIds');
 
+    // Parse filter params for server-side filtering
+    const filter = {
+      query: (urlObj.searchParams.get('q') || '').trim(),
+      status: (urlObj.searchParams.get('status') || '').trim(),
+      agent: urlObj.searchParams.get('agent'), // 'yes' | 'no' | null
+      prepay: urlObj.searchParams.get('prepay'),
+      full: urlObj.searchParams.get('full'),
+      commission: urlObj.searchParams.get('commission'),
+      npd: urlObj.searchParams.get('npd'),
+      showHidden: urlObj.searchParams.get('showHidden') || 'no',
+      saleFrom: urlObj.searchParams.get('saleFrom'),
+      saleTo: urlObj.searchParams.get('saleTo'),
+      endFrom: urlObj.searchParams.get('endFrom'),
+      endTo: urlObj.searchParams.get('endTo'),
+      amountMin: urlObj.searchParams.get('amountMin'),
+      amountMax: urlObj.searchParams.get('amountMax'),
+    } as const;
+
+    const hasAnyFilter = [filter.query, filter.status, filter.agent, filter.prepay, filter.full, filter.commission, filter.npd, filter.saleFrom, filter.saleTo, filter.endFrom, filter.endTo, filter.amountMin, filter.amountMax].some((v) => v && String(v).trim().length > 0) || filter.showHidden === 'yes';
+
+    const saleMatches = (s: any): boolean => {
+      // showHidden: default 'no'
+      if (filter.showHidden !== 'all') {
+        const isHidden = Boolean(s.hidden);
+        if (filter.showHidden === 'no' && isHidden) return false;
+        if (filter.showHidden === 'yes' && !isHidden) return false;
+      }
+      if (filter.query) {
+        const q = filter.query;
+        if (!(String(s.taskId).includes(q) || String(s.orderId).includes(q))) return false;
+      }
+      if (filter.status) {
+        const st = String(s.status || '').toLowerCase();
+        if (st !== String(filter.status).toLowerCase()) return false;
+      }
+      if (filter.agent === 'yes' && !s.isAgent) return false;
+      if (filter.agent === 'no' && s.isAgent) return false;
+      const hasPrepay = Boolean(s.ofdUrl);
+      const hasFull = Boolean(s.ofdFullUrl);
+      const hasComm = Boolean(s.additionalCommissionOfdUrl);
+      const hasNpd = Boolean(s.npdReceiptUri);
+      if (filter.prepay === 'yes' && !hasPrepay) return false; if (filter.prepay === 'no' && hasPrepay) return false;
+      if (filter.full === 'yes' && !hasFull) return false; if (filter.full === 'no' && hasFull) return false;
+      if (filter.commission === 'yes' && !hasComm) return false; if (filter.commission === 'no' && hasComm) return false;
+      if (filter.npd === 'yes' && !hasNpd) return false; if (filter.npd === 'no' && hasNpd) return false;
+      if (filter.saleFrom || filter.saleTo) {
+        const base = s.createdAtRw || s.createdAt;
+        const ts = base ? Date.parse(base) : NaN;
+        if (filter.saleFrom && !(Number.isFinite(ts) && ts >= Date.parse(String(filter.saleFrom)))) return false;
+        if (filter.saleTo && !(Number.isFinite(ts) && ts <= (Date.parse(String(filter.saleTo)) + 24*60*60*1000 - 1))) return false;
+      }
+      if (filter.endFrom || filter.endTo) {
+        const e = s.serviceEndDate ? Date.parse(String(s.serviceEndDate)) : NaN;
+        if (filter.endFrom && !(Number.isFinite(e) && e >= Date.parse(String(filter.endFrom)))) return false;
+        if (filter.endTo && !(Number.isFinite(e) && e <= (Date.parse(String(filter.endTo)) + 24*60*60*1000 - 1))) return false;
+      }
+      const min = filter.amountMin ? Number(String(filter.amountMin).replace(',', '.')) : null;
+      const max = filter.amountMax ? Number(String(filter.amountMax).replace(',', '.')) : null;
+      if (min != null && !(Number(s.amountGrossRub || 0) >= min)) return false;
+      if (max != null && !(Number(s.amountGrossRub || 0) <= max)) return false;
+      return true;
+    };
+
     function compareRows(a: any, b: any): number {
       const at = Date.parse(a?.createdAt || 0);
       const bt = Date.parse(b?.createdAt || 0);
@@ -446,29 +509,60 @@ export async function GET(req: Request) {
       if (inn && rows.length > 0) {
         rows = rows.filter((r) => String((r?.inn || '')).replace(/\D/g,'') === inn.replace(/\D/g,''));
       }
-      if (onlySuccess) rows = rows.filter((r) => { const st = String(r?.status || '').toLowerCase(); return st === 'paid' || st === 'transfered' || st === 'transferred'; });
-      rows.sort(compareRows);
-      let start = 0;
-      if (cursorRaw) {
-        const [ts, tid] = String(cursorRaw).split('|');
-        const idx = rows.findIndex((r) => String(r?.createdAt||'') === ts && String(r?.taskId||'') === String(tid));
-        if (idx >= 0) start = idx + 1;
+      // If filters provided, load and filter all, then paginate in-memory
+      if (hasAnyFilter) {
+        const salesAll: any[] = [];
+        for (const r of rows) {
+          try {
+            const p = `.data/sales/${String(r.inn||'').replace(/\D/g,'')}/sales/${String(r.taskId)}.json`;
+            const raw = await readText(p);
+            if (!raw) continue;
+            const s = JSON.parse(raw);
+            if (!showAll && s.userId !== userId) continue;
+            if (onlySuccess) {
+              const st = String(s.status || '').toLowerCase();
+              if (!(st === 'paid' || st === 'transfered' || st === 'transferred')) continue;
+            }
+            if (saleMatches(s)) salesAll.push(s);
+          } catch {}
+        }
+        const sorted = salesAll.sort((a: any, b: any) => {
+          if (a.createdAt === b.createdAt) return String(a.taskId) < String(b.taskId) ? 1 : -1;
+          return a.createdAt < b.createdAt ? 1 : -1;
+        });
+        let start = 0;
+        if (cursorRaw) {
+          const [ts, tid] = String(cursorRaw).split('|');
+          const idx = sorted.findIndex((s: any) => String(s.createdAt) === ts && String(s.taskId) === String(tid));
+          if (idx >= 0) start = idx + 1;
+        }
+        const page = sorted.slice(start, start + limit);
+        const nextCursor = (start + limit) < sorted.length && page.length > 0 ? `${String(page[page.length-1].createdAt)}|${String(page[page.length-1].taskId)}` : null;
+        return NextResponse.json({ sales: page, nextCursor });
+      } else {
+        // default fast path (no filters): use index paging and read only page items
+        rows.sort(compareRows);
+        let start = 0;
+        if (cursorRaw) {
+          const [ts, tid] = String(cursorRaw).split('|');
+          const idx = rows.findIndex((r) => String(r?.createdAt||'') === ts && String(r?.taskId||'') === String(tid));
+          if (idx >= 0) start = idx + 1;
+        }
+        const pageRows = rows.slice(start, start + limit);
+        const sales: any[] = [];
+        for (const r of pageRows) {
+          try {
+            const p = `.data/sales/${String(r.inn||'').replace(/\D/g,'')}/sales/${String(r.taskId)}.json`;
+            const raw = await readText(p);
+            if (!raw) continue;
+            const s = JSON.parse(raw);
+            if (!showAll && s.userId !== userId) continue;
+            sales.push(s);
+          } catch {}
+        }
+        const nextCursor = (start + limit) < rows.length && pageRows.length > 0 ? `${String(pageRows[pageRows.length-1].createdAt)}|${String(pageRows[pageRows.length-1].taskId)}` : null;
+        return NextResponse.json({ sales, nextCursor });
       }
-      const pageRows = rows.slice(start, start + limit);
-      // Read only page items
-      const sales: any[] = [];
-      for (const r of pageRows) {
-        try {
-          const p = `.data/sales/${String(r.inn||'').replace(/\D/g,'')}/sales/${String(r.taskId)}.json`;
-          const raw = await readText(p);
-          if (!raw) continue;
-          const s = JSON.parse(raw);
-          if (!showAll && s.userId !== userId) continue;
-          sales.push(s);
-        } catch {}
-      }
-      const nextCursor = (start + limit) < rows.length && pageRows.length > 0 ? `${String(pageRows[pageRows.length-1].createdAt)}|${String(pageRows[pageRows.length-1].taskId)}` : null;
-      return NextResponse.json({ sales, nextCursor });
     }
 
     // Fallback: full read then paginate/filter (legacy path)
