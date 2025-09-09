@@ -5,7 +5,7 @@ import { getSelectedOrgInn } from '@/server/orgContext';
 
 export const runtime = 'nodejs';
 
-function getUserId(req: Request): string | null {
+function getUserIdMeta(req: Request): string | null {
   const cookie = req.headers.get('cookie') || '';
   const m = /(?:^|;\s*)session_user=([^;]+)/.exec(cookie);
   if (m) return decodeURIComponent(m[1]);
@@ -28,7 +28,7 @@ async function readOrgIndex(inn: string): Promise<Row[]> {
 
 export async function GET(req: Request) {
   try {
-    const userId = getUserId(req);
+    const userId = getUserIdMeta(req);
     if (!userId) return NextResponse.json({ error: 'NO_USER' }, { status: 401 });
     const url = new URL(req.url);
     const onlySuccess = url.searchParams.get('success') === '1';
@@ -38,7 +38,6 @@ export async function GET(req: Request) {
     const offset = (() => { const n = Number(offsetRaw); return Number.isFinite(n) && n >= 0 ? Math.floor(n) : 0; })();
 
     const inn = getSelectedOrgInn(req);
-    // Prefer org index when org selected; fallback to by_user index
     let rows: Row[] = [];
     if (inn) rows = await readOrgIndex(inn);
     if (!rows || rows.length === 0) rows = await readUserIndex(userId) as unknown as Row[];
@@ -62,13 +61,13 @@ export async function GET(req: Request) {
   }
 }
 
-import { NextResponse } from 'next/server';
+import { NextResponse as NextResponseMetaPost } from 'next/server';
 import { updateSaleMeta } from '@/server/taskStore';
 import { appendAdminEntityLog } from '@/server/adminAudit';
 
-export const runtime = 'nodejs';
+export const runtime_post = 'nodejs';
 
-function getUserId(req: Request): string | null {
+function getUserIdPost(req: Request): string | null {
   const cookie = req.headers.get('cookie') || '';
   const m = /(?:^|;\s*)session_user=([^;]+)/.exec(cookie);
   if (m) return decodeURIComponent(m[1]);
@@ -78,11 +77,11 @@ function getUserId(req: Request): string | null {
 
 export async function POST(req: Request) {
   try {
-    const userId = getUserId(req);
-    if (!userId) return NextResponse.json({ error: 'NO_USER' }, { status: 401 });
+    const userId = getUserIdPost(req);
+    if (!userId) return NextResponseMetaPost.json({ error: 'NO_USER' }, { status: 401 });
     const body = await req.json().catch(() => ({} as any));
     const taskId = body?.taskId;
-    if (typeof taskId === 'undefined') return NextResponse.json({ error: 'NO_TASK' }, { status: 400 });
+    if (typeof taskId === 'undefined') return NextResponseMetaPost.json({ error: 'NO_TASK' }, { status: 400 });
     const payerTgId = typeof body?.payerTgId === 'string' && body.payerTgId.trim().length > 0 ? String(body.payerTgId).trim() : null;
     const linkCode = typeof body?.linkCode === 'string' && body.linkCode.trim().length > 0 ? String(body.linkCode).trim() : null;
     const payerTgFirstName = typeof body?.payerTgFirstName === 'string' && body.payerTgFirstName.trim().length > 0 ? String(body.payerTgFirstName).trim() : undefined as any;
@@ -90,10 +89,10 @@ export async function POST(req: Request) {
     const payerTgUsername = typeof body?.payerTgUsername === 'string' && body.payerTgUsername.trim().length > 0 ? String(body.payerTgUsername).trim() : undefined as any;
     await updateSaleMeta(userId, taskId, { payerTgId, linkCode, payerTgFirstName, payerTgLastName, payerTgUsername });
     try { await appendAdminEntityLog('sale', [String(userId), String(taskId)], { source: 'system', message: 'meta/update', data: { payerTgId, linkCode, ua: req.headers.get('user-agent') || null } }); } catch {}
-    return NextResponse.json({ ok: true });
+    return NextResponseMetaPost.json({ ok: true });
   } catch (e) {
     const message = e instanceof Error ? e.message : 'Server error';
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponseMetaPost.json({ error: message }, { status: 500 });
   }
 }
 
