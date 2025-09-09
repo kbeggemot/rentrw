@@ -476,8 +476,8 @@ export async function GET(req: Request) {
       const paths = ids.map((id) => {
         const meta = byTask.get(String(id));
         if (!meta) return null;
-        if (!showAll && String((meta as any).userId || '') !== String(userId)) return null;
-        return `.data/sales/${String(meta.inn||'').replace(/\D/g,'')}/sales/${String(meta.taskId)}.json`;
+        const innDigits = String((meta as any).inn || inn || '').replace(/\D/g,'');
+        return innDigits ? `.data/sales/${innDigits}/sales/${String(meta.taskId)}.json` : null;
       }).filter(Boolean) as string[];
       const sales: any[] = [];
       const chunkSize = 24;
@@ -519,7 +519,8 @@ export async function GET(req: Request) {
         const salesAll: any[] = [];
         for (const r of rows) {
           try {
-            const p = `.data/sales/${String(r.inn||'').replace(/\D/g,'')}/sales/${String(r.taskId)}.json`;
+            const d = String((r as any).inn || inn || '').replace(/\D/g,'');
+            const p = d ? `.data/sales/${d}/sales/${String(r.taskId)}.json` : '';
             const raw = await readText(p);
             if (!raw) continue;
             const s = JSON.parse(raw);
@@ -558,7 +559,8 @@ export async function GET(req: Request) {
         const sales: any[] = [];
         for (const r of pageRows) {
           try {
-            const p = `.data/sales/${String(r.inn||'').replace(/\D/g,'')}/sales/${String(r.taskId)}.json`;
+            const d = String((r as any).inn || inn || '').replace(/\D/g,'');
+            const p = d ? `.data/sales/${d}/sales/${String(r.taskId)}.json` : '';
             const raw = await readText(p);
             if (!raw) continue;
             const s = JSON.parse(raw);
