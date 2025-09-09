@@ -715,3 +715,20 @@ export async function updateSaleMeta(userId: string, taskId: number | string, me
   }
 }
 
+// Rebuild sharded sales files and all indexes from legacy tasks.json
+export async function rebuildSalesIndexesFromLegacy(): Promise<{ processed: number; errors: number }> {
+  const store = await readTasks();
+  const sales = Array.isArray(store.sales) ? store.sales : [];
+  let processed = 0;
+  let errors = 0;
+  for (const s of sales) {
+    try {
+      await writeSaleAndIndexes(s as SaleRecord);
+      processed += 1;
+    } catch {
+      errors += 1;
+    }
+  }
+  return { processed, errors };
+}
+
