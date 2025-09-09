@@ -65,7 +65,7 @@ import { NextResponse as NextResponseMetaPost } from 'next/server';
 import { updateSaleMeta } from '@/server/taskStore';
 import { appendAdminEntityLog } from '@/server/adminAudit';
 
-export const runtime_post = 'nodejs';
+// Note: one route file, single runtime export supported. Reuse the same runtime for both methods.
 
 function getUserIdPost(req: Request): string | null {
   const cookie = req.headers.get('cookie') || '';
