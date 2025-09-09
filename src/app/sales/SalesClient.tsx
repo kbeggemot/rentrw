@@ -128,8 +128,13 @@ export default function SalesClient({ initial, hasTokenInitial }: { initial: Sal
           const ordersSet = new Set((onlyOrders || []).map((n) => Number(n)));
           const pool = onlyOrders && onlyOrders.length > 0 ? arr.filter((s) => ordersSet.has(Number(s.orderId))) : arr;
           const need = pool.filter((s) => (!s.ofdUrl) || (!s.ofdFullUrl));
-          await Promise.allSettled(need.map((s) => fetch(`/api/ofd/sync?order=${encodeURIComponent(String(s.orderId))}`, { cache: 'no-store', credentials: 'include' })));
-          // soft refresh after sync attempts
+          // Ограничим параллелизм до 5, чтобы не создавать сотни запросов одновременно
+          const step = 5;
+          for (let i = 0; i < need.length; i += step) {
+            const chunk = need.slice(i, i + step);
+            await Promise.allSettled(chunk.map((s) => fetch(`/api/ofd/sync?order=${encodeURIComponent(String(s.orderId))}`, { cache: 'no-store', credentials: 'include' })));
+          }
+          // мягкое обновление после попыток
           const r2 = await fetch('/api/sales?limit=50', { cache: 'no-store', credentials: 'include' });
           const d2 = await r2.json();
           const list2 = Array.isArray(d2?.sales) ? d2.sales : [];
@@ -160,7 +165,6 @@ export default function SalesClient({ initial, hasTokenInitial }: { initial: Sal
         const list = Array.isArray(data?.sales) ? data.sales : [];
         setNextCursor(typeof data?.nextCursor === 'string' && data.nextCursor.length > 0 ? String(data.nextCursor) : null);
         setSales((prev) => (JSON.stringify(prev) === JSON.stringify(list) ? prev : list));
-        void syncMissing(list);
       }
     } catch {
       // keep previous data to avoid flicker
