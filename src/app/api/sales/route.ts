@@ -395,7 +395,7 @@ export async function GET(req: Request) {
     }
 
     if (taskIdsRaw && taskIdsRaw.trim().length > 0) {
-      // Fast lookup of specific tasks by IDs using indexes
+      // Fast lookup of specific tasks by IDs using indexes — читаем файлы параллельно
       let rows: any[] = [];
       if (showAll && inn) {
         try {
@@ -408,18 +408,24 @@ export async function GET(req: Request) {
       const byTask = new Map<string, any>();
       for (const r of Array.isArray(rows) ? rows : []) byTask.set(String(r?.taskId), r);
       const ids = taskIdsRaw.split(',').map((s) => s.trim()).filter((s) => s.length > 0);
-      const sales: any[] = [];
-      for (const id of ids) {
+      const paths = ids.map((id) => {
         const meta = byTask.get(String(id));
-        if (!meta) continue;
-        try {
-          const p = `.data/sales/${String(meta.inn||'').replace(/\D/g,'')}/sales/${String(meta.taskId)}.json`;
-          const raw = await readText(p);
-          if (!raw) continue;
-          const s = JSON.parse(raw);
-          if (!showAll && s.userId !== userId) continue;
-          sales.push(s);
-        } catch {}
+        return meta ? `.data/sales/${String(meta.inn||'').replace(/\D/g,'')}/sales/${String(meta.taskId)}.json` : null;
+      }).filter(Boolean) as string[];
+      const sales: any[] = [];
+      const chunkSize = 24;
+      for (let i = 0; i < paths.length; i += chunkSize) {
+        const chunk = paths.slice(i, i + chunkSize);
+        const results = await Promise.allSettled(chunk.map(async (p) => {
+          try {
+            const raw = await readText(p);
+            if (!raw) return null;
+            const s = JSON.parse(raw);
+            if (!showAll && s.userId !== userId) return null;
+            return s;
+          } catch { return null; }
+        }));
+        for (const r of results) { if (r.status === 'fulfilled' && r.value) sales.push(r.value); }
       }
       return NextResponse.json({ sales, nextCursor: null });
     }
