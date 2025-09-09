@@ -475,7 +475,9 @@ export async function GET(req: Request) {
       const ids = taskIdsRaw.split(',').map((s) => s.trim()).filter((s) => s.length > 0);
       const paths = ids.map((id) => {
         const meta = byTask.get(String(id));
-        return meta ? `.data/sales/${String(meta.inn||'').replace(/\D/g,'')}/sales/${String(meta.taskId)}.json` : null;
+        if (!meta) return null;
+        if (!showAll && String((meta as any).userId || '') !== String(userId)) return null;
+        return `.data/sales/${String(meta.inn||'').replace(/\D/g,'')}/sales/${String(meta.taskId)}.json`;
       }).filter(Boolean) as string[];
       const sales: any[] = [];
       const chunkSize = 24;
