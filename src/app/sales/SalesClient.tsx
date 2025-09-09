@@ -162,11 +162,12 @@ export default function SalesClient({ initial, hasTokenInitial }: { initial: Sal
         // fire-and-forget sync for the interim list as well
         void syncMissing(listOld);
       } else {
-        // 1) спросим метаданные по индексу (общее кол-во и ключи текущей страницы)
-        const meta = await fetch('/api/sales/meta?limit=50', { cache: 'no-store', credentials: 'include' }).then((r) => r.json()).catch(() => ({} as any));
+        // 1) спросим метаданные по индексу (берём все, без лимита)
+        const meta = await fetch('/api/sales/meta', { cache: 'no-store', credentials: 'include' }).then((r) => r.json()).catch(() => ({} as any));
         const items: Array<{ taskId: string | number; createdAt: string }>
           = Array.isArray(meta?.items) ? meta.items : [];
-        if (typeof meta?.total === 'number') setTotal(meta.total);
+        if (items.length > 0) setIndexRows(items);
+        if (typeof meta?.total === 'number') setTotal(meta.total); else if (items.length > 0) setTotal(items.length);
         // 2) загрузим текущую страницу продаж целиком по курсору
         const res = await fetch('/api/sales?limit=50', { cache: 'no-store', credentials: 'include' });
         const data = await res.json();
