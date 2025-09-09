@@ -510,10 +510,7 @@ export async function GET(req: Request) {
         try { rows = await readUserIndex(userId); } catch { rows = []; }
       }
       rows = Array.isArray(rows) ? rows.slice() : [];
-      // If using user index but org is selected, filter strictly by org
-      if (inn && rows.length > 0) {
-        rows = rows.filter((r) => String((r?.inn || '')).replace(/\D/g,'') === inn.replace(/\D/g,''));
-      }
+      rows = Array.isArray(rows) ? rows.slice() : [];
       // If filters provided, load and filter all, then paginate in-memory
       if (hasAnyFilter) {
         const salesAll: any[] = [];
