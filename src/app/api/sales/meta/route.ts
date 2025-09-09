@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { readUserIndex } from '@/server/salesIndex';
 import { readText } from '@/server/storage';
 import { getSelectedOrgInn } from '@/server/orgContext';
+import { getShowAllDataFlag } from '@/server/userStore';
 
 export const runtime = 'nodejs';
 
@@ -38,10 +39,13 @@ export async function GET(req: Request) {
     const offset = (() => { const n = Number(offsetRaw); return Number.isFinite(n) && n >= 0 ? Math.floor(n) : 0; })();
 
     const inn = getSelectedOrgInn(req);
+    const showAll = await getShowAllDataFlag(userId);
     let rows: Row[] = [];
     if (inn) rows = await readOrgIndex(inn);
     if (!rows || rows.length === 0) rows = await readUserIndex(userId) as unknown as Row[];
     rows = Array.isArray(rows) ? rows.slice() : [];
+    // Если режим "все данные" не включён — при наличии orgIndex отфильтруем по userId
+    if (inn && !showAll) rows = rows.filter((r: any) => String(r?.userId || '') === String(userId));
     if (onlySuccess) rows = rows.filter((r) => { const st = String((r as any)?.status || '').toLowerCase(); return st === 'paid' || st === 'transfered' || st === 'transferred'; });
     rows.sort((a: any, b: any) => {
       const at = Date.parse((a?.createdAt || 0) as any);
