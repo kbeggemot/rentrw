@@ -571,6 +571,16 @@ export default function SalesClient({ initial, hasTokenInitial }: { initial: Sal
 
   useEffect(() => { setPage(1); }, [query, status, agent, showHidden, purchaseReceipt, fullReceipt, commissionReceipt, npdReceipt, dateFrom, dateTo, endFrom, endTo, amountMin, amountMax]);
 
+  // Авто‑загрузка с сервера при смене фильтров (с лёгкой дебаунс‑задержкой)
+  useEffect(() => {
+    let timer: any = null;
+    if (hasActiveFilter) {
+      timer = setTimeout(() => { void load(false); }, 250);
+    }
+    return () => { if (timer) clearTimeout(timer); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [query, status, agent, purchaseReceipt, fullReceipt, commissionReceipt, npdReceipt, showHidden, dateFrom, dateTo, endFrom, endTo, amountMin, amountMax]);
+
   // export button is now in the toolbar; no floating positioning required
 
   const fmtDate = (d?: string | null) => (d ? new Date(d).toLocaleDateString('ru-RU', { timeZone: 'Europe/Moscow' }) : '-');
