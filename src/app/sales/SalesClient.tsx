@@ -466,6 +466,17 @@ export default function SalesClient({ initial, hasTokenInitial }: { initial: Sal
   }, [filtered, page]);
 
   const filteredTotal = useMemo(() => filtered.length, [filtered]);
+  const hasActiveFilter = useMemo(() => {
+    return (
+      (query && query.trim().length > 0) ||
+      status !== 'all' || agent !== 'all' ||
+      purchaseReceipt !== 'all' || fullReceipt !== 'all' || commissionReceipt !== 'all' || npdReceipt !== 'all' ||
+      showHidden !== 'no' ||
+      !!dateFrom || !!dateTo || !!endFrom || !!endTo || !!amountMin || !!amountMax
+    );
+  }, [query, status, agent, purchaseReceipt, fullReceipt, commissionReceipt, npdReceipt, showHidden, dateFrom, dateTo, endFrom, endTo, amountMin, amountMax]);
+  const totalFromIndex = useMemo(() => (indexRows.length > 0 ? indexRows.length : (typeof total === 'number' ? total : 0)), [indexRows.length, total]);
+  const displayTotal = hasActiveFilter ? filteredTotal : (totalFromIndex || filteredTotal);
 
   useEffect(() => { setPage(1); }, [query, status, agent, showHidden, purchaseReceipt, fullReceipt, commissionReceipt, npdReceipt, dateFrom, dateTo, endFrom, endTo, amountMin, amountMax]);
 
@@ -976,13 +987,13 @@ export default function SalesClient({ initial, hasTokenInitial }: { initial: Sal
           </tbody>
         </table>
       </div>
-      {((filteredTotal > pageSize) ? true : false) ? (
+      {(displayTotal > pageSize) ? (
         <div className="mt-3 flex items-center justify-between text-sm">
-          <div className="text-gray-600 dark:text-gray-400">Строк: {Math.min(filteredTotal, page * pageSize)} из {filteredTotal}</div>
+          <div className="text-gray-600 dark:text-gray-400">Строк: {Math.min(displayTotal, page * pageSize)} из {displayTotal}</div>
           <div className="flex items-center gap-2">
             <Button variant="ghost" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1}>Назад</Button>
             <div className="h-9 min-w-8 inline-flex items-center justify-center">{page}</div>
-            <Button variant="ghost" onClick={goNextPage} disabled={page * pageSize >= (total ?? filtered.length)}>Вперёд</Button>
+            <Button variant="ghost" onClick={goNextPage} disabled={page * pageSize >= displayTotal}>Вперёд</Button>
           </div>
         </div>
       ) : null}
