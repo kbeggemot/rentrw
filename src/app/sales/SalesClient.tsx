@@ -244,6 +244,25 @@ export default function SalesClient({ initial, hasTokenInitial }: { initial: Sal
     return () => { aborted = true; };
   }, []);
 
+  // Гарантируем наличие nextCursor для постраничной догрузки (и при пустом SSR — списка первой страницы)
+  useEffect(() => {
+    let aborted = false;
+    (async () => {
+      if (nextCursor) return;
+      try {
+        const r = await fetch('/api/sales?limit=50', { cache: 'no-store', credentials: 'include' });
+        const d = await r.json();
+        const nc = typeof d?.nextCursor === 'string' && d.nextCursor.length > 0 ? String(d.nextCursor) : null;
+        if (!aborted && nc) setNextCursor(nc);
+        const list = Array.isArray(d?.sales) ? d.sales : [];
+        if (!aborted && sales.length === 0 && list.length > 0) setSales(list);
+      } catch {}
+    })();
+    return () => { aborted = true; };
+  // deliberately run only once on mount
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // (moved below after `filtered` declaration)
 
   const filtered = useMemo(() => {
