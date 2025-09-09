@@ -347,7 +347,7 @@ export default function SalesClient({ initial, hasTokenInitial }: { initial: Sal
   // Обновление выполняется вручную кнопкой «Обновить» и по SSE-событиям.
   // useEffect(() => { /* intentionally disabled */ }, []);
 
-  // Подтянем индекс сразу после монтирования и быстро отрисуем первую страницу по taskIds
+  // Подтянем индекс и доберём до полной видимой страницы (15 строк) с учётом фильтров
   useEffect(() => {
     let aborted = false;
     (async () => {
@@ -357,15 +357,23 @@ export default function SalesClient({ initial, hasTokenInitial }: { initial: Sal
         if (Array.isArray(meta?.items)) {
           const rows = (meta.items as Array<{ taskId: string | number; createdAt: string }>);
           setIndexRows(rows);
-          const ids = rows.slice(0, pageSize).map((x) => encodeURIComponent(String(x.taskId))).join(',');
-          if (ids.length > 0) {
+          // Догружаем пакетами по 50, пока не соберём минимум 15 видимых записей
+          let loaded = 0;
+          let map = new Map<string, Sale>();
+          while (!aborted && applyFiltersLocal(Array.from(map.values())).length < pageSize && loaded < rows.length) {
+            const slice = rows.slice(loaded, loaded + 50);
+            loaded += slice.length;
+            const qs = slice.map((x) => encodeURIComponent(String(x.taskId))).join(',');
+            if (!qs) break;
             try {
-              const r = await fetch(`/api/sales?taskIds=${ids}`, { cache: 'no-store', credentials: 'include' });
+              const r = await fetch(`/api/sales?taskIds=${qs}`, { cache: 'no-store', credentials: 'include' });
               const d = await r.json();
-              const list = Array.isArray(d?.sales) ? d.sales : [];
-              if (!aborted && list.length > 0) setSales(list);
+              const list: Sale[] = Array.isArray(d?.sales) ? d.sales : [];
+              for (const s of list) map.set(String((s as any).taskId), s as Sale);
             } catch {}
           }
+          const combined = Array.from(map.values());
+          if (!aborted && combined.length > 0) setSales(combined);
         }
         if (typeof meta?.total === 'number') setTotal(meta.total);
       } catch {}

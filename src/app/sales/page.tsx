@@ -1,7 +1,6 @@
 import SalesClient from './SalesClient';
 import { cookies, headers } from 'next/headers';
 import { getTokenForOrg } from '@/server/orgStore';
-import { listSales, listAllSalesForOrg } from '@/server/taskStore';
 
 export default async function SalesPage() {
   const c = await cookies();
@@ -12,16 +11,8 @@ export default async function SalesPage() {
   if (inn && userId) {
     try { hasToken = !!(await getTokenForOrg(inn, userId)); } catch { hasToken = false; }
   }
-  let initial: any[] = [];
-  try {
-    if (hasToken) {
-      const { getShowAllDataFlag } = await import('@/server/userStore');
-      const showAll = await getShowAllDataFlag(userId);
-      const base = showAll && inn ? await listAllSalesForOrg(inn) : await listSales(userId);
-      const scoped = inn ? base.filter((s: any) => String((s as any).orgInn || 'неизвестно') === inn || (s as any).orgInn == null || String((s as any).orgInn) === 'неизвестно') : base;
-      initial = scoped.slice(0, 50);
-    }
-  } catch {}
+  // Больше не выполняем тяжёлую SSR-загрузку — отрисуем мгновенно, а данные подтянем на клиенте по индексу
+  const initial: any[] = [];
   return (
     <div className={(inn && hasToken) ? "mx-auto w-full max-w-3xl md:max-w-4xl lg:max-w-5xl xl:max-w-6xl 2xl:max-w-7xl pt-0 pb-4" : "max-w-3xl mx-auto pt-0 pb-4"}>
       <header className="mb-4">
