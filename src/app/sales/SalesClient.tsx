@@ -130,7 +130,7 @@ export default function SalesClient({ initial, hasTokenInitial }: { initial: Sal
           const need = pool.filter((s) => (!s.ofdUrl) || (!s.ofdFullUrl));
           await Promise.allSettled(need.map((s) => fetch(`/api/ofd/sync?order=${encodeURIComponent(String(s.orderId))}`, { cache: 'no-store', credentials: 'include' })));
           // soft refresh after sync attempts
-          const r2 = await fetch('/api/sales', { cache: 'no-store', credentials: 'include' });
+          const r2 = await fetch('/api/sales?limit=50', { cache: 'no-store', credentials: 'include' });
           const d2 = await r2.json();
           const list2 = Array.isArray(d2?.sales) ? d2.sales : [];
           setSales((prev) => (JSON.stringify(prev) === JSON.stringify(list2) ? prev : list2));
@@ -139,7 +139,7 @@ export default function SalesClient({ initial, hasTokenInitial }: { initial: Sal
       if (refresh) {
         const qs = onlyOrders && onlyOrders.length > 0 ? `&orders=${encodeURIComponent(onlyOrders.join(','))}` : '';
         void fetch(`/api/sales?refresh=1${qs}`, { cache: 'no-store', credentials: 'include' })
-          .then(() => fetch('/api/sales', { cache: 'no-store', credentials: 'include' }))
+          .then(() => fetch('/api/sales?limit=50', { cache: 'no-store', credentials: 'include' }))
           .then((r) => r.json())
           .then((d) => {
             const list = Array.isArray(d?.sales) ? d.sales : [];
@@ -148,7 +148,7 @@ export default function SalesClient({ initial, hasTokenInitial }: { initial: Sal
           })
           .catch(() => void 0)
           .finally(() => setLoading(false));
-        const resOld = await fetch('/api/sales', { cache: 'no-store', credentials: 'include' });
+        const resOld = await fetch('/api/sales?limit=50', { cache: 'no-store', credentials: 'include' });
         const oldData = await resOld.json();
         const listOld = Array.isArray(oldData?.sales) ? oldData.sales : [];
         setSales((prev) => (JSON.stringify(prev) === JSON.stringify(listOld) ? prev : listOld));
