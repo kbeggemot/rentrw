@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { listSales, listSalesForOrg, updateSaleOfdUrlsByOrderId } from '@/server/taskStore';
+import { listSales, listSalesForOrg, updateSaleOfdUrlsByOrderId, setSalePageCode } from '@/server/taskStore';
 import { getSelectedOrgInn } from '@/server/orgContext';
 import { getOrCreateSalePageCode } from '@/server/salePageStore';
 import { fermaGetAuthTokenCached, fermaGetReceiptStatus, buildReceiptViewUrl } from '@/server/ofdFerma';
@@ -78,6 +78,7 @@ export async function GET(req: Request) {
     }
     if (!sale) return NextResponse.json({ error: 'NOT_FOUND' }, { status: 404 });
     let pageCode: string | null = null; try { pageCode = await getOrCreateSalePageCode(userId, Number(idStr)); } catch {}
+    try { await setSalePageCode(userId, sale.taskId, pageCode); } catch {}
     return NextResponse.json({ sale, pageCode, successUrl: pageCode ? `/link/s/${encodeURIComponent(pageCode)}?order=${encodeURIComponent(String(idStr))}` : null }, { status: 200 });
   } catch (error) {
     const msg = error instanceof Error ? error.message : 'Server error';

@@ -676,3 +676,27 @@ export async function updateSaleMeta(userId: string, taskId: number | string, me
   }
 }
 
+
+// Persist pageCode to org index row for a sale (used to avoid extra by-order requests)
+export async function setSalePageCode(userId: string, taskId: number | string, pageCode: string | null): Promise<void> {
+  try {
+    const mapped = await readByTask(taskId).catch(() => null);
+    let inn = mapped?.inn || null;
+    if (!inn) {
+      // fallback scan legacy store to find sale and inn
+      const store = await readTasks();
+      const s = (store.sales || []).find((x) => x.userId === userId && String(x.taskId) === String(taskId));
+      if (s?.orgInn) inn = sanitizeInn(s.orgInn);
+    }
+    if (!inn) return;
+    const rows = await readOrgIndex(inn);
+    if (!Array.isArray(rows) || rows.length === 0) return;
+    const idx = rows.findIndex((r: any) => String((r as any)?.taskId) === String(taskId));
+    if (idx === -1) return;
+    const row: any = { ...(rows[idx] as any) };
+    row.pageCode = pageCode ?? null;
+    rows[idx] = row as any;
+    await writeOrgIndex(inn, rows as any);
+  } catch {}
+}
+
