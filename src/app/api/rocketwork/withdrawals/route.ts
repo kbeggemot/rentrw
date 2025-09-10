@@ -17,6 +17,12 @@ export async function GET(req: Request) {
   try {
     const userId = getUserId(req);
     if (!userId) return NextResponse.json({ error: 'NO_USER' }, { status: 401 });
+    const url = new URL(req.url);
+    const limitParam = url.searchParams.get('limit');
+    let limit = Number(limitParam);
+    if (!Number.isFinite(limit) || limit <= 0) limit = 15;
+    if (limit > 200) limit = 200;
+    const cursor = url.searchParams.get('cursor'); // format: createdAt|taskId
     // 1) Read local filtered by selected org, with showAll override
     const inn = getSelectedOrgInn(req);
     const { getShowAllDataFlag } = await import('@/server/userStore');
@@ -53,7 +59,37 @@ export async function GET(req: Request) {
         }
       } catch {}
     }
-    return NextResponse.json({ items });
+    // Pagination (descending by createdAt already in store)
+    let startIndex = 0;
+    if (cursor) {
+      const [curAt, curTaskId] = cursor.split('|');
+      const exactIdx = items.findIndex((x) => String(x.taskId) === String(curTaskId) && String(x.createdAt) === String(curAt));
+      if (exactIdx !== -1) {
+        startIndex = exactIdx + 1;
+      } else if (curAt) {
+        const curTs = Date.parse(curAt);
+        startIndex = items.findIndex((x) => {
+          const ts = Date.parse(x.createdAt);
+          if (!Number.isNaN(ts) && !Number.isNaN(curTs)) {
+            if (ts < curTs) return true; // list is desc
+            if (ts === curTs) return String(x.taskId) < String(curTaskId);
+            return false;
+          }
+          // Fallback string compare
+          if (x.createdAt < curAt) return true;
+          if (x.createdAt === curAt) return String(x.taskId) < String(curTaskId);
+          return false;
+        });
+        if (startIndex === -1) startIndex = items.length; // nothing older
+      }
+    }
+    const pageItems = items.slice(startIndex, startIndex + limit);
+    let nextCursor: string | null = null;
+    if (startIndex + limit < items.length && pageItems.length > 0) {
+      const last = pageItems[pageItems.length - 1];
+      nextCursor = `${last.createdAt}|${last.taskId}`;
+    }
+    return NextResponse.json({ items: pageItems, nextCursor });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Server error';
     return NextResponse.json({ error: message }, { status: 500 });

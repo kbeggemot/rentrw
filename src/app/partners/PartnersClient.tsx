@@ -15,6 +15,8 @@ function formatPhoneForDisplay(phone: string): string {
 
 export default function PartnersClient({ initial, hasTokenInitial }: { initial: Partner[]; hasTokenInitial?: boolean }) {
   const [partners, setPartners] = useState<Partner[]>(initial);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [total, setTotal] = useState<number | null>(null);
   const [hasToken, setHasToken] = useState<boolean | null>(typeof hasTokenInitial === 'boolean' ? hasTokenInitial : null);
   const [loading, setLoading] = useState(false);
   const [phone, setPhone] = useState('');
@@ -69,8 +71,10 @@ export default function PartnersClient({ initial, hasTokenInitial }: { initial: 
         try {
           const parsed = JSON.parse(raw);
           const list = Array.isArray(parsed?.items) ? parsed.items : (Array.isArray(parsed) ? parsed : []);
+          const nc = typeof parsed?.nextCursor === 'string' ? parsed.nextCursor : null;
           if (Array.isArray(list) && list.length > 0) {
             setPartners((prev) => (JSON.stringify(prev) === JSON.stringify(list) ? prev : list));
+            setNextCursor(nc);
           }
         } catch {}
       }
@@ -91,13 +95,52 @@ export default function PartnersClient({ initial, hasTokenInitial }: { initial: 
   const reload = async () => {
     setLoading(true);
     try {
-      const res = await fetch('/api/partners', { cache: 'no-store', credentials: 'include' });
+      try {
+        const m = await fetch('/api/partners/meta', { cache: 'no-store', credentials: 'include' });
+        const md = await m.json();
+        if (typeof md?.total === 'number') setTotal(md.total);
+      } catch {}
+      const res = await fetch('/api/partners?limit=15', { cache: 'no-store', credentials: 'include' });
       const data = await res.json();
-      const list = Array.isArray(data?.partners) ? data.partners : [];
+      const list = Array.isArray(data?.items) ? data.items : [];
+      const nc = typeof data?.nextCursor === 'string' && data.nextCursor.length > 0 ? String(data.nextCursor) : null;
       setPartners((prev) => (JSON.stringify(prev) === JSON.stringify(list) ? prev : list));
-      try { localStorage.setItem('partners_cache_v1', JSON.stringify({ items: list })); } catch {}
+      setNextCursor(nc);
+      try { localStorage.setItem('partners_cache_v1', JSON.stringify({ items: list, nextCursor: nc })); } catch {}
     } catch {
       // keep previous list on error to avoid flicker
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadMore = async () => {
+    if (!nextCursor) return;
+    setLoading(true);
+    try {
+      const r = await fetch(`/api/partners?limit=15&cursor=${encodeURIComponent(nextCursor)}`, { cache: 'no-store', credentials: 'include' });
+      const d = await r.json();
+      const list = Array.isArray(d?.items) ? d.items : [];
+      const nc = typeof d?.nextCursor === 'string' && d.nextCursor.length > 0 ? String(d.nextCursor) : null;
+      setNextCursor(nc);
+      setPartners((prev) => {
+        const map = new Map<string, Partner>();
+        for (const it of prev) map.set(String(it.phone), it);
+        for (const it of list) map.set(String(it.phone), it);
+        const merged = Array.from(map.values());
+        merged.sort((a: any, b: any) => {
+          const at = Date.parse(a?.updatedAt || a?.createdAt || 0);
+          const bt = Date.parse(b?.updatedAt || b?.createdAt || 0);
+          if (Number.isNaN(at) && Number.isNaN(bt)) return String(a.phone || '').localeCompare(String(b.phone || ''));
+          if (Number.isNaN(at)) return 1;
+          if (Number.isNaN(bt)) return -1;
+          if (bt !== at) return bt - at;
+          return String(a.phone || '').localeCompare(String(b.phone || ''));
+        });
+        try { localStorage.setItem('partners_cache_v1', JSON.stringify({ items: merged, nextCursor: nc })); } catch {}
+        return merged;
+      });
+    } catch {
     } finally {
       setLoading(false);
     }
@@ -248,16 +291,12 @@ export default function PartnersClient({ initial, hasTokenInitial }: { initial: 
           </tbody>
         </table>
       </div>
-      {filtered.length > pageSize ? (
-        <div className="mt-3 flex items-center justify-between text-sm">
-          <div className="text-gray-600 dark:text-gray-400">Строк: {Math.min(filtered.length, page * pageSize)} из {filtered.length}</div>
-          <div className="flex gap-2">
-            <Button variant="ghost" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1}>Назад</Button>
-            <div className="px-2 py-1">{page}</div>
-            <Button variant="ghost" onClick={() => setPage((p) => (p * pageSize < filtered.length ? p + 1 : p))} disabled={page * pageSize >= filtered.length}>Вперёд</Button>
-          </div>
-        </div>
-      ) : null}
+      <div className="mt-3 flex items-center justify-between text-sm">
+        <div className="text-gray-600 dark:text-gray-400">Строк: {partners.length}{typeof total === 'number' ? ` из ${total}` : ''}</div>
+        {nextCursor ? (
+          <Button variant="secondary" onClick={loadMore} disabled={loading}>{loading ? 'Загрузка…' : 'Показать ещё'}</Button>
+        ) : null}
+      </div>
     </div>
   );
 }

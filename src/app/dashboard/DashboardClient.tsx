@@ -19,12 +19,11 @@ export default function DashboardClient({ hasTokenInitial }: { hasTokenInitial: 
   const [optOutChecked, setOptOutChecked] = useState(true);
   // Toast notification
   const [toast, setToast] = useState<{ msg: string; kind: 'success' | 'error' | 'info'; actionLabel?: string; actionHref?: string } | null>(null);
-  // History UI: spoiler + pagination
+  // History UI: spoiler + server pagination (15/page)
   const [historyOpen, setHistoryOpen] = useState(false);
-  const [page, setPage] = useState(1);
-  const pageSize = 10;
-  const paged = useMemo(() => history.slice((page - 1) * pageSize, (page - 1) * pageSize + pageSize), [history, page]);
-  const totalPages = Math.max(1, Math.ceil(history.length / pageSize));
+  const [withdrawalsNextCursor, setWithdrawalsNextCursor] = useState<string | null>(null);
+  const [withdrawalsTotal, setWithdrawalsTotal] = useState<number | null>(null);
+  const [withdrawalsLoading, setWithdrawalsLoading] = useState(false);
 
   const showToast = (msg: string, kind: 'success' | 'error' | 'info' = 'info', actionLabel?: string, actionHref?: string) => {
     setToast({ msg, kind, actionLabel, actionHref });
@@ -83,12 +82,22 @@ export default function DashboardClient({ hasTokenInitial }: { hasTokenInitial: 
 
   const refreshHistory = async () => {
     try {
-      const r = await fetch('/api/rocketwork/withdrawals', { cache: 'no-store' });
+      setWithdrawalsLoading(true);
+      // meta first
+      try {
+        const m = await fetch('/api/rocketwork/withdrawals/meta', { cache: 'no-store' });
+        const md = await m.json();
+        if (typeof md?.total === 'number') setWithdrawalsTotal(md.total);
+      } catch {}
+      // first page
+      const r = await fetch('/api/rocketwork/withdrawals?limit=15', { cache: 'no-store' });
       const d = await r.json();
       const arr: Array<{ taskId: string | number; amountRub: number; status?: string | null; createdAt: string; paidAt?: string | null }> = Array.isArray(d?.items) ? d.items : [];
+      const nc = typeof d?.nextCursor === 'string' && d.nextCursor.length > 0 ? String(d.nextCursor) : null;
       setHistory(arr);
-      setPage(1);
-      // Дополнительно: вручную обновим статусы для всех не финальных записей
+      setWithdrawalsNextCursor(nc);
+      try { localStorage.setItem('withdrawals_cache_v1', JSON.stringify({ items: arr, nextCursor: nc })); } catch {}
+      // Обновим статусы для не финальных на первой странице
       const isFinal = (s: any) => {
         const st = String(s || '').toLowerCase();
         return st === 'paid' || st === 'error' || st === 'canceled' || st === 'cancelled' || st === 'failed' || st === 'refunded';
@@ -96,12 +105,18 @@ export default function DashboardClient({ hasTokenInitial }: { hasTokenInitial: 
       const active = arr.filter((x) => !isFinal(x.status));
       if (active.length > 0) {
         await Promise.allSettled(active.map((x) => fetch(`/api/rocketwork/withdrawal-status/${encodeURIComponent(String(x.taskId))}`, { cache: 'no-store' })));
-        const r2 = await fetch('/api/rocketwork/withdrawals', { cache: 'no-store' });
+        const r2 = await fetch('/api/rocketwork/withdrawals?limit=15', { cache: 'no-store' });
         const d2 = await r2.json();
-        setHistory(Array.isArray(d2?.items) ? d2.items : []);
+        const arr2 = Array.isArray(d2?.items) ? d2.items : [];
+        const nc2 = typeof d2?.nextCursor === 'string' && d2.nextCursor.length > 0 ? String(d2.nextCursor) : null;
+        setHistory(arr2);
+        setWithdrawalsNextCursor(nc2);
+        try { localStorage.setItem('withdrawals_cache_v1', JSON.stringify({ items: arr2, nextCursor: nc2 })); } catch {}
       }
     } catch {
       setHistory([]);
+    } finally {
+      setWithdrawalsLoading(false);
     }
   };
 
@@ -138,14 +153,27 @@ export default function DashboardClient({ hasTokenInitial }: { hasTokenInitial: 
     finally { setLinksLoading(false); }
   };
 
-  // On mount: load history and restore pending task (for spinner) if any
+  // On mount: load history (hydrate from cache) and restore pending task (for spinner) if any
   useEffect(() => {
     (async () => {
       try {
-        const r = await fetch('/api/rocketwork/withdrawals', { cache: 'no-store' });
+        try {
+          const raw = localStorage.getItem('withdrawals_cache_v1');
+          if (raw) {
+            try {
+              const parsed = JSON.parse(raw);
+              const list = Array.isArray(parsed?.items) ? parsed.items : [];
+              const nc = typeof parsed?.nextCursor === 'string' ? parsed.nextCursor : null;
+              if (list.length > 0) { setHistory(list); setWithdrawalsNextCursor(nc); }
+            } catch {}
+          }
+        } catch {}
+        const r = await fetch('/api/rocketwork/withdrawals?limit=15', { cache: 'no-store' });
         const d = await r.json();
         const items = Array.isArray(d?.items) ? d.items : [];
+        const nc = typeof d?.nextCursor === 'string' && d.nextCursor.length > 0 ? String(d.nextCursor) : null;
         setHistory(items);
+        setWithdrawalsNextCursor(nc);
         const isFinal = (s: any) => {
           const st = String(s || '').toLowerCase();
           return st === 'paid' || st === 'error' || st === 'canceled' || st === 'cancelled' || st === 'failed' || st === 'refunded';
@@ -590,8 +618,8 @@ export default function DashboardClient({ hasTokenInitial }: { hasTokenInitial: 
               {historyOpen ? (
                 <>
                   <div className="flex items-center justify-between mb-2 mt-2">
-                    <div />
-                    <Button variant="ghost" onClick={async () => { await refreshHistory(); showToast('История обновлена', 'info'); }}>Обновить</Button>
+                    <div className="text-xs text-gray-500">Строк: {history.length}{typeof withdrawalsTotal === 'number' ? ` из ${withdrawalsTotal}` : ''}</div>
+                    <Button variant="ghost" onClick={async () => { await refreshHistory(); showToast('История обновлена', 'info'); }} disabled={withdrawalsLoading}>{withdrawalsLoading ? '...' : 'Обновить'}</Button>
                   </div>
                   <div className="overflow-x-auto bg-white dark:bg-gray-950 border border-gray-200 dark:border-gray-800 rounded">
                     <table className="min-w-full text-sm">
@@ -604,11 +632,11 @@ export default function DashboardClient({ hasTokenInitial }: { hasTokenInitial: 
                         </tr>
                       </thead>
                       <tbody>
-                        {paged.length === 0 ? (
+                        {history.length === 0 ? (
                           <tr>
                             <td colSpan={5} className="px-3 py-4 text-center text-gray-500">Нет данных</td>
                           </tr>
-                        ) : paged.map((h) => (
+                        ) : history.map((h) => (
                           <tr key={String(h.taskId)} className="border-t border-gray-100 dark:border-gray-800">
                             <td className="px-3 py-2">{String(h.taskId)}</td>
                             <td className="px-3 py-2">{new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB' }).format(h.amountRub)}</td>
@@ -619,13 +647,31 @@ export default function DashboardClient({ hasTokenInitial }: { hasTokenInitial: 
                       </tbody>
                     </table>
                   </div>
-                  <div className="flex items-center justify-between mt-2">
-                    <div className="text-xs text-gray-500">Стр. {page} из {totalPages}</div>
-                    <div className="flex items-center gap-2">
-                      <Button variant="ghost" disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>Назад</Button>
-                      <Button variant="ghost" disabled={page >= totalPages} onClick={() => setPage((p) => Math.min(totalPages, p + 1))}>Вперёд</Button>
+                  {withdrawalsNextCursor ? (
+                    <div className="mt-2">
+                      <Button variant="secondary" onClick={async () => { await (async function loadMoreWithdrawalsWrapper(){
+                        if (!withdrawalsNextCursor) return;
+                        setWithdrawalsLoading(true);
+                        try {
+                          const r = await fetch(`/api/rocketwork/withdrawals?limit=15&cursor=${encodeURIComponent(withdrawalsNextCursor)}`, { cache: 'no-store' });
+                          const d = await r.json();
+                          const list = Array.isArray(d?.items) ? d.items : [];
+                          const nc = typeof d?.nextCursor === 'string' && d.nextCursor.length > 0 ? String(d.nextCursor) : null;
+                          setWithdrawalsNextCursor(nc);
+                          setHistory((prev) => {
+                            const map = new Map<string, any>();
+                            for (const it of prev) map.set(`${it.createdAt}|${it.taskId}`, it);
+                            for (const it of list) map.set(`${it.createdAt}|${it.taskId}`, it);
+                            const merged = Array.from(map.values()).sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
+                            try { localStorage.setItem('withdrawals_cache_v1', JSON.stringify({ items: merged, nextCursor: nc })); } catch {}
+                            return merged;
+                          });
+                        } catch {} finally {
+                          setWithdrawalsLoading(false);
+                        }
+                      })(); }} disabled={withdrawalsLoading}>{withdrawalsLoading ? 'Загрузка…' : 'Показать ещё'}</Button>
                     </div>
-                  </div>
+                  ) : null}
                 </>
           ) : null}
             </div>

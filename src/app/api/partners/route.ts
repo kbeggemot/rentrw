@@ -15,8 +15,53 @@ export async function GET(req: Request) {
     const inn = getSelectedOrgInn(req);
     const { getShowAllDataFlag } = await import('@/server/userStore');
     const showAll = await getShowAllDataFlag(userId);
-    const partners = inn ? (showAll ? await listAllPartnersForOrg(inn) : await listPartnersForOrg(userId, inn)) : await listPartners(userId);
-    return NextResponse.json({ partners }, { status: 200 });
+    const url = new URL(req.url);
+    const limitParam = url.searchParams.get('limit');
+    let limit = Number(limitParam);
+    if (!Number.isFinite(limit) || limit <= 0) limit = 15;
+    if (limit > 200) limit = 200;
+    const cursor = url.searchParams.get('cursor'); // format: updatedAt|phone
+
+    const all = inn ? (showAll ? await listAllPartnersForOrg(inn) : await listPartnersForOrg(userId, inn)) : await listPartners(userId);
+    // Sort by updatedAt desc, then phone asc for stable order
+    all.sort((a: any, b: any) => {
+      const at = Date.parse(a?.updatedAt || a?.createdAt || 0);
+      const bt = Date.parse(b?.updatedAt || b?.createdAt || 0);
+      if (Number.isNaN(at) && Number.isNaN(bt)) return (a.phone || '').localeCompare(b.phone || '');
+      if (Number.isNaN(at)) return 1;
+      if (Number.isNaN(bt)) return -1;
+      if (bt !== at) return bt - at; // latest first
+      return String(a.phone || '').localeCompare(String(b.phone || ''));
+    });
+
+    let startIndex = 0;
+    if (cursor) {
+      const [curAt, curPhone] = cursor.split('|');
+      const exactIdx = all.findIndex((x) => String(x.phone) === String(curPhone) && String(x.updatedAt || x.createdAt) === String(curAt));
+      if (exactIdx !== -1) startIndex = exactIdx + 1;
+      else if (curAt) {
+        const curTs = Date.parse(curAt);
+        startIndex = all.findIndex((x) => {
+          const ts = Date.parse(x.updatedAt || x.createdAt);
+          if (!Number.isNaN(ts) && !Number.isNaN(curTs)) {
+            if (ts < curTs) return true; // list is desc
+            if (ts === curTs) return String(x.phone) > String(curPhone); // ensure stable order
+            return false;
+          }
+          if ((x.updatedAt || x.createdAt) < curAt) return true;
+          if ((x.updatedAt || x.createdAt) === curAt) return String(x.phone) > String(curPhone);
+          return false;
+        });
+        if (startIndex === -1) startIndex = all.length;
+      }
+    }
+    const items = all.slice(startIndex, startIndex + limit);
+    let nextCursor: string | null = null;
+    if (startIndex + limit < all.length && items.length > 0) {
+      const last = items[items.length - 1];
+      nextCursor = `${last.updatedAt || last.createdAt}|${last.phone}`;
+    }
+    return NextResponse.json({ items, nextCursor }, { status: 200 });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Server error';
     return NextResponse.json({ error: message }, { status: 500 });
