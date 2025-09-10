@@ -39,6 +39,8 @@ export default function SalesClient({ initial, hasTokenInitial }: { initial: Sal
   // Показываем пустую таблицу «Собираем данные…» во время первой/фильтрованной загрузки
   const [gathering, setGathering] = useState<boolean>(false);
   const gatherReqRef = useRef<number>(0);
+  // total по серверной фильтрации
+  const [filteredTotalServer, setFilteredTotalServer] = useState<number | null>(null);
 
   function IconChevronRight() {
     return (
@@ -179,6 +181,11 @@ export default function SalesClient({ initial, hasTokenInitial }: { initial: Sal
           setSales(list);
           const nc = typeof d?.nextCursor === 'string' && d.nextCursor.length > 0 ? String(d.nextCursor) : null;
           setNextCursor(nc);
+          // Получим total с теми же фильтрами
+          try {
+            const meta = await fetch(`/api/sales/meta?${sp.toString()}`, { cache: 'no-store', credentials: 'include' }).then((x)=>x.json());
+            if (typeof meta?.total === 'number') setFilteredTotalServer(meta.total);
+          } catch {}
         } finally {
           setLoading(false);
         }
@@ -208,6 +215,7 @@ export default function SalesClient({ initial, hasTokenInitial }: { initial: Sal
           = Array.isArray(meta?.items) ? meta.items : [];
         if (items.length > 0) setIndexRows(items);
         if (typeof meta?.total === 'number') setTotal(meta.total); else if (items.length > 0) setTotal(items.length);
+        setFilteredTotalServer(null);
         // 2) загрузим первую страницу по индексам, а не общим /api/sales?limit=50
         const firstIds = items.slice(0, 50).map((x) => encodeURIComponent(String(x.taskId))).join(',');
         if (firstIds) {
@@ -573,7 +581,7 @@ export default function SalesClient({ initial, hasTokenInitial }: { initial: Sal
   // следим за активностью фильтров, чтобы не затирать результаты серверной выборки прелоадером
   useEffect(() => { hasFilterRef.current = hasActiveFilter; }, [hasActiveFilter]);
   const totalFromIndex = useMemo(() => (indexRows.length > 0 ? indexRows.length : (typeof total === 'number' ? total : 0)), [indexRows.length, total]);
-  const displayTotal = hasActiveFilter ? filteredTotal : (totalFromIndex || filteredTotal);
+  const displayTotal = hasActiveFilter ? (typeof filteredTotalServer === 'number' ? filteredTotalServer : filteredTotal) : (totalFromIndex || filteredTotal);
 
   useEffect(() => { setPage(1); }, [query, status, agent, showHidden, purchaseReceipt, fullReceipt, commissionReceipt, npdReceipt, dateFrom, dateTo, endFrom, endTo, amountMin, amountMax]);
 
