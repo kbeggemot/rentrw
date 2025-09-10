@@ -127,6 +127,23 @@ export default function SalesClient({ initial, hasTokenInitial }: { initial: Sal
   };
   const removeFilter = (key: string) => {
     setVisibleFilters((prev) => prev.filter((k) => k !== key));
+    // Сбрасываем значение соответствующего фильтра, чтобы запрос ушёл с актуальными параметрами
+    switch (key) {
+      case 'status': setStatus('all'); break;
+      case 'agent': setAgent('all'); break;
+      case 'prepay': setPurchaseReceipt('all'); break;
+      case 'full': setFullReceipt('all'); break;
+      case 'commission': setCommissionReceipt('all'); break;
+      case 'npd': setNpdReceipt('all'); break;
+      case 'saleFrom': setDateFrom(''); break;
+      case 'saleTo': setDateTo(''); break;
+      case 'endFrom': setEndFrom(''); break;
+      case 'endTo': setEndTo(''); break;
+      case 'amountMin': setAmountMin(''); break;
+      case 'amountMax': setAmountMax(''); break;
+      case 'showHidden': setShowHidden('no'); break;
+      default: break;
+    }
   };
 
   const load = async (refresh = false, onlyOrders?: number[]) => {
