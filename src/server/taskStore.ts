@@ -117,7 +117,7 @@ function byTaskIndexPath(taskId: number | string): string {
   return path.join(SALES_INDEX_DIR, 'by_task', `${String(taskId)}.json`).replace(/\\/g, '/');
 }
 
-type OrgIndexRow = { taskId: number | string; orderId: number | string; userId: string; createdAt: string; updatedAt: string; status?: string | null; orgInn: string };
+type OrgIndexRow = { taskId: number | string; orderId: number | string; userId: string; createdAt: string; updatedAt: string; status?: string | null; orgInn: string; hasPrepay?: boolean; hasFull?: boolean; hasCommission?: boolean; hasNpd?: boolean };
 
 async function readOrgIndex(inn: string): Promise<OrgIndexRow[]> {
   const raw = await readText(orgIndexPath(inn));
@@ -141,7 +141,7 @@ async function writeSaleAndIndexes(sale: SaleRecord): Promise<void> {
   await writeText(saleFilePath(inn, sale.taskId), JSON.stringify(sale, null, 2));
   // 2) update org index (upsert)
   const idx = await readOrgIndex(inn);
-  const meta: OrgIndexRow = { taskId: sale.taskId, orderId: sale.orderId, userId: sale.userId, createdAt: sale.createdAt, updatedAt: sale.updatedAt, status: sale.status ?? null, orgInn: inn };
+  const meta: OrgIndexRow = { taskId: sale.taskId, orderId: sale.orderId, userId: sale.userId, createdAt: sale.createdAt, updatedAt: sale.updatedAt, status: sale.status ?? null, orgInn: inn, hasPrepay: Boolean(sale.ofdUrl), hasFull: Boolean(sale.ofdFullUrl), hasCommission: Boolean(sale.additionalCommissionOfdUrl), hasNpd: Boolean(sale.npdReceiptUri) };
   const pos = idx.findIndex((r) => String(r.taskId) === String(sale.taskId));
   if (pos === -1) idx.push(meta); else idx[pos] = meta;
   // keep newest first (optional)

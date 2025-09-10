@@ -514,15 +514,15 @@ export async function GET(req: Request) {
       // If filters provided, scan rows in order and short-circuit after page is filled
       if (hasAnyFilter) {
         rows.sort(compareRows);
-        // Heuristic prefilter: если запрошены какие-либо чеки (prepay/full/commission/npd = yes),
-        // то нет смысла просматривать задачи с нефинальными статусами
-        const needReceipts = (filter.prepay === 'yes') || (filter.full === 'yes') || (filter.commission === 'yes') || (filter.npd === 'yes');
-        if (needReceipts) {
-          rows = rows.filter((r: any) => {
-            const st = String((r?.status || '') as string).toLowerCase();
-            return st === 'paid' || st === 'transferred' || st === 'transfered';
-          });
-        }
+        // Heuristic prefilter: если запрошены чеки — используем поля индекса
+        if (filter.prepay === 'yes') rows = rows.filter((r: any) => (r as any)?.hasPrepay === true);
+        if (filter.prepay === 'no') rows = rows.filter((r: any) => (r as any)?.hasPrepay !== true);
+        if (filter.full === 'yes') rows = rows.filter((r: any) => (r as any)?.hasFull === true);
+        if (filter.full === 'no') rows = rows.filter((r: any) => (r as any)?.hasFull !== true);
+        if (filter.commission === 'yes') rows = rows.filter((r: any) => (r as any)?.hasCommission === true);
+        if (filter.commission === 'no') rows = rows.filter((r: any) => (r as any)?.hasCommission !== true);
+        if (filter.npd === 'yes') rows = rows.filter((r: any) => (r as any)?.hasNpd === true);
+        if (filter.npd === 'no') rows = rows.filter((r: any) => (r as any)?.hasNpd !== true);
         // Prefilter по статусу, если задан
         if (filter.status) {
           const want = String(filter.status).toLowerCase();
