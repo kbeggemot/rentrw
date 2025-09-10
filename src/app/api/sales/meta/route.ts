@@ -107,6 +107,41 @@ export async function GET(req: Request) {
       return true;
     };
     if (onlySuccess) rows = rows.filter((r) => { const st = String((r as any)?.status || '').toLowerCase(); return st === 'paid' || st === 'transfered' || st === 'transferred'; });
+
+    // Fast index-only path: if filters are covered by index fields, return total without reading sale files
+    const rowMatches = (r: Row): boolean => {
+      if (filter.status) {
+        const st = String(r.status || '').toLowerCase();
+        if (st !== String(filter.status).toLowerCase()) return false;
+      }
+      if (filter.query) {
+        const q = filter.query;
+        const hit = String(r.taskId).includes(q) || (typeof r.orderId !== 'undefined' && String(r.orderId).includes(q));
+        if (!hit) return false;
+      }
+      if (filter.saleFrom || filter.saleTo) {
+        const ts = r.createdAt ? Date.parse(String(r.createdAt)) : NaN;
+        if (filter.saleFrom && !(Number.isFinite(ts) && ts >= Date.parse(String(filter.saleFrom)))) return false;
+        if (filter.saleTo && !(Number.isFinite(ts) && ts <= (Date.parse(String(filter.saleTo)) + 24*60*60*1000 - 1))) return false;
+      }
+      if (filter.prepay === 'yes' && !r.hasPrepay) return false; if (filter.prepay === 'no' && r.hasPrepay) return false;
+      if (filter.full === 'yes' && !r.hasFull) return false; if (filter.full === 'no' && r.hasFull) return false;
+      if (filter.commission === 'yes' && !r.hasCommission) return false; if (filter.commission === 'no' && r.hasCommission) return false;
+      if (filter.npd === 'yes' && !r.hasNpd) return false; if (filter.npd === 'no' && r.hasNpd) return false;
+      return true;
+    };
+
+    const coveredByIndexOnly = (
+      (!filter.agent || filter.agent === 'all') &&
+      (filter.showHidden === 'all' || !filter.showHidden) &&
+      !filter.endFrom && !filter.endTo &&
+      !filter.amountMin && !filter.amountMax
+    );
+    if (hasAnyFilter && coveredByIndexOnly) {
+      // Use index-only computation for total
+      const total = rows.filter(rowMatches).length;
+      return NextResponse.json({ total });
+    }
     rows.sort((a: any, b: any) => {
       const at = Date.parse((a?.createdAt || 0) as any);
       const bt = Date.parse((b?.createdAt || 0) as any);
@@ -115,6 +150,15 @@ export async function GET(req: Request) {
     });
     // Если есть фильтры — считаем total по фильтрам, читая минимально необходимые файлы
     if (hasAnyFilter) {
+      // Prefilter rows by index flags for heavy filters before reading files
+      if (filter.prepay === 'yes') rows = rows.filter((r: any) => (r as any)?.hasPrepay === true);
+      if (filter.prepay === 'no') rows = rows.filter((r: any) => (r as any)?.hasPrepay !== true);
+      if (filter.full === 'yes') rows = rows.filter((r: any) => (r as any)?.hasFull === true);
+      if (filter.full === 'no') rows = rows.filter((r: any) => (r as any)?.hasFull !== true);
+      if (filter.commission === 'yes') rows = rows.filter((r: any) => (r as any)?.hasCommission === true);
+      if (filter.commission === 'no') rows = rows.filter((r: any) => (r as any)?.hasCommission !== true);
+      if (filter.npd === 'yes') rows = rows.filter((r: any) => (r as any)?.hasNpd === true);
+      if (filter.npd === 'no') rows = rows.filter((r: any) => (r as any)?.hasNpd !== true);
       // Быстрый предфильтр по индексным флагам чеков
       if (filter.prepay === 'yes') rows = rows.filter((r: any) => (r as any)?.hasPrepay === true);
       if (filter.prepay === 'no') rows = rows.filter((r: any) => (r as any)?.hasPrepay !== true);
