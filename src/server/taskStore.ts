@@ -711,6 +711,18 @@ export async function setSalePageCode(userId: string, taskId: number | string, p
     row.pageCode = pageCode ?? null;
     rows[idx] = row as any;
     await writeOrgIndex(inn, rows as any);
+    // also persist to sale file so that direct reads get it immediately
+    try {
+      const p = saleFilePath(inn, taskId);
+      const raw = await readText(p);
+      if (raw) {
+        const s = JSON.parse(raw);
+        if ((s as any).pageCode !== pageCode) {
+          (s as any).pageCode = pageCode ?? null;
+          await writeText(p, JSON.stringify(s, null, 2));
+        }
+      }
+    } catch {}
   } catch {}
 }
 
