@@ -1,5 +1,4 @@
 import { readText, writeText, list } from './storage';
-import { upsertUserIndex, upsertOrderIndex, readUserIndex, readOrderIndexMapping, type SaleIndexRow } from './salesIndex';
 import { getHub } from './eventBus';
 import path from 'path';
 import { appendAdminEntityLog } from './adminAudit';
@@ -96,16 +95,7 @@ async function readTasks(): Promise<TaskStoreData> {
 }
 
 async function writeTasks(data: TaskStoreData): Promise<void> {
-  if (process.env.USE_LEGACY_TASKS_WRITE === '0') return;
-  try {
-    await writeText(TASKS_FILE, JSON.stringify(data, null, 2));
-  } catch (e: any) {
-    const msg = String(((e as any) && (e as any).message) || e || '');
-    if (msg.includes('TASKS_WRITE_BLOCKED_SHRINK') || msg.includes('TASKS_WRITE_BLOCKED_BACKEND_MISMATCH')) {
-      return;
-    }
-    throw e;
-  }
+  await writeText(TASKS_FILE, JSON.stringify(data, null, 2));
 }
 
 // ----- Sharded sales storage helpers (by orgInn) -----
@@ -159,11 +149,6 @@ async function writeSaleAndIndexes(sale: SaleRecord): Promise<void> {
   await writeOrgIndex(inn, idx);
   // 3) upsert by-task index
   await writeText(byTaskIndexPath(sale.taskId), JSON.stringify({ inn, userId: sale.userId }, null, 2));
-  // 4) upsert by-user index
-  const row: SaleIndexRow = { inn, userId: sale.userId, taskId: sale.taskId, orderId: sale.orderId, createdAt: sale.createdAt, updatedAt: sale.updatedAt, status: sale.status ?? null };
-  try { await upsertUserIndex(row); } catch {}
-  // 5) upsert by-order mapping
-  try { await upsertOrderIndex(sale.orderId, { inn, userId: sale.userId, taskId: sale.taskId }); } catch {}
 }
 
 async function readByTask(taskId: number | string): Promise<{ inn: string; userId: string } | null> {
@@ -482,21 +467,8 @@ export async function setSaleCreatedAtRw(userId: string, taskId: number | string
 }
 
 export async function listSales(userId: string): Promise<SaleRecord[]> {
-  // Merge multiple sources to avoid empty results if one index is incomplete
-  const map = new Map<string, SaleRecord>();
-  // 1) by_user index (fast path)
-  try {
-    const rows = await readUserIndex(userId);
-    if (Array.isArray(rows) && rows.length > 0) {
-      for (const r of rows) {
-        try {
-          const s = await readSaleByInnTask(r.inn, r.taskId);
-          if (s && s.userId === userId) map.set(String(s.taskId), s);
-        } catch {}
-      }
-    }
-  } catch {}
-  // 2) Sharded org indexes
+  // Read from sharded org indexes and merge с legacy
+  const out: SaleRecord[] = [];
   try {
     const orgPaths = (await list('.data/sales').catch(() => [] as string[])).filter((p) => /\.data\/sales\/[^/]+\/index\.json$/.test(p));
     for (const idxPath of orgPaths) {
@@ -505,22 +477,19 @@ export async function listSales(userId: string): Promise<SaleRecord[]> {
         const idxRaw = await readText(idxPath);
         const rows: OrgIndexRow[] = idxRaw ? JSON.parse(idxRaw) : [];
         for (const r of rows) {
-          const key = String(r.taskId);
-          if (map.has(key)) continue;
+          // lazy read individual sale and filter by userId
           const s = await readSaleByInnTask(inn, r.taskId);
-          if (s && s.userId === userId) map.set(key, s);
+          if (s && s.userId === userId) out.push(s);
         }
       } catch {}
     }
   } catch {}
-  // 3) Legacy tasks.json (backward compatibility)
-  try {
-    const store = await readTasks();
-    for (const s of (store.sales ?? [])) {
-      if (s.userId === userId && !map.has(String(s.taskId))) map.set(String(s.taskId), s);
-    }
-  } catch {}
-  const out = Array.from(map.values());
+  // Merge with legacy to avoid пропусков (на случай частичной миграции)
+  const seen = new Set(out.map((s) => String(s.taskId)));
+  const store = await readTasks();
+  for (const s of (store.sales ?? [])) {
+    if (s.userId === userId && !seen.has(String(s.taskId))) out.push(s);
+  }
   return out.sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
 }
 
@@ -554,14 +523,6 @@ export async function findSaleByTaskId(userId: string, taskId: number | string):
     const s = await readSaleByInnTask(mapped.inn, taskId);
     if (s && s.userId === userId) return s;
   }
-    // Try by_order index
-  try {
-    const map = await readOrderIndexMapping(String(taskId));
-    if (map) {
-      const s2 = await readSaleByInnTask(map.inn, map.taskId);
-      if (s2 && s2.userId === userId) return s2;
-    }
-  } catch {}
   // Fallback legacy
   const store = await readTasks();
   const arr = (store.sales ?? []).filter((s) => s.userId === userId && s.taskId == taskId);
@@ -713,22 +674,5 @@ export async function updateSaleMeta(userId: string, taskId: number | string, me
     try { await writeSaleAndIndexes(next); } catch {}
     try { getHub().publish(userId, 'sales:update'); } catch {}
   }
-}
-
-// Rebuild sharded sales files and all indexes from legacy tasks.json
-export async function rebuildSalesIndexesFromLegacy(): Promise<{ processed: number; errors: number }> {
-  const store = await readTasks();
-  const sales = Array.isArray(store.sales) ? store.sales : [];
-  let processed = 0;
-  let errors = 0;
-  for (const s of sales) {
-    try {
-      await writeSaleAndIndexes(s as SaleRecord);
-      processed += 1;
-    } catch {
-      errors += 1;
-    }
-  }
-  return { processed, errors };
 }
 

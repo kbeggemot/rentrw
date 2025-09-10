@@ -581,7 +581,7 @@ export default function SalesClient({ initial, hasTokenInitial }: { initial: Sal
   // следим за активностью фильтров, чтобы не затирать результаты серверной выборки прелоадером
   useEffect(() => { hasFilterRef.current = hasActiveFilter; }, [hasActiveFilter]);
   const totalFromIndex = useMemo(() => (indexRows.length > 0 ? indexRows.length : (typeof total === 'number' ? total : 0)), [indexRows.length, total]);
-  const displayTotal = hasActiveFilter ? (typeof filteredTotalServer === 'number' ? filteredTotalServer : filteredTotal) : (totalFromIndex || filteredTotal);
+  const displayTotal = hasActiveFilter ? (typeof filteredTotalServer === 'number' ? filteredTotalServer : null) : (totalFromIndex || filteredTotal);
 
   useEffect(() => { setPage(1); }, [query, status, agent, showHidden, purchaseReceipt, fullReceipt, commissionReceipt, npdReceipt, dateFrom, dateTo, endFrom, endTo, amountMin, amountMax]);
 
@@ -591,6 +591,7 @@ export default function SalesClient({ initial, hasTokenInitial }: { initial: Sal
     if (hasActiveFilter) {
       const reqId = ++gatherReqRef.current;
       setGathering(true);
+      setFilteredTotalServer(null);
       timer = setTimeout(() => {
         void load(false).finally(() => { if (gatherReqRef.current === reqId) setGathering(false); });
       }, 250);
@@ -1112,13 +1113,13 @@ export default function SalesClient({ initial, hasTokenInitial }: { initial: Sal
           </tbody>
         </table>
       </div>
-      {(displayTotal > pageSize) ? (
+      {(typeof displayTotal === 'number' && displayTotal > pageSize) ? (
         <div className="mt-3 flex items-center justify-between text-sm">
-          <div className="text-gray-600 dark:text-gray-400">Строк: {Math.min(displayTotal, page * pageSize)} из {displayTotal}</div>
+          <div className="text-gray-600 dark:text-gray-400">Строк: {Math.min(Number(displayTotal), page * pageSize)} из {displayTotal}</div>
           <div className="flex items-center gap-2">
             <Button variant="ghost" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1}>Назад</Button>
             <div className="h-9 min-w-8 inline-flex items-center justify-center">{page}</div>
-            <Button variant="ghost" onClick={goNextPage} disabled={page * pageSize >= displayTotal}>Вперёд</Button>
+            <Button variant="ghost" onClick={goNextPage} disabled={typeof displayTotal !== 'number' || page * pageSize >= Number(displayTotal)}>Вперёд</Button>
           </div>
         </div>
       ) : null}
