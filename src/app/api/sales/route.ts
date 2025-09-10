@@ -511,37 +511,39 @@ export async function GET(req: Request) {
       }
       rows = Array.isArray(rows) ? rows.slice() : [];
       rows = Array.isArray(rows) ? rows.slice() : [];
-      // If filters provided, load and filter all, then paginate in-memory
+      // If filters provided, scan rows in order and short-circuit after page is filled
       if (hasAnyFilter) {
-        const salesAll: any[] = [];
-        for (const r of rows) {
-          try {
-            const d = String((r as any).inn || inn || '').replace(/\D/g,'');
-            const p = d ? `.data/sales/${d}/sales/${String(r.taskId)}.json` : '';
-            const raw = await readText(p);
-            if (!raw) continue;
-            const s = JSON.parse(raw);
-            // Если режим "все данные" не включен — фильтруем по userId
-            if (!showAll && s.userId !== userId) continue;
-            if (onlySuccess) {
-              const st = String(s.status || '').toLowerCase();
-              if (!(st === 'paid' || st === 'transfered' || st === 'transferred')) continue;
-            }
-            if (saleMatches(s)) salesAll.push(s);
-          } catch {}
-        }
-        const sorted = salesAll.sort((a: any, b: any) => {
-          if (a.createdAt === b.createdAt) return String(a.taskId) < String(b.taskId) ? 1 : -1;
-          return a.createdAt < b.createdAt ? 1 : -1;
-        });
-        let start = 0;
+        rows.sort(compareRows);
+        let startIndex = 0;
         if (cursorRaw) {
           const [ts, tid] = String(cursorRaw).split('|');
-          const idx = sorted.findIndex((s: any) => String(s.createdAt) === ts && String(s.taskId) === String(tid));
-          if (idx >= 0) start = idx + 1;
+          const idx = rows.findIndex((r) => String((r as any)?.createdAt || '') === ts && String((r as any)?.taskId || '') === String(tid));
+          if (idx >= 0) startIndex = idx + 1;
         }
-        const page = sorted.slice(start, start + limit);
-        const nextCursor = (start + limit) < sorted.length && page.length > 0 ? `${String(page[page.length-1].createdAt)}|${String(page[page.length-1].taskId)}` : null;
+        const page: any[] = [];
+        const chunkSize = 24;
+        for (let i = startIndex; i < rows.length && page.length < Math.max(1, limit || 50); i += chunkSize) {
+          const slice = rows.slice(i, Math.min(rows.length, i + chunkSize));
+          const results = await Promise.allSettled(slice.map(async (r) => {
+            try {
+              const d = String((r as any).inn || inn || '').replace(/\D/g,'');
+              const p = d ? `.data/sales/${d}/sales/${String(r.taskId)}.json` : '';
+              const raw = await readText(p);
+              if (!raw) return null;
+              const s = JSON.parse(raw);
+              if (!showAll && s.userId !== userId) return null;
+              if (onlySuccess) {
+                const st = String(s.status || '').toLowerCase();
+                if (!(st === 'paid' || st === 'transfered' || st === 'transferred')) return null;
+              }
+              return saleMatches(s) ? s : null;
+            } catch { return null; }
+          }));
+          for (const r of results) {
+            if (r.status === 'fulfilled' && r.value) page.push(r.value);
+          }
+        }
+        const nextCursor = page.length > 0 ? `${String(page[page.length-1].createdAt)}|${String(page[page.length-1].taskId)}` : null;
         return NextResponse.json({ sales: page, nextCursor });
       } else {
         // default fast path (no filters): use index paging and read only page items
