@@ -624,15 +624,8 @@ export default function SalesClient({ initial, hasTokenInitial }: { initial: Sal
   const [menuPos, setMenuPos] = useState<{ top: number; left: number } | null>(null);
   const [pageCodes, setPageCodes] = useState<Record<number, string>>({});
   const openSale = useMemo(() => filtered.find((x) => x.taskId === menuOpenId) || null, [filtered, menuOpenId]);
-  // Предзагрузка pageCode для всех видимых финальных продаж, чтобы ссылка не мигала в меню
-  useEffect(() => {
-    const finals = filtered.filter((s) => {
-      const fin = String(s.status || '').toLowerCase();
-      return fin === 'paid' || fin === 'transfered' || fin === 'transferred';
-    });
-    finals.forEach((s) => { void ensurePageCode(s.orderId); });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filtered]);
+  // Убрали массовую предзагрузку pageCode, чтобы не создавать десятки запросов по orderId
+  // Код страницы запрашиваем лениво при открытии контекстного меню (см. onClick ниже)
   // Глобальное закрытие контекстного меню по клику вне
   useEffect(() => {
     const close = (e: Event) => {
