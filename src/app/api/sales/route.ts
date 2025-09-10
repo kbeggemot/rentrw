@@ -523,6 +523,22 @@ export async function GET(req: Request) {
             return st === 'paid' || st === 'transferred' || st === 'transfered';
           });
         }
+        // Prefilter по статусу, если задан
+        if (filter.status) {
+          const want = String(filter.status).toLowerCase();
+          rows = rows.filter((r: any) => String(r?.status || '').toLowerCase() === want);
+        }
+        // Prefilter по дате продажи (createdAt), если заданы интервалы
+        if (filter.saleFrom || filter.saleTo) {
+          const fromTs = filter.saleFrom ? Date.parse(String(filter.saleFrom)) : null;
+          const toTs = filter.saleTo ? (Date.parse(String(filter.saleTo)) + 24*60*60*1000 - 1) : null;
+          rows = rows.filter((r: any) => {
+            const ts = Date.parse(String(r?.createdAt || 0));
+            if (fromTs != null && !(Number.isFinite(ts) && ts >= fromTs)) return false;
+            if (toTs != null && !(Number.isFinite(ts) && ts <= toTs)) return false;
+            return true;
+          });
+        }
         let startIndex = 0;
         if (cursorRaw) {
           const [ts, tid] = String(cursorRaw).split('|');
