@@ -172,20 +172,19 @@ export default function SalesClient({ initial, hasTokenInitial }: { initial: Sal
         } catch {}
       };
       if (refresh || hasActiveFilter) {
-        // Серверная фильтрация + пагинация
+        // Серверная фильтрация + пагинация: сначала meta (быстро), потом сами продажи
         try {
           const sp = buildFilterQuery();
+          try {
+            const meta = await fetch(`/api/sales/meta?${sp.toString()}`, { cache: 'no-store', credentials: 'include' }).then((x)=>x.json());
+            if (typeof meta?.total === 'number') setFilteredTotalServer(meta.total);
+          } catch {}
           const r = await fetch(`/api/sales?${sp.toString()}`, { cache: 'no-store', credentials: 'include' });
           const d = await r.json();
           const list = Array.isArray(d?.sales) ? d.sales : [];
           setSales(list);
           const nc = typeof d?.nextCursor === 'string' && d.nextCursor.length > 0 ? String(d.nextCursor) : null;
           setNextCursor(nc);
-          // Получим total с теми же фильтрами
-          try {
-            const meta = await fetch(`/api/sales/meta?${sp.toString()}`, { cache: 'no-store', credentials: 'include' }).then((x)=>x.json());
-            if (typeof meta?.total === 'number') setFilteredTotalServer(meta.total);
-          } catch {}
         } finally {
           setLoading(false);
         }
