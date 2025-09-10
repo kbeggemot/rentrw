@@ -14,7 +14,7 @@ function getUserIdMeta(req: Request): string | null {
   return hdr && hdr.trim().length > 0 ? hdr.trim() : null;
 }
 
-type Row = { taskId: string | number; orderId?: string | number; createdAt: string; updatedAt?: string; status?: string | null; inn: string };
+type Row = { taskId: string | number; orderId?: string | number; createdAt: string; updatedAt?: string; status?: string | null; inn: string; userId?: string; hasPrepay?: boolean; hasFull?: boolean; hasCommission?: boolean; hasNpd?: boolean };
 
 async function readOrgIndex(inn: string): Promise<Row[]> {
   try {
@@ -115,6 +115,15 @@ export async function GET(req: Request) {
     });
     // Если есть фильтры — считаем total по фильтрам, читая минимально необходимые файлы
     if (hasAnyFilter) {
+      // Быстрый предфильтр по индексным флагам чеков
+      if (filter.prepay === 'yes') rows = rows.filter((r: any) => (r as any)?.hasPrepay === true);
+      if (filter.prepay === 'no') rows = rows.filter((r: any) => (r as any)?.hasPrepay !== true);
+      if (filter.full === 'yes') rows = rows.filter((r: any) => (r as any)?.hasFull === true);
+      if (filter.full === 'no') rows = rows.filter((r: any) => (r as any)?.hasFull !== true);
+      if (filter.commission === 'yes') rows = rows.filter((r: any) => (r as any)?.hasCommission === true);
+      if (filter.commission === 'no') rows = rows.filter((r: any) => (r as any)?.hasCommission !== true);
+      if (filter.npd === 'yes') rows = rows.filter((r: any) => (r as any)?.hasNpd === true);
+      if (filter.npd === 'no') rows = rows.filter((r: any) => (r as any)?.hasNpd !== true);
       let total = 0;
       const chunk = 48;
       for (let i = 0; i < rows.length; i += chunk) {
