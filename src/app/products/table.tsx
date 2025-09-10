@@ -192,12 +192,12 @@ export default function ProductsTable({ initialItems }: { initialItems: Item[] }
           </tbody>
         </table>
       </div>
-      <div className="mt-3 flex items-center justify-between text-sm">
-        <div className="text-gray-600 dark:text-gray-400">Строк: {items.length}{typeof total === 'number' ? ` из ${total}` : ''}</div>
-        {nextCursor ? (
-          <Button variant="secondary" onClick={loadMore} disabled={loading}>{loading ? 'Загрузка…' : 'Показать ещё'}</Button>
-        ) : null}
-      </div>
+      <div className="mt-2 text-xs text-gray-500">Строк: {items.length}{typeof total === 'number' ? ` из ${total}` : ''}</div>
+      {nextCursor ? (
+        <div className="mt-3">
+          <Button variant="secondary" fullWidth onClick={loadMore} disabled={loading}>{loading ? 'Загрузка…' : 'Показать ещё'}</Button>
+        </div>
+      ) : null}
       {toast ? (
         <div className={`fixed bottom-4 right-4 z-50 px-4 py-3 rounded-md shadow-lg text-sm ${toast.kind === 'success' ? 'bg-green-600 text-white' : 'bg-red-600 text-white'}`}>
           {toast.msg}
