@@ -490,6 +490,12 @@ export async function GET(req: Request) {
             const s = JSON.parse(raw);
             // Если режим "все данные" не включен — фильтруем по userId
             if (!showAll && s.userId !== userId) return null;
+            // attach pageCode from index if present
+            try {
+              const meta = byTask.get(String((s as any).taskId));
+              const pc = (meta as any)?.pageCode;
+              if (pc) (s as any).pageCode = pc;
+            } catch {}
             return s;
           } catch { return null; }
         }));
