@@ -514,6 +514,15 @@ export async function GET(req: Request) {
       // If filters provided, scan rows in order and short-circuit after page is filled
       if (hasAnyFilter) {
         rows.sort(compareRows);
+        // Heuristic prefilter: если запрошены какие-либо чеки (prepay/full/commission/npd = yes),
+        // то нет смысла просматривать задачи с нефинальными статусами
+        const needReceipts = (filter.prepay === 'yes') || (filter.full === 'yes') || (filter.commission === 'yes') || (filter.npd === 'yes');
+        if (needReceipts) {
+          rows = rows.filter((r: any) => {
+            const st = String((r?.status || '') as string).toLowerCase();
+            return st === 'paid' || st === 'transferred' || st === 'transfered';
+          });
+        }
         let startIndex = 0;
         if (cursorRaw) {
           const [ts, tid] = String(cursorRaw).split('|');
@@ -521,7 +530,7 @@ export async function GET(req: Request) {
           if (idx >= 0) startIndex = idx + 1;
         }
         const page: any[] = [];
-        const chunkSize = 24;
+        const chunkSize = 96;
         for (let i = startIndex; i < rows.length && page.length < Math.max(1, limit || 50); i += chunkSize) {
           const slice = rows.slice(i, Math.min(rows.length, i + chunkSize));
           const results = await Promise.allSettled(slice.map(async (r) => {
