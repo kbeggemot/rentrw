@@ -38,6 +38,37 @@ function buildFio(rec: any): string | null {
   return fio.length > 0 ? fio : null;
 }
 
+// Moscow date helper (YYYY-MM-DD)
+function ymdMoscow(ts: string | Date | null | undefined): string | null {
+  try {
+    if (!ts) return null;
+    const d = new Date(ts);
+    return d.toLocaleDateString('en-CA', { timeZone: 'Europe/Moscow' });
+  } catch { return null; }
+}
+
+// Persistent phase lock to avoid double creation (prepay vs full)
+async function getOrSetOfdPhase(userId: string, orderId: number | string, preferred: 'prepay' | 'full'): Promise<'prepay' | 'full'> {
+  try {
+    const { readText, writeText } = await import('@/server/storage');
+    const path = `.data/ofd_phase_${encodeURIComponent(String(userId))}_${encodeURIComponent(String(orderId))}.json`;
+    const prev = await readText(path);
+    if (prev) {
+      try {
+        const obj = JSON.parse(prev);
+        const phase = (obj && (obj.phase === 'prepay' || obj.phase === 'full') ? obj.phase : preferred) as 'prepay' | 'full';
+        return phase;
+      } catch {
+        return preferred;
+      }
+    }
+    await writeText(path, JSON.stringify({ phase: preferred, ts: new Date().toISOString() }));
+    return preferred;
+  } catch {
+    return preferred;
+  }
+}
+
 export async function POST(req: Request) {
   try {
     const urlObj = new URL(req.url);
@@ -160,10 +191,13 @@ export async function POST(req: Request) {
         if (fin === 'paid' || fin === 'transfered' || fin === 'transferred') {
           const sale = await findSaleByTaskId(userId, taskId);
           if (sale) {
+            // Compare pay date (paidAt if available else now) with service end date in MSK
+            const paidIso = (sale as any)?.paidAt ? String((sale as any).paidAt) : new Date().toISOString();
             const createdAt = (sale as any).createdAtRw || (sale as any).createdAt;
-            const createdDate = createdAt ? String(createdAt).slice(0, 10) : null;
+            const paidDateMsk = ymdMoscow(paidIso);
             const endDate = sale.serviceEndDate || null;
-            const isToday = Boolean(createdDate && endDate && createdDate === endDate);
+            const endDateMsk = ymdMoscow(endDate ? `${endDate}T00:00:00Z` : null);
+            const isToday = Boolean(paidDateMsk && endDateMsk && paidDateMsk === endDateMsk);
             const amountRub = Number(sale.amountGrossRub || 0);
             const usedVat = (sale.vatRate || 'none') as any;
             const baseUrl = process.env.FERMA_BASE_URL || 'https://ferma.ofd.ru/';
@@ -224,11 +258,14 @@ export async function POST(req: Request) {
                 if (partnerInn) {
                   const defaultEmail = process.env.OFD_DEFAULT_EMAIL || process.env.DEFAULT_RECEIPT_EMAIL || 'ofd@rockethumans.com';
                   const amountNet = Math.max(0, Number(sale.amountGrossRub || 0) - Number(sale.retainedCommissionRub || 0));
-                  if (isToday) {
-                    let invoiceIdFull = (sale as any).invoiceIdFull || null;
-                    if (!invoiceIdFull) {
-                      try { const num = Number(String(sale.orderId).match(/(\d+)/g)?.slice(-1)[0] || NaN); invoiceIdFull = await getInvoiceIdForFull(num); } catch {}
-                    }
+                  const useFull = isToday;
+                  try {
+                    const prev = (await readText('.data/ofd_create_attempts.log')) || '';
+                    const line = JSON.stringify({ ts: new Date().toISOString(), src: 'postback', stage: 'ofd_branch_choice', party: 'partner', userId, taskId, orderId: sale.orderId, reason: useFull ? 'is_today' : 'not_today', fin, paidDateMsk, endDateMsk });
+                    await writeText('.data/ofd_create_attempts.log', prev + line + '\n');
+                  } catch {}
+                  if (useFull) {
+                    const invoiceIdFull = (sale as any).invoiceIdFull || null;
                     if (invoiceIdFull) {
                       const partnerName = (taskObj?.executor && [taskObj?.executor?.last_name, taskObj?.executor?.first_name, taskObj?.executor?.second_name].filter(Boolean).join(' ').trim()) || undefined;
                       try {
@@ -236,7 +273,7 @@ export async function POST(req: Request) {
                         const line = JSON.stringify({ ts: new Date().toISOString(), src: 'postback', stage: 'create_attempt', party: 'partner', userId, taskId, orderId: sale.orderId, invoiceId: invoiceIdFull, callbackUrl });
                         await writeText('.data/ofd_create_attempts.log', prev + line + '\n');
                       } catch {}
-                      const itemsParam = await (async ()=>{
+                      let itemsParam = await (async ()=>{
                         try {
                           const snap = (sale as any)?.itemsSnapshot as any[] | null;
                           const inn = (sale as any)?.orgInn ? String((sale as any).orgInn).replace(/\D/g,'') : undefined;
@@ -292,6 +329,16 @@ export async function POST(req: Request) {
                           }
                         } catch { return undefined; }
                       })();
+                      if (!Array.isArray(itemsParam) || itemsParam.length === 0) {
+                        try {
+                          const snap2 = (sale as any)?.itemsSnapshot as any[] | null;
+                          if (Array.isArray(snap2) && snap2.length > 0) {
+                            itemsParam = snap2.map((it:any)=>({ label: String(it.title||''), price: Number(it.price||0), qty: Number(it.qty||1), vatRate: usedVat }));
+                            try { const prev = (await readText('.data/ofd_create_attempts.log')) || ''; const line = JSON.stringify({ ts: new Date().toISOString(), src: 'postback', stage: 'items_fallback_naive', party: 'partner', userId, taskId, orderId: sale.orderId, count: itemsParam.length }); await writeText('.data/ofd_create_attempts.log', prev + line + '\n'); } catch {}
+                          }
+                        } catch {}
+                      }
+                      try { const prev = (await readText('.data/ofd_create_attempts.log')) || ''; const line = JSON.stringify({ ts: new Date().toISOString(), src: 'postback', stage: 'items_final', party: 'partner', userId, taskId, orderId: sale.orderId, branch: 'full', count: Array.isArray(itemsParam) ? itemsParam.length : 0 }); await writeText('.data/ofd_create_attempts.log', prev + line + '\n'); } catch {}
                       const payload = buildFermaReceiptPayload({ party: 'partner', partyInn: partnerInn, description: 'Оплата услуг', amountRub: amountNet, vatRate: usedVat, methodCode: PAYMENT_METHOD_FULL_PAYMENT, orderId: sale.orderId, docType: 'Income', buyerEmail: sale.clientEmail || defaultEmail, invoiceId: invoiceIdFull, callbackUrl, paymentAgentInfo: { AgentType: 'AGENT', SupplierInn: partnerInn, SupplierName: partnerName || 'Исполнитель' }, items: itemsParam });
                       const created = await fermaCreateReceipt(payload, { baseUrl, authToken: tokenOfd });
                       try {
@@ -310,18 +357,27 @@ export async function POST(req: Request) {
                       } catch {}
                     }
                   } else {
-                    let invoiceIdPrepay = (sale as any).invoiceIdPrepay || null;
-                    if (!invoiceIdPrepay) {
-                      try { const num = Number(String(sale.orderId).match(/(\d+)/g)?.slice(-1)[0] || NaN); invoiceIdPrepay = await getInvoiceIdForPrepay(num); } catch {}
-                    }
-                    if (invoiceIdPrepay) {
+                    const invoiceIdPrepay = (sale as any).invoiceIdPrepay || null;
+                    // Extra guard: do not create prepay if full receipt already exists OR paid date equals service date in MSK
+                    const hasFullAlready = Boolean((sale as any)?.ofdFullUrl || (sale as any)?.ofdFullId);
+                    const paidIsoMsk = (sale as any)?.paidAt ? String((sale as any).paidAt) : new Date().toISOString();
+                    const endDateMsk = sale.serviceEndDate || null;
+                    const equalMsk = Boolean(ymdMoscow(paidIsoMsk) && ymdMoscow(endDateMsk ? `${endDateMsk}T00:00:00Z` : null) && ymdMoscow(paidIsoMsk) === ymdMoscow(endDateMsk ? `${endDateMsk}T00:00:00Z` : null));
+                    // Phase lock: only allow prepay if phase=='prepay'
+                    const lockOrder = Number(String(sale.orderId).match(/(\d+)/g)?.slice(-1)[0] || NaN);
+                    const phase = await getOrSetOfdPhase(userId, lockOrder, 'prepay');
+                    if (invoiceIdPrepay && !hasFullAlready && !equalMsk && phase === 'prepay') {
                       const partnerName2 = (taskObj?.executor && [taskObj?.executor?.last_name, taskObj?.executor?.first_name, taskObj?.executor?.second_name].filter(Boolean).join(' ').trim()) || undefined;
                       try {
                         const prev = (await readText('.data/ofd_create_attempts.log')) || '';
                         const line = JSON.stringify({ ts: new Date().toISOString(), src: 'postback', stage: 'create_attempt', party: 'partner', userId, taskId, orderId: sale.orderId, invoiceId: invoiceIdPrepay, callbackUrl });
                         await writeText('.data/ofd_create_attempts.log', prev + line + '\n');
                       } catch {}
-                      const itemsParamA = await (async ()=>{ try { const snap = (sale as any)?.itemsSnapshot as any[] | null; const inn = (sale as any)?.orgInn ? String((sale as any).orgInn).replace(/\D/g,'') : undefined; const products = inn ? await listProductsForOrg(inn) : []; const fromSnap = Array.isArray(snap) && snap.length>0 ? snap.map((it:any)=>{ const prod = products.find((p)=> (p.id && it?.id && String(p.id)===String(it.id)) || (p.title && it?.title && String(p.title).toLowerCase()===String(it.title).toLowerCase())) || null; const snapVat = (['none','0','5','7','10','20'].includes(String(it?.vat)) ? String(it.vat) : undefined) as any; return { label: String(it.title||''), price: Number(it.price||0), qty: Number(it.qty||1), vatRate: (snapVat || (prod?.vat as any) || (usedVat as any)), unit: (prod?.unit as any), kind: (prod?.kind as any) } as any; }) : []; if (fromSnap.length>0) return fromSnap; try { const prev = (await readText('.data/ofd_create_attempts.log')) || ''; const line = JSON.stringify({ ts: new Date().toISOString(), src: 'postback', stage: 'items_snapshot_empty', userId, taskId, orderId: sale.orderId }); await writeText('.data/ofd_create_attempts.log', prev + line + '\n'); } catch {} try { const code = (sale as any)?.linkCode ? String((sale as any).linkCode) : null; if (!code) { try { const prev2 = (await readText('.data/ofd_create_attempts.log')) || ''; const line2 = JSON.stringify({ ts: new Date().toISOString(), src: 'postback', stage: 'items_no_linkcode', userId, taskId, orderId: sale.orderId }); await writeText('.data/ofd_create_attempts.log', prev2 + line2 + '\n'); } catch {} return undefined; } const link = await (await fetch(new URL(`/api/links/${encodeURIComponent(code)}`, `${req.headers.get('x-forwarded-proto')||'http'}://${req.headers.get('x-forwarded-host')||req.headers.get('host')||'localhost:3000'}`).toString(), { cache: 'no-store', headers: { 'x-user-id': userId } })).json().catch(()=>null); const cart = Array.isArray(link?.cartItems) ? link.cartItems : []; if (cart.length===0) { try { const prev3 = (await readText('.data/ofd_create_attempts.log')) || ''; const line3 = JSON.stringify({ ts: new Date().toISOString(), src: 'postback', stage: 'items_link_cart_empty', userId, taskId, orderId: sale.orderId, linkCode: code }); await writeText('.data/ofd_create_attempts.log', prev3 + line3 + '\n'); } catch {} return undefined; } try { const prev4 = (await readText('.data/ofd_create_attempts.log')) || ''; const line4 = JSON.stringify({ ts: new Date().toISOString(), src: 'postback', stage: 'items_from_link', userId, taskId, orderId: sale.orderId, linkCode: code, count: cart.length }); await writeText('.data/ofd_create_attempts.log', prev4 + line4 + '\n'); } catch {} return cart.map((c:any)=>{ const prod = products.find((p)=> (p.id && c?.id && String(p.id)===String(c.id)) || (p.title && c?.title && String(p.title).toLowerCase()===String(c.title).toLowerCase())) || null; return { label: String(c.title||''), price: Number(c.price||0), qty: Number(c.qty||1), vatRate: ((prod?.vat as any) || (usedVat as any)), unit: (prod?.unit as any), kind: (prod?.kind as any) } as any; }); } catch { try { const prev5 = (await readText('.data/ofd_create_attempts.log')) || ''; const line5 = JSON.stringify({ ts: new Date().toISOString(), src: 'postback', stage: 'items_link_fetch_failed', userId, taskId, orderId: sale.orderId }); await writeText('.data/ofd_create_attempts.log', prev5 + line5 + '\n'); } catch {} return undefined; } } catch { return undefined; } })();
+                      let itemsParamA = await (async ()=>{ try { const snap = (sale as any)?.itemsSnapshot as any[] | null; const inn = (sale as any)?.orgInn ? String((sale as any).orgInn).replace(/\D/g,'') : undefined; const products = inn ? await listProductsForOrg(inn) : []; const fromSnap = Array.isArray(snap) && snap.length>0 ? snap.map((it:any)=>{ const prod = products.find((p)=> (p.id && it?.id && String(p.id)===String(it.id)) || (p.title && it?.title && String(p.title).toLowerCase()===String(it.title).toLowerCase())) || null; const snapVat = (['none','0','5','7','10','20'].includes(String(it?.vat)) ? String(it.vat) : undefined) as any; return { label: String(it.title||''), price: Number(it.price||0), qty: Number(it.qty||1), vatRate: (snapVat || (prod?.vat as any) || (usedVat as any)), unit: (prod?.unit as any), kind: (prod?.kind as any) } as any; }) : []; if (fromSnap.length>0) return fromSnap; try { const prev = (await readText('.data/ofd_create_attempts.log')) || ''; const line = JSON.stringify({ ts: new Date().toISOString(), src: 'postback', stage: 'items_snapshot_empty', userId, taskId, orderId: sale.orderId }); await writeText('.data/ofd_create_attempts.log', prev + line + '\n'); } catch {} try { const code = (sale as any)?.linkCode ? String((sale as any).linkCode) : null; if (!code) { try { const prev2 = (await readText('.data/ofd_create_attempts.log')) || ''; const line2 = JSON.stringify({ ts: new Date().toISOString(), src: 'postback', stage: 'items_no_linkcode', userId, taskId, orderId: sale.orderId }); await writeText('.data/ofd_create_attempts.log', prev2 + line2 + '\n'); } catch {} return undefined; } const link = await (await fetch(new URL(`/api/links/${encodeURIComponent(code)}`, `${req.headers.get('x-forwarded-proto')||'http'}://${req.headers.get('x-forwarded-host')||req.headers.get('host')||'localhost:3000'}`).toString(), { cache: 'no-store', headers: { 'x-user-id': userId } })).json().catch(()=>null); const cart = Array.isArray(link?.cartItems) ? link.cartItems : []; if (cart.length===0) { try { const prev3 = (await readText('.data/ofd_create_attempts.log')) || ''; const line3 = JSON.stringify({ ts: new Date().toISOString(), src: 'postback', stage: 'items_link_cart_empty', userId, taskId, orderId: sale.orderId, linkCode: code }); await writeText('.data/ofd_create_attempts.log', prev3 + line3 + '\n'); } catch {} return undefined; } try { const prev4 = (await readText('.data/ofd_create_attempts.log')) || ''; const line4 = JSON.stringify({ ts: new Date().toISOString(), src: 'postback', stage: 'items_from_link', userId, taskId, orderId: sale.orderId, linkCode: code, count: cart.length }); await writeText('.data/ofd_create_attempts.log', prev4 + line4 + '\n'); } catch {} return cart.map((c:any)=>{ const prod = products.find((p)=> (p.id && c?.id && String(p.id)===String(c.id)) || (p.title && c?.title && String(p.title).toLowerCase()===String(c.title).toLowerCase())) || null; return { label: String(c.title||''), price: Number(c.price||0), qty: Number(c.qty||1), vatRate: ((prod?.vat as any) || (usedVat as any)), unit: (prod?.unit as any), kind: (prod?.kind as any) } as any; }); } catch { try { const prev5 = (await readText('.data/ofd_create_attempts.log')) || ''; const line5 = JSON.stringify({ ts: new Date().toISOString(), src: 'postback', stage: 'items_link_fetch_failed', userId, taskId, orderId: sale.orderId }); await writeText('.data/ofd_create_attempts.log', prev5 + line5 + '\n'); } catch {} return undefined; } } catch { return undefined; } })();
+                      if (!Array.isArray(itemsParamA) || itemsParamA.length === 0) {
+                        try { const snap2 = (sale as any)?.itemsSnapshot as any[] | null; if (Array.isArray(snap2) && snap2.length > 0) { itemsParamA = snap2.map((it:any)=>({ label: String(it.title||''), price: Number(it.price||0), qty: Number(it.qty||1), vatRate: usedVat })); try { const prev = (await readText('.data/ofd_create_attempts.log')) || ''; const line = JSON.stringify({ ts: new Date().toISOString(), src: 'postback', stage: 'items_fallback_naive', party: 'partner', userId, taskId, orderId: sale.orderId, branch: 'prepay', count: itemsParamA.length }); await writeText('.data/ofd_create_attempts.log', prev + line + '\n'); } catch {} } } catch {}
+                      }
+                      try { const prev = (await readText('.data/ofd_create_attempts.log')) || ''; const line = JSON.stringify({ ts: new Date().toISOString(), src: 'postback', stage: 'items_final', party: 'partner', userId, taskId, orderId: sale.orderId, branch: 'prepay', count: Array.isArray(itemsParamA) ? itemsParamA.length : 0 }); await writeText('.data/ofd_create_attempts.log', prev + line + '\n'); } catch {}
                       const payload = buildFermaReceiptPayload({ party: 'partner', partyInn: partnerInn, description: 'Оплата услуг', amountRub: amountNet, vatRate: usedVat, methodCode: PAYMENT_METHOD_PREPAY_FULL, orderId: sale.orderId, docType: 'IncomePrepayment', buyerEmail: sale.clientEmail || defaultEmail, invoiceId: invoiceIdPrepay, callbackUrl, withPrepaymentItem: true, paymentAgentInfo: { AgentType: 'AGENT', SupplierInn: partnerInn, SupplierName: partnerName2 || 'Исполнитель' }, items: itemsParamA });
                       const created = await fermaCreateReceipt(payload, { baseUrl, authToken: tokenOfd });
                       try {
@@ -354,11 +410,14 @@ export async function POST(req: Request) {
               const orgData = orgInn ? await getOrgPayoutRequisites(orgInn) : { bik: null, account: null } as any;
               if (orgInn) {
                 const defaultEmail = process.env.OFD_DEFAULT_EMAIL || process.env.DEFAULT_RECEIPT_EMAIL || 'ofd@rockethumans.com';
-                if (isToday) {
-                  let invoiceIdFull = (sale as any).invoiceIdFull || null;
-                  if (!invoiceIdFull) {
-                    try { const num = Number(String(sale.orderId).match(/(\d+)/g)?.slice(-1)[0] || NaN); invoiceIdFull = await getInvoiceIdForFull(num); } catch {}
-                  }
+                const useFull = isToday;
+                try {
+                  const prev = (await readText('.data/ofd_create_attempts.log')) || '';
+                  const line = JSON.stringify({ ts: new Date().toISOString(), src: 'postback', stage: 'ofd_branch_choice', party: 'org', userId, taskId, orderId: sale.orderId, reason: useFull ? 'is_today' : 'not_today', fin, paidDateMsk, endDateMsk });
+                  await writeText('.data/ofd_create_attempts.log', prev + line + '\n');
+                } catch {}
+                if (useFull) {
+                  const invoiceIdFull = (sale as any).invoiceIdFull || null;
                   if (invoiceIdFull) {
                     try {
                       const prev = (await readText('.data/ofd_create_attempts.log')) || '';
@@ -383,7 +442,11 @@ export async function POST(req: Request) {
                         }
                       }
                     } catch {}
-                    const itemsParamOrg = await (async ()=>{ try { const snap = (sale as any)?.itemsSnapshot as any[] | null; const products = await listProductsForOrg(orgInn); const fromSnap = Array.isArray(snap) && snap.length>0 ? snap.map((it:any)=>{ const prod = products.find((p)=> (p.id && it?.id && String(p.id)===String(it.id)) || (p.title && it?.title && String(p.title).toLowerCase()===String(it.title).toLowerCase())) || null; const snapVat = (['none','0','5','7','10','20'].includes(String(it?.vat)) ? String(it.vat) : undefined) as any; return { label: String(it.title||''), price: Number(it.price||0), qty: Number(it.qty||1), vatRate: (snapVat || (prod?.vat as any) || (usedVat as any)), unit: (prod?.unit as any), kind: (prod?.kind as any) } as any; }) : []; if (fromSnap.length>0) return fromSnap; try { const prev = (await readText('.data/ofd_create_attempts.log')) || ''; const line = JSON.stringify({ ts: new Date().toISOString(), src: 'postback', stage: 'items_snapshot_empty', userId, taskId, orderId: sale.orderId }); await writeText('.data/ofd_create_attempts.log', prev + line + '\n'); } catch {} try { const code = (sale as any)?.linkCode ? String((sale as any).linkCode) : null; if (!code) { try { const prev2 = (await readText('.data/ofd_create_attempts.log')) || ''; const line2 = JSON.stringify({ ts: new Date().toISOString(), src: 'postback', stage: 'items_no_linkcode', userId, taskId, orderId: sale.orderId }); await writeText('.data/ofd_create_attempts.log', prev2 + line2 + '\n'); } catch {} return undefined; } const link = await (await fetch(new URL(`/api/links/${encodeURIComponent(code)}`, `${req.headers.get('x-forwarded-proto')||'http'}://${req.headers.get('x-forwarded-host')||req.headers.get('host')||'localhost:3000'}`).toString(), { cache: 'no-store', headers: { 'x-user-id': userId } })).json().catch(()=>null); const cart = Array.isArray(link?.cartItems) ? link.cartItems : []; if (cart.length===0) { try { const prev3 = (await readText('.data/ofd_create_attempts.log')) || ''; const line3 = JSON.stringify({ ts: new Date().toISOString(), src: 'postback', stage: 'items_link_cart_empty', userId, taskId, orderId: sale.orderId, linkCode: code }); await writeText('.data/ofd_create_attempts.log', prev3 + line3 + '\n'); } catch {} return undefined; } try { const prev4 = (await readText('.data/ofd_create_attempts.log')) || ''; const line4 = JSON.stringify({ ts: new Date().toISOString(), src: 'postback', stage: 'items_from_link', userId, taskId, orderId: sale.orderId, linkCode: code, count: cart.length }); await writeText('.data/ofd_create_attempts.log', prev4 + line4 + '\n'); } catch {} return cart.map((c:any)=>{ const prod = products.find((p)=> (p.id && c?.id && String(p.id)===String(c.id)) || (p.title && c?.title && String(p.title).toLowerCase()===String(c.title).toLowerCase())) || null; return { label: String(c.title||''), price: Number(c.price||0), qty: Number(c.qty||1), vatRate: ((prod?.vat as any) || (usedVat as any)), unit: (prod?.unit as any), kind: (prod?.kind as any) } as any; }); } catch { try { const prev5 = (await readText('.data/ofd_create_attempts.log')) || ''; const line5 = JSON.stringify({ ts: new Date().toISOString(), src: 'postback', stage: 'items_link_fetch_failed', userId, taskId, orderId: sale.orderId }); await writeText('.data/ofd_create_attempts.log', prev5 + line5 + '\n'); } catch {} return undefined; } } catch { return undefined; } })();
+                    let itemsParamOrg = await (async ()=>{ try { const snap = (sale as any)?.itemsSnapshot as any[] | null; const products = await listProductsForOrg(orgInn); const fromSnap = Array.isArray(snap) && snap.length>0 ? snap.map((it:any)=>{ const prod = products.find((p)=> (p.id && it?.id && String(p.id)===String(it.id)) || (p.title && it?.title && String(p.title).toLowerCase()===String(it.title).toLowerCase())) || null; const snapVat = (['none','0','5','7','10','20'].includes(String(it?.vat)) ? String(it.vat) : undefined) as any; return { label: String(it.title||''), price: Number(it.price||0), qty: Number(it.qty||1), vatRate: (snapVat || (prod?.vat as any) || (usedVat as any)), unit: (prod?.unit as any), kind: (prod?.kind as any) } as any; }) : []; if (fromSnap.length>0) return fromSnap; try { const prev = (await readText('.data/ofd_create_attempts.log')) || ''; const line = JSON.stringify({ ts: new Date().toISOString(), src: 'postback', stage: 'items_snapshot_empty', userId, taskId, orderId: sale.orderId }); await writeText('.data/ofd_create_attempts.log', prev + line + '\n'); } catch {} try { const code = (sale as any)?.linkCode ? String((sale as any).linkCode) : null; if (!code) { try { const prev2 = (await readText('.data/ofd_create_attempts.log')) || ''; const line2 = JSON.stringify({ ts: new Date().toISOString(), src: 'postback', stage: 'items_no_linkcode', userId, taskId, orderId: sale.orderId }); await writeText('.data/ofd_create_attempts.log', prev2 + line2 + '\n'); } catch {} return undefined; } const link = await (await fetch(new URL(`/api/links/${encodeURIComponent(code)}`, `${req.headers.get('x-forwarded-proto')||'http'}://${req.headers.get('x-forwarded-host')||req.headers.get('host')||'localhost:3000'}`).toString(), { cache: 'no-store', headers: { 'x-user-id': userId } })).json().catch(()=>null); const cart = Array.isArray(link?.cartItems) ? link.cartItems : []; if (cart.length===0) { try { const prev3 = (await readText('.data/ofd_create_attempts.log')) || ''; const line3 = JSON.stringify({ ts: new Date().toISOString(), src: 'postback', stage: 'items_link_cart_empty', userId, taskId, orderId: sale.orderId, linkCode: code }); await writeText('.data/ofd_create_attempts.log', prev3 + line3 + '\n'); } catch {} return undefined; } try { const prev4 = (await readText('.data/ofd_create_attempts.log')) || ''; const line4 = JSON.stringify({ ts: new Date().toISOString(), src: 'postback', stage: 'items_from_link', userId, taskId, orderId: sale.orderId, linkCode: code, count: cart.length }); await writeText('.data/ofd_create_attempts.log', prev4 + line4 + '\n'); } catch {} return cart.map((c:any)=>{ const prod = products.find((p)=> (p.id && c?.id && String(p.id)===String(c.id)) || (p.title && c?.title && String(p.title).toLowerCase()===String(c.title).toLowerCase())) || null; return { label: String(c.title||''), price: Number(c.price||0), qty: Number(c.qty||1), vatRate: ((prod?.vat as any) || (usedVat as any)), unit: (prod?.unit as any), kind: (prod?.kind as any) } as any; }); } catch { try { const prev5 = (await readText('.data/ofd_create_attempts.log')) || ''; const line5 = JSON.stringify({ ts: new Date().toISOString(), src: 'postback', stage: 'items_link_fetch_failed', userId, taskId, orderId: sale.orderId }); await writeText('.data/ofd_create_attempts.log', prev5 + line5 + '\n'); } catch {} return undefined; } } catch { return undefined; } })();
+                    if (!Array.isArray(itemsParamOrg) || itemsParamOrg.length === 0) {
+                      try { const snap2 = (sale as any)?.itemsSnapshot as any[] | null; if (Array.isArray(snap2) && snap2.length > 0) { itemsParamOrg = snap2.map((it:any)=>({ label: String(it.title||''), price: Number(it.price||0), qty: Number(it.qty||1), vatRate: usedVat })); try { const prev = (await readText('.data/ofd_create_attempts.log')) || ''; const line = JSON.stringify({ ts: new Date().toISOString(), src: 'postback', stage: 'items_fallback_naive', party: 'org', userId, taskId, orderId: sale.orderId, count: itemsParamOrg.length }); await writeText('.data/ofd_create_attempts.log', prev + line + '\n'); } catch {} } } catch {}
+                    }
+                    try { const prev = (await readText('.data/ofd_create_attempts.log')) || ''; const line = JSON.stringify({ ts: new Date().toISOString(), src: 'postback', stage: 'items_final', party: 'org', userId, taskId, orderId: sale.orderId, branch: 'full', count: Array.isArray(itemsParamOrg) ? itemsParamOrg.length : 0 }); await writeText('.data/ofd_create_attempts.log', prev + line + '\n'); } catch {}
                     const payload = buildFermaReceiptPayload({ party: 'org', partyInn: orgInn, description: 'Оплата услуг', amountRub: amountRub, vatRate: usedVat, methodCode: PAYMENT_METHOD_FULL_PAYMENT, orderId: sale.orderId, docType: 'Income', buyerEmail: sale.clientEmail || defaultEmail, invoiceId: invoiceIdFull, callbackUrl, paymentAgentInfo: { AgentType: 'AGENT', SupplierInn: orgInn, SupplierName: supplierName }, items: itemsParamOrg });
                     const created = await fermaCreateReceipt(payload, { baseUrl, authToken: tokenOfd });
                     try {
@@ -401,10 +464,7 @@ export async function POST(req: Request) {
                     } catch {}
                   }
                 } else {
-                  let invoiceIdPrepay = (sale as any).invoiceIdPrepay || null;
-                  if (!invoiceIdPrepay) {
-                    try { const num = Number(String(sale.orderId).match(/(\d+)/g)?.slice(-1)[0] || NaN); invoiceIdPrepay = await getInvoiceIdForPrepay(num); } catch {}
-                  }
+                  const invoiceIdPrepay = (sale as any).invoiceIdPrepay || null;
                   if (invoiceIdPrepay) {
                     try {
                       const prev = (await readText('.data/ofd_create_attempts.log')) || '';
@@ -429,7 +489,11 @@ export async function POST(req: Request) {
                         }
                       }
                     } catch {}
-                    const itemsParamAOrg = await (async ()=>{ try { const snap = (sale as any)?.itemsSnapshot as any[] | null; const products = await listProductsForOrg(orgInn); const fromSnap = Array.isArray(snap) && snap.length>0 ? snap.map((it:any)=>{ const prod = products.find((p)=> (p.id && it?.id && String(p.id)===String(it.id)) || (p.title && it?.title && String(p.title).toLowerCase()===String(it.title).toLowerCase())) || null; const snapVat = (['none','0','5','7','10','20'].includes(String(it?.vat)) ? String(it.vat) : undefined) as any; return { label: String(it.title||''), price: Number(it.price||0), qty: Number(it.qty||1), vatRate: (snapVat || (prod?.vat as any) || (usedVat as any)), unit: (prod?.unit as any), kind: (prod?.kind as any) } as any; }) : []; if (fromSnap.length>0) return fromSnap; try { const prev = (await readText('.data/ofd_create_attempts.log')) || ''; const line = JSON.stringify({ ts: new Date().toISOString(), src: 'postback', stage: 'items_snapshot_empty', userId, taskId, orderId: sale.orderId }); await writeText('.data/ofd_create_attempts.log', prev + line + '\n'); } catch {} try { const code = (sale as any)?.linkCode ? String((sale as any).linkCode) : null; if (!code) { try { const prev2 = (await readText('.data/ofd_create_attempts.log')) || ''; const line2 = JSON.stringify({ ts: new Date().toISOString(), src: 'postback', stage: 'items_no_linkcode', userId, taskId, orderId: sale.orderId }); await writeText('.data/ofd_create_attempts.log', prev2 + line2 + '\n'); } catch {} return undefined; } const link = await (await fetch(new URL(`/api/links/${encodeURIComponent(code)}`, `${req.headers.get('x-forwarded-proto')||'http'}://${req.headers.get('x-forwarded-host')||req.headers.get('host')||'localhost:3000'}`).toString(), { cache: 'no-store', headers: { 'x-user-id': userId } })).json().catch(()=>null); const cart = Array.isArray(link?.cartItems) ? link.cartItems : []; if (cart.length===0) { try { const prev3 = (await readText('.data/ofd_create_attempts.log')) || ''; const line3 = JSON.stringify({ ts: new Date().toISOString(), src: 'postback', stage: 'items_link_cart_empty', userId, taskId, orderId: sale.orderId, linkCode: code }); await writeText('.data/ofd_create_attempts.log', prev3 + line3 + '\n'); } catch {} return undefined; } try { const prev4 = (await readText('.data/ofd_create_attempts.log')) || ''; const line4 = JSON.stringify({ ts: new Date().toISOString(), src: 'postback', stage: 'items_from_link', userId, taskId, orderId: sale.orderId, linkCode: code, count: cart.length }); await writeText('.data/ofd_create_attempts.log', prev4 + line4 + '\n'); } catch {} return cart.map((c:any)=>{ const prod = products.find((p)=> (p.id && c?.id && String(p.id)===String(c.id)) || (p.title && c?.title && String(p.title).toLowerCase()===String(c.title).toLowerCase())) || null; return { label: String(c.title||''), price: Number(c.price||0), qty: Number(c.qty||1), vatRate: ((prod?.vat as any) || (usedVat as any)), unit: (prod?.unit as any), kind: (prod?.kind as any) } as any; }); } catch { try { const prev5 = (await readText('.data/ofd_create_attempts.log')) || ''; const line5 = JSON.stringify({ ts: new Date().toISOString(), src: 'postback', stage: 'items_link_fetch_failed', userId, taskId, orderId: sale.orderId }); await writeText('.data/ofd_create_attempts.log', prev5 + line5 + '\n'); } catch {} return undefined; } } catch { return undefined; } })();
+                    let itemsParamAOrg = await (async ()=>{ try { const snap = (sale as any)?.itemsSnapshot as any[] | null; const products = await listProductsForOrg(orgInn); const fromSnap = Array.isArray(snap) && snap.length>0 ? snap.map((it:any)=>{ const prod = products.find((p)=> (p.id && it?.id && String(p.id)===String(it.id)) || (p.title && it?.title && String(p.title).toLowerCase()===String(it.title).toLowerCase())) || null; const snapVat = (['none','0','5','7','10','20'].includes(String(it?.vat)) ? String(it.vat) : undefined) as any; return { label: String(it.title||''), price: Number(it.price||0), qty: Number(it.qty||1), vatRate: (snapVat || (prod?.vat as any) || (usedVat as any)), unit: (prod?.unit as any), kind: (prod?.kind as any) } as any; }) : []; if (fromSnap.length>0) return fromSnap; try { const prev = (await readText('.data/ofd_create_attempts.log')) || ''; const line = JSON.stringify({ ts: new Date().toISOString(), src: 'postback', stage: 'items_snapshot_empty', userId, taskId, orderId: sale.orderId }); await writeText('.data/ofd_create_attempts.log', prev + line + '\n'); } catch {} try { const code = (sale as any)?.linkCode ? String((sale as any).linkCode) : null; if (!code) { try { const prev2 = (await readText('.data/ofd_create_attempts.log')) || ''; const line2 = JSON.stringify({ ts: new Date().toISOString(), src: 'postback', stage: 'items_no_linkcode', userId, taskId, orderId: sale.orderId }); await writeText('.data/ofd_create_attempts.log', prev2 + line2 + '\n'); } catch {} return undefined; } const link = await (await fetch(new URL(`/api/links/${encodeURIComponent(code)}`, `${req.headers.get('x-forwarded-proto')||'http'}://${req.headers.get('x-forwarded-host')||req.headers.get('host')||'localhost:3000'}`).toString(), { cache: 'no-store', headers: { 'x-user-id': userId } })).json().catch(()=>null); const cart = Array.isArray(link?.cartItems) ? link.cartItems : []; if (cart.length===0) { try { const prev3 = (await readText('.data/ofd_create_attempts.log')) || ''; const line3 = JSON.stringify({ ts: new Date().toISOString(), src: 'postback', stage: 'items_link_cart_empty', userId, taskId, orderId: sale.orderId, linkCode: code }); await writeText('.data/ofd_create_attempts.log', prev3 + line3 + '\n'); } catch {} return undefined; } try { const prev4 = (await readText('.data/ofd_create_attempts.log')) || ''; const line4 = JSON.stringify({ ts: new Date().toISOString(), src: 'postback', stage: 'items_from_link', userId, taskId, orderId: sale.orderId, linkCode: code, count: cart.length }); await writeText('.data/ofd_create_attempts.log', prev4 + line4 + '\n'); } catch {} return cart.map((c:any)=>{ const prod = products.find((p)=> (p.id && c?.id && String(p.id)===String(c.id)) || (p.title && c?.title && String(p.title).toLowerCase()===String(c.title).toLowerCase())) || null; return { label: String(c.title||''), price: Number(c.price||0), qty: Number(c.qty||1), vatRate: ((prod?.vat as any) || (usedVat as any)), unit: (prod?.unit as any), kind: (prod?.kind as any) } as any; }); } catch { try { const prev5 = (await readText('.data/ofd_create_attempts.log')) || ''; const line5 = JSON.stringify({ ts: new Date().toISOString(), src: 'postback', stage: 'items_link_fetch_failed', userId, taskId, orderId: sale.orderId }); await writeText('.data/ofd_create_attempts.log', prev5 + line5 + '\n'); } catch {} return undefined; } } catch { return undefined; } })();
+                    if (!Array.isArray(itemsParamAOrg) || itemsParamAOrg.length === 0) {
+                      try { const snap2 = (sale as any)?.itemsSnapshot as any[] | null; if (Array.isArray(snap2) && snap2.length > 0) { itemsParamAOrg = snap2.map((it:any)=>({ label: String(it.title||''), price: Number(it.price||0), qty: Number(it.qty||1), vatRate: usedVat })); try { const prev = (await readText('.data/ofd_create_attempts.log')) || ''; const line = JSON.stringify({ ts: new Date().toISOString(), src: 'postback', stage: 'items_fallback_naive', party: 'org', userId, taskId, orderId: sale.orderId, branch: 'prepay', count: itemsParamAOrg.length }); await writeText('.data/ofd_create_attempts.log', prev + line + '\n'); } catch {} } } catch {}
+                    }
+                    try { const prev = (await readText('.data/ofd_create_attempts.log')) || ''; const line = JSON.stringify({ ts: new Date().toISOString(), src: 'postback', stage: 'items_final', party: 'org', userId, taskId, orderId: sale.orderId, branch: 'prepay', count: Array.isArray(itemsParamAOrg) ? itemsParamAOrg.length : 0 }); await writeText('.data/ofd_create_attempts.log', prev + line + '\n'); } catch {}
                     const payload = buildFermaReceiptPayload({ party: 'org', partyInn: orgInn, description: 'Оплата услуг', amountRub: amountRub, vatRate: usedVat, methodCode: PAYMENT_METHOD_PREPAY_FULL, orderId: sale.orderId, docType: 'IncomePrepayment', buyerEmail: sale.clientEmail || defaultEmail, invoiceId: invoiceIdPrepay, callbackUrl, withPrepaymentItem: true, paymentAgentInfo: { AgentType: 'AGENT', SupplierInn: orgInn, SupplierName: supplierName2 }, items: itemsParamAOrg });
                     const created = await fermaCreateReceipt(payload, { baseUrl, authToken: tokenOfd });
                     try {
@@ -518,18 +582,15 @@ export async function POST(req: Request) {
                 const retained = Number(sale.retainedCommissionRub || 0);
                 const amountNet = Math.max(0, amountRub - retained);
                 const usedVat = (sale.vatRate || 'none') as any;
-                const createdAt = (sale as any).createdAtRw || (sale as any).createdAt;
-                const createdDate = createdAt ? String(createdAt).slice(0, 10) : null;
+                // MSK-aware comparison: paid date vs service end date
+                const paidIso2 = (sale as any)?.paidAt ? String((sale as any).paidAt) : new Date().toISOString();
                 const endDate = sale.serviceEndDate || null;
-                const isToday = Boolean(createdDate && endDate && createdDate === endDate);
+                const isToday = Boolean(ymdMoscow(paidIso2) && ymdMoscow(endDate ? `${endDate}T00:00:00Z` : null) && ymdMoscow(paidIso2) === ymdMoscow(endDate ? `${endDate}T00:00:00Z` : null));
                 const callbackUrl = `${callbackBase}/api/ofd/ferma/callback${secret ? `?secret=${encodeURIComponent(secret)}&` : '?'}uid=${encodeURIComponent(userId)}`;
                 const itemsParam = await (async ()=>{ try { const snap = (sale as any)?.itemsSnapshot as any[] | null; if (!Array.isArray(snap) || snap.length === 0) return undefined; const orgInn = (sale as any)?.orgInn ? String((sale as any).orgInn).replace(/\D/g,'') : undefined; const products = orgInn ? await listProductsForOrg(orgInn) : []; return snap.map((it:any)=>{ const prod = products.find((p)=> (p.id && it?.id && String(p.id)===String(it.id)) || (p.title && it?.title && String(p.title).toLowerCase()===String(it.title).toLowerCase())) || null; const snapVat = (['none','0','5','7','10','20'].includes(String(it?.vat)) ? String(it.vat) : undefined) as any; return { label: String(it.title||''), price: Number(it.price||0), qty: Number(it.qty||1), vatRate: (snapVat || (prod?.vat as any) || (usedVat as any)), unit: (prod?.unit as any), kind: (prod?.kind as any) } as any; }); } catch { return undefined; } })();
                 const defaultEmail = process.env.OFD_DEFAULT_EMAIL || process.env.DEFAULT_RECEIPT_EMAIL || 'ofd@rockethumans.com';
                 if (isToday) {
-                  let invoiceIdFull = (sale as any).invoiceIdFull || null;
-                  if (!invoiceIdFull) {
-                    try { const num = Number(String(sale.orderId).match(/(\d+)/g)?.slice(-1)[0] || NaN); invoiceIdFull = await getInvoiceIdForFull(num); } catch {}
-                  }
+                  const invoiceIdFull = (sale as any).invoiceIdFull || null;
                   if (invoiceIdFull) {
                     const payload = buildFermaReceiptPayload({ party: 'partner', partyInn: innNow, description: 'Оплата услуг', amountRub: amountNet, vatRate: usedVat, methodCode: PAYMENT_METHOD_FULL_PAYMENT, orderId: sale.orderId, docType: 'Income', buyerEmail: sale.clientEmail || defaultEmail, invoiceId: invoiceIdFull, callbackUrl, paymentAgentInfo: { AgentType: 'AGENT', SupplierInn: innNow, SupplierName: 'Исполнитель' }, items: itemsParam });
                     const created = await fermaCreateReceipt(payload, { baseUrl, authToken: tokenOfd });
@@ -537,11 +598,13 @@ export async function POST(req: Request) {
                     await updateSaleOfdUrlsByOrderId(userId, numOrder, { ofdFullId: created.id || null });
                   }
                 } else {
-                  let invoiceIdPrepay = (sale as any).invoiceIdPrepay || null;
-                  if (!invoiceIdPrepay) {
-                    try { const num = Number(String(sale.orderId).match(/(\d+)/g)?.slice(-1)[0] || NaN); invoiceIdPrepay = await getInvoiceIdForPrepay(num); } catch {}
-                  }
-                  if (invoiceIdPrepay) {
+                  const invoiceIdPrepay = (sale as any).invoiceIdPrepay || null;
+                  // Extra guard: do not create prepay if full receipt already exists OR paid date equals service date in MSK
+                  const hasFullAlready = Boolean((sale as any)?.ofdFullUrl || (sale as any)?.ofdFullId);
+                  const paidIsoMsk = (sale as any)?.paidAt ? String((sale as any).paidAt) : new Date().toISOString();
+                  const endDateMsk = sale.serviceEndDate || null;
+                  const equalMsk = Boolean(ymdMoscow(paidIsoMsk) && ymdMoscow(endDateMsk ? `${endDateMsk}T00:00:00Z` : null) && ymdMoscow(paidIsoMsk) === ymdMoscow(endDateMsk ? `${endDateMsk}T00:00:00Z` : null));
+                  if (invoiceIdPrepay && !hasFullAlready && !equalMsk) {
                     const payload = buildFermaReceiptPayload({ party: 'partner', partyInn: innNow, description: 'Оплата услуг', amountRub: amountNet, vatRate: usedVat, methodCode: PAYMENT_METHOD_PREPAY_FULL, orderId: sale.orderId, docType: 'IncomePrepayment', buyerEmail: sale.clientEmail || defaultEmail, invoiceId: invoiceIdPrepay, callbackUrl, withPrepaymentItem: true, paymentAgentInfo: { AgentType: 'AGENT', SupplierInn: innNow, SupplierName: 'Исполнитель' }, items: itemsParam });
                     const created = await fermaCreateReceipt(payload, { baseUrl, authToken: tokenOfd });
                     const numOrder = Number(String(sale.orderId).match(/(\d+)/g)?.slice(-1)[0] || NaN);

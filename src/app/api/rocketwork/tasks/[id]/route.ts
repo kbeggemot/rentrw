@@ -204,8 +204,8 @@ export async function GET(_: Request) {
               if (sale.isAgent) {
                 const partnerInn: string | undefined = (normalized as any)?.executor?.inn as string | undefined;
                 if (partnerInn) {
-                  const { getInvoiceIdForFull } = await import('@/server/orderStore');
-                  const invoiceIdFull = await getInvoiceIdForFull(Number(String(sale.orderId).match(/(\d+)/g)?.slice(-1)[0] || NaN));
+                  const invoiceIdFull = (sale as any).invoiceIdFull || null;
+                  if (!invoiceIdFull) return NextResponse.json({ ok: true });
                   const partnerName = ((normalized as any)?.executor && [
                     (normalized as any)?.executor?.last_name,
                     (normalized as any)?.executor?.first_name,
@@ -220,8 +220,8 @@ export async function GET(_: Request) {
                 const orgInn = await getUserOrgInn(userId);
                 const orgDataReq = orgInn ? await getOrgPayoutRequisites(orgInn) : { bik: null, account: null };
                 if (orgInn) {
-                  const { getInvoiceIdForFull } = await import('@/server/orderStore');
-                  const invoiceIdFull = await getInvoiceIdForFull(Number(String(sale.orderId).match(/(\d+)/g)?.slice(-1)[0] || NaN));
+                  const invoiceIdFull = (sale as any).invoiceIdFull || null;
+                  if (!invoiceIdFull) return NextResponse.json({ ok: true });
                   const bEmail = sale.clientEmail || (normalized as any)?.acquiring_order?.client_email || defaultEmail;
                   let supplierNameOrg: string | undefined;
                   try {
@@ -253,8 +253,8 @@ export async function GET(_: Request) {
               if (sale.isAgent) {
                 const partnerInn: string | undefined = (normalized as any)?.executor?.inn as string | undefined;
                 if (partnerInn) {
-                  const { getInvoiceIdForPrepay } = await import('@/server/orderStore');
-                  const invoiceIdFull = await getInvoiceIdForPrepay(Number(String(sale.orderId).match(/(\d+)/g)?.slice(-1)[0] || NaN));
+                  const invoiceIdFull = (sale as any).invoiceIdPrepay || null;
+                  if (!invoiceIdFull) return NextResponse.json({ ok: true });
                   const partnerName2 = ((normalized as any)?.executor && [
                     (normalized as any)?.executor?.last_name,
                     (normalized as any)?.executor?.first_name,
@@ -269,8 +269,8 @@ export async function GET(_: Request) {
                 const orgInn = await getUserOrgInn(userId);
                 const orgDataReq2 = orgInn ? await getOrgPayoutRequisites(orgInn) : { bik: null, account: null };
                 if (orgInn) {
-                  const { getInvoiceIdForPrepay } = await import('@/server/orderStore');
-                  const invoiceIdFull = await getInvoiceIdForPrepay(Number(String(sale.orderId).match(/(\d+)/g)?.slice(-1)[0] || NaN));
+                  const invoiceIdFull = (sale as any).invoiceIdPrepay || null;
+                  if (!invoiceIdFull) return NextResponse.json({ ok: true });
                   const bEmail = sale.clientEmail || (normalized as any)?.acquiring_order?.client_email || defaultEmail;
                   let supplierNameOrg2: string | undefined;
                   try {
