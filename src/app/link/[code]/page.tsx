@@ -599,7 +599,15 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
     if (pollRef.current) return;
     const tick = async () => {
       try {
-        const r = await fetch(`/api/rocketwork/tasks/${encodeURIComponent(String(uid))}?t=${Date.now()}`, { cache: 'no-store', headers: data?.userId ? { 'x-user-id': data.userId } as any : undefined });
+        const r = await fetch(`/api/rocketwork/tasks/${encodeURIComponent(String(uid))}?t=${Date.now()}`, {
+          cache: 'no-store',
+          headers: (() => {
+            const h: Record<string, string> = {};
+            if (data?.userId) h['x-user-id'] = String(data.userId);
+            try { const inn = (data as any)?.orgInn ? String((data as any).orgInn).replace(/\D/g,'') : ''; if (inn) h['x-org-inn'] = inn; } catch {}
+            return h as any;
+          })(),
+        });
         const t = await r.json();
         const aoStatus = String((t?.acquiring_order?.status || t?.task?.acquiring_order?.status || '')).toLowerCase();
         if (aoStatus) setIsFinal(['paid', 'transfered', 'transferred'].includes(aoStatus));
@@ -653,7 +661,15 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
     if (payUrlPollRef.current) return;
     const tick = async () => {
       try {
-        const r = await fetch(`/api/rocketwork/task-status/${encodeURIComponent(String(uid))}`, { cache: 'no-store', headers: data?.userId ? { 'x-user-id': data.userId } as any : undefined });
+        const r = await fetch(`/api/rocketwork/task-status/${encodeURIComponent(String(uid))}`, {
+          cache: 'no-store',
+          headers: (() => {
+            const h: Record<string, string> = {};
+            if (data?.userId) h['x-user-id'] = String(data.userId);
+            try { const inn = (data as any)?.orgInn ? String((data as any).orgInn).replace(/\D/g,'') : ''; if (inn) h['x-org-inn'] = inn; } catch {}
+            return h as any;
+          })(),
+        });
         const t = await r.json();
         const ao = (t && (t.acquiring_order || (t.task && t.task.acquiring_order))) || null;
         const url = ao?.url || ao?.payment_url || null;
@@ -779,7 +795,16 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
         payerTgLastName: (tgMeta.last_name ?? undefined),
         payerTgUsername: (tgMeta.username ?? undefined),
       };
-      const res = await fetch('/api/rocketwork/tasks', { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-user-id': data.userId }, body: JSON.stringify(body) });
+      const res = await fetch('/api/rocketwork/tasks', {
+        method: 'POST',
+        headers: (() => {
+          const h: Record<string, string> = { 'Content-Type': 'application/json' };
+          if (data?.userId) h['x-user-id'] = String(data.userId);
+          try { const inn = (data as any)?.orgInn ? String((data as any).orgInn).replace(/\D/g,'') : ''; if (inn) h['x-org-inn'] = inn; } catch {}
+          return h as any;
+        })(),
+        body: JSON.stringify(body)
+      });
       const txt = await res.text();
       const d = txt ? JSON.parse(txt) : {};
       if (!res.ok) {
