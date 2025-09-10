@@ -13,9 +13,45 @@ export async function GET(req: Request) {
     const categories = await listCategoriesForOrg(orgInn);
     return NextResponse.json({ categories });
   }
-  const items = await listProductsForOrg(orgInn);
+  const hasLimit = url.searchParams.has('limit');
+  const cursor = url.searchParams.get('cursor'); // createdAt|id
+  const all = await listProductsForOrg(orgInn); // sorted desc by createdAt
+  if (!hasLimit && !cursor) {
+    const categories = await listCategoriesForOrg(orgInn);
+    return NextResponse.json({ items: all, categories });
+  }
+  let limit = Number(url.searchParams.get('limit'));
+  if (!Number.isFinite(limit) || limit <= 0) limit = 15;
+  if (limit > 200) limit = 200;
+  let startIndex = 0;
+  if (cursor) {
+    const [curAt, curId] = cursor.split('|');
+    const exactIdx = all.findIndex((x) => String(x.id) === String(curId) && String(x.createdAt) === String(curAt));
+    if (exactIdx !== -1) startIndex = exactIdx + 1;
+    else if (curAt) {
+      const curTs = Date.parse(curAt);
+      startIndex = all.findIndex((x) => {
+        const ts = Date.parse(x.createdAt);
+        if (!Number.isNaN(ts) && !Number.isNaN(curTs)) {
+          if (ts < curTs) return true;
+          if (ts === curTs) return String(x.id) < String(curId);
+          return false;
+        }
+        if (x.createdAt < curAt) return true;
+        if (x.createdAt === curAt) return String(x.id) < String(curId);
+        return false;
+      });
+      if (startIndex === -1) startIndex = all.length;
+    }
+  }
+  const items = all.slice(startIndex, startIndex + limit);
+  let nextCursor: string | null = null;
+  if (startIndex + limit < all.length && items.length > 0) {
+    const last = items[items.length - 1];
+    nextCursor = `${last.createdAt}|${last.id}`;
+  }
   const categories = await listCategoriesForOrg(orgInn);
-  return NextResponse.json({ items, categories });
+  return NextResponse.json({ items, nextCursor, categories });
 }
 
 export async function POST(req: Request) {

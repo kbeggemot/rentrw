@@ -13,27 +13,44 @@ type Item = {
   vat: 'none' | '0' | '5' | '7' | '10' | '20';
   sku?: string | null;
   instantResult?: string | null;
+  createdAt?: string;
 };
 
 export default function ProductsTable({ initialItems }: { initialItems: Item[] }) {
   const [items, setItems] = useState<Item[]>(Array.isArray(initialItems) ? initialItems : []);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [total, setTotal] = useState<number | null>(null);
+  const [loading, setLoading] = useState(false);
   // SWR-lite: hydrate from localStorage cache first, then revalidate in background
   useEffect(() => {
     try {
       const raw = localStorage.getItem('products_cache_v1');
-      const arr = raw ? JSON.parse(raw) : null;
-      if (Array.isArray(arr) && arr.length > 0) setItems(arr);
+      if (raw) {
+        try {
+          const parsed = JSON.parse(raw);
+          const arr = Array.isArray(parsed?.items) ? parsed.items : (Array.isArray(parsed) ? parsed : []);
+          const nc = typeof parsed?.nextCursor === 'string' ? parsed.nextCursor : null;
+          if (Array.isArray(arr) && arr.length > 0) { setItems(arr); setNextCursor(nc); }
+        } catch {}
+      }
     } catch {}
   }, []);
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        const r = await fetch('/api/products', { next: { revalidate: 5 } as any });
+        // meta first
+        try {
+          const m = await fetch('/api/products/meta', { cache: 'no-store' });
+          const md = await m.json();
+          if (typeof md?.total === 'number') setTotal(md.total);
+        } catch {}
+        const r = await fetch('/api/products?limit=15', { cache: 'no-store' });
         const d = await r.json();
         const arr: Item[] = Array.isArray(d?.items) ? d.items : [];
-        if (!cancelled) setItems(arr);
-        try { localStorage.setItem('products_cache_v1', JSON.stringify(arr)); } catch {}
+        const nc = typeof d?.nextCursor === 'string' && d.nextCursor.length > 0 ? String(d.nextCursor) : null;
+        if (!cancelled) { setItems(arr); setNextCursor(nc); }
+        try { localStorage.setItem('products_cache_v1', JSON.stringify({ items: arr, nextCursor: nc })); } catch {}
       } catch {}
     })();
     return () => { cancelled = true; };
@@ -52,10 +69,36 @@ export default function ProductsTable({ initialItems }: { initialItems: Item[] }
         showToast('Не удалось удалить', 'error');
         return;
       }
-      setItems((prev) => prev.filter((i) => i.id !== id));
+      setItems((prev) => {
+        const next = prev.filter((i) => i.id !== id);
+        try { localStorage.setItem('products_cache_v1', JSON.stringify({ items: next, nextCursor })); } catch {}
+        return next;
+      });
       showToast('Удалено', 'success');
     } catch {
       showToast('Не удалось удалить', 'error');
+    }
+  };
+
+  const loadMore = async () => {
+    if (!nextCursor) return;
+    setLoading(true);
+    try {
+      const r = await fetch(`/api/products?limit=15&cursor=${encodeURIComponent(nextCursor)}`, { cache: 'no-store' });
+      const d = await r.json();
+      const list: Item[] = Array.isArray(d?.items) ? d.items : [];
+      const nc = typeof d?.nextCursor === 'string' && d.nextCursor.length > 0 ? String(d.nextCursor) : null;
+      setNextCursor(nc);
+      setItems((prev) => {
+        const map = new Map<string, Item>();
+        for (const it of prev) map.set(String(it.id), it);
+        for (const it of list) map.set(String(it.id), it);
+        const merged = Array.from(map.values()).sort((a: any, b: any) => (a.createdAt < (b as any).createdAt ? 1 : -1));
+        try { localStorage.setItem('products_cache_v1', JSON.stringify({ items: merged, nextCursor: nc })); } catch {}
+        return merged;
+      });
+    } catch {} finally {
+      setLoading(false);
     }
   };
 
@@ -148,6 +191,12 @@ export default function ProductsTable({ initialItems }: { initialItems: Item[] }
             )}
           </tbody>
         </table>
+      </div>
+      <div className="mt-3 flex items-center justify-between text-sm">
+        <div className="text-gray-600 dark:text-gray-400">Строк: {items.length}{typeof total === 'number' ? ` из ${total}` : ''}</div>
+        {nextCursor ? (
+          <Button variant="secondary" onClick={loadMore} disabled={loading}>{loading ? 'Загрузка…' : 'Показать ещё'}</Button>
+        ) : null}
       </div>
       {toast ? (
         <div className={`fixed bottom-4 right-4 z-50 px-4 py-3 rounded-md shadow-lg text-sm ${toast.kind === 'success' ? 'bg-green-600 text-white' : 'bg-red-600 text-white'}`}>

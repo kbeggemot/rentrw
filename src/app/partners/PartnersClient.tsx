@@ -219,10 +219,10 @@ export default function PartnersClient({ initial, hasTokenInitial }: { initial: 
 
       {/* Mobile cards */}
       <div className="md:hidden space-y-3">
-        {paged.length === 0 ? (
+        {filtered.length === 0 ? (
           <div className="text-center text-gray-500 border rounded-lg p-4 bg-white dark:bg-gray-950">Нет партнёров</div>
         ) : (
-          paged.map((p) => (
+          filtered.map((p) => (
             <div key={p.phone} className="border border-gray-200 dark:border-gray-800 rounded-lg bg-white dark:bg-gray-950 p-3">
               <div className="grid grid-cols-[7.25rem_1fr] gap-x-2 gap-y-1 text-[13px] leading-tight">
                 <div className="text-xs text-gray-500">Телефон</div>
@@ -254,7 +254,7 @@ export default function PartnersClient({ initial, hasTokenInitial }: { initial: 
               <tr>
                 <td colSpan={4} className="px-3 py-6 text-center text-gray-500">Нет партнёров</td>
               </tr>
-            ) : paged.map((p) => (
+            ) : filtered.map((p) => (
               <tr key={p.phone} className="border-t border-gray-100 dark:border-gray-800">
                 <td className="px-3 py-2">{formatPhoneForDisplay(p.phone)}</td>
                 <td className="px-3 py-2">{p.fio ?? '-'}</td>

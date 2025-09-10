@@ -16,7 +16,8 @@ export default async function PartnersPage() {
       hasToken = false;
     }
   }
-  const partners = (userId && hasToken) ? (inn ? await listPartnersForOrg(userId, inn) : await listPartnersStore(userId)) : [];
+  // Единая логика с «Продажи»: не тянем тяжёлый список на SSR — клиент загрузит meta→15→ещё
+  const partners: any[] = [];
   return (
     <div className="max-w-3xl mx-auto pt-0 pb-4">
       <header className="mb-4">

@@ -19,6 +19,7 @@ export default function LinksStandalonePage() {
   const [linksOpen, setLinksOpen] = useState(true);
   const [menuOpenCode, setMenuOpenCode] = useState<string | null>(null);
   const [menuPos, setMenuPos] = useState<{ top: number; left: number } | null>(null);
+  const [total, setTotal] = useState<number | null>(null);
 
   // Глобальное закрытие контекстного меню по клику вне
   useEffect(() => {
@@ -38,13 +39,18 @@ export default function LinksStandalonePage() {
 
   const refreshLinks = async () => {
     try {
-      const r = await fetch('/api/links?limit=50', { cache: 'no-store' });
+      try {
+        const m = await fetch('/api/links/meta', { cache: 'no-store' });
+        const md = await m.json();
+        if (typeof md?.total === 'number') setTotal(md.total);
+      } catch {}
+      const r = await fetch('/api/links?limit=15', { cache: 'no-store' });
       const d = await r.json();
       const list = Array.isArray(d?.items) ? d.items.map((x: any) => ({ code: x.code, title: x.title, createdAt: x.createdAt })) : [];
       const nc = typeof d?.nextCursor === 'string' && d.nextCursor.length > 0 ? String(d.nextCursor) : null;
       setNextCursor(nc);
       setLinks((prev) => (JSON.stringify(prev) === JSON.stringify(list) ? prev : list));
-      try { localStorage.setItem('links_cache_v1', JSON.stringify({ items: list })); } catch {}
+      try { localStorage.setItem('links_cache_v1', JSON.stringify({ items: list, nextCursor: nc })); } catch {}
     } catch {}
   };
 
@@ -52,7 +58,7 @@ export default function LinksStandalonePage() {
     if (!nextCursor) return;
     setLoading(true);
     try {
-      const r = await fetch(`/api/links?limit=50&cursor=${encodeURIComponent(nextCursor)}`, { cache: 'no-store' });
+      const r = await fetch(`/api/links?limit=15&cursor=${encodeURIComponent(nextCursor)}`, { cache: 'no-store' });
       const d = await r.json();
       const list = Array.isArray(d?.items) ? d.items.map((x: any) => ({ code: x.code, title: x.title, createdAt: x.createdAt })) : [];
       const nc = typeof d?.nextCursor === 'string' && d.nextCursor.length > 0 ? String(d.nextCursor) : null;
@@ -62,7 +68,7 @@ export default function LinksStandalonePage() {
         for (const it of prev) map.set(it.code, it);
         for (const it of list) map.set(it.code, it);
         const merged = Array.from(map.values());
-        try { localStorage.setItem('links_cache_v1', JSON.stringify({ items: merged })); } catch {}
+        try { localStorage.setItem('links_cache_v1', JSON.stringify({ items: merged, nextCursor: nc })); } catch {}
         return merged;
       });
     } catch {}
@@ -76,8 +82,10 @@ export default function LinksStandalonePage() {
         try {
           const parsed = JSON.parse(raw);
           const list = Array.isArray(parsed?.items) ? parsed.items : (Array.isArray(parsed) ? parsed : []);
+          const nc = typeof parsed?.nextCursor === 'string' ? parsed.nextCursor : null;
           if (Array.isArray(list) && list.length > 0) {
             setLinks((prev) => (JSON.stringify(prev) === JSON.stringify(list) ? prev : list));
+            setNextCursor(nc);
           }
         } catch {}
       }
@@ -181,6 +189,7 @@ export default function LinksStandalonePage() {
             </div>
           ) : null}
         </div>
+        <div className="mt-2 text-xs text-gray-500">Строк: {links.length}{typeof total === 'number' ? ` из ${total}` : ''}</div>
         {nextCursor ? (
           <div className="mt-3">
             <Button variant="secondary" fullWidth onClick={loadMore} disabled={loading}>{loading ? 'Загрузка…' : 'Показать ещё'}</Button>

@@ -89,7 +89,7 @@ export async function GET(req: Request) {
       const last = pageItems[pageItems.length - 1];
       nextCursor = `${last.createdAt}|${last.taskId}`;
     }
-    return NextResponse.json({ items: pageItems, nextCursor });
+    return NextResponse.json({ items: pageItems, nextCursor }, { status: 200 });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Server error';
     return NextResponse.json({ error: message }, { status: 500 });

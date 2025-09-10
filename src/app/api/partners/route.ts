@@ -61,7 +61,8 @@ export async function GET(req: Request) {
       const last = items[items.length - 1];
       nextCursor = `${last.updatedAt || last.createdAt}|${last.phone}`;
     }
-    return NextResponse.json({ items, nextCursor }, { status: 200 });
+    // Back-compat: also return 'partners' for existing clients
+    return NextResponse.json({ items, nextCursor, partners: items }, { status: 200 });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Server error';
     return NextResponse.json({ error: message }, { status: 500 });
