@@ -173,8 +173,6 @@ export default function SalesClient({ initial, hasTokenInitial }: { initial: Sal
         // Серверная фильтрация + пагинация
         try {
           const sp = buildFilterQuery();
-          // Для активных фильтров не ограничиваем выборку на сервере
-          if (hasActiveFilter) sp.delete('limit');
           const r = await fetch(`/api/sales?${sp.toString()}`, { cache: 'no-store', credentials: 'include' });
           const d = await r.json();
           const list = Array.isArray(d?.sales) ? d.sales : [];

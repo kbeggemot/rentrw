@@ -32,6 +32,24 @@ export async function GET(req: Request) {
     const userId = getUserIdMeta(req);
     if (!userId) return NextResponse.json({ error: 'NO_USER' }, { status: 401 });
     const url = new URL(req.url);
+    // Фильтры как и в /api/sales
+    const filter = {
+      query: (url.searchParams.get('q') || '').trim(),
+      status: (url.searchParams.get('status') || '').trim(),
+      agent: url.searchParams.get('agent'),
+      prepay: url.searchParams.get('prepay'),
+      full: url.searchParams.get('full'),
+      commission: url.searchParams.get('commission'),
+      npd: url.searchParams.get('npd'),
+      showHidden: url.searchParams.get('showHidden') || 'no',
+      saleFrom: url.searchParams.get('saleFrom'),
+      saleTo: url.searchParams.get('saleTo'),
+      endFrom: url.searchParams.get('endFrom'),
+      endTo: url.searchParams.get('endTo'),
+      amountMin: url.searchParams.get('amountMin'),
+      amountMax: url.searchParams.get('amountMax'),
+    } as const;
+    const hasAnyFilter = [filter.query, filter.status, filter.agent, filter.prepay, filter.full, filter.commission, filter.npd, filter.saleFrom, filter.saleTo, filter.endFrom, filter.endTo, filter.amountMin, filter.amountMax].some((v) => v && String(v).trim().length > 0) || filter.showHidden === 'yes';
     const onlySuccess = url.searchParams.get('success') === '1';
     const limitRaw = url.searchParams.get('limit');
     const offsetRaw = url.searchParams.get('offset');
@@ -44,8 +62,50 @@ export async function GET(req: Request) {
     if (inn) rows = await readOrgIndex(inn);
     if (!rows || rows.length === 0) rows = await readUserIndex(userId) as unknown as Row[];
     rows = Array.isArray(rows) ? rows.slice() : [];
-    // Если режим "все данные" не включён — при наличии orgIndex отфильтруем по userId
-    if (inn && !showAll) rows = rows.filter((r: any) => String(r?.userId || '') === String(userId));
+    // Если режим "все данные" не включён — при наличии orgIndex отфильтруем по userId только когда можем (если поле есть). В остальном — проверим при чтении файла
+    if (inn && !showAll && rows.length > 0 && (rows[0] as any)?.userId) rows = rows.filter((r: any) => String(r?.userId || '') === String(userId));
+
+    const saleMatches = (s: any): boolean => {
+      if (filter.showHidden !== 'all') {
+        const isHidden = Boolean(s.hidden);
+        if (filter.showHidden === 'no' && isHidden) return false;
+        if (filter.showHidden === 'yes' && !isHidden) return false;
+      }
+      if (filter.query) {
+        const q = filter.query;
+        if (!(String(s.taskId).includes(q) || String(s.orderId).includes(q))) return false;
+      }
+      if (filter.status) {
+        const st = String(s.status || '').toLowerCase();
+        if (st !== String(filter.status).toLowerCase()) return false;
+      }
+      if (filter.agent === 'yes' && !s.isAgent) return false;
+      if (filter.agent === 'no' && s.isAgent) return false;
+      const hasPrepay = Boolean(s.ofdUrl);
+      const hasFull = Boolean(s.ofdFullUrl);
+      const hasComm = Boolean(s.additionalCommissionOfdUrl);
+      const hasNpd = Boolean(s.npdReceiptUri);
+      if (filter.prepay === 'yes' && !hasPrepay) return false; if (filter.prepay === 'no' && hasPrepay) return false;
+      if (filter.full === 'yes' && !hasFull) return false; if (filter.full === 'no' && hasFull) return false;
+      if (filter.commission === 'yes' && !hasComm) return false; if (filter.commission === 'no' && hasComm) return false;
+      if (filter.npd === 'yes' && !hasNpd) return false; if (filter.npd === 'no' && hasNpd) return false;
+      if (filter.saleFrom || filter.saleTo) {
+        const base = s.createdAtRw || s.createdAt;
+        const ts = base ? Date.parse(base) : NaN;
+        if (filter.saleFrom && !(Number.isFinite(ts) && ts >= Date.parse(String(filter.saleFrom)))) return false;
+        if (filter.saleTo && !(Number.isFinite(ts) && ts <= (Date.parse(String(filter.saleTo)) + 24*60*60*1000 - 1))) return false;
+      }
+      if (filter.endFrom || filter.endTo) {
+        const e = s.serviceEndDate ? Date.parse(String(s.serviceEndDate)) : NaN;
+        if (filter.endFrom && !(Number.isFinite(e) && e >= Date.parse(String(filter.endFrom)))) return false;
+        if (filter.endTo && !(Number.isFinite(e) && e <= (Date.parse(String(filter.endTo)) + 24*60*60*1000 - 1))) return false;
+      }
+      const min = filter.amountMin ? Number(String(filter.amountMin).replace(',', '.')) : null;
+      const max = filter.amountMax ? Number(String(filter.amountMax).replace(',', '.')) : null;
+      if (min != null && !(Number(s.amountGrossRub || 0) >= min)) return false;
+      if (max != null && !(Number(s.amountGrossRub || 0) <= max)) return false;
+      return true;
+    };
     if (onlySuccess) rows = rows.filter((r) => { const st = String((r as any)?.status || '').toLowerCase(); return st === 'paid' || st === 'transfered' || st === 'transferred'; });
     rows.sort((a: any, b: any) => {
       const at = Date.parse((a?.createdAt || 0) as any);
@@ -53,6 +113,28 @@ export async function GET(req: Request) {
       if (bt !== at) return bt - at;
       return String(b.taskId || '').localeCompare(String(a.taskId || ''));
     });
+    // Если есть фильтры — считаем total по фильтрам, читая минимально необходимые файлы
+    if (hasAnyFilter) {
+      let total = 0;
+      const chunk = 48;
+      for (let i = 0; i < rows.length; i += chunk) {
+        const slice = rows.slice(i, Math.min(rows.length, i + chunk));
+        const results = await Promise.allSettled(slice.map(async (r) => {
+          try {
+            const d = String((r as any).inn || inn || '').replace(/\D/g,'');
+            const p = d ? `.data/sales/${d}/sales/${String(r.taskId)}.json` : '';
+            const raw = await readText(p);
+            if (!raw) return 0;
+            const s = JSON.parse(raw);
+            if (!showAll && s.userId !== userId) return 0;
+            return saleMatches(s) ? 1 : 0;
+          } catch { return 0; }
+        }));
+        for (const r of results) if (r.status === 'fulfilled') total += (r.value as number);
+      }
+      return NextResponse.json({ total });
+    }
+
     const total = rows.length;
     const prev = (offset > 0 && offset - 1 < rows.length) ? rows[offset - 1] : null;
     const prevCursor = prev ? `${prev.createdAt}|${prev.taskId}` : null;

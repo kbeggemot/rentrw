@@ -543,6 +543,29 @@ export async function GET(req: Request) {
             if (r.status === 'fulfilled' && r.value) page.push(r.value);
           }
         }
+        // если страницу набрать не удалось (строгие фильтры) — продолжим сканирование ещё двумя чанками, чтобы не оставлять пользователя с 0 строк
+        if (page.length === 0 && startIndex < rows.length) {
+          const extraEnd = Math.min(rows.length, startIndex + (chunkSize * 3));
+          for (let i = startIndex + chunkSize; i < extraEnd && page.length < Math.max(1, limit || 50); i += chunkSize) {
+            const slice = rows.slice(i, Math.min(rows.length, i + chunkSize));
+            const results = await Promise.allSettled(slice.map(async (r) => {
+              try {
+                const d = String((r as any).inn || inn || '').replace(/\D/g,'');
+                const p = d ? `.data/sales/${d}/sales/${String(r.taskId)}.json` : '';
+                const raw = await readText(p);
+                if (!raw) return null;
+                const s = JSON.parse(raw);
+                if (!showAll && s.userId !== userId) return null;
+                if (onlySuccess) {
+                  const st = String(s.status || '').toLowerCase();
+                  if (!(st === 'paid' || st === 'transfered' || st === 'transferred')) return null;
+                }
+                return saleMatches(s) ? s : null;
+              } catch { return null; }
+            }));
+            for (const r of results) { if (r.status === 'fulfilled' && r.value) page.push(r.value); }
+          }
+        }
         const nextCursor = page.length > 0 ? `${String(page[page.length-1].createdAt)}|${String(page[page.length-1].taskId)}` : null;
         return NextResponse.json({ sales: page, nextCursor });
       } else {
