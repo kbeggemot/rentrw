@@ -55,6 +55,10 @@ async function runFill(orgInn: string): Promise<{ processed: number; errors: num
           if (!orderNum) return false;
           const code = await getOrCreateSalePageCode(s.userId, orderNum);
           await setSalePageCode(s.userId, s.taskId, code || null);
+          // дополнительно запишем код прямо в файл продажи, чтобы индексы и данные расходились реже
+          try {
+            (s as any).pageCode = code || null;
+          } catch {}
           return true;
         } catch { return false; }
       }));

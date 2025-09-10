@@ -141,9 +141,23 @@ async function writeSaleAndIndexes(sale: SaleRecord): Promise<void> {
   await writeText(saleFilePath(inn, sale.taskId), JSON.stringify(sale, null, 2));
   // 2) update org index (upsert)
   const idx = await readOrgIndex(inn);
-  const meta: OrgIndexRow = { taskId: sale.taskId, orderId: sale.orderId, userId: sale.userId, createdAt: sale.createdAt, updatedAt: sale.updatedAt, status: sale.status ?? null, orgInn: inn, hasPrepay: Boolean(sale.ofdUrl), hasFull: Boolean(sale.ofdFullUrl), hasCommission: Boolean(sale.additionalCommissionOfdUrl), hasNpd: Boolean(sale.npdReceiptUri), pageCode: (sale as any)?.pageCode ?? null };
-  const pos = idx.findIndex((r) => String(r.taskId) === String(sale.taskId));
-  if (pos === -1) idx.push(meta); else idx[pos] = meta;
+  const existingPos = idx.findIndex((r) => String(r.taskId) === String(sale.taskId));
+  const existing = existingPos !== -1 ? (idx[existingPos] as any) : null;
+  const meta: OrgIndexRow = {
+    taskId: sale.taskId,
+    orderId: sale.orderId,
+    userId: sale.userId,
+    createdAt: sale.createdAt,
+    updatedAt: sale.updatedAt,
+    status: sale.status ?? null,
+    orgInn: inn,
+    hasPrepay: Boolean(sale.ofdUrl),
+    hasFull: Boolean(sale.ofdFullUrl),
+    hasCommission: Boolean(sale.additionalCommissionOfdUrl),
+    hasNpd: Boolean(sale.npdReceiptUri),
+    pageCode: (sale as any)?.pageCode ?? (existing ? existing.pageCode ?? null : null),
+  };
+  if (existingPos === -1) idx.push(meta); else idx[existingPos] = meta;
   // keep newest first (optional)
   idx.sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
   await writeOrgIndex(inn, idx);
