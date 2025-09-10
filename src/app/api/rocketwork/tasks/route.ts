@@ -21,6 +21,8 @@ import { recordWithdrawalCreate } from '@/server/withdrawalStore';
 import { listProductsForOrg } from '@/server/productsStore';
 import { appendRwError, writeRwLastRequest } from '@/server/rwAudit';
 import { appendAdminEntityLog } from '@/server/adminAudit';
+import { getTokenForOrg } from '@/server/orgStore';
+import { findLinkByCode } from '@/server/paymentLinkStore';
 
 export const runtime = 'nodejs';
 
@@ -48,10 +50,36 @@ export async function POST(req: Request) {
     const tgUserFromCookie = tgCookieMatch ? decodeURIComponent(tgCookieMatch[1]) : null;
     const mc = /(?:^|;\s*)session_user=([^;]+)/.exec(cookie);
     const userId = (mc ? decodeURIComponent(mc[1]) : undefined) || req.headers.get('x-user-id') || 'default';
-    const { token, orgInn, fingerprint } = await resolveRwToken(req, userId);
+    const body = (await req.json()) as BodyIn | any;
+
+    // Prefer org from header/body/link to support Telegram WebView (no cookies)
+    let preferredInn: string | null = null;
+    try {
+      const hdrInn = req.headers.get('x-org-inn');
+      if (hdrInn && hdrInn.trim().length > 0) preferredInn = hdrInn.replace(/\D/g, '');
+    } catch {}
+    if (!preferredInn) {
+      try { const bInn = typeof body?.orgInn === 'string' || typeof body?.orgInn === 'number' ? String(body.orgInn) : null; preferredInn = bInn ? bInn.replace(/\D/g, '') : null; } catch {}
+    }
+    if (!preferredInn) {
+      try { const code = typeof body?.linkCode === 'string' ? String(body.linkCode) : null; if (code) { const link = await findLinkByCode(code); const li = (link?.orgInn || '').toString().replace(/\D/g, ''); preferredInn = li || null; } } catch {}
+    }
+
+    let token: string | null = null;
+    let orgInn: string | null = null;
+    let fingerprint: string | null = null;
+    if (preferredInn) {
+      try {
+        const t = await getTokenForOrg(preferredInn, userId);
+        if (t) { token = t; orgInn = preferredInn; }
+      } catch {}
+    }
+    if (!token) {
+      const res = await resolveRwToken(req, userId);
+      token = res.token; orgInn = res.orgInn; fingerprint = res.fingerprint;
+    }
     if (!token) return NextResponse.json({ error: 'NO_TOKEN' }, { status: 400 });
 
-    const body = (await req.json()) as BodyIn | any;
     // Withdrawal support
     if (body?.type === 'Withdrawal') {
       // Forced balance refresh skipped here; endpoint creates withdrawal task
