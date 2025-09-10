@@ -36,6 +36,9 @@ export default function SalesClient({ initial, hasTokenInitial }: { initial: Sal
   const [indexRows, setIndexRows] = useState<Array<{ taskId: string | number; createdAt: string }>>([]);
   // Актуальное значение наличия активных фильтров, чтобы не перезатирать результаты сервера
   const hasFilterRef = useRef<boolean>(false);
+  // Показываем пустую таблицу «Собираем данные…» во время первой/фильтрованной загрузки
+  const [gathering, setGathering] = useState<boolean>(false);
+  const gatherReqRef = useRef<number>(0);
 
   function IconChevronRight() {
     return (
@@ -447,6 +450,7 @@ export default function SalesClient({ initial, hasTokenInitial }: { initial: Sal
     (async () => {
       if (hasFilterRef.current) return; // не запускаем прелоадер, если включены фильтры
       try {
+        setGathering(true);
         const meta = await fetch('/api/sales/meta', { cache: 'no-store', credentials: 'include' }).then((r)=>r.json());
         if (aborted) return;
         if (Array.isArray(meta?.items)) {
@@ -481,6 +485,7 @@ export default function SalesClient({ initial, hasTokenInitial }: { initial: Sal
         }
         if (typeof meta?.total === 'number') setTotal(meta.total);
       } catch {}
+      finally { if (!aborted) setGathering(false); }
     })();
     return () => { aborted = true; };
   }, []);
@@ -578,7 +583,11 @@ export default function SalesClient({ initial, hasTokenInitial }: { initial: Sal
   useEffect(() => {
     let timer: any = null;
     if (hasActiveFilter) {
-      timer = setTimeout(() => { void load(false); }, 250);
+      const reqId = ++gatherReqRef.current;
+      setGathering(true);
+      timer = setTimeout(() => {
+        void load(false).finally(() => { if (gatherReqRef.current === reqId) setGathering(false); });
+      }, 250);
     }
     return () => { if (timer) clearTimeout(timer); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -968,7 +977,9 @@ export default function SalesClient({ initial, hasTokenInitial }: { initial: Sal
         </div>, document.body) : null}
       {/* Mobile cards */}
       <div className="md:hidden space-y-2">
-        {paged.length === 0 ? (
+        {gathering ? (
+          <div className="text-center text-gray-500 border rounded-lg p-4 bg-white dark:bg-gray-950">Собираем данные…</div>
+        ) : paged.length === 0 ? (
           <div className="text-center text-gray-500 border rounded-lg p-4 bg-white dark:bg-gray-950">Нет данных</div>
         ) : (
           paged.map((s) => (
@@ -1064,7 +1075,11 @@ export default function SalesClient({ initial, hasTokenInitial }: { initial: Sal
             </tr>
           </thead>
           <tbody>
-            {filtered.length === 0 ? (
+            {gathering ? (
+              <tr>
+                <td colSpan={12} className="px-3 py-6 text-center text-gray-500">Собираем данные…</td>
+              </tr>
+            ) : filtered.length === 0 ? (
               <tr>
                 <td colSpan={12} className="px-3 py-6 text-center text-gray-500">Нет данных</td>
               </tr>
