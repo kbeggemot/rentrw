@@ -969,7 +969,7 @@ export default function SalesClient({ initial, hasTokenInitial }: { initial: Sal
                   <div className="border-t border-gray-100 dark:border-gray-800" />
                   {isFinal ? (
                     (() => {
-                      const code = pageCodes[openSale.orderId];
+                      const code = pageCodes[openSale.orderId] || (openSale as any)?.pageCode || (openSale as any)?.linkCode || null;
                       return code ? (
                         <a className="block px-3 py-2 text-sm font-medium text-left hover:bg-gray-50 dark:hover:bg-gray-900" href={`/link/s/${encodeURIComponent(code)}`} target="_blank" rel="noreferrer" onClick={() => setMenuOpenId(null)}>Страница продажи</a>
                       ) : (
@@ -1032,7 +1032,7 @@ export default function SalesClient({ initial, hasTokenInitial }: { initial: Sal
                         const fin = String(s.status || '').toLowerCase();
                         const isFinal = fin === 'paid' || fin === 'transfered' || fin === 'transferred';
                         if (!isFinal) return null;
-                        const code = pageCodes[s.orderId];
+                        const code = pageCodes[s.orderId] || (s as any)?.pageCode || (s as any)?.linkCode || null;
                         return code ? (
                           <a className="block px-3 py-2 text-sm font-medium text-left hover:bg-gray-50 dark:hover:bg-gray-900" href={`/link/s/${encodeURIComponent(code)}`} target="_blank" rel="noreferrer" onClick={() => setMenuOpenId(null)}>Страница продажи</a>
                         ) : (
