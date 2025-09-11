@@ -206,13 +206,15 @@ export async function deleteSale(userId: string, taskId: number | string): Promi
 export async function deleteSaleByOrder(userId: string, orderId: number, taskId?: number | string): Promise<{ removed: number }> {
   const store = await readTasks();
   if (!store.sales) store.sales = [];
+  if (!store.tasks) store.tasks = [];
   const normalize = (v: unknown) => {
     if (typeof v === 'number') return v;
     const m = String(v ?? '').match(/(\d+)/g);
     return m && m.length > 0 ? Number(m[m.length - 1]) : NaN;
   };
   let removed = 0;
-  const before = store.sales.length;
+  const beforeSales = store.sales.length;
+  const beforeTasks = store.tasks.length;
   // Capture to-be-removed for sharded cleanup
   const toRemove = store.sales.filter((s) => s.userId === userId && normalize(s.orderId) === orderId && (typeof taskId === 'undefined' || String(s.taskId) === String(taskId)));
   store.sales = store.sales.filter((s) => !(s.userId === userId && normalize(s.orderId) === orderId && (typeof taskId === 'undefined' || String(s.taskId) === String(taskId))));
@@ -234,7 +236,9 @@ export async function deleteSaleByOrder(userId: string, orderId: number, taskId?
       store.tasks = (store.tasks || []).filter((t) => !(String(t.id) === String(s.taskId) && normT((t as any).orderId) === orderId));
     }
   }
-  if (before !== store.sales.length) await writeTasks(store);
+  const afterSales = store.sales.length;
+  const afterTasks = store.tasks.length;
+  if (beforeSales !== afterSales || beforeTasks !== afterTasks) await writeTasks(store);
   // Sharded cleanup mirroring deleteSale
   try {
     for (const s of toRemove) {
