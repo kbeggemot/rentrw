@@ -165,6 +165,74 @@ async function writeSaleAndIndexes(sale: SaleRecord): Promise<void> {
   await writeText(byTaskIndexPath(sale.taskId), JSON.stringify({ inn, userId: sale.userId }, null, 2));
 }
 
+export async function deleteSale(userId: string, taskId: number | string): Promise<boolean> {
+  const store = await readTasks();
+  if (!store.sales) store.sales = [];
+  const beforeLen = store.sales.length;
+  // Determine inn from sharded index or legacy sale
+  let inn: string | null = null;
+  try {
+    const mapped = await readByTask(taskId).catch(() => null);
+    if (mapped) inn = mapped.inn;
+  } catch {}
+  if (!inn) {
+    const found = store.sales.find((s) => s.userId === userId && String(s.taskId) === String(taskId));
+    if (found?.orgInn) inn = sanitizeInn(found.orgInn);
+  }
+  // Remove from legacy store
+  store.sales = store.sales.filter((s) => !(s.userId === userId && String(s.taskId) === String(taskId)));
+  // Remove from tasks list
+  store.tasks = (store.tasks || []).filter((t) => String(t.id) !== String(taskId));
+  await writeTasks(store);
+  // Remove sharded sale file and index if present
+  try {
+    if (inn) {
+      const p = saleFilePath(inn, taskId);
+      const { writeText, readText } = await import('./storage');
+      // Overwrite with empty to keep S3 APIs simple, then rely on index removal
+      await writeText(p, '');
+      // rewrite org index without the row
+      const rows = await readOrgIndex(inn);
+      const nextRows = rows.filter((r) => String((r as any).taskId) !== String(taskId));
+      await writeOrgIndex(inn, nextRows as any);
+      // remove by_task mapping
+      await writeText(byTaskIndexPath(taskId), '');
+    }
+  } catch {}
+  try { getHub().publish(userId, 'sales:update'); } catch {}
+  return store.sales.length < beforeLen;
+}
+
+export async function deleteSaleByOrder(userId: string, orderId: number, taskId?: number | string): Promise<{ removed: number }> {
+  const store = await readTasks();
+  if (!store.sales) store.sales = [];
+  const normalize = (v: unknown) => {
+    if (typeof v === 'number') return v;
+    const m = String(v ?? '').match(/(\d+)/g);
+    return m && m.length > 0 ? Number(m[m.length - 1]) : NaN;
+  };
+  let removed = 0;
+  const before = store.sales.length;
+  store.sales = store.sales.filter((s) => {
+    const sameUser = s.userId === userId;
+    const sameOrder = normalize(s.orderId) === orderId;
+    const sameTask = typeof taskId === 'undefined' ? true : (String(s.taskId) === String(taskId));
+    const match = sameUser && sameOrder && sameTask;
+    if (match) removed += 1;
+    return !match;
+  });
+  // Tasks list: if a task still has any sale entry, keep it; otherwise remove
+  if (typeof taskId !== 'undefined') {
+    const stillExists = store.sales.some((s) => String(s.taskId) === String(taskId));
+    if (!stillExists) {
+      store.tasks = (store.tasks || []).filter((t) => String(t.id) !== String(taskId));
+    }
+  }
+  if (before !== store.sales.length) await writeTasks(store);
+  try { getHub().publish(userId, 'sales:update'); } catch {}
+  return { removed };
+}
+
 async function readByTask(taskId: number | string): Promise<{ inn: string; userId: string } | null> {
   const raw = await readText(byTaskIndexPath(taskId));
   if (!raw) return null;

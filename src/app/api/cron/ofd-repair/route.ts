@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { repairUserSales, startOfdRepairWorker } from '@/server/ofdRepairWorker';
+import { deleteSale, deleteSaleByOrder } from '@/server/taskStore';
 import { listAllSales } from '@/server/taskStore';
 
 export const runtime = 'nodejs';
@@ -17,8 +18,19 @@ export async function GET(req: Request) {
     const orderIdStr = url.searchParams.get('orderId') || undefined;
     const orderId = orderIdStr ? Number(orderIdStr) : undefined;
     const debug = url.searchParams.get('debug') === '1';
+    const deleteTaskId = url.searchParams.get('deleteTaskId') || undefined;
+    const deleteOrderStr = url.searchParams.get('deleteOrderId') || undefined;
+    const deleteOrder = deleteOrderStr ? Number(deleteOrderStr) : undefined;
 
     if (userId) {
+      if (deleteTaskId) {
+        const ok = await deleteSale(userId, deleteTaskId);
+        return NextResponse.json({ ok, deleted: ok ? { userId, taskId: deleteTaskId } : null });
+      }
+      if (typeof deleteOrder === 'number' && Number.isFinite(deleteOrder)) {
+        const res = await deleteSaleByOrder(userId, deleteOrder, url.searchParams.get('onlyTaskId') || undefined as any);
+        return NextResponse.json({ ok: true, removed: res.removed, scope: { userId, orderId: deleteOrder } });
+      }
       await repairUserSales(userId, Number.isFinite(orderId as any) ? (orderId as any) : undefined);
     } else {
       const all = await listAllSales();
