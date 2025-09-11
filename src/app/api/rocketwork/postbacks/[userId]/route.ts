@@ -372,14 +372,17 @@ export async function POST(req: Request) {
                         await writeText('.data/ofd_create_attempts.log', prev2 + line2 + '\n');
                       } catch {}
                       { const numOrder = Number(String(sale.orderId).match(/(\d+)/g)?.slice(-1)[0] || NaN); await updateSaleOfdUrlsByOrderId(userId, numOrder, { ofdFullId: created.id || null }); }
-                      // try resolve URL immediately without waiting for callback
-                      try {
-                        const built = await tryResolveUrl(created.id || null);
-                        if (built) {
-                          const numOrder = Number(String(sale.orderId).match(/(\d+)/g)?.slice(-1)[0] || NaN);
-                          await updateSaleOfdUrlsByOrderId(userId, numOrder, { ofdFullUrl: built });
-                        }
-                      } catch {}
+                      // defer URL resolve to give callback up to ~10s per docs
+                      (async () => {
+                        try { await new Promise((r) => setTimeout(r, 10000)); } catch {}
+                        try {
+                          const built = await tryResolveUrl(created.id || null);
+                          if (built) {
+                            const numOrder = Number(String(sale.orderId).match(/(\d+)/g)?.slice(-1)[0] || NaN);
+                            await updateSaleOfdUrlsByOrderId(userId, numOrder, { ofdFullUrl: built });
+                          }
+                        } catch {}
+                      })();
                     }
                   } else {
                     const invoiceIdPrepay = (sale as any).invoiceIdPrepay || null;
@@ -411,13 +414,17 @@ export async function POST(req: Request) {
                         await writeText('.data/ofd_create_attempts.log', prev2 + line2 + '\n');
                       } catch {}
                       { const numOrder = Number(String(sale.orderId).match(/(\d+)/g)?.slice(-1)[0] || NaN); await updateSaleOfdUrlsByOrderId(userId, numOrder, { ofdPrepayId: created.id || null }); }
-                      try {
-                        const built = await tryResolveUrl(created.id || null);
-                        if (built) {
-                          const numOrder = Number(String(sale.orderId).match(/(\d+)/g)?.slice(-1)[0] || NaN);
-                          await updateSaleOfdUrlsByOrderId(userId, numOrder, { ofdUrl: built });
-                        }
-                      } catch {}
+                      // defer URL resolve to give callback up to ~10s
+                      (async () => {
+                        try { await new Promise((r) => setTimeout(r, 10000)); } catch {}
+                        try {
+                          const built = await tryResolveUrl(created.id || null);
+                          if (built) {
+                            const numOrder = Number(String(sale.orderId).match(/(\d+)/g)?.slice(-1)[0] || NaN);
+                            await updateSaleOfdUrlsByOrderId(userId, numOrder, { ofdUrl: built });
+                          }
+                        } catch {}
+                      })();
                       // schedule offset at 12:00 MSK
                       if (sale.serviceEndDate) {
                         startOfdScheduleWorker();
@@ -480,13 +487,17 @@ export async function POST(req: Request) {
                       await writeText('.data/ofd_create_attempts.log', prev2 + line2 + '\n');
                     } catch {}
                     { const numOrder = Number(String(sale.orderId).match(/(\d+)/g)?.slice(-1)[0] || NaN); await updateSaleOfdUrlsByOrderId(userId, numOrder, { ofdFullId: created.id || null }); }
-                    try {
-                      const built = await tryResolveUrl(created.id || null);
-                      if (built) {
-                        const numOrder = Number(String(sale.orderId).match(/(\d+)/g)?.slice(-1)[0] || NaN);
-                        await updateSaleOfdUrlsByOrderId(userId, numOrder, { ofdFullUrl: built });
-                      }
-                    } catch {}
+                    // defer URL resolve to give callback up to ~10s
+                    (async () => {
+                      try { await new Promise((r) => setTimeout(r, 10000)); } catch {}
+                      try {
+                        const built = await tryResolveUrl(created.id || null);
+                        if (built) {
+                          const numOrder = Number(String(sale.orderId).match(/(\d+)/g)?.slice(-1)[0] || NaN);
+                          await updateSaleOfdUrlsByOrderId(userId, numOrder, { ofdFullUrl: built });
+                        }
+                      } catch {}
+                    })();
                   }
                 } else {
                   const invoiceIdPrepay = (sale as any).invoiceIdPrepay || null;
