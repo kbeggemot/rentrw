@@ -111,10 +111,31 @@ export async function PUT(req: Request) {
     // Minimal update: only change termsDocHash without revalidating other fields
     // Triggered when client explicitly sets onlyTerms=true
     if (body && typeof (body as any)?.termsDocHash !== 'undefined' && (body as any)?.onlyTerms === true) {
+      // Debug log: before/after
+      try {
+        const { readText, writeText } = await import('@/server/storage');
+        const prev = (await readText('.data/links_terms_updates.log')) || '';
+        const line = JSON.stringify({ ts: new Date().toISOString(), scope: 'onlyTerms', userId, code, before: (current as any)?.termsDocHash ?? null, request: (body as any)?.termsDocHash ?? null });
+        await writeText('.data/links_terms_updates.log', prev + line + '\n');
+      } catch {}
       const updated = await updatePaymentLink(userId, code, {
         termsDocHash: (body as any).termsDocHash ? String((body as any).termsDocHash) : null,
       } as any);
-      if (!updated) return NextResponse.json({ error: 'NOT_FOUND' }, { status: 404 });
+      if (!updated) {
+        try {
+          const { readText, writeText } = await import('@/server/storage');
+          const prev = (await readText('.data/links_terms_updates.log')) || '';
+          const line = JSON.stringify({ ts: new Date().toISOString(), scope: 'onlyTerms', userId, code, result: 'NOT_FOUND' });
+          await writeText('.data/links_terms_updates.log', prev + line + '\n');
+        } catch {}
+        return NextResponse.json({ error: 'NOT_FOUND' }, { status: 404 });
+      }
+      try {
+        const { readText, writeText } = await import('@/server/storage');
+        const prev = (await readText('.data/links_terms_updates.log')) || '';
+        const line = JSON.stringify({ ts: new Date().toISOString(), scope: 'onlyTerms', userId, code, after: (updated as any)?.termsDocHash ?? null });
+        await writeText('.data/links_terms_updates.log', prev + line + '\n');
+      } catch {}
       return NextResponse.json({ ok: true, item: updated });
     }
     // Determine mode from incoming payload (allows switching between modes)

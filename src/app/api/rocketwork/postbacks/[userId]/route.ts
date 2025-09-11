@@ -287,6 +287,18 @@ export async function POST(req: Request) {
                 if (partnerInn) {
                   const defaultEmail = process.env.OFD_DEFAULT_EMAIL || process.env.DEFAULT_RECEIPT_EMAIL || 'ofd@rockethumans.com';
                   const amountNet = Math.max(0, Number(sale.amountGrossRub || 0) - Number(sale.retainedCommissionRub || 0));
+                  const itemLabel = (() => {
+                    try {
+                      const desc = (sale as any)?.description && String((sale as any).description).trim();
+                      if (desc) return String(desc).slice(0, 128);
+                      const snap = (sale as any)?.itemsSnapshot as any[] | null;
+                      if (Array.isArray(snap) && snap.length > 0) {
+                        const labels = snap.map((it: any) => String(it?.title || '').trim()).filter(Boolean);
+                        if (labels.length > 0) return labels.join(', ').slice(0, 128);
+                      }
+                    } catch {}
+                    return 'Оплата услуг';
+                  })();
                   const useFull = isToday;
                   try {
                     const prev = (await readText('.data/ofd_create_attempts.log')) || '';
@@ -390,7 +402,7 @@ export async function POST(req: Request) {
                         } catch {}
                       }
                       try { const prev = (await readText('.data/ofd_create_attempts.log')) || ''; const line = JSON.stringify({ ts: new Date().toISOString(), src: 'postback', stage: 'items_final', party: 'partner', userId, taskId, orderId: sale.orderId, branch: 'full', count: Array.isArray(itemsParam) ? itemsParam.length : 0 }); await writeText('.data/ofd_create_attempts.log', prev + line + '\n'); } catch {}
-                      const payload = buildFermaReceiptPayload({ party: 'partner', partyInn: partnerInn, description: 'Оплата услуг', amountRub: amountNet, vatRate: usedVat, methodCode: PAYMENT_METHOD_FULL_PAYMENT, orderId: sale.orderId, docType: 'Income', buyerEmail: sale.clientEmail || defaultEmail, invoiceId: invoiceIdFull, callbackUrl, paymentAgentInfo: { AgentType: 'AGENT', SupplierInn: partnerInn, SupplierName: partnerName || 'Исполнитель' }, items: itemsParam });
+                      const payload = buildFermaReceiptPayload({ party: 'partner', partyInn: partnerInn, description: itemLabel, amountRub: amountNet, vatRate: usedVat, methodCode: PAYMENT_METHOD_FULL_PAYMENT, orderId: sale.orderId, docType: 'Income', buyerEmail: sale.clientEmail || defaultEmail, invoiceId: invoiceIdFull, callbackUrl, paymentAgentInfo: { AgentType: 'AGENT', SupplierInn: partnerInn, SupplierName: partnerName || 'Исполнитель' }, items: itemsParam });
                       const created = await fermaCreateReceipt(payload, { baseUrl, authToken: tokenOfd });
                       try {
                         const prev2 = (await readText('.data/ofd_create_attempts.log')) || '';
@@ -456,7 +468,7 @@ export async function POST(req: Request) {
                         try { const snap2 = (sale as any)?.itemsSnapshot as any[] | null; if (Array.isArray(snap2) && snap2.length > 0) { itemsParamA = snap2.map((it:any)=>({ label: String(it.title||''), price: Number(it.price||0), qty: Number(it.qty||1), vatRate: usedVat })); try { const prev = (await readText('.data/ofd_create_attempts.log')) || ''; const line = JSON.stringify({ ts: new Date().toISOString(), src: 'postback', stage: 'items_fallback_naive', party: 'partner', userId, taskId, orderId: sale.orderId, branch: 'prepay', count: itemsParamA.length }); await writeText('.data/ofd_create_attempts.log', prev + line + '\n'); } catch {} } } catch {}
                       }
                       try { const prev = (await readText('.data/ofd_create_attempts.log')) || ''; const line = JSON.stringify({ ts: new Date().toISOString(), src: 'postback', stage: 'items_final', party: 'partner', userId, taskId, orderId: sale.orderId, branch: 'prepay', count: Array.isArray(itemsParamA) ? itemsParamA.length : 0 }); await writeText('.data/ofd_create_attempts.log', prev + line + '\n'); } catch {}
-                      const payload = buildFermaReceiptPayload({ party: 'partner', partyInn: partnerInn, description: 'Оплата услуг', amountRub: amountNet, vatRate: usedVat, methodCode: PAYMENT_METHOD_PREPAY_FULL, orderId: sale.orderId, docType: 'IncomePrepayment', buyerEmail: sale.clientEmail || defaultEmail, invoiceId: invoiceIdPrepay, callbackUrl, withPrepaymentItem: true, paymentAgentInfo: { AgentType: 'AGENT', SupplierInn: partnerInn, SupplierName: partnerName2 || 'Исполнитель' }, items: itemsParamA });
+                      const payload = buildFermaReceiptPayload({ party: 'partner', partyInn: partnerInn, description: itemLabel, amountRub: amountNet, vatRate: usedVat, methodCode: PAYMENT_METHOD_PREPAY_FULL, orderId: sale.orderId, docType: 'IncomePrepayment', buyerEmail: sale.clientEmail || defaultEmail, invoiceId: invoiceIdPrepay, callbackUrl, withPrepaymentItem: true, paymentAgentInfo: { AgentType: 'AGENT', SupplierInn: partnerInn, SupplierName: partnerName2 || 'Исполнитель' }, items: itemsParamA });
                       const created = await fermaCreateReceipt(payload, { baseUrl, authToken: tokenOfd });
                       try {
                         const prev2 = (await readText('.data/ofd_create_attempts.log')) || '';
@@ -482,7 +494,7 @@ export async function POST(req: Request) {
                         startOfdScheduleWorker();
                         // 12:00 MSK -> convert to UTC: MSK=UTC+3, so 09:00Z
                         const dueDate = new Date(`${sale.serviceEndDate}T09:00:00Z`);
-                        { const numOrder = Number(String(sale.orderId).match(/(\d+)/g)?.slice(-1)[0] || NaN); await enqueueOffsetJob({ userId, orderId: numOrder, dueAt: dueDate.toISOString(), party: 'partner', partnerInn, description: 'Оплата услуги', amountRub: amountNet, vatRate: usedVat, buyerEmail: sale.clientEmail || defaultEmail }); }
+                        { const numOrder = Number(String(sale.orderId).match(/(\d+)/g)?.slice(-1)[0] || NaN); await enqueueOffsetJob({ userId, orderId: numOrder, dueAt: dueDate.toISOString(), party: 'partner', partnerInn, description: itemLabel, amountRub: amountNet, vatRate: usedVat, buyerEmail: sale.clientEmail || defaultEmail }); }
                       }
                     }
                   }
@@ -494,6 +506,18 @@ export async function POST(req: Request) {
               const orgData = orgInn ? await getOrgPayoutRequisites(orgInn) : { bik: null, account: null } as any;
               if (orgInn) {
                 const defaultEmail = process.env.OFD_DEFAULT_EMAIL || process.env.DEFAULT_RECEIPT_EMAIL || 'ofd@rockethumans.com';
+                const itemLabelOrg = (() => {
+                  try {
+                    const desc = (sale as any)?.description && String((sale as any).description).trim();
+                    if (desc) return String(desc).slice(0, 128);
+                    const snap = (sale as any)?.itemsSnapshot as any[] | null;
+                    if (Array.isArray(snap) && snap.length > 0) {
+                      const labels = snap.map((it: any) => String(it?.title || '').trim()).filter(Boolean);
+                      if (labels.length > 0) return labels.join(', ').slice(0, 128);
+                    }
+                  } catch {}
+                  return 'Оплата услуг';
+                })();
                 const useFull = isToday;
                 try {
                   const prev = (await readText('.data/ofd_create_attempts.log')) || '';
@@ -552,7 +576,7 @@ export async function POST(req: Request) {
                       try { const snap2 = (sale as any)?.itemsSnapshot as any[] | null; if (Array.isArray(snap2) && snap2.length > 0) { itemsParamOrg = snap2.map((it:any)=>({ label: String(it.title||''), price: Number(it.price||0), qty: Number(it.qty||1), vatRate: usedVat })); try { const prev = (await readText('.data/ofd_create_attempts.log')) || ''; const line = JSON.stringify({ ts: new Date().toISOString(), src: 'postback', stage: 'items_fallback_naive', party: 'org', userId, taskId, orderId: sale.orderId, count: itemsParamOrg.length }); await writeText('.data/ofd_create_attempts.log', prev + line + '\n'); } catch {} } } catch {}
                     }
                     try { const prev = (await readText('.data/ofd_create_attempts.log')) || ''; const line = JSON.stringify({ ts: new Date().toISOString(), src: 'postback', stage: 'items_final', party: 'org', userId, taskId, orderId: sale.orderId, branch: 'full', count: Array.isArray(itemsParamOrg) ? itemsParamOrg.length : 0 }); await writeText('.data/ofd_create_attempts.log', prev + line + '\n'); } catch {}
-                    const payload = buildFermaReceiptPayload({ party: 'org', partyInn: orgInn, description: 'Оплата услуг', amountRub: amountRub, vatRate: usedVat, methodCode: PAYMENT_METHOD_FULL_PAYMENT, orderId: sale.orderId, docType: 'Income', buyerEmail: sale.clientEmail || defaultEmail, invoiceId: invoiceIdFull, callbackUrl, paymentAgentInfo: { AgentType: 'AGENT', SupplierInn: orgInn, SupplierName: supplierName }, items: itemsParamOrg });
+                    const payload = buildFermaReceiptPayload({ party: 'org', partyInn: orgInn, description: itemLabelOrg, amountRub: amountRub, vatRate: usedVat, methodCode: PAYMENT_METHOD_FULL_PAYMENT, orderId: sale.orderId, docType: 'Income', buyerEmail: sale.clientEmail || defaultEmail, invoiceId: invoiceIdFull, callbackUrl, paymentAgentInfo: { AgentType: 'AGENT', SupplierInn: orgInn, SupplierName: supplierName }, items: itemsParamOrg });
                     const created = await fermaCreateReceipt(payload, { baseUrl, authToken: tokenOfd });
                     try {
                       const prev2 = (await readText('.data/ofd_create_attempts.log')) || '';
@@ -627,7 +651,7 @@ export async function POST(req: Request) {
                       try { const snap2 = (sale as any)?.itemsSnapshot as any[] | null; if (Array.isArray(snap2) && snap2.length > 0) { itemsParamAOrg = snap2.map((it:any)=>({ label: String(it.title||''), price: Number(it.price||0), qty: Number(it.qty||1), vatRate: usedVat })); try { const prev = (await readText('.data/ofd_create_attempts.log')) || ''; const line = JSON.stringify({ ts: new Date().toISOString(), src: 'postback', stage: 'items_fallback_naive', party: 'org', userId, taskId, orderId: sale.orderId, branch: 'prepay', count: itemsParamAOrg.length }); await writeText('.data/ofd_create_attempts.log', prev + line + '\n'); } catch {} } } catch {}
                     }
                     try { const prev = (await readText('.data/ofd_create_attempts.log')) || ''; const line = JSON.stringify({ ts: new Date().toISOString(), src: 'postback', stage: 'items_final', party: 'org', userId, taskId, orderId: sale.orderId, branch: 'prepay', count: Array.isArray(itemsParamAOrg) ? itemsParamAOrg.length : 0 }); await writeText('.data/ofd_create_attempts.log', prev + line + '\n'); } catch {}
-                    const payload = buildFermaReceiptPayload({ party: 'org', partyInn: orgInn, description: 'Оплата услуг', amountRub: amountRub, vatRate: usedVat, methodCode: PAYMENT_METHOD_PREPAY_FULL, orderId: sale.orderId, docType: 'IncomePrepayment', buyerEmail: sale.clientEmail || defaultEmail, invoiceId: invoiceIdPrepay, callbackUrl, withPrepaymentItem: true, paymentAgentInfo: { AgentType: 'AGENT', SupplierInn: orgInn, SupplierName: supplierName2 }, items: itemsParamAOrg });
+                    const payload = buildFermaReceiptPayload({ party: 'org', partyInn: orgInn, description: itemLabelOrg, amountRub: amountRub, vatRate: usedVat, methodCode: PAYMENT_METHOD_PREPAY_FULL, orderId: sale.orderId, docType: 'IncomePrepayment', buyerEmail: sale.clientEmail || defaultEmail, invoiceId: invoiceIdPrepay, callbackUrl, withPrepaymentItem: true, paymentAgentInfo: { AgentType: 'AGENT', SupplierInn: orgInn, SupplierName: supplierName2 }, items: itemsParamAOrg });
                     const created = await fermaCreateReceipt(payload, { baseUrl, authToken: tokenOfd });
                     try {
                       const prev2 = (await readText('.data/ofd_create_attempts.log')) || '';
@@ -651,7 +675,7 @@ export async function POST(req: Request) {
                     if (sale.serviceEndDate) {
                       startOfdScheduleWorker();
                       const dueDate = new Date(`${sale.serviceEndDate}T09:00:00Z`);
-                      { const numOrder = Number(String(sale.orderId).match(/(\d+)/g)?.slice(-1)[0] || NaN); await enqueueOffsetJob({ userId, orderId: numOrder, dueAt: dueDate.toISOString(), party: 'org', description: 'Оплата услуги', amountRub, vatRate: usedVat, buyerEmail: sale.clientEmail || defaultEmail }); }
+                      { const numOrder = Number(String(sale.orderId).match(/(\d+)/g)?.slice(-1)[0] || NaN); await enqueueOffsetJob({ userId, orderId: numOrder, dueAt: dueDate.toISOString(), party: 'org', description: itemLabelOrg, amountRub, vatRate: usedVat, buyerEmail: sale.clientEmail || defaultEmail }); }
                     }
                   }
                 }
