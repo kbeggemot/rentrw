@@ -23,7 +23,7 @@ export async function GET(req: Request) {
       const all = await listAllSales();
       const uids = Array.from(new Set(all.map((s: any) => s.userId)));
       for (const uid of uids) {
-        try { await repairUserSales(uid); } catch {}
+        try { await repairUserSales(uid, Number.isFinite(orderId as any) ? (orderId as any) : undefined); } catch {}
       }
     }
     try { startOfdRepairWorker(); } catch {}

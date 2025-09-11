@@ -117,7 +117,15 @@ export async function repairUserSales(userId: string, onlyOrderId?: number): Pro
           // create new with stored InvoiceId C
           if (s.isAgent) {
             // need partner inn/name from RW
-            const token = await getDecryptedApiToken(userId);
+            let token: string | null = null;
+            try {
+              const { resolveRwTokenWithFingerprint } = await import('./rwToken');
+              const fp = (s as any)?.rwTokenFp || undefined;
+              const inn = (s as any)?.orgInn || undefined;
+              const res = await resolveRwTokenWithFingerprint({ headers: new Headers() } as any, userId, inn, fp);
+              token = res.token;
+            } catch {}
+            if (!token) token = await getDecryptedApiToken(userId);
             if (!token) continue;
             const base = process.env.ROCKETWORK_API_BASE_URL || 'https://app.rocketwork.ru/api/';
             const tUrl = new URL(`tasks/${encodeURIComponent(String(s.taskId))}`, base.endsWith('/') ? base : base + '/').toString();
