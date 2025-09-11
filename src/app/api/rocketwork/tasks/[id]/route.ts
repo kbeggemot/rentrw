@@ -154,8 +154,29 @@ export async function GET(_: Request) {
       let saleHasFull = false;
       try { const s = await findSaleByTaskId(userId, taskId); saleHasFull = Boolean(s?.ofdFullUrl); } catch {}
       if (hasAgent && aoStatus === 'transfered' && rootStatus === 'completed' && saleHasFull) {
+        // Prefer org-scoped token for the sale if available
+        try {
+          const { findSaleByTaskId } = await import('@/server/taskStore');
+          const s = await findSaleByTaskId(userId, taskId);
+          if (s && s.orgInn) {
+            try {
+              const { getTokenForOrg } = await import('@/server/orgStore');
+              const t2 = await getTokenForOrg(String(s.orgInn).replace(/\D/g, ''), userId);
+              if (t2) { /* prefer org token for pay */ }
+            } catch {}
+          }
+        } catch {}
         const payUrl = new URL(`tasks/${encodeURIComponent(taskId)}/pay`, base.endsWith('/') ? base : base + '/').toString();
-        await fetch(payUrl, { method: 'PATCH', headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }, cache: 'no-store' });
+        try {
+          const authToken = (async () => { try { const { findSaleByTaskId } = await import('@/server/taskStore'); const s = await findSaleByTaskId(userId, taskId); if (s && s.orgInn) { try { const { getTokenForOrg } = await import('@/server/orgStore'); const t2 = await getTokenForOrg(String(s.orgInn).replace(/\D/g, ''), userId); if (t2) return t2; } catch {} } } catch {} return token; })();
+          const tok = await authToken;
+          const resPay = await fetch(payUrl, { method: 'PATCH', headers: { Authorization: `Bearer ${tok}`, Accept: 'application/json' }, cache: 'no-store' });
+          if (!resPay.ok) {
+            try { const { appendRwError } = await import('@/server/rwAudit'); await appendRwError({ ts: new Date().toISOString(), scope: 'tasks:pay', method: 'PATCH', url: payUrl, status: resPay.status, responseText: await resPay.text(), userId }); } catch {}
+          }
+        } catch (e) {
+          try { const { appendRwError } = await import('@/server/rwAudit'); await appendRwError({ ts: new Date().toISOString(), scope: 'tasks:pay', method: 'PATCH', url: payUrl, status: null, error: e instanceof Error ? e.message : String(e), userId }); } catch {}
+        }
         // After pay, poll NPD only for self-employed partners (not for entrepreneurs)
         try {
           let isEntrepreneurPartner = false;

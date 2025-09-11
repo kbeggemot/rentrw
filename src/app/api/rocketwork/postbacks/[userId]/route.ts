@@ -149,7 +149,16 @@ export async function POST(req: Request) {
         const aoStatus = String(aoStatusRaw || status || '').toLowerCase();
         const rootStatus = String(rootStatusRaw || '').toLowerCase();
         if (sale && sale.isAgent && sale.ofdFullUrl && aoStatus === 'transfered' && rootStatus === 'completed') {
-          const token = await getDecryptedApiToken(userId);
+          // Resolve token preferring org-scoped token for the sale's inn
+          let token: string | null = null;
+          try {
+            const innDigits = sale.orgInn ? String(sale.orgInn).replace(/\D/g, '') : '';
+            if (innDigits) {
+              const { getTokenForOrg } = await import('@/server/orgStore');
+              token = await getTokenForOrg(innDigits, userId);
+            }
+          } catch {}
+          if (!token) token = await getDecryptedApiToken(userId);
           if (token) {
             const base = process.env.ROCKETWORK_API_BASE_URL || 'https://app.rocketwork.ru/api/';
             const payUrl = new URL(`tasks/${encodeURIComponent(String(taskId))}/pay`, base.endsWith('/') ? base : base + '/').toString();
@@ -159,7 +168,23 @@ export async function POST(req: Request) {
                 await appendOfdAudit({ ts: new Date().toISOString(), source: 'postback', userId, orderId: numOrder, taskId, action: 'background_pay', patch: { reason: 'agent_transfered_completed_has_full', payUrl } });
               }
             } catch {}
-            await fetch(payUrl, { method: 'PATCH', headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }, cache: 'no-store' });
+            try {
+              const res = await fetch(payUrl, { method: 'PATCH', headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }, cache: 'no-store' });
+              const txt = await res.text().catch(()=> '');
+              if (!res.ok) {
+                try {
+                  const prev = (await readText('.data/rw_errors.log')) || '';
+                  const line = JSON.stringify({ ts: new Date().toISOString(), scope: 'tasks:pay', method: 'PATCH', url: payUrl, status: res.status, responseText: txt, userId, taskId });
+                  await writeText('.data/rw_errors.log', prev + line + '\n');
+                } catch {}
+              }
+            } catch (e) {
+              try {
+                const prev = (await readText('.data/rw_errors.log')) || '';
+                const line = JSON.stringify({ ts: new Date().toISOString(), scope: 'tasks:pay', method: 'PATCH', url: payUrl, status: null, error: e instanceof Error ? e.message : String(e), userId, taskId });
+                await writeText('.data/rw_errors.log', prev + line + '\n');
+              } catch {}
+            }
           }
         }
       } catch {}
