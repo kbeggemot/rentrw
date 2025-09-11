@@ -453,8 +453,13 @@ export async function updateSaleOfdUrls(userId: string, taskId: number | string,
 export async function updateSaleOfdUrlsByOrderId(userId: string, orderId: number, patch: Partial<Pick<SaleRecord, 'ofdUrl' | 'ofdFullUrl' | 'ofdPrepayId' | 'ofdFullId'>>): Promise<void> {
   const store = await readTasks();
   if (!store.sales) store.sales = [];
-  const idx = store.sales.findIndex((s) => normalizeOrderId(s.orderId) === orderId && s.userId === userId);
-  if (idx !== -1) {
+  const idxs = store.sales
+    .map((s, i) => ({ s, i }))
+    .filter(({ s }) => normalizeOrderId(s.orderId) === orderId && s.userId === userId)
+    .map(({ i }) => i);
+  if (idxs.length === 0) return;
+  let anyChanged = false;
+  for (const idx of idxs) {
     const current = store.sales[idx];
     const next = { ...current } as SaleRecord;
     const before: any = process.env.OFD_AUDIT === '1' ? { ofdUrl: next.ofdUrl ?? null, ofdFullUrl: next.ofdFullUrl ?? null, ofdPrepayId: (next as any).ofdPrepayId ?? null, ofdFullId: (next as any).ofdFullId ?? null } : null;
@@ -464,7 +469,6 @@ export async function updateSaleOfdUrlsByOrderId(userId: string, orderId: number
     if (typeof patch.ofdPrepayId !== 'undefined' && ((next as any).ofdPrepayId ?? null) !== (patch.ofdPrepayId ?? null)) { (next as any).ofdPrepayId = patch.ofdPrepayId ?? null; changed = true; }
     if (typeof patch.ofdFullId !== 'undefined' && ((next as any).ofdFullId ?? null) !== (patch.ofdFullId ?? null)) { (next as any).ofdFullId = patch.ofdFullId ?? null; changed = true; }
     if (!changed) {
-      // Если источник OFD-обращение известен — логируем сам факт нулевого обновления
       try {
         if ((global as any).__OFD_SOURCE__) {
           const src = (global as any).__OFD_SOURCE__ || 'unknown';
@@ -472,11 +476,11 @@ export async function updateSaleOfdUrlsByOrderId(userId: string, orderId: number
           await appendOfdAudit({ ts: new Date().toISOString(), source: String(src), userId, orderId, taskId: current.taskId, action: 'update_ofd_urls', patch: { ...patch, noop: true }, before, after: before });
         }
       } catch {}
-      return; // no-op update, avoid extra writes/logs to store
+      continue;
     }
     next.updatedAt = new Date().toISOString();
     store.sales[idx] = next;
-    await writeTasks(store);
+    anyChanged = true;
     try { await writeSaleAndIndexes(next); } catch {}
     try { getHub().publish(userId, 'sales:update'); } catch {}
     try {
@@ -486,8 +490,10 @@ export async function updateSaleOfdUrlsByOrderId(userId: string, orderId: number
       }
     } catch {}
     try { await appendAdminEntityLog('sale', [String(userId), String(current.taskId)], { source: 'system', message: 'ofd/updateByOrder', data: { patch } }); } catch {}
-    // Fire-and-forget instant email attempt
     try { sendInstantDeliveryIfReady(userId, store.sales[idx]).catch(() => {}); } catch {}
+  }
+  if (anyChanged) {
+    await writeTasks(store);
   }
 }
 
