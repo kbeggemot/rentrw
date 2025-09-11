@@ -152,7 +152,6 @@ export function buildFermaReceiptPayload(params: {
       CustomerReceipt: customerReceipt,
       PaymentItems: paymentItems,
       CallbackUrl: params.callbackUrl,
-      CallBackUrl: params.callbackUrl,
     },
   };
 
