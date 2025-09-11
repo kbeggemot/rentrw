@@ -16,6 +16,7 @@ export async function GET(req: Request) {
     const userId = url.searchParams.get('userId') || undefined;
     const orderIdStr = url.searchParams.get('orderId') || undefined;
     const orderId = orderIdStr ? Number(orderIdStr) : undefined;
+    const debug = url.searchParams.get('debug') === '1';
 
     if (userId) {
       await repairUserSales(userId, Number.isFinite(orderId as any) ? (orderId as any) : undefined);
@@ -27,6 +28,31 @@ export async function GET(req: Request) {
       }
     }
     try { startOfdRepairWorker(); } catch {}
+    if (debug && userId && typeof orderId === 'number' && Number.isFinite(orderId)) {
+      try {
+        const allForUser = await listAllSales();
+        const sale = allForUser.find((s: any) => s.userId === userId && Number(String(s.orderId).match(/(\d+)/g)?.slice(-1)[0] || NaN) === orderId) || null;
+        if (sale) {
+          const out = {
+            orderId,
+            taskId: sale.taskId,
+            status: sale.status,
+            rootStatus: sale.rootStatus || null,
+            serviceEndDate: sale.serviceEndDate || null,
+            isAgent: !!sale.isAgent,
+            invoiceIdPrepay: sale.invoiceIdPrepay || null,
+            invoiceIdFull: sale.invoiceIdFull || null,
+            invoiceIdOffset: sale.invoiceIdOffset || null,
+            ofdPrepayId: sale.ofdPrepayId || null,
+            ofdUrl: sale.ofdUrl || null,
+            ofdFullId: sale.ofdFullId || null,
+            ofdFullUrl: sale.ofdFullUrl || null,
+            additionalCommissionOfdUrl: sale.additionalCommissionOfdUrl || null,
+          };
+          return NextResponse.json({ ok: true, sale: out });
+        }
+      } catch {}
+    }
     return NextResponse.json({ ok: true });
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'Server error';
