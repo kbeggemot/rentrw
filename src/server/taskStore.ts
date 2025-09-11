@@ -171,6 +171,25 @@ async function readByTask(taskId: number | string): Promise<{ inn: string; userI
   try { const d = JSON.parse(raw); return (d && typeof d.inn === 'string' && typeof d.userId === 'string') ? d : null; } catch { return null; }
 }
 
+// Resolve owner userId and organization INN for a given taskId using indexes/legacy store
+export async function resolveOwnerAndInnByTask(taskId: number | string): Promise<{ userId: string | null; orgInn: string | null }> {
+  try {
+    const mapped = await readByTask(taskId).catch(() => null);
+    if (mapped) return { userId: mapped.userId, orgInn: mapped.inn };
+  } catch {}
+  try {
+    const store = await readTasks();
+    const found = (store.sales ?? []).find((s) => s.taskId == taskId);
+    if (found) {
+      const innVal = (found.orgInn && String(found.orgInn).trim().length > 0 && String(found.orgInn) !== 'неизвестно')
+        ? String(found.orgInn).replace(/\D/g, '')
+        : null;
+      return { userId: found.userId, orgInn: innVal };
+    }
+  } catch {}
+  return { userId: null, orgInn: null };
+}
+
 // Backward‑compat: try reading legacy sale from tasks.json if not in sharded store
 async function readLegacySale(userId: string, taskId: number | string): Promise<SaleRecord | null> {
   try {

@@ -3,7 +3,7 @@ import { getDecryptedApiToken } from '@/server/secureStore';
 import { resolveRwTokenWithFingerprint } from '@/server/rwToken';
 import { getSelectedOrgInn } from '@/server/orgContext';
 import { readText, writeText } from '@/server/storage';
-import { updateSaleFromStatus, findSaleByTaskId, updateSaleOfdUrlsByOrderId, setSaleCreatedAtRw } from '@/server/taskStore';
+import { updateSaleFromStatus, findSaleByTaskId, updateSaleOfdUrlsByOrderId, setSaleCreatedAtRw, resolveOwnerAndInnByTask } from '@/server/taskStore';
 import { ensureSaleFromTask } from '@/server/taskStore';
 import type { RocketworkTask } from '@/types/rocketwork';
 import { fermaGetAuthTokenCached, fermaCreateReceipt } from '@/server/ofdFerma';
@@ -21,13 +21,21 @@ export async function GET(_: Request) {
   try {
     const cookie = _.headers.get('cookie') || '';
     const mc = /(?:^|;\s*)session_user=([^;]+)/.exec(cookie);
-    const userId = (mc ? decodeURIComponent(mc[1]) : undefined) || _.headers.get('x-user-id') || 'default';
+    let userId = (mc ? decodeURIComponent(mc[1]) : undefined) || _.headers.get('x-user-id') || 'default';
     const urlObj = new URL(_.url);
     const segs = urlObj.pathname.split('/');
     let taskId = decodeURIComponent(segs[segs.length - 1] || '');
     let rwTokenFp: string | null = null;
     try { const s = await findSaleByTaskId(userId, taskId); rwTokenFp = (s as any)?.rwTokenFp ?? null; } catch {}
-    const inn = getSelectedOrgInn(_);
+    let inn = getSelectedOrgInn(_);
+    // Auto-resolve owner and inn by taskId if headers are missing and current user has no access
+    if (!inn || String(inn).trim().length === 0 || inn === 'неизвестно') {
+      try {
+        const mapped = await resolveOwnerAndInnByTask(taskId);
+        if (mapped.userId) userId = mapped.userId;
+        if (mapped.orgInn) inn = mapped.orgInn;
+      } catch {}
+    }
     const { token } = await resolveRwTokenWithFingerprint(_, userId, inn, rwTokenFp);
     if (!token) return NextResponse.json({ error: 'API токен не задан' }, { status: 400 });
 

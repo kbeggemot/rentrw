@@ -80,6 +80,8 @@ export async function POST(req: Request) {
     const body = await req.json() as { phone?: string };
     const inn = getSelectedOrgInn(req);
     const phone = String(body?.phone || '').trim();
+    // Normalize common formats: drop all non-digits, allow leading +, unify to digits-only for RW lookups and storage
+    const phoneDigits = phone.replace(/\D/g, '');
     if (!phone) return NextResponse.json({ error: 'Введите телефон' }, { status: 400 });
 
     const base = process.env.ROCKETWORK_API_BASE_URL || DEFAULT_BASE_URL;
@@ -96,7 +98,6 @@ export async function POST(req: Request) {
     } catch {}
 
     // 2) Validate by fetching executor info
-    const phoneDigits = phone.replace(/\D/g, '');
     async function getExecutorById(id: string) {
       const url = new URL(`executors/${encodeURIComponent(id)}`, base.endsWith('/') ? base : base + '/').toString();
       const res = await fetch(url, { method: 'GET', headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }, cache: 'no-store' });
@@ -147,9 +148,9 @@ export async function POST(req: Request) {
       ?? (chosen.data?.employment_kind as string | undefined)
       ?? null;
 
-    await upsertPartnerFromValidation(userId, phone, chosen.data, inn ?? null);
-
-    return NextResponse.json({ ok: true, partner: { phone, fio, status, employmentKind } }, { status: 201 });
+    await upsertPartnerFromValidation(userId, phoneDigits || phone, chosen.data, inn ?? null);
+    
+    return NextResponse.json({ ok: true, partner: { phone: phoneDigits || phone, fio, status, employmentKind } }, { status: 201 });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Server error';
     return NextResponse.json({ error: message }, { status: 500 });
