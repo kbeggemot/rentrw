@@ -571,7 +571,23 @@ export default function NewLinkStandalonePage() {
                         const code = d?.error; if (code==='INVALID_FORMAT') showToast('Загрузите файл в формате PDF','error'); else if (code==='TOO_LARGE') showToast('Файл слишком большой. Загрузите файл размером до 5 МБ','error'); else showToast('Не удалось открыть файл. Попробуйте другой PDF','error');
                         return;
                       }
-                      const h = d?.item?.hash; if (h) { setSelectedDoc(h); setDocs((prev)=> { const exists = prev.some(x=> x.hash===h); return exists ? prev.map(x=> x.hash===h ? { ...x, name: f.name, size: f.size } : x) : [{ hash: h, name: f.name, size: f.size }, ...prev]; }); setShowTermsUpload(false); showToast('Документ загружен','success'); }
+                      const h = d?.item?.hash; if (h) {
+                        setSelectedDoc(h);
+                        setDocs((prev)=> { const exists = prev.some(x=> x.hash===h); return exists ? prev.map(x=> x.hash===h ? { ...x, name: f.name, size: f.size } : x) : [{ hash: h, name: f.name, size: f.size }, ...prev]; });
+                        // Refresh docs list to avoid any races and guarantee presence in dropdown
+                        try {
+                          const r2 = await fetch('/api/docs', { cache: 'no-store' });
+                          const j2 = await r2.json();
+                          const arr2 = Array.isArray(j2?.items) ? j2.items : [];
+                          setDocs((prev)=>{
+                            const by = new Map(prev.map(x=>[x.hash,x] as const));
+                            for (const it of arr2) by.set(it.hash, { hash: it.hash, name: it.name, size: it.size });
+                            return Array.from(by.values());
+                          });
+                        } catch {}
+                        setShowTermsUpload(false);
+                        showToast('Документ загружен','success');
+                      }
                     } catch { showToast('Не удалось открыть файл. Попробуйте другой PDF', 'error'); }
                     finally { setUploading(false); if (inputEl) inputEl.value=''; }
                   }} />
