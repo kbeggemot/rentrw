@@ -394,9 +394,9 @@ export async function updateSaleFromStatus(userId: string, taskId: number | stri
     if (typeof update.ofdFullUrl !== 'undefined' && update.ofdFullUrl) next.ofdFullUrl = update.ofdFullUrl;
     if (typeof update.additionalCommissionOfdUrl !== 'undefined' && update.additionalCommissionOfdUrl) next.additionalCommissionOfdUrl = update.additionalCommissionOfdUrl;
     if (typeof update.npdReceiptUri !== 'undefined' && update.npdReceiptUri) next.npdReceiptUri = update.npdReceiptUri;
-    // no-op guard: skip write if nothing changed
-    const beforeVals = { status: current.status, ofdUrl: current.ofdUrl, ofdFullUrl: current.ofdFullUrl, additionalCommissionOfdUrl: current.additionalCommissionOfdUrl, npdReceiptUri: current.npdReceiptUri };
-    const afterVals = { status: next.status, ofdUrl: next.ofdUrl, ofdFullUrl: next.ofdFullUrl, additionalCommissionOfdUrl: next.additionalCommissionOfdUrl, npdReceiptUri: next.npdReceiptUri };
+    // no-op guard: skip write if nothing changed (include rootStatus as well)
+    const beforeVals = { status: current.status, rootStatus: (current as any).rootStatus ?? null, ofdUrl: current.ofdUrl, ofdFullUrl: current.ofdFullUrl, additionalCommissionOfdUrl: current.additionalCommissionOfdUrl, npdReceiptUri: current.npdReceiptUri } as const;
+    const afterVals = { status: next.status, rootStatus: (next as any).rootStatus ?? null, ofdUrl: next.ofdUrl, ofdFullUrl: next.ofdFullUrl, additionalCommissionOfdUrl: next.additionalCommissionOfdUrl, npdReceiptUri: next.npdReceiptUri } as const;
     if (JSON.stringify(beforeVals) === JSON.stringify(afterVals)) return;
     next.updatedAt = new Date().toISOString();
     store.sales[idx] = next;
