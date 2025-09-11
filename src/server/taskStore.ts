@@ -364,11 +364,20 @@ export async function updateSaleFromStatus(userId: string, taskId: number | stri
     if (typeof update.status !== 'undefined' && update.status !== null) {
       const prevStatus = String(next.status || '').toLowerCase();
       const newStatus = String(update.status || '').toLowerCase();
-      next.status = update.status;
-      const wasPaid = prevStatus === 'paid' || prevStatus === 'transfered' || prevStatus === 'transferred';
-      const nowPaid = newStatus === 'paid' || newStatus === 'transfered' || newStatus === 'transferred';
-      if (!wasPaid && nowPaid && !next.paidAt) {
-        next.paidAt = new Date().toISOString();
+      // Guard: if someone accidentally passed root task status into `status`,
+      // do NOT overwrite acquiring/payment status. Persist it into rootStatus instead.
+      const acquiringStatuses = new Set(['pending', 'paying', 'paid', 'transfered', 'transferred', 'expired', 'refunded', 'failed']);
+      const rootOnlyStatuses = new Set(['completed', 'draft', 'canceled', 'cancelled', 'error']);
+      if (!acquiringStatuses.has(newStatus) && rootOnlyStatuses.has(newStatus)) {
+        // treat as root status update only
+        (next as any).rootStatus = update.status as any;
+      } else {
+        next.status = update.status;
+        const wasPaid = prevStatus === 'paid' || prevStatus === 'transfered' || prevStatus === 'transferred';
+        const nowPaid = newStatus === 'paid' || newStatus === 'transfered' || newStatus === 'transferred';
+        if (!wasPaid && nowPaid && !next.paidAt) {
+          next.paidAt = new Date().toISOString();
+        }
       }
     }
     // Try to infer root status from textual payloads when available in update (duck-typing)
