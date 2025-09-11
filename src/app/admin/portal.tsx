@@ -483,14 +483,15 @@ function PartnersPanel({ showToast, role }: { showToast: (m: string, k?: any) =>
       </div>
       <div className="border rounded overflow-x-auto">
         <table className="min-w-full text-sm">
-          <thead><tr><th className="text-left px-2 py-1">createdAt</th><th className="text-left px-2 py-1">phone</th><th className="text-left px-2 py-1">fio</th><th className="text-left px-2 py-1">status</th><th className="text-left px-2 py-1">inn</th><th className="text-left px-2 py-1">orgInn</th><th className="text-left px-2 py-1">Действия</th></tr></thead>
+          <thead><tr><th className="text-left px-2 py-1">createdAt</th><th className="text-left px-2 py-1">phone</th><th className="text-left px-2 py-1">fio</th><th className="text-left px-2 py-1">status</th><th className="text-left px-2 py-1">тип</th><th className="text-left px-2 py-1">inn</th><th className="text-left px-2 py-1">orgInn</th><th className="text-left px-2 py-1">Действия</th></tr></thead>
           <tbody>
-            {items.filter((x)=>{ const v=q.trim().toLowerCase(); if(!v) return true; const hay=[x.phone,x.fio,x.status,x.inn,x.orgInn].join(' ').toLowerCase(); return hay.includes(v); }).slice((page-1)*100, page*100).map((x)=> (
+            {items.filter((x)=>{ const v=q.trim().toLowerCase(); if(!v) return true; const kind=(x.employmentKind==='entrepreneur'?'ип':x.employmentKind==='selfemployed'?'смз':''); const hay=[x.phone,x.fio,x.status,kind,x.inn,x.orgInn].join(' ').toLowerCase(); return hay.includes(v); }).slice((page-1)*100, page*100).map((x)=> (
               <tr key={x.userId+':'+x.phone} className="border-t">
                 <td className="px-2 py-1">{x.createdAt?new Date(x.createdAt).toLocaleString('ru-RU',{timeZone:'Europe/Moscow'}):'—'}</td>
                 <td className="px-2 py-1">{x.phone}</td>
                 <td className="px-2 py-1">{x.fio||'—'}</td>
                 <td className="px-2 py-1">{x.status||'—'}</td>
+                <td className="px-2 py-1">{x.employmentKind==='entrepreneur'?'ип':(x.employmentKind==='selfemployed'?'смз':'—')}</td>
                 <td className="px-2 py-1">{x.inn||'—'}</td>
                 <td className="px-2 py-1">{x.orgInn||'—'}</td>
                 <td className="px-2 py-1">
@@ -501,7 +502,7 @@ function PartnersPanel({ showToast, role }: { showToast: (m: string, k?: any) =>
           </tbody>
         </table>
       </div>
-      <Pager total={items.filter((x)=>{ const v=q.trim().toLowerCase(); if(!v) return true; const hay=[x.phone,x.fio,x.status,x.inn,x.orgInn].join(' ').toLowerCase(); return hay.includes(v); }).length} page={page} setPage={setPage} />
+      <Pager total={items.filter((x)=>{ const v=q.trim().toLowerCase(); if(!v) return true; const kind=(x.employmentKind==='entrepreneur'?'ип':x.employmentKind==='selfemployed'?'смз':''); const hay=[x.phone,x.fio,x.status,kind,x.inn,x.orgInn].join(' ').toLowerCase(); return hay.includes(v); }).length} page={page} setPage={setPage} />
     </div>
   );
 }

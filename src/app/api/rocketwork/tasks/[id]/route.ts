@@ -96,6 +96,23 @@ export async function GET(_: Request) {
       } catch {}
     }
 
+    // Superadmin fallback: if still Not Found, try scanning all org tokens
+    if (!res.ok && (res.status === 404 || res.status === 401)) {
+      try {
+        const { allOrganizations, getTokenForOrg, listActiveTokensForOrg } = await import('@/server/orgStore');
+        const orgs = await allOrganizations();
+        outer: for (const org of orgs) {
+          const tokens = await listActiveTokensForOrg(org.inn);
+          for (const t of tokens) {
+            try {
+              const r3 = await fetch(url, { method: 'GET', headers: { Authorization: `Bearer ${t}`, Accept: 'application/json' }, cache: 'no-store' });
+              if (r3.ok) { res = r3; token = t; inn = org.inn; break outer; }
+            } catch {}
+          }
+        }
+      } catch {}
+    }
+
     let text = await res.text();
     let data: unknown = null;
     try { data = text ? JSON.parse(text) : null; } catch { data = text; }
