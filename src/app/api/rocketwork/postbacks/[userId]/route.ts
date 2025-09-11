@@ -293,6 +293,28 @@ export async function POST(req: Request) {
                     const invoiceIdFull = (sale as any).invoiceIdFull || null;
                     if (invoiceIdFull) {
                       const partnerName = (taskObj?.executor && [taskObj?.executor?.last_name, taskObj?.executor?.first_name, taskObj?.executor?.second_name].filter(Boolean).join(' ').trim()) || undefined;
+                      // Pre-check by InvoiceId to avoid duplicate creation
+                      try {
+                        let existingUrl: string | undefined;
+                        let existingId: string | undefined;
+                        try {
+                          const stPre = await fermaGetReceiptStatus(String(invoiceIdFull), { baseUrl, authToken: tokenOfd });
+                          const objPre = stPre.rawText ? JSON.parse(stPre.rawText) : {};
+                          const fnPre = objPre?.Data?.Fn || objPre?.Fn;
+                          const fdPre = objPre?.Data?.Fd || objPre?.Fd;
+                          const fpPre = objPre?.Data?.Fp || objPre?.Fp;
+                          const directPre = objPre?.Data?.Device?.OfdReceiptUrl as string | undefined;
+                          if (typeof directPre === 'string' && directPre.length > 0) existingUrl = directPre;
+                          else if (fnPre && fdPre != null && fpPre != null) existingUrl = buildReceiptViewUrl(fnPre, fdPre, fpPre);
+                          existingId = (objPre?.Data?.ReceiptId as string | undefined) ?? (objPre?.ReceiptId as string | undefined);
+                        } catch {}
+                        if (existingId || existingUrl) {
+                          const numOrderPre = Number(String(sale.orderId).match(/(\d+)/g)?.slice(-1)[0] || NaN);
+                          await updateSaleOfdUrlsByOrderId(userId, numOrderPre, { ofdFullId: existingId || null, ...(existingUrl ? { ofdFullUrl: existingUrl } : {}) });
+                          // Skip creation since exists
+                          return NextResponse.json({ ok: true });
+                        }
+                      } catch {}
                       try {
                         const prev = (await readText('.data/ofd_create_attempts.log')) || '';
                         const line = JSON.stringify({ ts: new Date().toISOString(), src: 'postback', stage: 'create_attempt', party: 'partner', userId, taskId, orderId: sale.orderId, invoiceId: invoiceIdFull, callbackUrl });
@@ -372,16 +394,18 @@ export async function POST(req: Request) {
                         await writeText('.data/ofd_create_attempts.log', prev2 + line2 + '\n');
                       } catch {}
                       { const numOrder = Number(String(sale.orderId).match(/(\d+)/g)?.slice(-1)[0] || NaN); await updateSaleOfdUrlsByOrderId(userId, numOrder, { ofdFullId: created.id || null }); }
-                      // defer URL resolve to give callback up to ~10s per docs
+                      // defer URL resolve with retries: 7x every 10s, then background worker will handle
                       (async () => {
-                        try { await new Promise((r) => setTimeout(r, 10000)); } catch {}
-                        try {
-                          const built = await tryResolveUrl(created.id || null);
+                        let built: string | undefined;
+                        for (let i = 0; i < 7; i += 1) {
+                          try { await new Promise((r) => setTimeout(r, 10000)); } catch {}
+                          try { built = await tryResolveUrl(created.id || null); } catch { built = undefined; }
                           if (built) {
                             const numOrder = Number(String(sale.orderId).match(/(\d+)/g)?.slice(-1)[0] || NaN);
-                            await updateSaleOfdUrlsByOrderId(userId, numOrder, { ofdFullUrl: built });
+                            try { await updateSaleOfdUrlsByOrderId(userId, numOrder, { ofdFullUrl: built }); } catch {}
+                            return;
                           }
-                        } catch {}
+                        }
                       })();
                     }
                   } else {
@@ -396,6 +420,28 @@ export async function POST(req: Request) {
                     const phase = await getOrSetOfdPhase(userId, lockOrder, 'prepay');
                     if (invoiceIdPrepay && !hasFullAlready && !equalMsk && phase === 'prepay') {
                       const partnerName2 = (taskObj?.executor && [taskObj?.executor?.last_name, taskObj?.executor?.first_name, taskObj?.executor?.second_name].filter(Boolean).join(' ').trim()) || undefined;
+                      // Pre-check by InvoiceId to avoid duplicate creation
+                      try {
+                        let existingUrl: string | undefined;
+                        let existingId: string | undefined;
+                        try {
+                          const stPre = await fermaGetReceiptStatus(String(invoiceIdPrepay), { baseUrl, authToken: tokenOfd });
+                          const objPre = stPre.rawText ? JSON.parse(stPre.rawText) : {};
+                          const fnPre = objPre?.Data?.Fn || objPre?.Fn;
+                          const fdPre = objPre?.Data?.Fd || objPre?.Fd;
+                          const fpPre = objPre?.Data?.Fp || objPre?.Fp;
+                          const directPre = objPre?.Data?.Device?.OfdReceiptUrl as string | undefined;
+                          if (typeof directPre === 'string' && directPre.length > 0) existingUrl = directPre;
+                          else if (fnPre && fdPre != null && fpPre != null) existingUrl = buildReceiptViewUrl(fnPre, fdPre, fpPre);
+                          existingId = (objPre?.Data?.ReceiptId as string | undefined) ?? (objPre?.ReceiptId as string | undefined);
+                        } catch {}
+                        if (existingId || existingUrl) {
+                          const numOrderPre = Number(String(sale.orderId).match(/(\d+)/g)?.slice(-1)[0] || NaN);
+                          await updateSaleOfdUrlsByOrderId(userId, numOrderPre, { ofdPrepayId: existingId || null, ...(existingUrl ? { ofdUrl: existingUrl } : {}) });
+                          // Skip creation since exists
+                          return NextResponse.json({ ok: true });
+                        }
+                      } catch {}
                       try {
                         const prev = (await readText('.data/ofd_create_attempts.log')) || '';
                         const line = JSON.stringify({ ts: new Date().toISOString(), src: 'postback', stage: 'create_attempt', party: 'partner', userId, taskId, orderId: sale.orderId, invoiceId: invoiceIdPrepay, callbackUrl });
@@ -414,16 +460,18 @@ export async function POST(req: Request) {
                         await writeText('.data/ofd_create_attempts.log', prev2 + line2 + '\n');
                       } catch {}
                       { const numOrder = Number(String(sale.orderId).match(/(\d+)/g)?.slice(-1)[0] || NaN); await updateSaleOfdUrlsByOrderId(userId, numOrder, { ofdPrepayId: created.id || null }); }
-                      // defer URL resolve to give callback up to ~10s
+                      // defer URL resolve with retries: 7x every 10s
                       (async () => {
-                        try { await new Promise((r) => setTimeout(r, 10000)); } catch {}
-                        try {
-                          const built = await tryResolveUrl(created.id || null);
+                        let built: string | undefined;
+                        for (let i = 0; i < 7; i += 1) {
+                          try { await new Promise((r) => setTimeout(r, 10000)); } catch {}
+                          try { built = await tryResolveUrl(created.id || null); } catch { built = undefined; }
                           if (built) {
                             const numOrder = Number(String(sale.orderId).match(/(\d+)/g)?.slice(-1)[0] || NaN);
-                            await updateSaleOfdUrlsByOrderId(userId, numOrder, { ofdUrl: built });
+                            try { await updateSaleOfdUrlsByOrderId(userId, numOrder, { ofdUrl: built }); } catch {}
+                            return;
                           }
-                        } catch {}
+                        }
                       })();
                       // schedule offset at 12:00 MSK
                       if (sale.serviceEndDate) {
@@ -451,6 +499,27 @@ export async function POST(req: Request) {
                 if (useFull) {
                   const invoiceIdFull = (sale as any).invoiceIdFull || null;
                   if (invoiceIdFull) {
+                    // Pre-check by InvoiceId to avoid duplicate creation
+                    try {
+                      let existingUrl: string | undefined;
+                      let existingId: string | undefined;
+                      try {
+                        const stPre = await fermaGetReceiptStatus(String(invoiceIdFull), { baseUrl, authToken: tokenOfd });
+                        const objPre = stPre.rawText ? JSON.parse(stPre.rawText) : {};
+                        const fnPre = objPre?.Data?.Fn || objPre?.Fn;
+                        const fdPre = objPre?.Data?.Fd || objPre?.Fd;
+                        const fpPre = objPre?.Data?.Fp || objPre?.Fp;
+                        const directPre = objPre?.Data?.Device?.OfdReceiptUrl as string | undefined;
+                        if (typeof directPre === 'string' && directPre.length > 0) existingUrl = directPre;
+                        else if (fnPre && fdPre != null && fpPre != null) existingUrl = buildReceiptViewUrl(fnPre, fdPre, fpPre);
+                        existingId = (objPre?.Data?.ReceiptId as string | undefined) ?? (objPre?.ReceiptId as string | undefined);
+                      } catch {}
+                      if (existingId || existingUrl) {
+                        const numOrderPre = Number(String(sale.orderId).match(/(\d+)/g)?.slice(-1)[0] || NaN);
+                        await updateSaleOfdUrlsByOrderId(userId, numOrderPre, { ofdFullId: existingId || null, ...(existingUrl ? { ofdFullUrl: existingUrl } : {}) });
+                        return NextResponse.json({ ok: true });
+                      }
+                    } catch {}
                     try {
                       const prev = (await readText('.data/ofd_create_attempts.log')) || '';
                       const line = JSON.stringify({ ts: new Date().toISOString(), src: 'postback', stage: 'create_attempt', party: 'org', userId, taskId, orderId: sale.orderId, invoiceId: invoiceIdFull, callbackUrl, orgInn });
@@ -487,21 +556,45 @@ export async function POST(req: Request) {
                       await writeText('.data/ofd_create_attempts.log', prev2 + line2 + '\n');
                     } catch {}
                     { const numOrder = Number(String(sale.orderId).match(/(\d+)/g)?.slice(-1)[0] || NaN); await updateSaleOfdUrlsByOrderId(userId, numOrder, { ofdFullId: created.id || null }); }
-                    // defer URL resolve to give callback up to ~10s
+                    // defer URL resolve with retries: 7x every 10s
                     (async () => {
-                      try { await new Promise((r) => setTimeout(r, 10000)); } catch {}
-                      try {
-                        const built = await tryResolveUrl(created.id || null);
+                      let built: string | undefined;
+                      for (let i = 0; i < 7; i += 1) {
+                        try { await new Promise((r) => setTimeout(r, 10000)); } catch {}
+                        try { built = await tryResolveUrl(created.id || null); } catch { built = undefined; }
                         if (built) {
                           const numOrder = Number(String(sale.orderId).match(/(\d+)/g)?.slice(-1)[0] || NaN);
-                          await updateSaleOfdUrlsByOrderId(userId, numOrder, { ofdFullUrl: built });
+                          try { await updateSaleOfdUrlsByOrderId(userId, numOrder, { ofdFullUrl: built }); } catch {}
+                          return;
                         }
-                      } catch {}
+                      }
                     })();
                   }
                 } else {
                   const invoiceIdPrepay = (sale as any).invoiceIdPrepay || null;
                   if (invoiceIdPrepay) {
+                    // Pre-check by InvoiceId to avoid duplicate creation
+                    try {
+                      let existingUrl: string | undefined;
+                      let existingId: string | undefined;
+                      try {
+                        const stPre = await fermaGetReceiptStatus(String(invoiceIdPrepay), { baseUrl, authToken: tokenOfd });
+                        const objPre = stPre.rawText ? JSON.parse(stPre.rawText) : {};
+                        const fnPre = objPre?.Data?.Fn || objPre?.Fn;
+                        const fdPre = objPre?.Data?.Fd || objPre?.Fd;
+                        const fpPre = objPre?.Data?.Fp || objPre?.Fp;
+                        const directPre = objPre?.Data?.Device?.OfdReceiptUrl as string | undefined;
+                        if (typeof directPre === 'string' && directPre.length > 0) existingUrl = directPre;
+                        else if (fnPre && fdPre != null && fpPre != null) existingUrl = buildReceiptViewUrl(fnPre, fdPre, fpPre);
+                        existingId = (objPre?.Data?.ReceiptId as string | undefined) ?? (objPre?.ReceiptId as string | undefined);
+                      } catch {}
+                      if (existingId || existingUrl) {
+                        const numOrderPre = Number(String(sale.orderId).match(/(\d+)/g)?.slice(-1)[0] || NaN);
+                        await updateSaleOfdUrlsByOrderId(userId, numOrderPre, { ofdPrepayId: existingId || null, ...(existingUrl ? { ofdUrl: existingUrl } : {}) });
+                        // Existing found; skip creation
+                        return NextResponse.json({ ok: true });
+                      }
+                    } catch {}
                     try {
                       const prev = (await readText('.data/ofd_create_attempts.log')) || '';
                       const line = JSON.stringify({ ts: new Date().toISOString(), src: 'postback', stage: 'create_attempt', party: 'org', userId, taskId, orderId: sale.orderId, invoiceId: invoiceIdPrepay, callbackUrl, orgInn });
@@ -538,13 +631,19 @@ export async function POST(req: Request) {
                       await writeText('.data/ofd_create_attempts.log', prev2 + line2 + '\n');
                     } catch {}
                     { const numOrder = Number(String(sale.orderId).match(/(\d+)/g)?.slice(-1)[0] || NaN); await updateSaleOfdUrlsByOrderId(userId, numOrder, { ofdPrepayId: created.id || null }); }
-                    try {
-                      const built = await tryResolveUrl(created.id || null);
-                      if (built) {
-                        const numOrder = Number(String(sale.orderId).match(/(\d+)/g)?.slice(-1)[0] || NaN);
-                        await updateSaleOfdUrlsByOrderId(userId, numOrder, { ofdUrl: built });
+                    // defer URL resolve with retries: 7x every 10s
+                    (async () => {
+                      let built: string | undefined;
+                      for (let i = 0; i < 7; i += 1) {
+                        try { await new Promise((r) => setTimeout(r, 10000)); } catch {}
+                        try { built = await tryResolveUrl(created.id || null); } catch { built = undefined; }
+                        if (built) {
+                          const numOrder = Number(String(sale.orderId).match(/(\d+)/g)?.slice(-1)[0] || NaN);
+                          try { await updateSaleOfdUrlsByOrderId(userId, numOrder, { ofdUrl: built }); } catch {}
+                          return;
+                        }
                       }
-                    } catch {}
+                    })();
                     if (sale.serviceEndDate) {
                       startOfdScheduleWorker();
                       const dueDate = new Date(`${sale.serviceEndDate}T09:00:00Z`);
