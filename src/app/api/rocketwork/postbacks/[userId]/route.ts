@@ -127,8 +127,11 @@ export async function POST(req: Request) {
       const rootStatusRaw = pick<string>(data, 'status')
         ?? pick<string>(data, 'task.status');
 
+      const allowedAo = new Set(['pending','paying','paid','transfered','transferred','expired','refunded','failed']);
+      const statusLower = typeof status === 'string' ? String(status).toLowerCase() : undefined;
+      const aoLower = typeof aoStatusRaw === 'string' ? String(aoStatusRaw).toLowerCase() : undefined;
       await updateSaleFromStatus(userId, taskId, {
-        status: status || aoStatusRaw,
+        status: (statusLower && allowedAo.has(statusLower)) ? statusLower : (aoLower && allowedAo.has(aoLower) ? aoLower : undefined as any),
         ofdUrl: ofdUrl || undefined,
         additionalCommissionOfdUrl: additionalCommissionOfdUrl || undefined,
         npdReceiptUri: npdReceiptUri || undefined,
