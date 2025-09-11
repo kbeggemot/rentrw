@@ -150,7 +150,19 @@ export async function repairUserSales(userId: string, onlyOrderId?: number): Pro
             })();
             const itemLabel = (() => { try { const d=(s as any)?.description&&String((s as any).description).trim(); if(d) return String(d).slice(0,128); const snap=(s as any)?.itemsSnapshot as any[]|null; if(Array.isArray(snap)&&snap.length>0){ const labels=snap.map(it=>String(it?.title||'').trim()).filter(Boolean); if(labels.length>0) return labels.join(', ').slice(0,128);} } catch{} return 'Оплата услуг'; })();
             const payload = buildFermaReceiptPayload({ party: 'partner', partyInn: partnerInn, description: itemLabel, amountRub: s.isAgent ? Math.max(0, s.amountGrossRub - s.retainedCommissionRub) : s.amountGrossRub, vatRate: (s.vatRate as any) || 'none', methodCode: PAYMENT_METHOD_FULL_PAYMENT, orderId: s.orderId, docType: 'Income', buyerEmail: s.clientEmail || defaultEmail, invoiceId: s.invoiceIdFull, callbackUrl: undefined, paymentAgentInfo: { AgentType: 'AGENT', SupplierInn: partnerInn, SupplierName: partnerName || 'Исполнитель' }, items: itemsParam });
+            try {
+              const { readText, writeText } = await import('./storage');
+              const prev = (await readText('.data/ofd_create_attempts.log')) || '';
+              const line = JSON.stringify({ ts: new Date().toISOString(), src: 'repair_worker', stage: 'create_attempt', party: 'partner', userId, taskId: s.taskId, orderId: s.orderId, invoiceId: s.invoiceIdFull, doc: 'C' }) + '\n';
+              await writeText('.data/ofd_create_attempts.log', prev + line);
+            } catch {}
             const created = await fermaCreateReceipt(payload, { baseUrl, authToken: ofdToken });
+            try {
+              const { readText, writeText } = await import('./storage');
+              const prev = (await readText('.data/ofd_create_attempts.log')) || '';
+              const line = JSON.stringify({ ts: new Date().toISOString(), src: 'repair_worker', stage: 'create_result', party: 'partner', userId, taskId: s.taskId, orderId: s.orderId, invoiceId: s.invoiceIdFull, id: created.id, rawStatus: created.rawStatus, statusText: created.status, doc: 'C' }) + '\n';
+              await writeText('.data/ofd_create_attempts.log', prev + line);
+            } catch {}
             try { (global as any).__OFD_SOURCE__ = 'repair_worker'; } catch {}
             { const numOrder = Number(String(s.orderId).match(/(\d+)/g)?.slice(-1)[0] || NaN); await updateSaleOfdUrlsByOrderId(userId, numOrder, { ofdFullId: created.id || null }); }
             // Try to resolve URL right away without waiting for callback
@@ -215,7 +227,19 @@ export async function repairUserSales(userId: string, onlyOrderId?: number): Pro
             })();
             const itemLabelOrg = (() => { try { const d=(s as any)?.description&&String((s as any).description).trim(); if(d) return String(d).slice(0,128); const snap=(s as any)?.itemsSnapshot as any[]|null; if(Array.isArray(snap)&&snap.length>0){ const labels=snap.map(it=>String(it?.title||'').trim()).filter(Boolean); if(labels.length>0) return labels.join(', ').slice(0,128);} } catch{} return 'Оплата услуг'; })();
             const payload = buildFermaReceiptPayload({ party: 'org', partyInn: orgInn, description: itemLabelOrg, amountRub: s.amountGrossRub, vatRate: (s.vatRate as any) || 'none', methodCode: PAYMENT_METHOD_FULL_PAYMENT, orderId: s.orderId, docType: 'Income', buyerEmail: s.clientEmail || defaultEmail, invoiceId: s.invoiceIdFull, callbackUrl: undefined, paymentAgentInfo: { AgentType: 'AGENT', SupplierInn: orgInn, SupplierName: supplierName }, items: itemsParamOrg });
+            try {
+              const { readText, writeText } = await import('./storage');
+              const prev = (await readText('.data/ofd_create_attempts.log')) || '';
+              const line = JSON.stringify({ ts: new Date().toISOString(), src: 'repair_worker', stage: 'create_attempt', party: 'org', userId, taskId: s.taskId, orderId: s.orderId, invoiceId: s.invoiceIdFull, doc: 'C' }) + '\n';
+              await writeText('.data/ofd_create_attempts.log', prev + line);
+            } catch {}
             const created = await fermaCreateReceipt(payload, { baseUrl, authToken: ofdToken });
+            try {
+              const { readText, writeText } = await import('./storage');
+              const prev = (await readText('.data/ofd_create_attempts.log')) || '';
+              const line = JSON.stringify({ ts: new Date().toISOString(), src: 'repair_worker', stage: 'create_result', party: 'org', userId, taskId: s.taskId, orderId: s.orderId, invoiceId: s.invoiceIdFull, id: created.id, rawStatus: created.rawStatus, statusText: created.status, doc: 'C' }) + '\n';
+              await writeText('.data/ofd_create_attempts.log', prev + line);
+            } catch {}
             try { (global as any).__OFD_SOURCE__ = 'repair_worker'; } catch {}
             { const numOrder = Number(String(s.orderId).match(/(\d+)/g)?.slice(-1)[0] || NaN); await updateSaleOfdUrlsByOrderId(userId, numOrder, { ofdFullId: created.id || null }); }
             // Try to resolve URL right away without waiting for callback
