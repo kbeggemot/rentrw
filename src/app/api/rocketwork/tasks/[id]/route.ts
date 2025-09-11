@@ -150,10 +150,11 @@ export async function GET(_: Request) {
       const aoStatus = String(normalized?.acquiring_order?.status || '').toLowerCase();
       const rootStatus = String(normalized?.status || '').toLowerCase();
       const hasAgent = Boolean(normalized?.additional_commission_value);
-      // New gate: require full-settlement receipt link present in our store
+      // New gate: require full-settlement receipt link AND commission receipt link present in our store
       let saleHasFull = false;
-      try { const s = await findSaleByTaskId(userId, taskId); saleHasFull = Boolean(s?.ofdFullUrl); } catch {}
-      if (hasAgent && aoStatus === 'transfered' && rootStatus === 'completed' && saleHasFull) {
+      let saleHasCommission = false;
+      try { const s = await findSaleByTaskId(userId, taskId); saleHasFull = Boolean(s?.ofdFullUrl); saleHasCommission = Boolean((s as any)?.additionalCommissionOfdUrl); } catch {}
+      if (hasAgent && aoStatus === 'transfered' && rootStatus === 'completed' && saleHasFull && saleHasCommission) {
         // Prefer org-scoped token for the sale if available
         try {
           const { findSaleByTaskId } = await import('@/server/taskStore');
@@ -193,16 +194,16 @@ export async function GET(_: Request) {
             isEntrepreneurPartner = ek === 'entrepreneur';
           }
           if (!isEntrepreneurPartner) {
-            let triesNpd = 0;
-            while (!normalized?.receipt_uri && triesNpd < 5) {
-              await new Promise((r) => setTimeout(r, 1200));
-              res = await fetch(url, { method: 'GET', headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }, cache: 'no-store' });
-              text = await res.text();
-              try { data = text ? JSON.parse(text) : null; } catch { data = text; }
-              maybeObj = typeof data === 'object' && data !== null ? (data as Record<string, unknown>) : null;
-              normalized = ((maybeObj?.task as RocketworkTask) ?? (data as RocketworkTask));
-              triesNpd += 1;
-            }
+        let triesNpd = 0;
+        while (!normalized?.receipt_uri && triesNpd < 5) {
+          await new Promise((r) => setTimeout(r, 1200));
+          res = await fetch(url, { method: 'GET', headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }, cache: 'no-store' });
+          text = await res.text();
+          try { data = text ? JSON.parse(text) : null; } catch { data = text; }
+          maybeObj = typeof data === 'object' && data !== null ? (data as Record<string, unknown>) : null;
+          normalized = ((maybeObj?.task as RocketworkTask) ?? (data as RocketworkTask));
+          triesNpd += 1;
+        }
           }
         } catch {}
       }

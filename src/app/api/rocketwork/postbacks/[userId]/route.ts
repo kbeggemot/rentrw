@@ -146,12 +146,13 @@ export async function POST(req: Request) {
         await writeText('.data/ofd_create_attempts.log', prev + line + '\n');
       } catch {}
       try { await appendAdminEntityLog('sale', [String(userId), String(taskId)], { source: 'system', message: 'postback', data: { event, status: status || null, rootStatusRaw: rootStatusRaw || null } }); } catch {}
-      // Background pay trigger with unchanged conditions (agent, transfered, completed, has full receipt)
+      // Background pay trigger (agent, transfered, completed, has full receipt AND commission receipt)
       try {
         const sale = await findSaleByTaskId(userId, taskId);
         const aoStatus = String(aoStatusRaw || status || '').toLowerCase();
         const rootStatus = String(rootStatusRaw || '').toLowerCase();
-        if (sale && sale.isAgent && sale.ofdFullUrl && aoStatus === 'transfered' && rootStatus === 'completed') {
+        const hasCommission = Boolean(sale?.additionalCommissionOfdUrl);
+        if (sale && sale.isAgent && sale.ofdFullUrl && hasCommission && aoStatus === 'transfered' && rootStatus === 'completed') {
           // Resolve token preferring org-scoped token for the sale's inn
           let token: string | null = null;
           try {
