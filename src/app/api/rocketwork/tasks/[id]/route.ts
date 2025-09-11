@@ -48,13 +48,13 @@ export async function GET(_: Request) {
     try {
       await writeRwLastRequest({ ts: new Date().toISOString(), scope: 'tasks:get', method: 'GET', url, userId });
       res = await fetch(url, {
-        method: 'GET',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          Accept: 'application/json',
-        },
-        cache: 'no-store',
-      });
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: 'application/json',
+      },
+      cache: 'no-store',
+    });
     } catch (e) {
       await appendRwError({ ts: new Date().toISOString(), scope: 'tasks:get', method: 'GET', url, status: null, error: e instanceof Error ? e.message : String(e), userId });
       throw e;
@@ -116,7 +116,7 @@ export async function GET(_: Request) {
     while (tries < 5 && (await needMore(normalized))) {
       await new Promise((r) => setTimeout(r, 1200));
       try {
-        res = await fetch(url, { method: 'GET', headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }, cache: 'no-store' });
+      res = await fetch(url, { method: 'GET', headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }, cache: 'no-store' });
       } catch (e) {
         await appendRwError({ ts: new Date().toISOString(), scope: 'tasks:get', method: 'GET', url, status: null, error: e instanceof Error ? e.message : String(e), userId });
         throw e;
@@ -212,7 +212,13 @@ export async function GET(_: Request) {
                     (normalized as any)?.executor?.second_name,
                   ].filter(Boolean).join(' ').trim()) || undefined;
                   const bEmail = sale.clientEmail || (normalized as any)?.acquiring_order?.client_email || defaultEmail;
-                  const payload = buildFermaReceiptPayload({ party: 'partner', partyInn: partnerInn, description: itemLabel, amountRub: amountNetRub, vatRate: usedVat, methodCode: PAYMENT_METHOD_FULL_PAYMENT, orderId: sale.orderId, docType: 'Income', buyerEmail: bEmail, invoiceId: invoiceIdFull, callbackUrl, paymentAgentInfo: { AgentType: 'AGENT', SupplierInn: partnerInn, SupplierName: partnerName || 'Исполнитель' } });
+                  const itemsParam = await (async ()=>{ try { const snap = (sale as any)?.itemsSnapshot as any[] | null; const inn = (sale as any)?.orgInn ? String((sale as any).orgInn).replace(/\D/g,'') : undefined; const { listProductsForOrg } = await import('@/server/productsStore'); const products = inn ? await listProductsForOrg(inn) : []; const fromSnap = Array.isArray(snap) && snap.length>0 ? snap.map((it:any)=>{ const prod = products.find((p)=> (p.id && it?.id && String(p.id)===String(it.id)) || (p.title && it?.title && String(p.title).toLowerCase()===String(it.title).toLowerCase())) || null; const snapVat=(['none','0','5','7','10','20'].includes(String(it?.vat))?String(it.vat):undefined) as any; return { label:String(it.title||''), price:Number(it.price||0), qty:Number(it.qty||1), vatRate:(snapVat||(prod?.vat as any)||usedVat), unit:(prod?.unit as any), kind:(prod?.kind as any) } as any; }) : []; if (fromSnap.length>0) return fromSnap; const code = (sale as any)?.linkCode ? String((sale as any).linkCode) : null; if (!code) return undefined; const link = await (await fetch(new URL(`/api/links/${encodeURIComponent(code)}`, `${protoHdr}://${hostHdr}`).toString(), { cache:'no-store', headers:{ 'x-user-id': userId } })).json().catch(()=>null); const cart = Array.isArray(link?.cartItems) ? link.cartItems : []; if (cart.length===0) return undefined; return cart.map((c:any)=>{ const prod = products.find((p)=> (p.id && c?.id && String(p.id)===String(c.id)) || (p.title && c?.title && String(p.title).toLowerCase()===String(c.title).toLowerCase())) || null; return { label:String(c.title||''), price:Number(c.price||0), qty:Number(c.qty||1), vatRate:((prod?.vat as any)||usedVat), unit:(prod?.unit as any), kind:(prod?.kind as any) } as any; }); } catch { return undefined; } })();
+                  const itemsFinal = (Array.isArray(itemsParam) && itemsParam.length>0)
+                    ? itemsParam
+                    : ((Array.isArray((sale as any)?.itemsSnapshot) && (sale as any).itemsSnapshot.length>0)
+                      ? (sale as any).itemsSnapshot.map((it:any)=>({ label:String(it.title||''), price:Number(it.price||0), qty:Number(it.qty||1), vatRate: usedVat }))
+                      : undefined);
+                  const payload = buildFermaReceiptPayload({ party: 'partner', partyInn: partnerInn, description: itemLabel, amountRub: amountNetRub, vatRate: usedVat, methodCode: PAYMENT_METHOD_FULL_PAYMENT, orderId: sale.orderId, docType: 'Income', buyerEmail: bEmail, invoiceId: invoiceIdFull, callbackUrl, paymentAgentInfo: { AgentType: 'AGENT', SupplierInn: partnerInn, SupplierName: partnerName || 'Исполнитель' }, items: itemsFinal });
                   const created = await fermaCreateReceipt(payload, { baseUrl, authToken: tokenOfd });
                   { const numOrder = Number(String(sale.orderId).match(/(\d+)/g)?.slice(-1)[0] || NaN); await updateSaleOfdUrlsByOrderId(userId, numOrder, { ofdFullId: created.id || null }); }
                 }
@@ -241,7 +247,13 @@ export async function GET(_: Request) {
                       }
                     }
                   } catch {}
-                  const payload = buildFermaReceiptPayload({ party: 'org', partyInn: orgInn, description: itemLabel, amountRub, vatRate: usedVat, methodCode: PAYMENT_METHOD_FULL_PAYMENT, orderId: sale.orderId, docType: 'Income', buyerEmail: bEmail, invoiceId: invoiceIdFull, callbackUrl, paymentAgentInfo: { AgentType: 'AGENT', SupplierInn: orgInn, SupplierName: supplierNameOrg } });
+                  const itemsParamOrg = await (async ()=>{ try { const snap = (sale as any)?.itemsSnapshot as any[] | null; if (!Array.isArray(snap)||snap.length===0) return undefined; const { listProductsForOrg } = await import('@/server/productsStore'); const products = await listProductsForOrg(orgInn); return snap.map((it:any)=>{ const prod = products.find((p)=> (p.id && it?.id && String(p.id)===String(it.id)) || (p.title && it?.title && String(p.title).toLowerCase()===String(it.title).toLowerCase()))||null; const snapVat=(['none','0','5','7','10','20'].includes(String(it?.vat))?String(it.vat):undefined) as any; return { label:String(it.title||''), price:Number(it.price||0), qty:Number(it.qty||1), vatRate:(snapVat||(prod?.vat as any)||usedVat), unit:(prod?.unit as any), kind:(prod?.kind as any) } as any; }); } catch { return undefined; } })();
+                  const itemsFinalOrg = (Array.isArray(itemsParamOrg) && itemsParamOrg.length>0)
+                    ? itemsParamOrg
+                    : ((Array.isArray((sale as any)?.itemsSnapshot) && (sale as any).itemsSnapshot.length>0)
+                      ? (sale as any).itemsSnapshot.map((it:any)=>({ label:String(it.title||''), price:Number(it.price||0), qty:Number(it.qty||1), vatRate: usedVat }))
+                      : undefined);
+                  const payload = buildFermaReceiptPayload({ party: 'org', partyInn: orgInn, description: itemLabel, amountRub, vatRate: usedVat, methodCode: PAYMENT_METHOD_FULL_PAYMENT, orderId: sale.orderId, docType: 'Income', buyerEmail: bEmail, invoiceId: invoiceIdFull, callbackUrl, paymentAgentInfo: { AgentType: 'AGENT', SupplierInn: orgInn, SupplierName: supplierNameOrg }, items: itemsFinalOrg });
                   const created = await fermaCreateReceipt(payload, { baseUrl, authToken: tokenOfd });
                   { const numOrder = Number(String(sale.orderId).match(/(\d+)/g)?.slice(-1)[0] || NaN); await updateSaleOfdUrlsByOrderId(userId, numOrder, { ofdFullId: created.id || null }); }
                 }
@@ -261,7 +273,13 @@ export async function GET(_: Request) {
                     (normalized as any)?.executor?.second_name,
                   ].filter(Boolean).join(' ').trim()) || undefined;
                   const bEmail = sale.clientEmail || (normalized as any)?.acquiring_order?.client_email || defaultEmail;
-                  const payload = buildFermaReceiptPayload({ party: 'partner', partyInn: partnerInn, description: itemLabel, amountRub: amountNetRub, vatRate: usedVat, methodCode: PAYMENT_METHOD_PREPAY_FULL, orderId: sale.orderId, docType: 'IncomePrepayment', buyerEmail: bEmail, invoiceId: invoiceIdFull, callbackUrl, withPrepaymentItem: true, paymentAgentInfo: { AgentType: 'AGENT', SupplierInn: partnerInn, SupplierName: partnerName2 || 'Исполнитель' } });
+                  const itemsParamA = await (async ()=>{ try { const snap = (sale as any)?.itemsSnapshot as any[] | null; const inn = (sale as any)?.orgInn ? String((sale as any).orgInn).replace(/\D/g,'') : undefined; const { listProductsForOrg } = await import('@/server/productsStore'); const products = inn ? await listProductsForOrg(inn) : []; const fromSnap = Array.isArray(snap) && snap.length>0 ? snap.map((it:any)=>{ const prod = products.find((p)=> (p.id && it?.id && String(p.id)===String(it.id)) || (p.title && it?.title && String(p.title).toLowerCase()===String(it.title).toLowerCase())) || null; const snapVat=(['none','0','5','7','10','20'].includes(String(it?.vat))?String(it.vat):undefined) as any; return { label:String(it.title||''), price:Number(it.price||0), qty:Number(it.qty||1), vatRate:(snapVat||(prod?.vat as any)||usedVat), unit:(prod?.unit as any), kind:(prod?.kind as any) } as any; }) : []; if (fromSnap.length>0) return fromSnap; const code = (sale as any)?.linkCode ? String((sale as any).linkCode) : null; if (!code) return undefined; const link = await (await fetch(new URL(`/api/links/${encodeURIComponent(code)}`, `${protoHdr}://${hostHdr}`).toString(), { cache:'no-store', headers:{ 'x-user-id': userId } })).json().catch(()=>null); const cart = Array.isArray(link?.cartItems) ? link.cartItems : []; if (cart.length===0) return undefined; return cart.map((c:any)=>{ const prod = products.find((p)=> (p.id && c?.id && String(p.id)===String(c.id)) || (p.title && c?.title && String(p.title).toLowerCase()===String(c.title).toLowerCase())) || null; return { label:String(c.title||''), price:Number(c.price||0), qty:Number(c.qty||1), vatRate:((prod?.vat as any)||usedVat), unit:(prod?.unit as any), kind:(prod?.kind as any) } as any; }); } catch { return undefined; } })();
+                  const itemsFinalA = (Array.isArray(itemsParamA) && itemsParamA.length>0)
+                    ? itemsParamA
+                    : ((Array.isArray((sale as any)?.itemsSnapshot) && (sale as any).itemsSnapshot.length>0)
+                      ? (sale as any).itemsSnapshot.map((it:any)=>({ label:String(it.title||''), price:Number(it.price||0), qty:Number(it.qty||1), vatRate: usedVat }))
+                      : undefined);
+                  const payload = buildFermaReceiptPayload({ party: 'partner', partyInn: partnerInn, description: itemLabel, amountRub: amountNetRub, vatRate: usedVat, methodCode: PAYMENT_METHOD_PREPAY_FULL, orderId: sale.orderId, docType: 'IncomePrepayment', buyerEmail: bEmail, invoiceId: invoiceIdFull, callbackUrl, withPrepaymentItem: true, paymentAgentInfo: { AgentType: 'AGENT', SupplierInn: partnerInn, SupplierName: partnerName2 || 'Исполнитель' }, items: itemsFinalA });
                   const created = await fermaCreateReceipt(payload, { baseUrl, authToken: tokenOfd });
                   { const numOrder = Number(String(sale.orderId).match(/(\d+)/g)?.slice(-1)[0] || NaN); await updateSaleOfdUrlsByOrderId(userId, numOrder, { ofdPrepayId: created.id || null }); }
                 }
@@ -290,7 +308,13 @@ export async function GET(_: Request) {
                       }
                     }
                   } catch {}
-                  const payload = buildFermaReceiptPayload({ party: 'org', partyInn: orgInn, description: itemLabel, amountRub, vatRate: usedVat, methodCode: PAYMENT_METHOD_PREPAY_FULL, orderId: sale.orderId, docType: 'IncomePrepayment', buyerEmail: bEmail, invoiceId: invoiceIdFull, callbackUrl, withPrepaymentItem: true, paymentAgentInfo: { AgentType: 'AGENT', SupplierInn: orgInn, SupplierName: supplierNameOrg2 } });
+                  const itemsParamAOrg = await (async ()=>{ try { const snap = (sale as any)?.itemsSnapshot as any[] | null; if (!Array.isArray(snap)||snap.length===0) return undefined; const { listProductsForOrg } = await import('@/server/productsStore'); const products = await listProductsForOrg(orgInn); return snap.map((it:any)=>{ const prod = products.find((p)=> (p.id && it?.id && String(p.id)===String(it.id)) || (p.title && it?.title && String(p.title).toLowerCase()===String(it.title).toLowerCase()))||null; const snapVat=(['none','0','5','7','10','20'].includes(String(it?.vat))?String(it.vat):undefined) as any; return { label:String(it.title||''), price:Number(it.price||0), qty:Number(it.qty||1), vatRate:(snapVat||(prod?.vat as any)||usedVat), unit:(prod?.unit as any), kind:(prod?.kind as any) } as any; }); } catch { return undefined; } })();
+                  const itemsFinalAOrg = (Array.isArray(itemsParamAOrg) && itemsParamAOrg.length>0)
+                    ? itemsParamAOrg
+                    : ((Array.isArray((sale as any)?.itemsSnapshot) && (sale as any).itemsSnapshot.length>0)
+                      ? (sale as any).itemsSnapshot.map((it:any)=>({ label:String(it.title||''), price:Number(it.price||0), qty:Number(it.qty||1), vatRate: usedVat }))
+                      : undefined);
+                  const payload = buildFermaReceiptPayload({ party: 'org', partyInn: orgInn, description: itemLabel, amountRub, vatRate: usedVat, methodCode: PAYMENT_METHOD_PREPAY_FULL, orderId: sale.orderId, docType: 'IncomePrepayment', buyerEmail: bEmail, invoiceId: invoiceIdFull, callbackUrl, withPrepaymentItem: true, paymentAgentInfo: { AgentType: 'AGENT', SupplierInn: orgInn, SupplierName: supplierNameOrg2 }, items: itemsFinalAOrg });
                   const created = await fermaCreateReceipt(payload, { baseUrl, authToken: tokenOfd });
                   { const numOrder = Number(String(sale.orderId).match(/(\d+)/g)?.slice(-1)[0] || NaN); await updateSaleOfdUrlsByOrderId(userId, numOrder, { ofdPrepayId: created.id || null }); }
                 }
