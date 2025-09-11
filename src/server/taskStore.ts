@@ -222,6 +222,16 @@ export async function deleteSaleByOrder(userId: string, orderId: number, taskId?
     const stillExists = store.sales.some((s) => String(s.taskId) === String(taskId));
     if (!stillExists) {
       store.tasks = (store.tasks || []).filter((t) => String(t.id) !== String(taskId));
+    } else {
+      // Remove only mapping pair (taskId, orderId) that we deleted
+      const normT = (v: unknown) => (typeof v === 'number' ? v : (String(v ?? '').match(/(\d+)/g)?.slice(-1)?.map(Number)?.[0] ?? NaN));
+      store.tasks = (store.tasks || []).filter((t) => !(String(t.id) === String(taskId) && normT((t as any).orderId) === orderId));
+    }
+  } else {
+    // Remove all mapping pairs that correspond to removed sales (by orderId)
+    const normT = (v: unknown) => (typeof v === 'number' ? v : (String(v ?? '').match(/(\d+)/g)?.slice(-1)?.map(Number)?.[0] ?? NaN));
+    for (const s of toRemove) {
+      store.tasks = (store.tasks || []).filter((t) => !(String(t.id) === String(s.taskId) && normT((t as any).orderId) === orderId));
     }
   }
   if (before !== store.sales.length) await writeTasks(store);
