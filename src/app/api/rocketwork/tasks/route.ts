@@ -376,6 +376,11 @@ export async function POST(req: Request) {
         order: (process.env.NODE_ENV !== 'production') ? `0000${String(orderId)}` : String(orderId),
       },
     };
+    // Idempotency: attach external id key to prevent duplicate task creation server-side
+    try {
+      const idemKey = `sale:${userId}:${String(orgInn || '')}:${String(orderId)}`;
+      (payload as any).external_id = idemKey;
+    } catch {}
 
     // Inject redirect_url to acquiring_order for bank success redirect
     try {
