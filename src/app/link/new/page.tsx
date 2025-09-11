@@ -252,7 +252,8 @@ export default function NewLinkStandalonePage() {
         else if (code === 'COMMISSION_FIXED_POSITIVE') showToast('Укажите фиксированную комиссию (> 0)', 'error');
         else if (code === 'PARTNER_PHONE_REQUIRED') showToast('Укажите телефон партнёра', 'error');
         else if (code === 'PARTNER_NOT_REGISTERED') showToast('Партнёр не завершил регистрацию в Рокет Ворк', 'error');
-        else if (code === 'PARTNER_NOT_VALIDATED') showToast('Партнёр не самозанятый', 'error');
+        else if (code === 'PARTNER_NOT_VALIDATED') showToast('Партнёр не может принять оплату: нет статуса самозанятого', 'error');
+        else if (code === 'PARTNER_NOT_VALIDATED_OR_NOT_SE_IP') showToast('Партнёр не может принять оплату: не смз или ип', 'error');
         else if (code === 'PARTNER_NO_PAYMENT_INFO') showToast('У партнёра нет платёжных реквизитов', 'error');
         else if (code === 'NO_TOKEN') showToast('Не задан токен API. Укажите токен в настройках', 'error', 'Открыть настройки', '/settings');
         else if (code === 'VANITY_INVALID') showToast('Можно использовать только буквы, цифры и дефис.', 'error');
@@ -588,7 +589,7 @@ export default function NewLinkStandalonePage() {
               <span>Агентская продажа</span>
             </label>
             <div className="text-xs text-gray-500 mt-1">
-              Разделите оплату между вами и самозанятым партнёром. Укажите свою долю вознаграждения.
+              Разделите оплату между вами и партнёром (самозанятым или ИП). Укажите свою долю вознаграждения.
               <span className="ml-1 text-gray-700 dark:text-gray-300">Описание услуги агента:</span>
               <span className="ml-1 text-black dark:text-white">{agentDesc || 'Услуги агента'}</span>
               <span className="ml-1">(<a href="/settings" className="underline">изменить</a>)</span>

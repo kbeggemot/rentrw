@@ -7,6 +7,7 @@ export type PartnerRecord = {
   status: string | null; // e.g., validated, pending, etc.
   inn?: string | null;
   orgInn?: string | null; // owning organization INN (digits) or 'неизвестно'
+  employmentKind?: 'selfemployed' | 'entrepreneur' | null;
   createdAt: string; // ISO
   updatedAt: string; // ISO
   hidden?: boolean; // soft delete flag
@@ -102,6 +103,7 @@ export async function upsertPartner(userId: string, partner: PartnerRecord): Pro
       status: normalizedPartner.status ?? prev.status,
       inn: normalizedPartner.inn ?? prev.inn,
       orgInn: mergedOrgInn || '',
+      employmentKind: (normalizedPartner as any).employmentKind ?? (prev as any).employmentKind ?? null,
       createdAt: prev.createdAt || prev.updatedAt || new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       hidden: normalizedPartner.hidden ?? prev.hidden,
@@ -162,6 +164,10 @@ export async function upsertPartnerFromValidation(
   
   const status = executorData?.executor?.selfemployed_status || executorData?.selfemployed_status;
   const inn = executorData?.executor?.inn || executorData?.inn;
+  const employmentKindRaw = (executorData?.executor?.employment_kind as string | undefined)
+    ?? (executorData?.employment_kind as string | undefined)
+    ?? null;
+  const employmentKind: 'selfemployed' | 'entrepreneur' | null = employmentKindRaw === 'entrepreneur' ? 'entrepreneur' : (employmentKindRaw === 'selfemployed' ? 'selfemployed' : null);
   
   const partner: PartnerRecord = {
     phone: normalizePhone(phone), // Normalize phone before storing
@@ -169,6 +175,7 @@ export async function upsertPartnerFromValidation(
     status: status || null,
     inn: inn || null,
     orgInn: orgInn ? orgInn.replace(/\D/g, '') : 'неизвестно',
+    employmentKind,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
     hidden: false

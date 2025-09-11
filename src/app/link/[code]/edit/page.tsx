@@ -627,7 +627,7 @@ export default function EditLinkPage(props: { params: Promise<{ code: string }> 
               <span>Агентская продажа</span>
             </label>
             <div className="text-xs text-gray-500 mt-1">
-              Разделите оплату между вами и самозанятым партнёром. Укажите свою долю вознаграждения.
+              Разделите оплату между вами и партнёром (самозанятым или ИП). Укажите свою долю вознаграждения.
               <span className="ml-1 text-gray-700 dark:text-gray-300">Описание услуги агента:</span>
               <span className="ml-1 text-black dark:text-white">{agentDesc || 'Услуги агента'}</span>
               <span className="ml-1">(<a href="/settings" className="underline">изменить</a>)</span>

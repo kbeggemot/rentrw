@@ -301,18 +301,27 @@ export async function POST(req: Request) {
         const msg = (exData?.error as string | undefined) || 'Ошибка проверки исполнителя';
         return NextResponse.json({ error: msg }, { status: 400 });
       }
-      const seStatus: string | undefined = (exData?.selfemployed_status as string | undefined)
-        ?? (exData?.executor?.selfemployed_status as string | undefined);
-      if (!seStatus) {
+      // Use RW payment_readiness for both Self-Employed and Entrepreneurs
+      const exObj: any = (exData && typeof exData === 'object' && (exData as any).executor) ? (exData as any).executor : exData;
+      const employmentKindRw: string | undefined = (exObj?.employment_kind as string | undefined) ?? (exData as any)?.employment_kind;
+      const readinessRaw: string | undefined = (exObj?.payment_readiness as string | undefined) ?? (exData as any)?.payment_readiness;
+      const readiness = readinessRaw ? String(readinessRaw).toLowerCase() : undefined;
+      if (readiness === 'no_payments') {
         return NextResponse.json({ error: 'Партнёр не завершил регистрацию в Рокет Ворк' }, { status: 400 });
       }
-      if (seStatus !== 'validated') {
-        return NextResponse.json({ error: 'Партнёр не может принять оплату, так как не является самозанятым' }, { status: 400 });
-      }
-      // validated: ensure payment info is present
-      const paymentInfo = (exData as any)?.executor?.payment_info ?? (exData as any)?.payment_info ?? null;
-      if (paymentInfo == null) {
+      if (readiness === 'no_requisites') {
         return NextResponse.json({ error: 'Партнёр не может принять оплату, так как не указал свои платёжные данные' }, { status: 400 });
+      }
+      // Allow when all_is_well or no_tax_payment. If readiness is missing, fallback to old checks for SE only
+      if (!(readiness === 'all_is_well' || readiness === 'no_tax_payment')) {
+        const seStatus: string | undefined = (exData?.selfemployed_status as string | undefined)
+          ?? (exData?.executor?.selfemployed_status as string | undefined);
+        if ((employmentKindRw ?? 'selfemployed') === 'selfemployed') {
+          if (!seStatus) return NextResponse.json({ error: 'Партнёр не завершил регистрацию в Рокет Ворк' }, { status: 400 });
+          if (seStatus !== 'validated') return NextResponse.json({ error: 'Партнёр не может принять оплату, так как не является самозанятым' }, { status: 400 });
+          const paymentInfo = (exData as any)?.executor?.payment_info ?? (exData as any)?.payment_info ?? null;
+          if (paymentInfo == null) return NextResponse.json({ error: 'Партнёр не может принять оплату, так как не указал свои платёжные данные' }, { status: 400 });
+        }
       }
       verifiedPartnerPhone = partnerPhone;
     }

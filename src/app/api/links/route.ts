@@ -195,8 +195,15 @@ export async function POST(req: Request) {
           return NextResponse.json({ error: (data?.error as string) || 'RW_ERROR' }, { status: 400 });
         }
         const status: string | undefined = (data?.executor?.selfemployed_status as string | undefined) ?? (data?.selfemployed_status as string | undefined);
-        if (!status) return NextResponse.json({ error: 'PARTNER_NOT_REGISTERED' }, { status: 400 });
-        if (status !== 'validated') return NextResponse.json({ error: 'PARTNER_NOT_VALIDATED' }, { status: 400 });
+        const employmentKind: string | undefined = (data?.executor?.employment_kind as string | undefined) ?? (data?.employment_kind as string | undefined);
+        const isEntrepreneur = employmentKind === 'entrepreneur';
+        const isSEValidated = Boolean(status && status === 'validated' && ((employmentKind ?? 'selfemployed') === 'selfemployed'));
+        if (!(isEntrepreneur || isSEValidated)) {
+          if ((employmentKind ?? 'selfemployed') === 'selfemployed' && status && status !== 'validated') {
+            return NextResponse.json({ error: 'PARTNER_NOT_VALIDATED' }, { status: 400 });
+          }
+          return NextResponse.json({ error: 'PARTNER_NOT_VALIDATED_OR_NOT_SE_IP' }, { status: 400 });
+        }
         const paymentInfo = (data?.executor?.payment_info ?? data?.payment_info ?? null);
         if (!paymentInfo) return NextResponse.json({ error: 'PARTNER_NO_PAYMENT_INFO' }, { status: 400 });
         
@@ -207,25 +214,45 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: msg }, { status: 400 });
       }
     }
-    // Rule: self-employed cannot sell positions with VAT
+    // Rule: НДС запрещён только для самозанятых (SE validated). Для ИП — разрешён.
     if (isAgent) {
-      if (sumMode === 'fixed') {
+      try {
+        const inn = getSelectedOrgInn(req);
+        const { token } = await resolveRwTokenWithFingerprint(req, userId, inn, null);
+        if (!token) return NextResponse.json({ error: 'NO_TOKEN' }, { status: 400 });
+        const base = process.env.ROCKETWORK_API_BASE_URL || 'https://app.rocketwork.ru/api/';
+        const digits = String(partnerPhone || '').replace(/\D/g, '');
+        const url = new URL(`executors/${encodeURIComponent(digits)}`, base.endsWith('/') ? base : base + '/').toString();
+        const res = await fetch(url, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }, cache: 'no-store' });
+        const txt = await res.text();
+        let data: any = null; try { data = txt ? JSON.parse(txt) : null; } catch { data = txt; }
+        if (res.status === 404) return NextResponse.json({ error: 'PARTNER_NOT_REGISTERED' }, { status: 400 });
+        if (!res.ok) return NextResponse.json({ error: (data?.error as string) || 'RW_ERROR' }, { status: 400 });
+        const seStatus: string | undefined = (data?.executor?.selfemployed_status as string | undefined) ?? (data?.selfemployed_status as string | undefined);
+        const employmentKind: string | undefined = (data?.executor?.employment_kind as string | undefined) ?? (data?.employment_kind as string | undefined);
+        const isEntrepreneur = employmentKind === 'entrepreneur';
+        const isSEValidated = Boolean(seStatus && seStatus === 'validated' && ((employmentKind ?? 'selfemployed') === 'selfemployed'));
+        // Fail-closed: НДС разрешён только для ИП. Если НДС присутствует и партнёр не ИП — блокируем.
         const vr = String(body?.vatRate || 'none');
-        if (vr !== 'none') return NextResponse.json({ error: 'AGENT_VAT_FORBIDDEN' }, { status: 400 });
-      }
-      if (Array.isArray(cartItems) && cartItems.length > 0) {
-        try {
-          const inn = getSelectedOrgInn(req);
-          const catalog = inn ? await listProductsForOrg(inn) : [];
-          const hasVat = cartItems.some((ci: any) => {
-            const id = ci?.id ? String(ci.id) : null;
-            const title = (ci?.title || '').toString().trim().toLowerCase();
-            const p = catalog.find((x) => (id && String(x.id) === id) || (title && x.title.toLowerCase() === title));
-            return p && p.vat !== 'none';
-          });
-          if (hasVat) return NextResponse.json({ error: 'AGENT_VAT_FORBIDDEN' }, { status: 400 });
-        } catch {}
-      }
+        let cartHasVat = false;
+        if (Array.isArray(cartItems) && cartItems.length > 0) {
+          try {
+            const catalog = inn ? await listProductsForOrg(inn) : [];
+            cartHasVat = cartItems.some((ci: any) => {
+              const id = ci?.id ? String(ci.id) : null;
+              const title = (ci?.title || '').toString().trim().toLowerCase();
+              const p = catalog.find((x) => (id && String(x.id) === id) || (title && x.title.toLowerCase() === title));
+              return p && p.vat !== 'none';
+            });
+          } catch {}
+        }
+        const vatPresent = (vr !== 'none') || cartHasVat;
+        if (vatPresent && !isEntrepreneur) {
+          return NextResponse.json({ error: 'AGENT_VAT_FORBIDDEN' }, { status: 400 });
+        }
+        // Save/refresh partner entry
+        await upsertPartnerFromValidation(userId, digits, data, inn ?? null);
+      } catch {}
     }
     // If cart + agent: avoid double-lowering.
     if (Array.isArray(cartItems) && cartItems.length > 0 && isAgent && commissionType && commissionValue != null) {

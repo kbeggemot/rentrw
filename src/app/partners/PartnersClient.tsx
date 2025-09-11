@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 
-type Partner = { phone: string; fio: string | null; status: string | null; updatedAt: string };
+type Partner = { phone: string; fio: string | null; status: string | null; updatedAt: string; employmentKind?: 'selfemployed'|'entrepreneur'|null };
 
 // Format phone for display with +
 function formatPhoneForDisplay(phone: string): string {
@@ -246,19 +246,21 @@ export default function PartnersClient({ initial, hasTokenInitial }: { initial: 
               <th className="text-left px-3 py-2">Телефон</th>
               <th className="text-left px-3 py-2">ФИО</th>
               <th className="text-left px-3 py-2">Статус</th>
+              <th className="text-left px-3 py-2">Тип</th>
               <th className="text-left px-3 py-2 w-[230px]">Действия</th>
             </tr>
           </thead>
           <tbody>
             {filtered.length === 0 ? (
               <tr>
-                <td colSpan={4} className="px-3 py-6 text-center text-gray-500">Нет партнёров</td>
+                <td colSpan={5} className="px-3 py-6 text-center text-gray-500">Нет партнёров</td>
               </tr>
             ) : filtered.map((p) => (
               <tr key={p.phone} className="border-t border-gray-100 dark:border-gray-800">
                 <td className="px-3 py-2">{formatPhoneForDisplay(p.phone)}</td>
                 <td className="px-3 py-2">{p.fio ?? '-'}</td>
                 <td className="px-3 py-2">{p.status ?? '-'}</td>
+                <td className="px-3 py-2">{p.employmentKind === 'entrepreneur' ? 'ИП' : 'Самозанятый'}</td>
                 <td className="px-3 py-2">
                   <div className="inline-flex items-center gap-2">
                     <Button asChild variant="secondary"><Link href={`/dashboard/accept?agent=1&phone=${encodeURIComponent(p.phone)}`}>Создать оплату</Link></Button>

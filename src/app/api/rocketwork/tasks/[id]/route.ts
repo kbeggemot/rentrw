@@ -100,9 +100,26 @@ export async function GET(_: Request) {
         const isAgent = Boolean((s as any)?.isAgent);
         const hasAgentCommission = Boolean((s as any)?.additionalCommissionOfdUrl);
         const hasNpd = Boolean((s as any)?.npdReceiptUri);
+        // Determine if partner is entrepreneur
+        let isEntrepreneurPartner = false;
+        if (isAgent) {
+          try {
+            const phoneDigits = (s as any)?.partnerPhone ? String((s as any).partnerPhone).replace(/\D/g, '') : '';
+            if (phoneDigits) {
+              const { listPartners } = await import('@/server/partnerStore');
+              const partners = await listPartners(userId);
+              const p = partners.find((pp: any) => String(pp.phone || '').replace(/\D/g, '') === phoneDigits);
+              isEntrepreneurPartner = (p?.employmentKind === 'entrepreneur');
+            } else {
+              const ek = ((obj as any)?.executor?.employment_kind as string | undefined) ?? ((obj as any)?.employment_kind as string | undefined);
+              isEntrepreneurPartner = ek === 'entrepreneur';
+            }
+          } catch {}
+        }
+        const needNpd = isAgent && !isEntrepreneurPartner;
         if (sameDayAssumption) {
-          // Нужен полный чек; для агентской дополнительно ждём чек комиссии И НПД
-          return !hasFull || (isAgent && (!hasAgentCommission || !hasNpd));
+          // Нужен полный чек; для агентской дополнительно ждём чек комиссии; НПД — только для СМЗ
+          return !hasFull || (isAgent && (!hasAgentCommission || (needNpd && !hasNpd)));
         }
         // Отложенный расчёт: ждём предоплату; для агентской — ещё чек комиссии. Полный чек появится после pay — не ждём его здесь
         return !hasPrepay || (isAgent && !hasAgentCommission);
@@ -139,17 +156,34 @@ export async function GET(_: Request) {
       if (hasAgent && aoStatus === 'transfered' && rootStatus === 'completed' && saleHasFull) {
         const payUrl = new URL(`tasks/${encodeURIComponent(taskId)}/pay`, base.endsWith('/') ? base : base + '/').toString();
         await fetch(payUrl, { method: 'PATCH', headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }, cache: 'no-store' });
-        // After pay, poll specifically until NPD receipt appears
-        let triesNpd = 0;
-        while (!normalized?.receipt_uri && triesNpd < 5) {
-          await new Promise((r) => setTimeout(r, 1200));
-          res = await fetch(url, { method: 'GET', headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }, cache: 'no-store' });
-          text = await res.text();
-          try { data = text ? JSON.parse(text) : null; } catch { data = text; }
-          maybeObj = typeof data === 'object' && data !== null ? (data as Record<string, unknown>) : null;
-          normalized = ((maybeObj?.task as RocketworkTask) ?? (data as RocketworkTask));
-          triesNpd += 1;
-        }
+        // After pay, poll NPD only for self-employed partners (not for entrepreneurs)
+        try {
+          let isEntrepreneurPartner = false;
+          const { findSaleByTaskId } = await import('@/server/taskStore');
+          const sale = await findSaleByTaskId(userId, taskId);
+          const phoneDigits = (sale as any)?.partnerPhone ? String((sale as any).partnerPhone).replace(/\D/g, '') : '';
+          if (phoneDigits) {
+            const { listPartners } = await import('@/server/partnerStore');
+            const partners = await listPartners(userId);
+            const p = partners.find((pp: any) => String(pp.phone || '').replace(/\D/g, '') === phoneDigits);
+            isEntrepreneurPartner = (p?.employmentKind === 'entrepreneur');
+          } else {
+            const ek = ((normalized as any)?.executor?.employment_kind as string | undefined) ?? ((normalized as any)?.employment_kind as string | undefined);
+            isEntrepreneurPartner = ek === 'entrepreneur';
+          }
+          if (!isEntrepreneurPartner) {
+            let triesNpd = 0;
+            while (!normalized?.receipt_uri && triesNpd < 5) {
+              await new Promise((r) => setTimeout(r, 1200));
+              res = await fetch(url, { method: 'GET', headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }, cache: 'no-store' });
+              text = await res.text();
+              try { data = text ? JSON.parse(text) : null; } catch { data = text; }
+              maybeObj = typeof data === 'object' && data !== null ? (data as Record<string, unknown>) : null;
+              normalized = ((maybeObj?.task as RocketworkTask) ?? (data as RocketworkTask));
+              triesNpd += 1;
+            }
+          }
+        } catch {}
       }
     } catch {}
 

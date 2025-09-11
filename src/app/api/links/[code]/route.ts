@@ -152,10 +152,27 @@ export async function PUT(req: Request) {
         amountRub = Number.isFinite(n) ? n : NaN;
         if (!Number.isFinite(amountRub) || Number(amountRub) <= 0) return NextResponse.json({ error: 'INVALID_AMOUNT' }, { status: 400 });
       }
-      // Agent VAT rule: в режиме «свободная услуга» при агентской НДС должен быть only none
+      // Agent VAT rule: запрещён только для самозанятых (SE validated), для ИП — разрешён
       if (isAgent) {
-        const vr = String(body?.vatRate || 'none');
-        if (vr !== 'none') return NextResponse.json({ error: 'AGENT_VAT_FORBIDDEN' }, { status: 400 });
+        try {
+          const { getSelectedOrgInn } = await import('@/server/orgContext');
+          const inn = getSelectedOrgInn(req);
+          const { resolveRwTokenWithFingerprint } = await import('@/server/rwToken');
+          const { token } = await resolveRwTokenWithFingerprint(req, userId!, inn, null);
+          if (!token) return NextResponse.json({ error: 'NO_TOKEN' }, { status: 400 });
+          const base = process.env.ROCKETWORK_API_BASE_URL || 'https://app.rocketwork.ru/api/';
+          const digits = String(partnerPhone || '').replace(/\D/g, '');
+          const url = new URL(`executors/${encodeURIComponent(digits)}`, base.endsWith('/') ? base : base + '/').toString();
+          const res = await fetch(url, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }, cache: 'no-store' });
+          const txt = await res.text();
+          let data: any = null; try { data = txt ? JSON.parse(txt) : null; } catch { data = txt; }
+          if (res.status === 404) return NextResponse.json({ error: 'PARTNER_NOT_REGISTERED' }, { status: 400 });
+          if (!res.ok) return NextResponse.json({ error: (data?.error as string) || 'RW_ERROR' }, { status: 400 });
+          const employmentKind: string | undefined = (data?.executor?.employment_kind as string | undefined) ?? (data?.employment_kind as string | undefined);
+          const isEntrepreneur = employmentKind === 'entrepreneur';
+          const vr = String(body?.vatRate || 'none');
+          if ((vr !== 'none') && !isEntrepreneur) return NextResponse.json({ error: 'AGENT_VAT_FORBIDDEN' }, { status: 400 });
+        } catch {}
       }
       // Business rule: минимальная сумма (после вычета комиссии при агентской) — 10 ₽
       const MIN_AMOUNT_RUB = 10;
@@ -218,19 +235,34 @@ export async function PUT(req: Request) {
       const allowCartAdjust = !!body?.allowCartAdjust;
       const cartDisplay = body?.cartDisplay === 'list' ? 'list' : (body?.cartDisplay === 'grid' ? 'grid' : undefined);
       const total = normalized.reduce((s: number, r: any) => s + r.price * r.qty, 0);
-      // Agent VAT rule: нельзя, если хоть у одной позиции НДС != none
+      // Agent VAT rule: НДС разрешён только для ИП. Если НДС присутствует и не ИП — блокируем
       if (isAgent) {
         try {
+          const { resolveRwTokenWithFingerprint } = await import('@/server/rwToken');
+          const { getSelectedOrgInn } = await import('@/server/orgContext');
+          const inn = getSelectedOrgInn(req);
+          const { token } = await resolveRwTokenWithFingerprint(req, userId!, inn, null);
+          if (!token) return NextResponse.json({ error: 'NO_TOKEN' }, { status: 400 });
+          const base = process.env.ROCKETWORK_API_BASE_URL || 'https://app.rocketwork.ru/api/';
+          const digits = String(partnerPhone || '').replace(/\D/g, '');
+          const url = new URL(`executors/${encodeURIComponent(digits)}`, base.endsWith('/') ? base : base + '/').toString();
+          const res = await fetch(url, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }, cache: 'no-store' });
+          const txt = await res.text();
+          let data: any = null; try { data = txt ? JSON.parse(txt) : null; } catch { data = txt; }
+          if (res.status === 404) return NextResponse.json({ error: 'PARTNER_NOT_REGISTERED' }, { status: 400 });
+          if (!res.ok) return NextResponse.json({ error: (data?.error as string) || 'RW_ERROR' }, { status: 400 });
+          const employmentKind: string | undefined = (data?.executor?.employment_kind as string | undefined) ?? (data?.employment_kind as string | undefined);
+          const isEntrepreneur = employmentKind === 'entrepreneur';
           const innRaw = (current.orgInn || '').toString();
-          const inn = innRaw.replace(/\D/g, '');
-          const catalog = inn ? await listProductsForOrg(inn) : [];
+          const innDigits = innRaw.replace(/\D/g, '');
+          const catalog = innDigits ? await listProductsForOrg(innDigits) : [];
           const hasVat = normalized.some((ci: any) => {
             const id = ci?.id ? String(ci.id) : null;
             const title = (ci?.title || '').toString().trim().toLowerCase();
             const p = catalog.find((x) => (id && String(x.id) === id) || (title && x.title.toLowerCase() === title));
             return p && p.vat !== 'none';
           });
-          if (hasVat) return NextResponse.json({ error: 'AGENT_VAT_FORBIDDEN' }, { status: 400 });
+          if (hasVat && !isEntrepreneur) return NextResponse.json({ error: 'AGENT_VAT_FORBIDDEN' }, { status: 400 });
         } catch {}
       }
       // Business rule: минимальная сумма (после комиссии) — 10 ₽

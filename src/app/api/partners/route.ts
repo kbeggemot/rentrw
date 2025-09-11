@@ -84,7 +84,7 @@ export async function POST(req: Request) {
 
     const base = process.env.ROCKETWORK_API_BASE_URL || DEFAULT_BASE_URL;
 
-    // 1) Invite
+    // 1) Invite (best-effort; offline ok)
     try {
       const inviteUrl = new URL('executors/invite', base.endsWith('/') ? base : base + '/').toString();
       await fetch(inviteUrl, {
@@ -104,9 +104,11 @@ export async function POST(req: Request) {
       let data: any = null; try { data = text ? JSON.parse(text) : null; } catch { data = text; }
       return { res, data };
     }
-    let chosen = await getExecutorById(phoneDigits);
-    if (!chosen.res.ok && chosen.res.status !== 404) {
-      chosen = await getExecutorById(phone);
+    const resDigits = await getExecutorById(phoneDigits);
+    let chosen = resDigits;
+    if (!resDigits.res.ok && resDigits.res.status !== 404) {
+      const resRaw = await getExecutorById(phone);
+      chosen = resRaw;
     }
     if (chosen.res.status === 404) {
       return NextResponse.json({ error: 'Партнёр не найден в РВ' }, { status: 404 });
@@ -141,10 +143,13 @@ export async function POST(req: Request) {
     const status = (chosen.data?.selfemployed_status as string | undefined)
       ?? (chosen.data?.executor?.selfemployed_status as string | undefined)
       ?? null;
+    const employmentKind: string | null = (chosen.data?.executor?.employment_kind as string | undefined)
+      ?? (chosen.data?.employment_kind as string | undefined)
+      ?? null;
 
     await upsertPartnerFromValidation(userId, phone, chosen.data, inn ?? null);
 
-    return NextResponse.json({ ok: true, partner: { phone, fio, status } }, { status: 201 });
+    return NextResponse.json({ ok: true, partner: { phone, fio, status, employmentKind } }, { status: 201 });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Server error';
     return NextResponse.json({ error: message }, { status: 500 });
