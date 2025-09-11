@@ -26,7 +26,7 @@ export async function GET(_: Request) {
     const segs = urlObj.pathname.split('/');
     let taskId = decodeURIComponent(segs[segs.length - 1] || '');
     let rwTokenFp: string | null = null;
-    try { const s = await findSaleByTaskId(userId, taskId); rwTokenFp = (s as any)?.rwTokenFp ?? null; } catch {}
+    try { const s0 = await findSaleByTaskId(userId, taskId); rwTokenFp = (s0 as any)?.rwTokenFp ?? null; } catch {}
     let inn = getSelectedOrgInn(_);
     // Auto-resolve owner and inn by taskId if headers are missing and current user has no access
     if (!inn || String(inn).trim().length === 0 || inn === 'неизвестно') {
@@ -34,9 +34,22 @@ export async function GET(_: Request) {
         const mapped = await resolveOwnerAndInnByTask(taskId);
         if (mapped.userId) userId = mapped.userId;
         if (mapped.orgInn) inn = mapped.orgInn;
+        // Re-read fingerprint for mapped owner if we didn't have it
+        if (!rwTokenFp && mapped.userId) {
+          try { const s = await findSaleByTaskId(mapped.userId, taskId); rwTokenFp = (s as any)?.rwTokenFp ?? null; } catch {}
+        }
       } catch {}
     }
-    const { token } = await resolveRwTokenWithFingerprint(_, userId, inn, rwTokenFp);
+    const resolved = await resolveRwTokenWithFingerprint(_, userId, inn, rwTokenFp);
+    let token = resolved.token;
+    if (!token && inn) {
+      // As a last resort, try any active token for this org (superadmin helper)
+      try {
+        const { listActiveTokensForOrg } = await import('@/server/orgStore');
+        const list = await listActiveTokensForOrg(String(inn).replace(/\D/g, ''));
+        if (list.length > 0) token = list[0];
+      } catch {}
+    }
     if (!token) return NextResponse.json({ error: 'API токен не задан' }, { status: 400 });
 
     const base = process.env.ROCKETWORK_API_BASE_URL || DEFAULT_BASE_URL;
@@ -66,6 +79,21 @@ export async function GET(_: Request) {
     } catch (e) {
       await appendRwError({ ts: new Date().toISOString(), scope: 'tasks:get', method: 'GET', url, status: null, error: e instanceof Error ? e.message : String(e), userId });
       throw e;
+    }
+
+    // Fallback: if RW says Not Found with this token, try other active tokens for the org
+    if (!res.ok && (res.status === 404 || res.status === 401) && inn) {
+      try {
+        const { listActiveTokensForOrg } = await import('@/server/orgStore');
+        const candidates = await listActiveTokensForOrg(String(inn).replace(/\D/g, ''), undefined);
+        for (const alt of candidates) {
+          if (!alt || alt === token) continue;
+          try {
+            const r2 = await fetch(url, { method: 'GET', headers: { Authorization: `Bearer ${alt}`, Accept: 'application/json' }, cache: 'no-store' });
+            if (r2.ok) { res = r2; token = alt; break; }
+          } catch {}
+        }
+      } catch {}
     }
 
     let text = await res.text();
