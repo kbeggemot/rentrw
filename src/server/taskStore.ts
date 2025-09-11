@@ -213,14 +213,10 @@ export async function deleteSaleByOrder(userId: string, orderId: number, taskId?
   };
   let removed = 0;
   const before = store.sales.length;
-  store.sales = store.sales.filter((s) => {
-    const sameUser = s.userId === userId;
-    const sameOrder = normalize(s.orderId) === orderId;
-    const sameTask = typeof taskId === 'undefined' ? true : (String(s.taskId) === String(taskId));
-    const match = sameUser && sameOrder && sameTask;
-    if (match) removed += 1;
-    return !match;
-  });
+  // Capture to-be-removed for sharded cleanup
+  const toRemove = store.sales.filter((s) => s.userId === userId && normalize(s.orderId) === orderId && (typeof taskId === 'undefined' || String(s.taskId) === String(taskId)));
+  store.sales = store.sales.filter((s) => !(s.userId === userId && normalize(s.orderId) === orderId && (typeof taskId === 'undefined' || String(s.taskId) === String(taskId))));
+  removed = toRemove.length;
   // Tasks list: if a task still has any sale entry, keep it; otherwise remove
   if (typeof taskId !== 'undefined') {
     const stillExists = store.sales.some((s) => String(s.taskId) === String(taskId));
@@ -229,6 +225,20 @@ export async function deleteSaleByOrder(userId: string, orderId: number, taskId?
     }
   }
   if (before !== store.sales.length) await writeTasks(store);
+  // Sharded cleanup mirroring deleteSale
+  try {
+    for (const s of toRemove) {
+      const inn = s.orgInn ? sanitizeInn(s.orgInn) : null;
+      if (!inn) continue;
+      try { await writeText(saleFilePath(inn, s.taskId), ''); } catch {}
+      try {
+        const rows = await readOrgIndex(inn);
+        const next = rows.filter((r) => String((r as any).taskId) !== String(s.taskId));
+        await writeOrgIndex(inn, next as any);
+      } catch {}
+      try { await writeText(byTaskIndexPath(s.taskId), ''); } catch {}
+    }
+  } catch {}
   try { getHub().publish(userId, 'sales:update'); } catch {}
   return { removed };
 }
