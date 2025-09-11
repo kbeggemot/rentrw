@@ -603,6 +603,14 @@ export async function ensureSaleFromTask(params: {
   }>;
 }): Promise<void> {
   const { userId, taskId, task, orgInn } = params;
+  // If this task already has a canonical owner/org mapping, do not create a duplicate under another user/org
+  try {
+    const mapped = await readByTask(taskId).catch(() => null);
+    if (mapped && mapped.userId && mapped.userId !== userId) {
+      // Another user's sale already exists for this task — skip creating a shadow copy
+      return;
+    }
+  } catch {}
   const store = await readTasks();
   if (!store.sales) store.sales = [];
   const exists = store.sales.some((s) => s.userId === userId && s.taskId == taskId);

@@ -204,8 +204,16 @@ export async function POST(req: Request) {
           }
           return NextResponse.json({ error: 'PARTNER_NOT_VALIDATED_OR_NOT_SE_IP' }, { status: 400 });
         }
-        const paymentInfo = (data?.executor?.payment_info ?? data?.payment_info ?? null);
-        if (!paymentInfo) return NextResponse.json({ error: 'PARTNER_NO_PAYMENT_INFO' }, { status: 400 });
+        // Readiness-based gate: do not require payment_info for entrepreneurs
+        const readinessRaw: string | undefined = ((data?.executor?.payment_readiness as string | undefined) ?? (data as any)?.payment_readiness) as any;
+        const readiness = readinessRaw ? String(readinessRaw).toLowerCase() : undefined;
+        if (readiness === 'no_payments') {
+          return NextResponse.json({ error: 'PARTNER_NOT_REGISTERED' }, { status: 400 });
+        }
+        if (readiness === 'no_requisites') {
+          return NextResponse.json({ error: 'PARTNER_NO_PAYMENT_INFO' }, { status: 400 });
+        }
+        // If readiness is missing — do not block по payment_info ни для кого (см. договорённость)
         
         // Auto-add/update partner if validation successful
         await upsertPartnerFromValidation(userId, digits, data);
