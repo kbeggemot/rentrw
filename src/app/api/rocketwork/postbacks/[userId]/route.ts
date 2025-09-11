@@ -106,12 +106,17 @@ export async function POST(req: Request) {
 
       if (typeof taskId === 'undefined') return NextResponse.json({ ok: true });
 
-      // Normalize status by event name when obvious
-      let status: string | undefined;
-      if (/task\.paid/.test(event)) status = 'paid';
-      else if (/task\.paying/.test(event)) status = 'paying';
-      else if (/task\.transfered?/.test(event)) status = 'transfered';
-      else if (/task\.pending/.test(event)) status = 'pending';
+      // Normalize acquiring status only from acquiring_order events; root-level events (task.paid, task.completed, ...) must NOT change acquiring
+      let statusFromEvent: string | undefined;
+      if (/^task\.acquiring_order\./.test(event)) {
+        if (/\.paid$/.test(event)) statusFromEvent = 'paid';
+        else if (/\.paying$/.test(event)) statusFromEvent = 'paying';
+        else if (/\.transfered$/.test(event) || /\.transferred$/.test(event)) statusFromEvent = 'transfered';
+        else if (/\.pending$/.test(event)) statusFromEvent = 'pending';
+        else if (/\.expired$/.test(event)) statusFromEvent = 'expired';
+        else if (/\.refunded$/.test(event)) statusFromEvent = 'refunded';
+        else if (/\.failed$/.test(event)) statusFromEvent = 'failed';
+      }
 
       // Extract known URLs from payload when present (try multiple shapes)
       const ofdUrl = pick<string>(data, 'ofd_url')
@@ -128,10 +133,14 @@ export async function POST(req: Request) {
         ?? pick<string>(data, 'task.status');
 
       const allowedAo = new Set(['pending','paying','paid','transfered','transferred','expired','refunded','failed']);
-      const statusLower = typeof status === 'string' ? String(status).toLowerCase() : undefined;
+      const statusLower = typeof statusFromEvent === 'string' ? String(statusFromEvent).toLowerCase() : undefined;
       const aoLower = typeof aoStatusRaw === 'string' ? String(aoStatusRaw).toLowerCase() : undefined;
+      // Acquiring status priority: 1) acquiring_order.status; 2) only if missing — event-based when it is an acquiring_order.* event
+      const acquiringStatus = (aoLower && allowedAo.has(aoLower))
+        ? aoLower
+        : ((statusLower && allowedAo.has(statusLower)) ? statusLower : undefined);
       await updateSaleFromStatus(userId, taskId, {
-        status: (statusLower && allowedAo.has(statusLower)) ? statusLower : (aoLower && allowedAo.has(aoLower) ? aoLower : undefined as any),
+        status: acquiringStatus as any,
         ofdUrl: ofdUrl || undefined,
         additionalCommissionOfdUrl: additionalCommissionOfdUrl || undefined,
         npdReceiptUri: npdReceiptUri || undefined,
@@ -145,7 +154,7 @@ export async function POST(req: Request) {
         const prev = (await readText('.data/ofd_create_attempts.log')) || '';
         await writeText('.data/ofd_create_attempts.log', prev + line + '\n');
       } catch {}
-      try { await appendAdminEntityLog('sale', [String(userId), String(taskId)], { source: 'system', message: 'postback', data: { event, status: status || null, rootStatusRaw: rootStatusRaw || null } }); } catch {}
+      try { await appendAdminEntityLog('sale', [String(userId), String(taskId)], { source: 'system', message: 'postback', data: { event, status: acquiringStatus || null, rootStatusRaw: rootStatusRaw || null } }); } catch {}
       // Background pay trigger (agent, transfered, completed, has full receipt AND commission receipt)
       try {
         const sale = await findSaleByTaskId(userId, taskId);
@@ -192,9 +201,9 @@ export async function POST(req: Request) {
           }
         }
       } catch {}
-      // If paid/transfered — write a local marker so UI can hide QR instantly
+      // If paid/transfered — write a local marker so UI can hide QR instantly (based on acquiring status only)
       try {
-        const fin = String((status || aoStatusRaw || '') as string).toLowerCase();
+        const fin = String((aoStatusRaw || statusFromEvent || '') as string).toLowerCase();
         if (fin === 'paid' || fin === 'transfered' || fin === 'transferred') {
           await writeText(`.data/task_paid_${userId}_${String(taskId)}.json`, JSON.stringify({ userId, taskId, status: fin, ts: new Date().toISOString() }));
         }
