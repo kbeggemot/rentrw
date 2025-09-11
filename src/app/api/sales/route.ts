@@ -89,7 +89,7 @@ export async function GET(req: Request) {
               ?? null;
             const npdReceipt = (normalized?.receipt_uri as string | undefined) ?? null;
             // Classify RW ofd_url using creation date vs service end date
-            const patch: any = { status: normalized?.acquiring_order?.status, additionalCommissionOfdUrl: addOfd, npdReceiptUri: npdReceipt };
+            const patch: any = { status: normalized?.acquiring_order?.status, additionalCommissionOfdUrl: addOfd, npdReceiptUri: npdReceipt, rootStatus: (normalized as any)?.status };
             if (ofdUrl) {
               const toMskDate = (iso: string | null | undefined): string | null => {
                 if (!iso) return null;

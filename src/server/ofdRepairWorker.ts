@@ -566,7 +566,7 @@ export async function repairUserSales(userId: string, onlyOrderId?: number): Pro
               ?? undefined;
             const add = (norm?.additional_commission_ofd_url as string | undefined) ?? undefined;
             const aoSt = (norm?.acquiring_order?.status as string | undefined) ?? undefined;
-            try { await updateSaleFromStatus(userId, s.taskId, { status: aoSt, ofdUrl: ofd, additionalCommissionOfdUrl: add, npdReceiptUri: npd }); } catch {}
+            try { await updateSaleFromStatus(userId, s.taskId, { status: aoSt, ofdUrl: ofd, additionalCommissionOfdUrl: add, npdReceiptUri: npd, rootStatus: String(norm?.status || '').toLowerCase() } as any); } catch {}
             if (npd) break;
             triesNpd += 1;
           }

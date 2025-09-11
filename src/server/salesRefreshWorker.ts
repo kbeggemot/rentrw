@@ -44,7 +44,7 @@ export async function refreshAllSales(): Promise<void> {
         const ofd = t?.ofd_url ?? t?.acquiring_order?.ofd_url ?? null;
         const add = t?.additional_commission_ofd_url ?? null;
         const npd = t?.receipt_uri ?? null;
-        await updateSaleFromStatus(userId, s.taskId, { status: t?.acquiring_order?.status, ofdUrl: ofd || undefined, additionalCommissionOfdUrl: add || undefined, npdReceiptUri: npd || undefined } as any);
+        await updateSaleFromStatus(userId, s.taskId, { status: t?.acquiring_order?.status, ofdUrl: ofd || undefined, additionalCommissionOfdUrl: add || undefined, npdReceiptUri: npd || undefined, rootStatus: (t?.status as any) } as any);
       } catch {}
     }
   }
