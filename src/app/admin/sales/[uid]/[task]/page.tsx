@@ -42,6 +42,109 @@ export default async function AdminSaleEditor(props: { params: Promise<{ uid: st
         <div className="text-sm text-gray-600">Запись не найдена</div>
       ) : (
         <div className="space-y-6">
+          {/* Сводка по продаже */}
+          <div className="border rounded p-3 bg-white dark:bg-gray-950">
+            <h2 className="text-lg font-semibold mb-2">Сводка</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
+              <div>
+                <div className="text-gray-600">taskId (RW)</div>
+                <div className="font-mono">{String((item as any).taskId)}</div>
+              </div>
+              <div>
+                <div className="text-gray-600">orderId</div>
+                <div className="font-mono">{String((item as any).orderId)}</div>
+              </div>
+              <div>
+                <div className="text-gray-600">Тип продажи</div>
+                <div>{(item as any).isAgent ? 'агентская' : 'прямая'}</div>
+              </div>
+              <div>
+                <div className="text-gray-600">Канал</div>
+                <div>{(() => { const it:any=item; if (it.linkCode) return 'по ссылке'; if (it.payerTgId) return 'через Telegram'; if (String(it.source||'')==='ui') return 'с дашборда'; return 'внешняя'; })()}</div>
+              </div>
+              {(item as any).rwOrderId ? (
+                <div>
+                  <div className="text-gray-600">rwOrderId</div>
+                  <div className="font-mono">{String((item as any).rwOrderId)}</div>
+                </div>
+              ) : null}
+              {(item as any).agentDescription ? (
+                <div className="sm:col-span-2">
+                  <div className="text-gray-600">Описание агента</div>
+                  <div className="break-words">{String((item as any).agentDescription)}</div>
+                </div>
+              ) : null}
+              {(item as any).isAgent ? (
+                <div>
+                  <div className="text-gray-600">Удержанная комиссия, ₽</div>
+                  <div>{typeof (item as any).retainedCommissionRub==='number' ? new Intl.NumberFormat('ru-RU',{ minimumFractionDigits:2, maximumFractionDigits:2 }).format((item as any).retainedCommissionRub) : '—'}</div>
+                </div>
+              ) : null}
+              {((item as any).partnerPhone || (item as any).partnerFio) ? (
+                <div className="sm:col-span-2">
+                  <div className="text-gray-600">Партнёр (агент)</div>
+                  <div className="font-mono">{(item as any).partnerFio || '—'}{((item as any).partnerFio && (item as any).partnerPhone) ? ' · ' : ''}{(item as any).partnerPhone || '—'}</div>
+                </div>
+              ) : null}
+            </div>
+          </div>
+
+          {/* Данные о позициях */}
+          {Array.isArray((item as any).itemsSnapshot) && (item as any).itemsSnapshot.length > 0 ? (
+            <div className="border rounded p-3 bg-white dark:bg-gray-950">
+              <h2 className="text-lg font-semibold mb-2">Позиции</h2>
+              <div className="overflow-x-auto">
+                <table className="min-w-full text-sm">
+                  <thead><tr><th className="text-left px-2 py-1">Название</th><th className="text-left px-2 py-1">Кол-во</th><th className="text-left px-2 py-1">Цена</th><th className="text-left px-2 py-1">НДС</th></tr></thead>
+                  <tbody>
+                    {(item as any).itemsSnapshot.map((it:any, idx:number)=> (
+                      <tr key={idx} className="border-t">
+                        <td className="px-2 py-1 break-words">{String(it?.title||'')}</td>
+                        <td className="px-2 py-1 whitespace-nowrap">{Number(it?.qty||0)}</td>
+                        <td className="px-2 py-1 whitespace-nowrap">{new Intl.NumberFormat('ru-RU',{ minimumFractionDigits:2, maximumFractionDigits:2 }).format(Number(it?.price||0))}</td>
+                        <td className="px-2 py-1 whitespace-nowrap">{String(it?.vat||'—')}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          ) : null}
+
+          {/* Данные покупателя (Telegram) */}
+          {((item as any).payerTgId || (item as any).payerTgUsername || (item as any).payerTgFirstName || (item as any).payerTgLastName) ? (
+            <div className="border rounded p-3 bg-white dark:bg-gray-950">
+              <h2 className="text-lg font-semibold mb-2">Покупатель (Telegram)</h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
+                <div><div className="text-gray-600">tg_id</div><div className="font-mono">{String((item as any).payerTgId||'—')}</div></div>
+                <div><div className="text-gray-600">username</div><div className="font-mono">{(item as any).payerTgUsername? ('@'+String((item as any).payerTgUsername)):'—'}</div></div>
+                <div><div className="text-gray-600">first_name</div><div>{String((item as any).payerTgFirstName||'—')}</div></div>
+                <div><div className="text-gray-600">last_name</div><div>{String((item as any).payerTgLastName||'—')}</div></div>
+              </div>
+            </div>
+          ) : null}
+
+          {/* Подписанный документ */}
+          {((item as any).termsDocHash || (item as any).termsAcceptedAt) ? (
+            <div className="border rounded p-3 bg-white dark:bg-gray-950">
+              <h2 className="text-lg font-semibold mb-2">Подписанный документ</h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
+                <div><div className="text-gray-600">Название</div><div>{String((item as any).termsDocName||'—')}</div></div>
+                <div><div className="text-gray-600">Хэш</div><div className="font-mono break-all">{String((item as any).termsDocHash||'—')}</div></div>
+                <div className="sm:col-span-2"><div className="text-gray-600">Принято (МСК)</div><div>{(item as any).termsAcceptedAt ? new Date((item as any).termsAcceptedAt).toLocaleString('ru-RU',{ timeZone:'Europe/Moscow' }) : '—'}</div></div>
+              </div>
+            </div>
+          ) : null}
+
+          {/* Мгновенная выдача */}
+          <div className="border rounded p-3 bg-white dark:bg-gray-950">
+            <h2 className="text-lg font-semibold mb-2">Мгновенная выдача</h2>
+            <div className="text-sm grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <div><div className="text-gray-600">Статус</div><div>{(item as any).instantEmailStatus || '—'}</div></div>
+              <div><div className="text-gray-600">Ошибка</div><div className="break-words">{(item as any).instantEmailError || '—'}</div></div>
+            </div>
+          </div>
+
           <form action={`/admin/sales/${encodeURIComponent(p.uid)}/${encodeURIComponent(p.task)}/save`} method="post" className="space-y-3">
             <input type="hidden" name="uid" defaultValue={p.uid} />
             <input type="hidden" name="taskId" defaultValue={p.task} />
