@@ -503,7 +503,7 @@ function DocsPanel() {
       </div>
       <div className="border rounded overflow-x-auto">
         <table className="min-w-full text-sm">
-          <thead><tr><th className="text-left px-2 py-1">uploadedAt</th><th className="text-left px-2 py-1">hash</th><th className="text-left px-2 py-1">name</th><th className="text-left px-2 py-1">size</th><th className="text-left px-2 py-1">userId</th><th className="text-left px-2 py-1">Используется в ссылках</th></tr></thead>
+          <thead><tr><th className="text-left px-2 py-1">uploadedAt</th><th className="text-left px-2 py-1">hash</th><th className="text-left px-2 py-1">name</th><th className="text-left px-2 py-1">size</th><th className="text-left px-2 py-1">userId</th><th className="text-left px-2 py-1">Используется в ссылках</th><th className="text-left px-2 py-1">Действия</th></tr></thead>
           <tbody>
             {pageItems.map((d)=> (
               <tr key={d.hash} className="border-t">
@@ -518,6 +518,9 @@ function DocsPanel() {
                       {usages[d.hash].map((u)=> (<a key={u.code} className="inline-block px-2 py-1 border rounded" href={`/admin/links/${encodeURIComponent(String(u.code))}`}>{u.code}{u.title?` — ${u.title}`:''}</a>))}
                     </div>
                   ) : '—'}
+                </td>
+                <td className="px-2 py-1">
+                  <a className="inline-block px-2 py-1 border rounded" href={`/api/docs/${encodeURIComponent(String(d.hash))}`} target="_blank" rel="noreferrer">Открыть</a>
                 </td>
               </tr>
             ))}
