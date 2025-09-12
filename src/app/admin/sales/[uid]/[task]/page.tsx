@@ -83,7 +83,16 @@ export default async function AdminSaleEditor(props: { params: Promise<{ uid: st
               {((item as any).partnerPhone || (item as any).partnerFio) ? (
                 <div className="sm:col-span-2">
                   <div className="text-gray-600">Партнёр (агент)</div>
-                  <div className="font-mono">{(item as any).partnerFio || '—'}{((item as any).partnerFio && (item as any).partnerPhone) ? ' · ' : ''}{(item as any).partnerPhone || '—'}</div>
+                  {(() => {
+                    const fio = String((item as any).partnerFio || '').trim();
+                    const phoneRaw = String((item as any).partnerPhone || '').trim();
+                    const phoneDigits = phoneRaw.replace(/\D/g, '');
+                    const label = [fio || null, phoneRaw || null].filter(Boolean).join(' · ');
+                    const href = `/admin/partners/${encodeURIComponent(String(p.uid))}/${encodeURIComponent(phoneDigits || phoneRaw)}`;
+                    return (
+                      <a className="text-blue-600 break-words" href={href}>{label || '—'}</a>
+                    );
+                  })()}
                 </div>
               ) : null}
             </div>

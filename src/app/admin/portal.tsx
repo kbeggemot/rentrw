@@ -61,7 +61,7 @@ function AdminLogin({ onLogged }: { onLogged: () => void }) {
 // Deprecated: moved to LkUsersPanel as LkUserOptions
 
 function AdminDashboard({ showToast, role }: { showToast: (m: string, k?: any) => void; role: 'superadmin' | 'admin' | null }) {
-  const [tab, setTab] = useState<'users' | 'sales' | 'links' | 'partners' | 'orgs' | 'files' | 'lk_users' | 'tokens' | 'withdrawals'>(() => {
+  const [tab, setTab] = useState<'users' | 'sales' | 'links' | 'partners' | 'orgs' | 'files' | 'lk_users' | 'tokens' | 'withdrawals' | 'docs'>(() => {
     try { const u = new URL(window.location.href); const t = (u.searchParams.get('tab')||'') as any; if (t) return t; } catch {}
     return 'sales';
   });
@@ -78,6 +78,7 @@ function AdminDashboard({ showToast, role }: { showToast: (m: string, k?: any) =
         <Button variant={tab==='tokens'?'secondary':'ghost'} onClick={() => setTab('tokens')}>Токены</Button>
         <Button variant={tab==='withdrawals'?'secondary':'ghost'} onClick={() => setTab('withdrawals')}>Выводы</Button>
         <Button variant={tab==='files'?'secondary':'ghost'} onClick={() => setTab('files')}>Файлы</Button>
+        <Button variant={tab==='docs'?'secondary':'ghost'} onClick={() => setTab('docs')}>Документы</Button>
         <div className="ml-auto" />
         <Button variant={tab==='users'?'secondary':'ghost'} onClick={() => setTab('users')}>Юзеры</Button>
         <form onSubmit={(e)=>{e.preventDefault();}}>
@@ -93,6 +94,7 @@ function AdminDashboard({ showToast, role }: { showToast: (m: string, k?: any) =
       {tab === 'files' ? <FilesPanel /> : null}
       {tab === 'tokens' ? <TokensPanel /> : null}
       {tab === 'withdrawals' ? <WithdrawalsPanel /> : null}
+      {tab === 'docs' ? <DocsPanel /> : null}
     </div>
   );
 }
@@ -460,6 +462,69 @@ function LinksPanel({ showToast, role }: { showToast: (m: string, k?: any) => vo
         </table>
       </div>
       <Pager total={items.filter((x)=>{ const v=q.trim().toLowerCase(); if(!v) return true; const hay=[x.code,x.orgInn,(x.__orgName||''),x.vatRate,x.method,x.amountRub,x.title,x.description].join(' ').toLowerCase(); return hay.includes(v); }).length} page={page} setPage={setPage} />
+    </div>
+  );
+}
+
+function DocsPanel() {
+  const [items, setItems] = useState<Array<{ hash: string; name: string | null; size: number; userId: string; uploadedAt: string }>>([]);
+  const [usages, setUsages] = useState<Record<string, Array<{ code: string; title?: string | null; createdAt?: string }>>>({});
+  const [q, setQ] = useState('');
+  const [page, setPage] = useState(1);
+  const load = async () => {
+    const [rDocs, rLinks] = await Promise.all([
+      fetch('/api/admin/data/docs', { cache: 'no-store' }),
+      fetch('/api/admin/data/links', { cache: 'no-store' }),
+    ]);
+    const d = await rDocs.json().catch(()=>({ items: [] }));
+    const l = await rLinks.json().catch(()=>({ items: [] }));
+    const arr = Array.isArray(d?.items) ? d.items : [];
+    const links = Array.isArray(l?.items) ? l.items : [];
+    const map: Record<string, Array<{ code: string; title?: string | null; createdAt?: string }>> = {};
+    for (const ln of links) {
+      const h = (ln?.termsDocHash ? String(ln.termsDocHash) : '') as string;
+      if (!h) continue;
+      if (!map[h]) map[h] = [];
+      map[h].push({ code: ln.code, title: ln.title || ln.description || null, createdAt: ln.createdAt });
+    }
+    setUsages(map);
+    // newest first
+    arr.sort((a:any,b:any)=> Date.parse(b?.uploadedAt||'') - Date.parse(a?.uploadedAt||''));
+    setItems(arr);
+  };
+  useEffect(()=>{ void load(); },[]);
+  const filtered = items.filter((d)=>{ const v=q.trim().toLowerCase(); if(!v) return true; const hay=[d.hash,d.name||'',d.userId].join(' ').toLowerCase(); return hay.includes(v); });
+  const pageItems = filtered.slice((page-1)*100, page*100);
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center gap-2">
+        <Button variant="secondary" onClick={load}>Обновить</Button>
+        <input className="border rounded px-2 h-9 text-sm ml-auto" placeholder="Фильтр... (hash, имя, userId)" value={q} onChange={(e)=>{ setQ(e.target.value); setPage(1); }} />
+      </div>
+      <div className="border rounded overflow-x-auto">
+        <table className="min-w-full text-sm">
+          <thead><tr><th className="text-left px-2 py-1">uploadedAt</th><th className="text-left px-2 py-1">hash</th><th className="text-left px-2 py-1">name</th><th className="text-left px-2 py-1">size</th><th className="text-left px-2 py-1">userId</th><th className="text-left px-2 py-1">Используется в ссылках</th></tr></thead>
+          <tbody>
+            {pageItems.map((d)=> (
+              <tr key={d.hash} className="border-t">
+                <td className="px-2 py-1 whitespace-nowrap">{d.uploadedAt ? new Date(d.uploadedAt).toLocaleString('ru-RU',{ timeZone:'Europe/Moscow' }) : '—'}</td>
+                <td className="px-2 py-1 font-mono break-all">{d.hash}</td>
+                <td className="px-2 py-1 break-words">{d.name || '—'}</td>
+                <td className="px-2 py-1 whitespace-nowrap">{new Intl.NumberFormat('ru-RU').format(d.size)} байт</td>
+                <td className="px-2 py-1">{d.userId}</td>
+                <td className="px-2 py-1">
+                  {(usages[d.hash] && usages[d.hash].length>0) ? (
+                    <div className="flex flex-wrap gap-1">
+                      {usages[d.hash].map((u)=> (<a key={u.code} className="inline-block px-2 py-1 border rounded" href={`/admin/links/${encodeURIComponent(String(u.code))}`}>{u.code}{u.title?` — ${u.title}`:''}</a>))}
+                    </div>
+                  ) : '—'}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <Pager total={filtered.length} page={page} setPage={setPage} />
     </div>
   );
 }
