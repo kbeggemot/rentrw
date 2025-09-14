@@ -30,6 +30,7 @@ export default function PartnersClient({ initial, hasTokenInitial }: { initial: 
   const [page, setPage] = useState(1);
   const pageSize = 15;
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [autoLoaded, setAutoLoaded] = useState(false);
   // SSR уже передал флаг; если он не был передан, проверим на клиенте
   useEffect(() => { if (typeof hasTokenInitial === 'boolean') setHasToken(hasTokenInitial); }, [hasTokenInitial]);
   useEffect(() => {
@@ -80,6 +81,14 @@ export default function PartnersClient({ initial, hasTokenInitial }: { initial: 
       }
     } catch {}
   }, []);
+
+  // Автозагрузка при первом открытии, если кэша нет
+  useEffect(() => {
+    if (!autoLoaded && hasToken === true && partners.length === 0) {
+      setAutoLoaded(true);
+      void reload();
+    }
+  }, [autoLoaded, hasToken, partners.length]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();

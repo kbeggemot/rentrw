@@ -1,541 +1,209 @@
-npm warn config production Use `--omit=dev` instead.
-
-> rentrw@0.1.0 dev
-> next dev --port 3001
-
    ▲ Next.js 15.4.6
-   - Local:        http://localhost:3001
-   - Network:      http://192.168.1.15:3001
+   - Local:        http://localhost:3000
+   - Network:      http://192.168.1.12:3000
    - Environments: .env.local
 
  ✓ Starting...
- ✓ Ready in 1845ms
- ○ Compiling /link/new ...
- ✓ Compiled /link/new in 1208ms (550 modules)
- ⚠ Fast Refresh had to perform a full reload due to a runtime error.
- GET /link/new 200 in 1551ms
- GET /_next/static/webpack/9cd69239a74466f7.webpack.hot-update.json 404 in 1618ms
- GET /link/new 200 in 124ms
- ○ Compiling /favicon.ico ...
- ✓ Compiled /favicon.ico in 1007ms (596 modules)
- GET /favicon.ico 200 in 1141ms
- GET /api/partners 200 in 1167ms
- GET /api/products 200 in 1170ms
- ✓ Compiled in 1023ms (560 modules)
- GET /link/new 200 in 151ms
- ✓ Compiled in 297ms (560 modules)
- GET /link/new 200 in 134ms
- ⨯ [TypeError: a[d] is not a function] { digest: '4208375715' }
-[TypeError: a[d] is not a function]
- ⨯ [TypeError: a[d] is not a function]
- ⨯ [TypeError: a[d] is not a function] { page: '/link/new' }
- ○ Compiling /middleware ...
- ✓ Compiled /middleware in 552ms (982 modules)
- ⨯ Error: Cannot find module './431.js'
-Require stack:
-- /Users/beggemot/Projects/rentrw/.next/server/webpack-runtime.js
-- /Users/beggemot/Projects/rentrw/.next/server/pages/_document.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/server/require.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/server/load-components.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/build/utils.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/build/swc/options.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/build/swc/index.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/build/analysis/parse-module.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/build/analysis/get-page-static-info.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/server/lib/router-utils/setup-dev-bundler.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/server/lib/router-server.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/server/lib/start-server.js
-    at <unknown> (.next/server/app/link/new/page.js:2:28778)
-    at Object.<anonymous> (.next/server/app/link/new/page.js:2:28829) {
-  code: 'MODULE_NOT_FOUND',
-  requireStack: [Array],
-  page: '/link/new'
-}
- GET /link/new 500 in 1484ms
- GET /link/new 500 in 849ms
- ○ Compiling /admin ...
- ✓ Compiled /admin in 1057ms (982 modules)
- ⚠ Fast Refresh had to perform a full reload. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
- GET /admin 200 in 1543ms
- GET /dashboard 200 in 1557ms
- ✓ Compiled /favicon.ico in 276ms (1004 modules)
- GET /_next/static/css/app/layout.css?v=1756570608412 404 in 1047ms
- GET /_next/static/css/app/layout.css?v=1756570608283 404 in 1038ms
- GET /favicon.ico 200 in 1061ms
- GET /_next/static/chunks/main-app.js?v=1756570608283 404 in 1120ms
- GET /_next/static/chunks/app-pages-internals.js 404 in 1116ms
- GET /_next/static/chunks/main-app.js?v=1756570608412 404 in 1180ms
- GET /_next/static/chunks/app-pages-internals.js 404 in 95ms
- GET /favicon.ico 200 in 11ms
- ✓ Compiled in 635ms (399 modules)
- ✓ Compiled in 329ms (399 modules)
- ✓ Compiled in 148ms (399 modules)
- ✓ Compiled in 614ms (820 modules)
- ✓ Compiled in 412ms (399 modules)
- ✓ Compiled in 181ms (399 modules)
- ○ Compiling /products ...
- ✓ Compiled /products in 527ms (885 modules)
- ⨯ Error: ENOENT: no such file or directory, open '/Users/beggemot/Projects/rentrw/.next/server/vendor-chunks/@swc.js'
-    at <unknown> (.next/server/app/products/page.js:314:47)
-    at Object.<anonymous> (.next/server/app/products/page.js:317:3) {
-  errno: -2,
-  code: 'ENOENT',
-  syscall: 'open',
-  path: '/Users/beggemot/Projects/rentrw/.next/server/vendor-chunks/@swc.js',
-  page: '/products'
-}
- ⚠ Fast Refresh had to perform a full reload due to a runtime error.
- GET /link/new 200 in 144ms
- ⨯ Error: Cannot find module './431.js'
-Require stack:
-- /Users/beggemot/Projects/rentrw/.next/server/webpack-runtime.js
-- /Users/beggemot/Projects/rentrw/.next/server/app/products/page.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/server/require.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/server/load-components.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/build/utils.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/build/swc/options.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/build/swc/index.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/build/analysis/parse-module.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/build/analysis/get-page-static-info.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/server/lib/router-utils/setup-dev-bundler.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/server/lib/router-server.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/server/lib/start-server.js
-    at <unknown> (.next/server/app/link/new/page.js:2:28778)
-    at Object.<anonymous> (.next/server/app/link/new/page.js:2:28829) {
-  code: 'MODULE_NOT_FOUND',
-  requireStack: [Array],
-  page: '/link/new'
-}
- ⚠ Fast Refresh had to perform a full reload due to a runtime error.
- GET /link/new 200 in 148ms
- ✓ Compiled /_error in 281ms (958 modules)
- ⨯ Error: Cannot find module './8548.js'
-Require stack:
-- /Users/beggemot/Projects/rentrw/.next/server/webpack-runtime.js
-- /Users/beggemot/Projects/rentrw/.next/server/pages/_document.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/server/require.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/server/load-components.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/build/utils.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/build/swc/options.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/build/swc/index.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/build/analysis/parse-module.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/build/analysis/get-page-static-info.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/server/lib/router-utils/setup-dev-bundler.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/server/lib/router-server.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/server/lib/start-server.js
-    at <unknown> (.next/server/pages/_document.js:1:327)
-    at Object.<anonymous> (.next/server/pages/_document.js:1:374) {
-  code: 'MODULE_NOT_FOUND',
-  requireStack: [Array]
-}
- ⨯ Error: Cannot find module './8548.js'
-Require stack:
-- /Users/beggemot/Projects/rentrw/.next/server/webpack-runtime.js
-- /Users/beggemot/Projects/rentrw/.next/server/pages/_document.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/server/require.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/server/load-components.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/build/utils.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/build/swc/options.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/build/swc/index.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/build/analysis/parse-module.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/build/analysis/get-page-static-info.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/server/lib/router-utils/setup-dev-bundler.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/server/lib/router-server.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/server/lib/start-server.js
-    at <unknown> (.next/server/pages/_document.js:1:327)
-    at Object.<anonymous> (.next/server/pages/_document.js:1:374) {
-  code: 'MODULE_NOT_FOUND',
-  requireStack: [Array]
-}
- ⨯ Error: Cannot find module './431.js'
-Require stack:
-- /Users/beggemot/Projects/rentrw/.next/server/webpack-runtime.js
-- /Users/beggemot/Projects/rentrw/.next/server/pages/_document.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/server/require.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/server/load-components.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/build/utils.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/build/swc/options.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/build/swc/index.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/build/analysis/parse-module.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/build/analysis/get-page-static-info.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/server/lib/router-utils/setup-dev-bundler.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/server/lib/router-server.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/server/lib/start-server.js
-    at <unknown> (.next/server/app/link/new/page.js:2:28778)
-    at Object.<anonymous> (.next/server/app/link/new/page.js:2:28829) {
-  code: 'MODULE_NOT_FOUND',
-  requireStack: [Array],
-  page: '/link/new'
-}
- ⨯ Error: Cannot find module './8548.js'
-Require stack:
-- /Users/beggemot/Projects/rentrw/.next/server/webpack-runtime.js
-- /Users/beggemot/Projects/rentrw/.next/server/pages/_document.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/server/require.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/server/load-components.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/build/utils.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/build/swc/options.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/build/swc/index.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/build/analysis/parse-module.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/build/analysis/get-page-static-info.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/server/lib/router-utils/setup-dev-bundler.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/server/lib/router-server.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/server/lib/start-server.js
-    at <unknown> (.next/server/pages/_document.js:1:327)
-    at Object.<anonymous> (.next/server/pages/_document.js:1:374) {
-  code: 'MODULE_NOT_FOUND',
-  requireStack: [Array]
-}
- ⨯ Error: Cannot find module './431.js'
-Require stack:
-- /Users/beggemot/Projects/rentrw/.next/server/webpack-runtime.js
-- /Users/beggemot/Projects/rentrw/.next/server/pages/_document.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/server/require.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/server/load-components.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/build/utils.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/build/swc/options.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/build/swc/index.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/build/analysis/parse-module.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/build/analysis/get-page-static-info.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/server/lib/router-utils/setup-dev-bundler.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/server/lib/router-server.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/server/lib/start-server.js
-    at <unknown> (.next/server/app/link/new/page.js:2:28778)
-    at Object.<anonymous> (.next/server/app/link/new/page.js:2:28829) {
-  code: 'MODULE_NOT_FOUND',
-  requireStack: [Array],
-  page: '/link/new'
-}
- ⨯ Error: Cannot find module './8548.js'
-Require stack:
-- /Users/beggemot/Projects/rentrw/.next/server/webpack-runtime.js
-- /Users/beggemot/Projects/rentrw/.next/server/pages/_document.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/server/require.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/server/load-components.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/build/utils.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/build/swc/options.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/build/swc/index.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/build/analysis/parse-module.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/build/analysis/get-page-static-info.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/server/lib/router-utils/setup-dev-bundler.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/server/lib/router-server.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/server/lib/start-server.js
-    at <unknown> (.next/server/pages/_document.js:1:327)
-    at Object.<anonymous> (.next/server/pages/_document.js:1:374) {
-  code: 'MODULE_NOT_FOUND',
-  requireStack: [Array]
-}
- GET /products 500 in 7024ms
- GET /link/new 500 in 6540ms
- ○ Compiling /_not-found ...
- ✓ Compiled /_not-found in 3.4s (980 modules)
- ⚠ Fast Refresh had to perform a full reload due to a runtime error.
- GET /favicon.ico 200 in 3750ms
- GET /_next/static/webpack/762e7c9495893d1f.webpack.hot-update.json 404 in 3780ms
- ⚠ Fast Refresh had to perform a full reload. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
- GET /favicon.ico 200 in 100ms
- GET /_next/static/webpack/762e7c9495893d1f.webpack.hot-update.json 404 in 115ms
- ○ Compiling /api/products ...
- ✓ Compiled /api/products in 646ms (597 modules)
- ⨯ Error: Cannot find module './431.js'
-Require stack:
-- /Users/beggemot/Projects/rentrw/.next/server/webpack-runtime.js
-- /Users/beggemot/Projects/rentrw/.next/server/app/link/new/page.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/server/require.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/server/load-components.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/build/utils.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/build/swc/options.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/build/swc/index.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/build/analysis/parse-module.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/build/analysis/get-page-static-info.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/server/lib/router-utils/setup-dev-bundler.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/server/lib/router-server.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/server/lib/start-server.js
-    at <unknown> (.next/server/app/link/new/page.js:2:28778)
-    at Object.<anonymous> (.next/server/app/link/new/page.js:2:28829) {
-  code: 'MODULE_NOT_FOUND',
-  requireStack: [Array],
-  page: '/link/new'
-}
- ⨯ Error: Cannot find module './8548.js'
-Require stack:
-- /Users/beggemot/Projects/rentrw/.next/server/webpack-runtime.js
-- /Users/beggemot/Projects/rentrw/.next/server/app/link/new/page.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/server/require.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/server/load-components.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/build/utils.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/build/swc/options.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/build/swc/index.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/build/analysis/parse-module.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/build/analysis/get-page-static-info.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/server/lib/router-utils/setup-dev-bundler.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/server/lib/router-server.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/server/lib/start-server.js
-    at <unknown> (.next/server/pages/_document.js:1:327)
-    at Object.<anonymous> (.next/server/pages/_document.js:1:374) {
-  code: 'MODULE_NOT_FOUND',
-  requireStack: [Array]
-}
- GET /link/new 500 in 900ms
- GET /api/products 200 in 917ms
- GET /products 200 in 1101ms
- GET /_next/static/css/app/layout.css?v=1756573713610 404 in 279ms
- GET /_next/static/chunks/main-app.js?v=1756573713610 404 in 315ms
- GET /_next/static/chunks/app-pages-internals.js 404 in 311ms
-<w> [webpack.cache.PackFileCacheStrategy] Caching failed for pack: Error: ENOENT: no such file or directory, rename '/Users/beggemot/Projects/rentrw/.next/cache/webpack/client-development-fallback/0.pack.gz_' -> '/Users/beggemot/Projects/rentrw/.next/cache/webpack/client-development-fallback/0.pack.gz'
-<w> [webpack.cache.PackFileCacheStrategy] Caching failed for pack: Error: ENOENT: no such file or directory, rename '/Users/beggemot/Projects/rentrw/.next/cache/webpack/client-development-fallback/0.pack.gz_' -> '/Users/beggemot/Projects/rentrw/.next/cache/webpack/client-development-fallback/0.pack.gz'
-<w> [webpack.cache.PackFileCacheStrategy] Caching failed for pack: Error: ENOENT: no such file or directory, rename '/Users/beggemot/Projects/rentrw/.next/cache/webpack/client-development-fallback/0.pack.gz_' -> '/Users/beggemot/Projects/rentrw/.next/cache/webpack/client-development-fallback/0.pack.gz'
- ✓ Compiled in 475ms (402 modules)
- ✓ Compiled /_not-found in 220ms (900 modules)
- ⚠ Fast Refresh had to perform a full reload. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
- GET /_next/static/webpack/762e7c9495893d1f.webpack.hot-update.json 404 in 471ms
- ⨯ Error: Cannot find module './431.js'
-Require stack:
-- /Users/beggemot/Projects/rentrw/.next/server/webpack-runtime.js
-- /Users/beggemot/Projects/rentrw/.next/server/app/_not-found/page.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/server/require.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/server/load-components.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/build/utils.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/build/swc/options.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/build/swc/index.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/build/analysis/parse-module.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/build/analysis/get-page-static-info.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/server/lib/router-utils/setup-dev-bundler.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/server/lib/router-server.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/server/lib/start-server.js
-    at <unknown> (.next/server/app/link/new/page.js:2:28778)
-    at Object.<anonymous> (.next/server/app/link/new/page.js:2:28829) {
-  code: 'MODULE_NOT_FOUND',
-  requireStack: [Array],
-  page: '/link/new'
-}
- ⨯ Error: Cannot find module './8548.js'
-Require stack:
-- /Users/beggemot/Projects/rentrw/.next/server/webpack-runtime.js
-- /Users/beggemot/Projects/rentrw/.next/server/app/_not-found/page.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/server/require.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/server/load-components.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/build/utils.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/build/swc/options.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/build/swc/index.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/build/analysis/parse-module.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/build/analysis/get-page-static-info.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/server/lib/router-utils/setup-dev-bundler.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/server/lib/router-server.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/server/lib/start-server.js
-    at <unknown> (.next/server/pages/_document.js:1:327)
-    at Object.<anonymous> (.next/server/pages/_document.js:1:374) {
-  code: 'MODULE_NOT_FOUND',
-  requireStack: [Array]
-}
- GET /link/new 500 in 80ms
- ✓ Compiled /favicon.ico in 83ms (525 modules)
- GET /favicon.ico 200 in 194ms
- ✓ Compiled in 332ms (406 modules)
- ⚠ Fast Refresh had to perform a full reload. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
- GET /_next/static/webpack/762e7c9495893d1f.webpack.hot-update.json 404 in 182ms
- ⨯ Error: Cannot find module './431.js'
-Require stack:
-- /Users/beggemot/Projects/rentrw/.next/server/webpack-runtime.js
-- /Users/beggemot/Projects/rentrw/.next/server/app/favicon.ico/route.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/server/require.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/server/load-components.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/build/utils.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/build/swc/options.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/build/swc/index.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/build/analysis/parse-module.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/build/analysis/get-page-static-info.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/server/lib/router-utils/setup-dev-bundler.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/server/lib/router-server.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/server/lib/start-server.js
-    at <unknown> (.next/server/app/link/new/page.js:2:28778)
-    at Object.<anonymous> (.next/server/app/link/new/page.js:2:28829) {
-  code: 'MODULE_NOT_FOUND',
-  requireStack: [Array],
-  page: '/link/new'
-}
- ⨯ Error: Cannot find module './8548.js'
-Require stack:
-- /Users/beggemot/Projects/rentrw/.next/server/webpack-runtime.js
-- /Users/beggemot/Projects/rentrw/.next/server/app/favicon.ico/route.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/server/require.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/server/load-components.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/build/utils.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/build/swc/options.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/build/swc/index.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/build/analysis/parse-module.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/build/analysis/get-page-static-info.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/server/lib/router-utils/setup-dev-bundler.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/server/lib/router-server.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/server/lib/start-server.js
-    at <unknown> (.next/server/pages/_document.js:1:327)
-    at Object.<anonymous> (.next/server/pages/_document.js:1:374) {
-  code: 'MODULE_NOT_FOUND',
-  requireStack: [Array]
-}
- GET /link/new 500 in 183ms
- GET /favicon.ico 200 in 12ms
- ○ Compiling /products ...
- ✓ Compiled /products in 611ms (588 modules)
- ⨯ Error: Cannot find module './431.js'
-Require stack:
-- /Users/beggemot/Projects/rentrw/.next/server/webpack-runtime.js
-- /Users/beggemot/Projects/rentrw/.next/server/app/products/page.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/server/require.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/server/load-components.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/build/utils.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/build/swc/options.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/build/swc/index.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/build/analysis/parse-module.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/build/analysis/get-page-static-info.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/server/lib/router-utils/setup-dev-bundler.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/server/lib/router-server.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/server/lib/start-server.js
-    at <unknown> (.next/server/app/products/page.js:2:16894)
-    at Object.<anonymous> (.next/server/app/products/page.js:2:16954) {
-  code: 'MODULE_NOT_FOUND',
-  requireStack: [Array],
-  page: '/products'
-}
- ⨯ Error: Cannot find module './8548.js'
-Require stack:
-- /Users/beggemot/Projects/rentrw/.next/server/webpack-runtime.js
-- /Users/beggemot/Projects/rentrw/.next/server/app/products/page.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/server/require.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/server/load-components.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/build/utils.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/build/swc/options.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/build/swc/index.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/build/analysis/parse-module.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/build/analysis/get-page-static-info.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/server/lib/router-utils/setup-dev-bundler.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/server/lib/router-server.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/server/lib/start-server.js
-    at <unknown> (.next/server/pages/_document.js:1:327)
-    at Object.<anonymous> (.next/server/pages/_document.js:1:374) {
-  code: 'MODULE_NOT_FOUND',
-  requireStack: [Array]
-}
- GET /products 500 in 733ms
- ⨯ Error: Cannot find module './431.js'
-Require stack:
-- /Users/beggemot/Projects/rentrw/.next/server/webpack-runtime.js
-- /Users/beggemot/Projects/rentrw/.next/server/app/products/page.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/server/require.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/server/load-components.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/build/utils.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/build/swc/options.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/build/swc/index.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/build/analysis/parse-module.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/build/analysis/get-page-static-info.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/server/lib/router-utils/setup-dev-bundler.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/server/lib/router-server.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/server/lib/start-server.js
-    at <unknown> (.next/server/app/_not-found/page.js:2:9473)
-    at Object.<anonymous> (.next/server/app/_not-found/page.js:2:9524) {
-  code: 'MODULE_NOT_FOUND',
-  requireStack: [Array]
-}
- GET /_next/static/chunks/fallback/webpack.js 500 in 58ms
- ⨯ Error: Cannot find module './431.js'
-Require stack:
-- /Users/beggemot/Projects/rentrw/.next/server/webpack-runtime.js
-- /Users/beggemot/Projects/rentrw/.next/server/app/products/page.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/server/require.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/server/load-components.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/build/utils.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/build/swc/options.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/build/swc/index.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/build/analysis/parse-module.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/build/analysis/get-page-static-info.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/server/lib/router-utils/setup-dev-bundler.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/server/lib/router-server.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/server/lib/start-server.js
-    at <unknown> (.next/server/app/_not-found/page.js:2:9473)
-    at Object.<anonymous> (.next/server/app/_not-found/page.js:2:9524) {
-  code: 'MODULE_NOT_FOUND',
-  requireStack: [Array]
-}
- ⨯ Error: Cannot find module './431.js'
-Require stack:
-- /Users/beggemot/Projects/rentrw/.next/server/webpack-runtime.js
-- /Users/beggemot/Projects/rentrw/.next/server/app/products/page.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/server/require.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/server/load-components.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/build/utils.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/build/swc/options.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/build/swc/index.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/build/analysis/parse-module.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/build/analysis/get-page-static-info.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/server/lib/router-utils/setup-dev-bundler.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/server/lib/router-server.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/server/lib/start-server.js
-    at <unknown> (.next/server/app/_not-found/page.js:2:9473)
-    at Object.<anonymous> (.next/server/app/_not-found/page.js:2:9524) {
-  code: 'MODULE_NOT_FOUND',
-  requireStack: [Array]
-}
- ⨯ Error: Cannot find module './431.js'
-Require stack:
-- /Users/beggemot/Projects/rentrw/.next/server/webpack-runtime.js
-- /Users/beggemot/Projects/rentrw/.next/server/app/products/page.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/server/require.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/server/load-components.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/build/utils.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/build/swc/options.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/build/swc/index.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/build/analysis/parse-module.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/build/analysis/get-page-static-info.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/server/lib/router-utils/setup-dev-bundler.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/server/lib/router-server.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/server/lib/start-server.js
-    at <unknown> (.next/server/app/_not-found/page.js:2:9473)
-    at Object.<anonymous> (.next/server/app/_not-found/page.js:2:9524) {
-  code: 'MODULE_NOT_FOUND',
-  requireStack: [Array]
-}
- ⨯ Error: Cannot find module './431.js'
-Require stack:
-- /Users/beggemot/Projects/rentrw/.next/server/webpack-runtime.js
-- /Users/beggemot/Projects/rentrw/.next/server/app/products/page.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/server/require.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/server/load-components.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/build/utils.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/build/swc/options.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/build/swc/index.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/build/analysis/parse-module.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/build/analysis/get-page-static-info.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/server/lib/router-utils/setup-dev-bundler.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/server/lib/router-server.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/server/lib/start-server.js
-    at <unknown> (.next/server/app/_not-found/page.js:2:9473)
-    at Object.<anonymous> (.next/server/app/_not-found/page.js:2:9524) {
-  code: 'MODULE_NOT_FOUND',
-  requireStack: [Array]
-}
- GET /_next/static/chunks/fallback/main.js 500 in 132ms
- GET /_next/static/chunks/fallback/react-refresh.js 500 in 119ms
- GET /_next/static/chunks/fallback/pages/_app.js 500 in 117ms
- GET /_next/static/chunks/fallback/pages/_error.js 500 in 117ms
- ⨯ Error: Cannot find module './431.js'
-Require stack:
-- /Users/beggemot/Projects/rentrw/.next/server/webpack-runtime.js
-- /Users/beggemot/Projects/rentrw/.next/server/app/products/page.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/server/require.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/server/load-components.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/build/utils.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/build/swc/options.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/build/swc/index.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/build/analysis/parse-module.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/build/analysis/get-page-static-info.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/server/lib/router-utils/setup-dev-bundler.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/server/lib/router-server.js
-- /Users/beggemot/Projects/rentrw/node_modules/next/dist/server/lib/start-server.js
-    at <unknown> (.next/server/app/favicon.ico/route.js:1:52565)
-    at Object.<anonymous> (.next/server/app/favicon.ico/route.js:1:52616) {
-  code: 'MODULE_NOT_FOUND',
-  requireStack: [Array],
-  page: '/favicon.ico'
-}
- GET /favicon.ico 500 in 33ms
-[?25h
+ ✓ Ready in 1687ms
+ ✓ Compiled /middleware in 169ms (108 modules)
+ ○ Compiling /dashboard ...
+ ✓ Compiled /dashboard in 1050ms (627 modules)
+ GET /dashboard 200 in 1430ms
+ ○ Compiling /api/links ...
+ ✓ Compiled /api/links in 1109ms (722 modules)
+ GET /favicon.ico 200 in 1341ms
+ GET /api/organizations 200 in 1385ms
+ GET /api/organizations 200 in 1384ms
+ GET /api/links?limit=50 200 in 1391ms
+ ✓ Compiled /api/auth/logout in 144ms (724 modules)
+ POST /api/auth/logout 303 in 267ms
+ ✓ Compiled /auth in 294ms (737 modules)
+ GET /api/rocketwork/withdrawals?limit=15 200 in 2263ms
+ GET /auth 200 in 536ms
+ GET /favicon.ico 200 in 21ms
+ ✓ Compiled /api/settings/token in 142ms (740 modules)
+ GET /api/settings/token 401 in 181ms
+ ✓ Compiled /api/auth/webauthn/exists in 140ms (742 modules)
+ GET /api/auth/webauthn/exists?id=UkZnR0pGdzBFSmxBUjZqamdzcmZMN3BESlNr 200 in 171ms
+ ✓ Compiled /api/auth/webauthn/status in 186ms (744 modules)
+ GET /api/auth/webauthn/status 401 in 224ms
+ GET /auth 200 in 70ms
+ GET /auth 200 in 84ms
+ GET /api/settings/token 401 in 27ms
+ GET /favicon.ico 200 in 39ms
+ GET /api/auth/webauthn/exists?id=UkZnR0pGdzBFSmxBUjZqamdzcmZMN3BESlNr 200 in 24ms
+ GET /api/auth/webauthn/status 401 in 9ms
+ GET /auth 200 in 47ms
+ GET /favicon.ico 200 in 33ms
+ GET /api/settings/token 401 in 41ms
+ GET /api/auth/webauthn/exists?id=UkZnR0pGdzBFSmxBUjZqamdzcmZMN3BESlNr 200 in 20ms
+ GET /api/auth/webauthn/status 401 in 16ms
+ ✓ Compiled /api/auth/login in 401ms (746 modules)
+ POST /api/auth/login 200 in 535ms
+ ○ Compiling /api/sales ...
+ ✓ Compiled /api/sales in 688ms (749 modules)
+ReferenceError: Cannot access 'migrationStarted' before initialization
+    at migrateLegacyTasksToOrgStore (src/server/taskStore.ts:297:2)
+    at eval (src/server/boot.ts:14:30)
+    at <unknown> (rsc)/./src/server/boot.ts (/Users/beggemot/Projects/rentrw/.next/server/app/api/sales/route.js:87:1)
+    at eval (src/server/eventBus.ts:45:6)
+    at <unknown> (rsc)/./src/server/eventBus.ts (/Users/beggemot/Projects/rentrw/.next/server/app/api/sales/route.js:109:1)
+    at eval (webpack-internal:///(rsc)/./src/server/taskStore.ts:25:67)
+    at <unknown> (rsc)/./src/server/taskStore.ts (/Users/beggemot/Projects/rentrw/.next/server/app/api/sales/route.js:263:1)
+    at eval (webpack-internal:///(rsc)/./src/app/api/sales/route.ts:8:75)
+    at <unknown> (rsc)/./src/app/api/sales/route.ts (/Users/beggemot/Projects/rentrw/.next/server/app/api/sales/route.js:54:1)
+    at __webpack_exec__ (.next/server/app/api/sales/route.js:558:39)
+    at <unknown> (.next/server/app/api/sales/route.js:559:83)
+    at <unknown> (.next/server/app/api/sales/route.js:559:47)
+    at Object.<anonymous> (.next/server/app/api/sales/route.js:562:3)
+  295 | let migrationStarted = false;
+  296 | export async function migrateLegacyTasksToOrgStore(): Promise<void> {
+> 297 |   if (migrationStarted) return; migrationStarted = true;
+      |  ^
+  298 |   try {
+  299 |     const store = await readTasks();
+  300 |     const sales = Array.isArray(store.sales) ? store.sales : [];
+ ⨯ unhandledRejection: ReferenceError: Cannot access 'migrationStarted' before initialization
+    at migrateLegacyTasksToOrgStore (src/server/taskStore.ts:297:2)
+    at eval (src/server/boot.ts:14:30)
+    at <unknown> (rsc)/./src/server/boot.ts (/Users/beggemot/Projects/rentrw/.next/server/app/api/sales/route.js:87:1)
+    at eval (src/server/eventBus.ts:45:6)
+    at <unknown> (rsc)/./src/server/eventBus.ts (/Users/beggemot/Projects/rentrw/.next/server/app/api/sales/route.js:109:1)
+    at eval (webpack-internal:///(rsc)/./src/server/taskStore.ts:25:67)
+    at <unknown> (rsc)/./src/server/taskStore.ts (/Users/beggemot/Projects/rentrw/.next/server/app/api/sales/route.js:263:1)
+    at eval (webpack-internal:///(rsc)/./src/app/api/sales/route.ts:8:75)
+    at <unknown> (rsc)/./src/app/api/sales/route.ts (/Users/beggemot/Projects/rentrw/.next/server/app/api/sales/route.js:54:1)
+    at __webpack_exec__ (.next/server/app/api/sales/route.js:558:39)
+    at <unknown> (.next/server/app/api/sales/route.js:559:83)
+    at <unknown> (.next/server/app/api/sales/route.js:559:47)
+    at Object.<anonymous> (.next/server/app/api/sales/route.js:562:3)
+  295 | let migrationStarted = false;
+  296 | export async function migrateLegacyTasksToOrgStore(): Promise<void> {
+> 297 |   if (migrationStarted) return; migrationStarted = true;
+      |  ^
+  298 |   try {
+  299 |     const store = await readTasks();
+  300 |     const sales = Array.isArray(store.sales) ? store.sales : [];
+ ⨯ unhandledRejection:  ReferenceError: Cannot access 'migrationStarted' before initialization
+    at migrateLegacyTasksToOrgStore (src/server/taskStore.ts:297:2)
+    at eval (src/server/boot.ts:14:30)
+    at <unknown> (rsc)/./src/server/boot.ts (/Users/beggemot/Projects/rentrw/.next/server/app/api/sales/route.js:87:1)
+    at eval (src/server/eventBus.ts:45:6)
+    at <unknown> (rsc)/./src/server/eventBus.ts (/Users/beggemot/Projects/rentrw/.next/server/app/api/sales/route.js:109:1)
+    at eval (webpack-internal:///(rsc)/./src/server/taskStore.ts:25:67)
+    at <unknown> (rsc)/./src/server/taskStore.ts (/Users/beggemot/Projects/rentrw/.next/server/app/api/sales/route.js:263:1)
+    at eval (webpack-internal:///(rsc)/./src/app/api/sales/route.ts:8:75)
+    at <unknown> (rsc)/./src/app/api/sales/route.ts (/Users/beggemot/Projects/rentrw/.next/server/app/api/sales/route.js:54:1)
+    at __webpack_exec__ (.next/server/app/api/sales/route.js:558:39)
+    at <unknown> (.next/server/app/api/sales/route.js:559:83)
+    at <unknown> (.next/server/app/api/sales/route.js:559:47)
+    at Object.<anonymous> (.next/server/app/api/sales/route.js:562:3)
+  295 | let migrationStarted = false;
+  296 | export async function migrateLegacyTasksToOrgStore(): Promise<void> {
+> 297 |   if (migrationStarted) return; migrationStarted = true;
+      |  ^
+  298 |   try {
+  299 |     const store = await readTasks();
+  300 |     const sales = Array.isArray(store.sales) ? store.sales : [];
+ GET /dashboard 200 in 1349ms
+ GET /api/sales?refresh=1 200 in 1418ms
+ GET /favicon.ico 200 in 30ms
+ GET /api/organizations 200 in 69ms
+ GET /api/organizations 200 in 70ms
+ GET /api/links?limit=50 200 in 72ms
+ GET /api/auth/webauthn/status 200 in 17ms
+ GET /api/rocketwork/withdrawals?limit=15 200 in 10203ms
+ POST /api/auth/logout 303 in 41ms
+ GET /auth 200 in 287ms
+ GET /favicon.ico 200 in 121ms
+ GET /api/settings/token 401 in 105ms
+ GET /api/auth/webauthn/exists?id=UkZnR0pGdzBFSmxBUjZqamdzcmZMN3BESlNr 200 in 32ms
+ GET /api/auth/webauthn/status 401 in 94ms
+ POST /api/auth/login 200 in 81ms
+ GET /dashboard 200 in 154ms
+ GET /api/sales?refresh=1 200 in 254ms
+ GET /favicon.ico 200 in 37ms
+ GET /api/organizations 200 in 51ms
+ GET /api/organizations 200 in 50ms
+ GET /api/links?limit=50 200 in 53ms
+ GET /api/auth/webauthn/status 200 in 19ms
+ GET /api/sales?refresh=1 200 in 95627ms
+ GET /api/rocketwork/withdrawals?limit=15 200 in 10132ms
+ POST /api/auth/logout 303 in 51ms
+ GET /auth 200 in 51ms
+ GET /api/settings/token 401 in 17ms
+ GET /api/auth/webauthn/exists?id=UkZnR0pGdzBFSmxBUjZqamdzcmZMN3BESlNr 200 in 25ms
+ GET /favicon.ico 200 in 23ms
+ GET /api/auth/webauthn/status 401 in 16ms
+ POST /api/auth/login 200 in 83ms
+ GET /dashboard 200 in 134ms
+ GET /api/sales?refresh=1 200 in 222ms
+ GET /api/organizations 200 in 43ms
+ GET /api/organizations 200 in 53ms
+ GET /api/links?limit=50 200 in 54ms
+ GET /favicon.ico 200 in 91ms
+ GET /api/auth/webauthn/status 200 in 15ms
+ GET /api/rocketwork/withdrawals?limit=15 200 in 10248ms
+ GET /api/sales?refresh=1 200 in 94577ms
+ GET /api/sales?refresh=1 200 in 94682ms
+ POST /api/auth/logout 303 in 33ms
+ GET /auth 200 in 72ms
+ GET /api/settings/token 401 in 55ms
+ GET /favicon.ico 200 in 48ms
+ GET /api/auth/webauthn/exists?id=UkZnR0pGdzBFSmxBUjZqamdzcmZMN3BESlNr 200 in 36ms
+ GET /api/auth/webauthn/status 401 in 30ms
+ GET /auth 200 in 37ms
+ GET /api/settings/token 401 in 20ms
+ GET /favicon.ico 200 in 23ms
+ GET /api/auth/webauthn/exists?id=UkZnR0pGdzBFSmxBUjZqamdzcmZMN3BESlNr 200 in 14ms
+ GET /api/auth/webauthn/status 401 in 10ms
+ GET /auth 200 in 51ms
+ GET /api/settings/token 401 in 20ms
+ GET /favicon.ico 200 in 23ms
+ GET /api/auth/webauthn/exists?id=UkZnR0pGdzBFSmxBUjZqamdzcmZMN3BESlNr 200 in 13ms
+ GET /api/auth/webauthn/status 401 in 9ms
+ POST /api/auth/login 200 in 88ms
+ GET /dashboard 200 in 198ms
+ GET /api/sales?refresh=1 200 in 229ms
+ GET /api/organizations 200 in 44ms
+ GET /api/organizations 200 in 45ms
+ GET /api/links?limit=50 200 in 45ms
+ GET /favicon.ico 200 in 82ms
+ GET /api/auth/webauthn/status 200 in 17ms
+ GET /api/rocketwork/withdrawals?limit=15 200 in 10382ms
+ GET /dashboard 200 in 96ms
+ GET /favicon.ico 200 in 15ms
+ GET /api/organizations 200 in 31ms
+ GET /api/organizations 200 in 43ms
+ GET /api/links?limit=50 200 in 41ms
+ GET /api/rocketwork/withdrawals?limit=15 200 in 10354ms
+ GET /api/sales?refresh=1 200 in 94811ms
+ ○ Compiling /partners ...
+ ✓ Compiled /partners in 592ms (655 modules)
+ GET /partners 200 in 824ms
+ ✓ Compiled /api/organizations in 87ms (432 modules)
+ ✓ Compiled (436 modules)
+ GET /favicon.ico 200 in 285ms
+ GET /api/organizations 200 in 292ms
+ GET /api/organizations 200 in 289ms
+ GET /api/organizations 200 in 289ms
+ GET /api/organizations 200 in 297ms
+ ✓ Compiled /api/partners/refresh in 252ms (743 modules)
+ POST /api/partners/refresh 200 in 42269ms
+ ✓ Compiled /api/partners/meta in 281ms (745 modules)
+ GET /api/partners/meta 200 in 392ms
+ ✓ Compiled /api/partners in 305ms (747 modules)
+ GET /api/partners?limit=15 200 in 375ms
+ GET /api/partners/meta 200 in 72ms
+ GET /favicon.ico 200 in 26ms
+ ✓ Compiled in 1328ms (669 modules)
+ ✓ Compiled in 574ms (669 modules)
+ GET /partners 200 in 328ms
+ ✓ Compiled /favicon.ico in 142ms (434 modules)
+ ✓ Compiled (503 modules)
+ GET /favicon.ico 200 in 308ms
+ GET /api/organizations 200 in 374ms
+ GET /api/organizations 200 in 381ms
+ GET /api/partners/meta 200 in 381ms
+ ✓ Compiled /api/partners in 285ms (505 modules)
+ GET /api/partners?limit=15 200 in 383ms

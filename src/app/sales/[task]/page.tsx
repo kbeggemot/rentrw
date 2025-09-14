@@ -64,7 +64,14 @@ export default async function SaleDetailsPage(props: { params: Promise<{ task: s
               {sale.isAgent ? (
                 <>
                   <div className="text-gray-500">Партнёр</div>
-                  <div>{(sale as any).partnerFio ? `${(sale as any).partnerFio}${(sale as any).partnerPhone ? ` — ${(sale as any).partnerPhone}` : ''}` : ((sale as any).partnerPhone || '—')}</div>
+                  <div>
+                    {(() => {
+                      const phone = (sale as any)?.partnerPhone ? String((sale as any).partnerPhone) : '';
+                      const fio = (sale as any)?.partnerFio ? String((sale as any).partnerFio).trim() : '';
+                      if (phone) return fio ? `${phone} — ${fio}` : phone;
+                      return fio || '—';
+                    })()}
+                  </div>
                 </>
               ) : null}
               <div className="text-gray-500">Сумма, ₽</div>
