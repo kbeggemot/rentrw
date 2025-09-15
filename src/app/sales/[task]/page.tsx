@@ -1,5 +1,6 @@
 import { headers } from 'next/headers';
 import { findSaleByTaskId } from '@/server/taskStore';
+import { listPartners } from '@/server/partnerStore';
 import { listProductsForOrg } from '@/server/productsStore';
 import InstantResendLink from '@/app/sales/InstantResendLink';
 
@@ -46,6 +47,24 @@ export default async function SaleDetailsPage(props: { params: Promise<{ task: s
     }
   } catch {}
 
+  // Enrich partner info (FIO + type) from partners store by phone digits
+  let partnerFioFromStore: string | null = null;
+  let partnerKindFromStore: 'selfemployed' | 'entrepreneur' | null = null;
+  try {
+    if (sale && (sale as any).isAgent && (sale as any).partnerPhone) {
+      const phoneDigits = String((sale as any).partnerPhone).replace(/\D/g, '');
+      const uid = String((sale as any).userId || '');
+      if (uid && phoneDigits) {
+        const partners = await listPartners(uid);
+        const found = partners.find((pp: any) => String(pp.phone || '').replace(/\D/g, '') === phoneDigits) as any || null;
+        if (found) {
+          partnerFioFromStore = (typeof found.fio === 'string' && found.fio.trim().length > 0) ? String(found.fio).trim() : null;
+          partnerKindFromStore = (found.employmentKind === 'entrepreneur' || found.employmentKind === 'selfemployed') ? found.employmentKind : null;
+        }
+      }
+    }
+  } catch {}
+
   return (
     <div className="max-w-3xl mx-auto pt-0 pb-4">
       <div className="flex items-center justify-between mb-3">
@@ -67,8 +86,9 @@ export default async function SaleDetailsPage(props: { params: Promise<{ task: s
                   <div>
                     {(() => {
                       const phone = (sale as any)?.partnerPhone ? String((sale as any).partnerPhone) : '';
-                      const fio = (sale as any)?.partnerFio ? String((sale as any).partnerFio).trim() : '';
-                      const kindRaw = (sale as any)?.employmentKind as string | undefined;
+                      const fioDirect = (sale as any)?.partnerFio ? String((sale as any).partnerFio).trim() : '';
+                      const fio = fioDirect || (partnerFioFromStore || '');
+                      const kindRaw = (partnerKindFromStore as string | undefined);
                       const kind = kindRaw === 'entrepreneur' ? 'ИП' : (kindRaw === 'selfemployed' ? 'СМЗ' : '');
                       const parts = [phone || null, fio || null, kind || null].filter(Boolean);
                       return parts.length > 0 ? parts.join(' — ') : '—';
