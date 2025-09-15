@@ -584,19 +584,19 @@ export async function repairUserSales(userId: string, onlyOrderId?: number): Pro
           try { token = await getDecryptedApiToken(userId); } catch { token = null; }
         }
         if (token) {
-          const tUrl = new URL(`tasks/${encodeURIComponent(String(s.taskId))}`, rwBase.endsWith('/') ? rwBase : rwBase + '/').toString();
+        const tUrl = new URL(`tasks/${encodeURIComponent(String(s.taskId))}`, rwBase.endsWith('/') ? rwBase : rwBase + '/').toString();
           let rootStatus = '';
           try {
             const res = await fetch(tUrl, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }, cache: 'no-store' });
-            const txt = await res.text();
-            let d: any = null; try { d = txt ? JSON.parse(txt) : null; } catch { d = txt; }
-            const taskObj = (d && typeof d === 'object' && 'task' in d) ? (d.task as any) : d;
+        const txt = await res.text();
+        let d: any = null; try { d = txt ? JSON.parse(txt) : null; } catch { d = txt; }
+        const taskObj = (d && typeof d === 'object' && 'task' in d) ? (d.task as any) : d;
             rootStatus = String(taskObj?.status || '').toLowerCase();
           } catch {}
-          if (rootStatus === 'completed') {
-            const payUrl = new URL(`tasks/${encodeURIComponent(String(s.taskId))}/pay`, rwBase.endsWith('/') ? rwBase : rwBase + '/').toString();
-            try {
-              if (process.env.OFD_AUDIT === '1') {
+        if (rootStatus === 'completed') {
+          const payUrl = new URL(`tasks/${encodeURIComponent(String(s.taskId))}/pay`, rwBase.endsWith('/') ? rwBase : rwBase + '/').toString();
+          try {
+            if (process.env.OFD_AUDIT === '1') {
                 const numOrder = Number(String(s.orderId).match(/(\d+)/g)?.slice(-1)[0] || NaN);
                 await appendOfdAudit({ ts: new Date().toISOString(), source: 'repair_worker', userId, orderId: numOrder, taskId: s.taskId, action: 'background_pay', patch: { reason: 'agent_transfered_completed_has_full_and_commission', payUrl } });
               }
@@ -611,21 +611,21 @@ export async function repairUserSales(userId: string, onlyOrderId?: number): Pro
               try { await appendRwError({ ts: new Date().toISOString(), scope: 'tasks:pay', method: 'PATCH', url: payUrl, status: null, error: e instanceof Error ? e.message : String(e), userId }); } catch {}
             }
             // Короткий опрос статуса, чтобы обновить локальную продажу
-            let triesNpd = 0;
-            while (triesNpd < 5) {
-              await new Promise((r) => setTimeout(r, 1200));
+          let triesNpd = 0;
+          while (triesNpd < 5) {
+            await new Promise((r) => setTimeout(r, 1200));
               const r2 = await fetch(tUrl, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }, cache: 'no-store' });
-              const t2 = await r2.text();
-              let o2: any = null; try { o2 = t2 ? JSON.parse(t2) : null; } catch { o2 = t2; }
-              const norm = (o2 && typeof o2 === 'object' && 'task' in o2) ? (o2.task as any) : o2;
-              const npd = (norm?.receipt_uri as string | undefined) ?? undefined;
-              const ofd = (norm?.ofd_url as string | undefined)
-                ?? (norm?.ofd_receipt_url as string | undefined)
-                ?? (norm?.acquiring_order?.ofd_url as string | undefined)
-                ?? (norm?.acquiring_order?.ofd_receipt_url as string | undefined)
-                ?? undefined;
-              const add = (norm?.additional_commission_ofd_url as string | undefined) ?? undefined;
-              const aoSt = (norm?.acquiring_order?.status as string | undefined) ?? undefined;
+            const t2 = await r2.text();
+            let o2: any = null; try { o2 = t2 ? JSON.parse(t2) : null; } catch { o2 = t2; }
+            const norm = (o2 && typeof o2 === 'object' && 'task' in o2) ? (o2.task as any) : o2;
+            const npd = (norm?.receipt_uri as string | undefined) ?? undefined;
+            const ofd = (norm?.ofd_url as string | undefined)
+              ?? (norm?.ofd_receipt_url as string | undefined)
+              ?? (norm?.acquiring_order?.ofd_url as string | undefined)
+              ?? (norm?.acquiring_order?.ofd_receipt_url as string | undefined)
+              ?? undefined;
+            const add = (norm?.additional_commission_ofd_url as string | undefined) ?? undefined;
+            const aoSt = (norm?.acquiring_order?.status as string | undefined) ?? undefined;
               try { await updateSaleFromStatus(userId, s.taskId, { status: aoSt, ofdUrl: ofd, additionalCommissionOfdUrl: add, npdReceiptUri: npd, rootStatus: String(norm?.status || '').toLowerCase() } as any); } catch {}
               // НПД для ИП не ждём
               break;
