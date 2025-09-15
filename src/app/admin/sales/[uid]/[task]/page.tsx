@@ -60,7 +60,7 @@ export default async function AdminSaleEditor(props: { params: Promise<{ uid: st
               </div>
               <div>
                 <div className="text-gray-600">Способ оплаты</div>
-                <div>{(() => { const it:any=item; const m=String((it as any)?.method||'').toLowerCase(); const ao=(it as any)?.acquiring_order; const hint=(it as any)?.acqMethod; const byAo=ao && typeof (ao as any)?.type==='string' ? String((ao as any).type).toUpperCase() : ''; const txt = (m==='card'||m==='cards')?'карта':(m==='qr'||byAo==='QR'?'СБП':(hint==='card'?'карта':(hint==='qr'?'СБП':''))); return txt||'—'; })()}</div>
+                <div>{(() => { const it:any=item; const byAo=String((it?.acquiring_order?.type||'')).toUpperCase(); if(byAo==='QR') return 'СБП'; if(byAo==='CARD') return 'карта'; const m=String((it?.method||'')).toLowerCase(); if(m==='qr') return 'СБП'; if(m==='card'||m==='cards') return 'карта'; return '—'; })()}</div>
               </div>
               <div>
                 <div className="text-gray-600">Канал</div>
@@ -137,25 +137,25 @@ export default async function AdminSaleEditor(props: { params: Promise<{ uid: st
             </div>
           ) : null}
 
-          {/* Подписанный документ */}
-          {((item as any).termsDocHash || (item as any).termsAcceptedAt) ? (
-            <div className="border rounded p-3 bg-white dark:bg-gray-950">
-              <h2 className="text-lg font-semibold mb-2">Подписанный документ</h2>
+          {/* Документы (оферта) */}
+          <div className="border rounded p-3 bg-white dark:bg-gray-950">
+            <h2 className="text-lg font-semibold mb-2">Документы</h2>
+            {((item as any).termsDocHash || (item as any).termsAcceptedAt) ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
                 <div><div className="text-gray-600">Название</div><div>{String((item as any).termsDocName||'—')}</div></div>
                 <div><div className="text-gray-600">Хэш</div><div className="font-mono break-all">{String((item as any).termsDocHash||'—')}</div></div>
                 <div>
                   <div className="text-gray-600">Открыть</div>
                   <div>
-                    {((item as any).termsDocHash) ? (
-                      <a className="px-3 py-2 border rounded inline-block" href={`/api/docs/${encodeURIComponent(String((item as any).termsDocHash))}`} target="_blank" rel="noreferrer">Открыть документ</a>
-                    ) : '—'}
+                    <a className="px-3 py-2 border rounded inline-block" href={`/api/docs/${encodeURIComponent(String((item as any).termsDocHash))}`} target="_blank" rel="noreferrer">Открыть документ</a>
                   </div>
                 </div>
                 <div className="sm:col-span-2"><div className="text-gray-600">Принято (МСК)</div><div>{(item as any).termsAcceptedAt ? new Date((item as any).termsAcceptedAt).toLocaleString('ru-RU',{ timeZone:'Europe/Moscow' }) : '—'}</div></div>
               </div>
-            </div>
-          ) : null}
+            ) : (
+              <div className="text-sm text-gray-600">Оферта не принималась</div>
+            )}
+          </div>
 
           {/* Мгновенная выдача */}
           <div className="border rounded p-3 bg-white dark:bg-gray-950">
