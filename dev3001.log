@@ -207,3 +207,107 @@ ReferenceError: Cannot access 'migrationStarted' before initialization
  GET /api/partners/meta 200 in 381ms
  ✓ Compiled /api/partners in 285ms (505 modules)
  GET /api/partners?limit=15 200 in 383ms
+ ○ Compiling /products ...
+ ✓ Compiled /products in 561ms (670 modules)
+ ✓ Compiled /sales in 216ms (448 modules)
+ ✓ Compiled in 387ms (706 modules)
+ GET /api/settings/token 200 in 892ms
+ GET /sales 200 in 941ms
+ GET /dashboard 200 in 761ms
+ ○ Compiling /api/links ...
+ ✓ Compiled /api/links in 683ms (781 modules)
+ GET /api/organizations 200 in 816ms
+ GET /api/organizations 200 in 818ms
+ GET /api/organizations 200 in 818ms
+ GET /api/products 200 in 927ms
+ GET /api/links?limit=50 200 in 825ms
+ GET /products 200 in 3011ms
+ GET /api/organizations 200 in 110ms
+ ✓ Compiled /favicon.ico in 209ms (535 modules)
+ GET /api/links?limit=50 200 in 564ms
+ GET /favicon.ico 200 in 618ms
+ GET /sales 200 in 109ms
+ GET /favicon.ico 200 in 31ms
+ ✓ Compiled /api/sales in 439ms (788 modules)
+ GET /api/organizations 200 in 487ms
+ GET /api/organizations 200 in 488ms
+ReferenceError: Cannot access 'migrationStarted' before initialization
+    at migrateLegacyTasksToOrgStore (src/server/taskStore.ts:297:2)
+    at eval (src/server/boot.ts:14:30)
+    at <unknown> (rsc)/./src/server/boot.ts (/Users/beggemot/Projects/rentrw/.next/server/app/api/sales/meta/route.js:87:1)
+    at eval (src/server/eventBus.ts:45:6)
+    at <unknown> (rsc)/./src/server/eventBus.ts (/Users/beggemot/Projects/rentrw/.next/server/app/api/sales/meta/route.js:109:1)
+    at eval (webpack-internal:///(rsc)/./src/server/taskStore.ts:25:67)
+    at <unknown> (rsc)/./src/server/taskStore.ts (/Users/beggemot/Projects/rentrw/.next/server/app/api/sales/meta/route.js:263:1)
+    at eval (webpack-internal:///(rsc)/./src/app/api/sales/meta/route.ts:12:75)
+    at <unknown> (rsc)/./src/app/api/sales/meta/route.ts (/Users/beggemot/Projects/rentrw/.next/server/app/api/sales/meta/route.js:54:1)
+    at __webpack_exec__ (.next/server/app/api/sales/meta/route.js:558:39)
+    at <unknown> (.next/server/app/api/sales/meta/route.js:559:83)
+    at <unknown> (.next/server/app/api/sales/meta/route.js:559:47)
+    at Object.<anonymous> (.next/server/app/api/sales/meta/route.js:562:3)
+  295 | let migrationStarted = false;
+  296 | export async function migrateLegacyTasksToOrgStore(): Promise<void> {
+> 297 |   if (migrationStarted) return; migrationStarted = true;
+      |  ^
+  298 |   try {
+  299 |     const store = await readTasks();
+  300 |     const sales = Array.isArray(store.sales) ? store.sales : [];
+ ⨯ unhandledRejection: ReferenceError: Cannot access 'migrationStarted' before initialization
+    at migrateLegacyTasksToOrgStore (src/server/taskStore.ts:297:2)
+    at eval (src/server/boot.ts:14:30)
+    at <unknown> (rsc)/./src/server/boot.ts (/Users/beggemot/Projects/rentrw/.next/server/app/api/sales/meta/route.js:87:1)
+    at eval (src/server/eventBus.ts:45:6)
+    at <unknown> (rsc)/./src/server/eventBus.ts (/Users/beggemot/Projects/rentrw/.next/server/app/api/sales/meta/route.js:109:1)
+    at eval (webpack-internal:///(rsc)/./src/server/taskStore.ts:25:67)
+    at <unknown> (rsc)/./src/server/taskStore.ts (/Users/beggemot/Projects/rentrw/.next/server/app/api/sales/meta/route.js:263:1)
+    at eval (webpack-internal:///(rsc)/./src/app/api/sales/meta/route.ts:12:75)
+    at <unknown> (rsc)/./src/app/api/sales/meta/route.ts (/Users/beggemot/Projects/rentrw/.next/server/app/api/sales/meta/route.js:54:1)
+    at __webpack_exec__ (.next/server/app/api/sales/meta/route.js:558:39)
+    at <unknown> (.next/server/app/api/sales/meta/route.js:559:83)
+    at <unknown> (.next/server/app/api/sales/meta/route.js:559:47)
+    at Object.<anonymous> (.next/server/app/api/sales/meta/route.js:562:3)
+  295 | let migrationStarted = false;
+  296 | export async function migrateLegacyTasksToOrgStore(): Promise<void> {
+> 297 |   if (migrationStarted) return; migrationStarted = true;
+      |  ^
+  298 |   try {
+  299 |     const store = await readTasks();
+  300 |     const sales = Array.isArray(store.sales) ? store.sales : [];
+ ⨯ unhandledRejection:  ReferenceError: Cannot access 'migrationStarted' before initialization
+    at migrateLegacyTasksToOrgStore (src/server/taskStore.ts:297:2)
+    at eval (src/server/boot.ts:14:30)
+    at <unknown> (rsc)/./src/server/boot.ts (/Users/beggemot/Projects/rentrw/.next/server/app/api/sales/meta/route.js:87:1)
+    at eval (src/server/eventBus.ts:45:6)
+    at <unknown> (rsc)/./src/server/eventBus.ts (/Users/beggemot/Projects/rentrw/.next/server/app/api/sales/meta/route.js:109:1)
+    at eval (webpack-internal:///(rsc)/./src/server/taskStore.ts:25:67)
+    at <unknown> (rsc)/./src/server/taskStore.ts (/Users/beggemot/Projects/rentrw/.next/server/app/api/sales/meta/route.js:263:1)
+    at eval (webpack-internal:///(rsc)/./src/app/api/sales/meta/route.ts:12:75)
+    at <unknown> (rsc)/./src/app/api/sales/meta/route.ts (/Users/beggemot/Projects/rentrw/.next/server/app/api/sales/meta/route.js:54:1)
+    at __webpack_exec__ (.next/server/app/api/sales/meta/route.js:558:39)
+    at <unknown> (.next/server/app/api/sales/meta/route.js:559:83)
+    at <unknown> (.next/server/app/api/sales/meta/route.js:559:47)
+    at Object.<anonymous> (.next/server/app/api/sales/meta/route.js:562:3)
+  295 | let migrationStarted = false;
+  296 | export async function migrateLegacyTasksToOrgStore(): Promise<void> {
+> 297 |   if (migrationStarted) return; migrationStarted = true;
+      |  ^
+  298 |   try {
+  299 |     const store = await readTasks();
+  300 |     const sales = Array.isArray(store.sales) ? store.sales : [];
+ GET /api/sales/meta 200 in 664ms
+ GET /api/organizations 200 in 196ms
+ GET /api/organizations 200 in 196ms
+ GET /api/sales/meta?limit=50&showHidden=all 200 in 64ms
+ GET /api/sales?limit=50&showHidden=all 200 in 64ms
+ GET /api/sales?refresh=1 200 in 5818ms
+ GET /api/rocketwork/withdrawals?limit=15 200 in 9563ms
+ GET /api/sales?refresh=1 200 in 6455ms
+ GET /api/rocketwork/withdrawals?limit=15 200 in 8736ms
+ GET /dashboard 200 in 414ms
+ GET /api/organizations 200 in 163ms
+ GET /api/links?limit=50 200 in 204ms
+ GET /api/organizations 200 in 61ms
+ GET /api/rocketwork/withdrawals?limit=15 200 in 10662ms
+ ✓ Compiled in 4.6s (677 modules)
+ ✓ Compiled in 697ms (262 modules)
+ ✓ Compiled in 504ms (262 modules)

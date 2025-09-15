@@ -68,8 +68,10 @@ export default async function SaleDetailsPage(props: { params: Promise<{ task: s
                     {(() => {
                       const phone = (sale as any)?.partnerPhone ? String((sale as any).partnerPhone) : '';
                       const fio = (sale as any)?.partnerFio ? String((sale as any).partnerFio).trim() : '';
-                      if (phone) return fio ? `${phone} — ${fio}` : phone;
-                      return fio || '—';
+                      const kindRaw = (sale as any)?.employmentKind as string | undefined;
+                      const kind = kindRaw === 'entrepreneur' ? 'ИП' : (kindRaw === 'selfemployed' ? 'СМЗ' : '');
+                      const parts = [phone || null, fio || null, kind || null].filter(Boolean);
+                      return parts.length > 0 ? parts.join(' — ') : '—';
                     })()}
                   </div>
                 </>
