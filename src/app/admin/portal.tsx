@@ -68,7 +68,7 @@ function AdminDashboard({ showToast, role }: { showToast: (m: string, k?: any) =
   const [loading, setLoading] = useState(false);
 
   return (
-    <div>
+    <div className="max-w-none">
       <div className="flex items-center gap-3 mb-4">
         <Button variant={tab==='sales'?'secondary':'ghost'} onClick={() => setTab('sales')}>Продажи</Button>
         <Button variant={tab==='partners'?'secondary':'ghost'} onClick={() => setTab('partners')}>Партнёры</Button>
@@ -173,7 +173,7 @@ function LkUsersPanel() {
         <input className="border rounded px-2 h-9 text-sm ml-auto" placeholder="Фильтр..." value={q} onChange={(e)=>{ setQ(e.target.value); setPage(1); }} />
       </div>
       <div className="border rounded overflow-x-auto">
-        <table className="min-w-full text-sm">
+        <table className="min-w-full text-[13px]">
           <thead><tr><th className="text-left px-2 py-1">id</th><th className="text-left px-2 py-1">phone</th><th className="text-left px-2 py-1">email</th><th className="text-left px-2 py-1">Организации</th><th className="text-left px-2 py-1">Действия</th></tr></thead>
           <tbody>
             {items.filter((u)=>{ const v=q.trim().toLowerCase(); if(!v) return true; const hay=[u.id,u.phone,u.email,(u.orgs||[]).map((o:any)=>o.inn+' '+(o.name||'')).join(' ')].join(' ').toLowerCase(); return hay.includes(v); }).slice((page-1)*100, page*100).map((u)=> (
@@ -382,25 +382,25 @@ function SalesPanel({ showToast, role }: { showToast: (m: string, k?: any) => vo
           <tbody>
             {items.filter((s)=>{ const v=q.trim().toLowerCase(); if(!v) return true; const hay=[s.orderId,s.taskId,s.orgInn,(s.__orgName||''),s.clientEmail,s.status,s.serviceEndDate,(s.createdAtRw||s.createdAt)].join(' ').toLowerCase(); return hay.includes(v); }).slice((page-1)*100, page*100).map((s)=> (
               <tr key={String(s.taskId)} className="border-t">
-                <td className="px-2 py-1 leading-tight">
+                <td className="px-1 py-1 leading-tight">
                   {(() => { const dt = (s.createdAtRw||s.createdAt) ? new Date(s.createdAtRw||s.createdAt) : null; return dt ? (<><div>{dt.toLocaleDateString('ru-RU',{ timeZone:'Europe/Moscow' })}</div><div className="text-[11px] text-gray-500">{dt.toLocaleTimeString('ru-RU',{ timeZone:'Europe/Moscow', hour:'2-digit', minute:'2-digit' })}</div></>) : '—'; })()}
                 </td>
-                <td className="px-2 py-1">{String(s.orderId)}</td>
-                <td className="px-2 py-1">{s.taskId}</td>
-                <td className="px-2 py-1 whitespace-nowrap">{s.orgInn || '—'}</td>
-                <td className="px-2 py-1 leading-tight">{s.__orgName || '—'}</td>
-                <td className="px-2 py-1"><div className="max-w-[260px] break-all">{s.clientEmail || '—'}</div></td>
-                <td className="px-2 py-1 whitespace-nowrap">{typeof s.amountGrossRub==='number'? new Intl.NumberFormat('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(s.amountGrossRub) : '-'}</td>
-                <td className="px-2 py-1 whitespace-nowrap">{typeof s.isAgent === 'boolean' ? (s.isAgent ? 'агентская' : 'прямая') : '—'}</td>
-                <td className="px-2 py-1 leading-tight">
+                <td className="px-1 py-1">{String(s.orderId)}</td>
+                <td className="px-1 py-1">{s.taskId}</td>
+                <td className="px-1 py-1 whitespace-nowrap">{s.orgInn || '—'}</td>
+                <td className="px-1 py-1 leading-tight">{s.__orgName || '—'}</td>
+                <td className="px-1 py-1"><div className="max-w-[260px] break-all">{s.clientEmail || '—'}</div></td>
+                <td className="px-1 py-1 whitespace-nowrap">{typeof s.amountGrossRub==='number'? new Intl.NumberFormat('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(s.amountGrossRub) : '-'}</td>
+                <td className="px-1 py-1 whitespace-nowrap">{typeof s.isAgent === 'boolean' ? (s.isAgent ? 'агентская' : 'прямая') : '—'}</td>
+                <td className="px-1 py-1 leading-tight">
                   {s.serviceEndDate ? (<><div>{new Date(`${s.serviceEndDate}T00:00:00Z`).toLocaleDateString('ru-RU',{ timeZone:'Europe/Moscow' })}</div></>) : '—'}
                 </td>
-                <td className="px-2 py-1 whitespace-nowrap">{s.status || '—'}</td>
-                <td className="px-2 py-1 whitespace-nowrap">{(s as any).rootStatus || '—'}</td>
-                <td className="px-2 py-1 text-center">{s.ofdUrl ? <a className="text-blue-600" href={s.ofdUrl} target="_blank">чек</a> : '—'}</td>
-                <td className="px-2 py-1 text-center">{s.ofdFullUrl ? <a className="text-blue-600" href={s.ofdFullUrl} target="_blank">чек</a> : '—'}</td>
-                <td className="px-2 py-1 text-center">{s.npdReceiptUri ? <a className="text-blue-600" href={s.npdReceiptUri} target="_blank">чек</a> : '—'}</td>
-                <td className="px-2 py-1">
+                <td className="px-1 py-1 whitespace-nowrap">{s.status || '—'}</td>
+                <td className="px-1 py-1 whitespace-nowrap">{(s as any).rootStatus || '—'}</td>
+                <td className="px-1 py-1 text-center">{s.ofdUrl ? <a className="text-blue-600" href={s.ofdUrl} target="_blank">чек</a> : '—'}</td>
+                <td className="px-1 py-1 text-center">{s.ofdFullUrl ? <a className="text-blue-600" href={s.ofdFullUrl} target="_blank">чек</a> : '—'}</td>
+                <td className="px-1 py-1 text-center">{s.npdReceiptUri ? <a className="text-blue-600" href={s.npdReceiptUri} target="_blank">чек</a> : '—'}</td>
+                <td className="px-1 py-1">
                   <a className="inline-block px-2 py-1" href={`/admin/sales/${encodeURIComponent(String(s.userId||'default'))}/${encodeURIComponent(String(s.taskId))}`}>Открыть</a>
                 </td>
               </tr>
