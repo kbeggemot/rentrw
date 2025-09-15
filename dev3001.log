@@ -332,3 +332,5 @@ ReferenceError: Cannot access 'migrationStarted' before initialization
  ✓ Compiled in 620ms (262 modules)
  ✓ Compiled in 880ms (262 modules)
  ✓ Compiled in 364ms (262 modules)
+ ✓ Compiled in 1902ms (262 modules)
+ ✓ Compiled in 1019ms (262 modules)
