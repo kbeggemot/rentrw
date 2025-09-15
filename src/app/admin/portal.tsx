@@ -68,7 +68,7 @@ function AdminDashboard({ showToast, role }: { showToast: (m: string, k?: any) =
   const [loading, setLoading] = useState(false);
 
   return (
-    <div className="max-w-none w-[98vw] mx-auto">
+    <div className="max-w-none w-screen mx-0">
       <div className="flex items-center gap-3 mb-4">
         <Button variant={tab==='sales'?'secondary':'ghost'} onClick={() => setTab('sales')}>Продажи</Button>
         <Button variant={tab==='partners'?'secondary':'ghost'} onClick={() => setTab('partners')}>Партнёры</Button>
@@ -172,7 +172,7 @@ function LkUsersPanel() {
         <Button variant="secondary" onClick={load}>Обновить</Button>
         <input className="border rounded px-2 h-9 text-sm ml-auto" placeholder="Фильтр..." value={q} onChange={(e)=>{ setQ(e.target.value); setPage(1); }} />
       </div>
-      <div className="border rounded overflow-x-auto">
+      <div className="border rounded-none border-l-0 border-r-0 overflow-x-auto">
         <table className="min-w-full text-[13px]">
           <thead><tr><th className="text-left px-2 py-1">id</th><th className="text-left px-2 py-1">phone</th><th className="text-left px-2 py-1">email</th><th className="text-left px-2 py-1">Организации</th><th className="text-left px-2 py-1">Действия</th></tr></thead>
           <tbody>

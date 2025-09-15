@@ -59,6 +59,10 @@ export default async function AdminSaleEditor(props: { params: Promise<{ uid: st
                 <div>{(item as any).isAgent ? 'агентская' : 'прямая'}</div>
               </div>
               <div>
+                <div className="text-gray-600">Способ оплаты</div>
+                <div>{(() => { const it:any=item; const m=String((it as any)?.method||'').toLowerCase(); const ao=(it as any)?.acquiring_order; const hint=(it as any)?.acqMethod; const byAo=ao && typeof (ao as any)?.type==='string' ? String((ao as any).type).toUpperCase() : ''; const txt = (m==='card'||m==='cards')?'карта':(m==='qr'||byAo==='QR'?'СБП':(hint==='card'?'карта':(hint==='qr'?'СБП':''))); return txt||'—'; })()}</div>
+              </div>
+              <div>
                 <div className="text-gray-600">Канал</div>
                 <div>{(() => { const it:any=item; if (it.linkCode) return 'по ссылке'; if (it.payerTgId) return 'через Telegram'; if (String(it.source||'')==='ui') return 'с дашборда'; return 'внешняя'; })()}</div>
               </div>
