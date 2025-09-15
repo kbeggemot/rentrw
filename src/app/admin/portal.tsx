@@ -68,7 +68,7 @@ function AdminDashboard({ showToast, role }: { showToast: (m: string, k?: any) =
   const [loading, setLoading] = useState(false);
 
   return (
-    <div className="max-w-none">
+    <div className="max-w-none w-[98vw] mx-auto">
       <div className="flex items-center gap-3 mb-4">
         <Button variant={tab==='sales'?'secondary':'ghost'} onClick={() => setTab('sales')}>Продажи</Button>
         <Button variant={tab==='partners'?'secondary':'ghost'} onClick={() => setTab('partners')}>Партнёры</Button>
