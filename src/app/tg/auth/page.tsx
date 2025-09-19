@@ -76,7 +76,7 @@ export default function TgAuthPage() {
       if (typeof tg?.requestContact === 'function') {
         tg.requestContact((shared: boolean) => {
           if (shared) {
-            try { tg?.showAlert?.('Спасибо! Для продолжения вернитесь на экран создания счета'); } catch {}
+            try { tg?.showAlert?.('Спасибо! Чтобы продолжить, вернитесь на экран «Создание счёта». Telegram можно закрыть.'); } catch {}
           } else {
             try { tg?.showAlert?.('Вы отменили доступ к номеру'); } catch {}
           }
@@ -114,7 +114,7 @@ export default function TgAuthPage() {
       <h1 className="text-lg font-semibold mb-3">YPLA</h1>
       {showShare ? (
         <div className="space-y-3">
-          <div className="text-sm text-gray-700 dark:text-gray-200">Для создания счёта нам нужно проверить ваш номер телефона</div>
+          <div className="text-sm text-gray-700 dark:text-gray-200">Для создания Счёта нам нужно сверить ваш номер телефона</div>
           {ready ? (
             <button
               className="inline-flex items-center justify-center h-10 px-4 rounded bg-blue-600 hover:bg-blue-700 text-white text-sm w-full"
