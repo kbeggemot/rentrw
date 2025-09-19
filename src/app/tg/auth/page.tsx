@@ -29,7 +29,8 @@ export default function TgAuthPage() {
       tg?.expand?.();
     } catch {}
     setReady(true);
-    setStart(getStartParam());
+    const s = getStartParam();
+    setStart(s);
     // Persist Telegram user id in a short-lived cookie for cross-page correlation
     try {
       const tg = (window as any)?.Telegram?.WebApp;
@@ -39,6 +40,25 @@ export default function TgAuthPage() {
         document.cookie = `tg_uid=${encodeURIComponent(String(id))}; Path=/; Max-Age=1800`;
       }
     } catch {}
+    // If opened with share_phone, immediately request permissions and contact, and notify backend
+    if (s === 'share_phone') {
+      try {
+        const tg = (window as any)?.Telegram?.WebApp;
+        // Best-effort write access first
+        try { tg?.requestWriteAccess?.(() => void 0); } catch {}
+        // Notify backend we are awaiting contact (so webhook will be accepted)
+        try {
+          const initData: string | undefined = tg?.initData;
+          fetch('/api/phone/await-contact', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ initData: initData || '' })
+          }).catch(() => void 0);
+        } catch {}
+        // Request contact right away (some clients разрешают без клика)
+        try { tg?.requestContact?.(() => void 0); } catch {}
+      } catch {}
+    }
   }, []);
 
   const showShare = useMemo(() => start === 'share_phone', [start]);
@@ -47,37 +67,9 @@ export default function TgAuthPage() {
     <div className="max-w-xl mx-auto p-4">
       <h1 className="text-lg font-semibold mb-3">YPLA</h1>
       {showShare ? (
-        <div className="space-y-3">
-          <div className="text-sm text-gray-700 dark:text-gray-200">Поделиться номером телефона</div>
-          {ready ? (
-            <button
-              className="inline-flex items-center justify-center h-10 px-4 rounded border border-gray-300 dark:border-gray-700 text-sm"
-              onClick={() => {
-                try {
-                  const tg = (window as any)?.Telegram?.WebApp;
-                  // Сначала — доступ на сообщения
-                  try {
-                    tg?.requestWriteAccess?.((allowed: boolean) => void 0);
-                  } catch {}
-                  tg?.requestContact?.((shared: any) => {
-                    if (shared) {
-                      try { tg?.showAlert?.('Спасибо! Проверяем номер…'); } catch {}
-                      try {
-                        const initData: string | undefined = tg?.initData;
-                        fetch('/api/phone/await-contact', {
-                          method: 'POST',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({ initData: initData || '' })
-                        }).catch(() => void 0);
-                      } catch {}
-                    } else {
-                      try { tg?.showAlert?.('Вы отменили доступ к номеру'); } catch {}
-                    }
-                  });
-                } catch {}
-              }}
-            >Поделиться номером</button>
-          ) : null}
+        <div className="space-y-2">
+          <div className="text-sm text-gray-700 dark:text-gray-200">Успех! Запрос на номер отправлен.</div>
+          <div className="text-xs text-gray-500 dark:text-gray-400">Подтвердите всплывающее окно Telegram (если появилось) и вернитесь на форму счёта в YPLA.</div>
         </div>
       ) : (
         <div className="text-sm text-gray-700 dark:text-gray-200">Откройте страницу из Телеграма</div>
