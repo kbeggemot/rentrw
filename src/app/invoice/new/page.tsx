@@ -134,13 +134,20 @@ export default function InvoiceNewPage() {
                 try { setOpening(true); } catch {}
                 try {
                   const url = 'https://t.me/yplaru_bot/tg_auth?startapp=share_phone';
-                  const w = window.open(url, '_blank', 'noopener,noreferrer');
-                  if (!w) {
-                    // Fallback navigation if popup was blocked
-                    window.location.href = url;
-                  }
+                  // Prefer opening in a new tab via an anchor to avoid replacing current page
+                  const a = document.createElement('a');
+                  a.href = url;
+                  a.target = '_blank';
+                  a.rel = 'noopener noreferrer';
+                  a.style.position = 'absolute';
+                  a.style.left = '-9999px';
+                  document.body.appendChild(a);
+                  a.click();
+                  try { document.body.removeChild(a); } catch {}
+                  // Best-effort secondary call (some browsers block anchor programmatic clicks)
+                  try { window.open(url, '_blank', 'noopener,noreferrer'); } catch {}
                 } catch {
-                  window.location.href = 'https://t.me/yplaru_bot/tg_auth?startapp=share_phone';
+                  // Do nothing: keep current tab, user can try again
                 }
                 // Подсказка статуса, если пользователь остаётся на странице
                 setStatus('Ожидаем подтверждение в Telegram…');
