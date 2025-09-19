@@ -104,7 +104,7 @@ export default function TgAuthPage() {
       <h1 className="text-lg font-semibold mb-3">YPLA</h1>
       {showShare ? (
         <div className="space-y-3">
-          <div className="text-sm text-gray-700 dark:text-gray-200">Поделиться номером телефона</div>
+          <div className="text-sm text-gray-700 dark:text-gray-200">Для создания счёта нам нужно проверить ваш номер телефона</div>
           {ready ? (
             <button
               className="inline-flex items-center justify-center h-10 px-4 rounded bg-blue-600 hover:bg-blue-700 text-white text-sm w-full"

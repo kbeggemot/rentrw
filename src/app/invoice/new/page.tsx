@@ -11,6 +11,7 @@ export default function InvoiceNewPage() {
   const [tgUserId, setTgUserId] = useState<string | null>(null);
   const [phone, setPhone] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
+  const [opening, setOpening] = useState(false);
 
   useEffect(() => {
     try {
@@ -127,18 +128,46 @@ export default function InvoiceNewPage() {
         <div className="space-y-3">
           <p className="text-sm text-gray-700 dark:text-gray-200">Поделитесь своим номером телефона — он должен совпадать с номером из Рокет Ворк.</p>
           <div className="flex flex-col gap-3">
-            <a
-              href="https://t.me/yplaru_bot/tg_auth?startapp=share_phone"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center justify-center h-10 px-4 rounded bg-blue-600 hover:bg-blue-700 text-white text-sm"
-            >Войти через Телеграм</a>
+            <button
+              disabled={opening}
+              onClick={() => {
+                try { setOpening(true); } catch {}
+                try {
+                  const url = 'https://t.me/yplaru_bot/tg_auth?startapp=share_phone';
+                  const w = window.open(url, '_blank', 'noopener,noreferrer');
+                  if (!w) {
+                    // Fallback navigation if popup was blocked
+                    window.location.href = url;
+                  }
+                } catch {
+                  window.location.href = 'https://t.me/yplaru_bot/tg_auth?startapp=share_phone';
+                }
+                // Подсказка статуса, если пользователь остаётся на странице
+                setStatus('Ожидаем подтверждение в Telegram…');
+              }}
+              className={`inline-flex items-center justify-center h-10 px-4 rounded text-sm text-white ${opening ? 'opacity-70 pointer-events-none bg-blue-600' : 'bg-blue-600 hover:bg-blue-700'}`}
+            >
+              {opening ? (
+                <>
+                  <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" viewBox="0 0 24 24" aria-hidden="true">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+                  </svg>
+                  Открываем Телеграм…
+                </>
+              ) : (
+                'Войти через Телеграм'
+              )}
+            </button>
             {status ? <div className="text-xs text-gray-500 dark:text-gray-400">{status}</div> : null}
           </div>
         </div>
       ) : (
-        <div className="space-y-2">
-          <div className="text-sm text-gray-700 dark:text-gray-200">Ваш номер: <strong>{phone}</strong></div>
+        <div className="space-y-3">
+          <div className="rounded border border-gray-200 dark:border-gray-800 p-4">
+            <div className="text-sm font-medium mb-2">Исполнитель</div>
+            <div className="text-sm text-gray-700 dark:text-gray-200">Телефон: <strong>{phone}</strong></div>
+          </div>
           <div className="text-xs text-gray-500 dark:text-gray-400">Продолжение создания счёта добавим следующим шагом.</div>
         </div>
       )}
