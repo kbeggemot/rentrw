@@ -128,31 +128,12 @@ export default function InvoiceNewPage() {
         <div className="space-y-3">
           <p className="text-sm text-gray-700 dark:text-gray-200">Поделитесь своим номером телефона — он должен совпадать с номером из Рокет Ворк.</p>
           <div className="flex flex-col gap-3">
-            <button
-              disabled={opening}
-              onClick={() => {
-                try { setOpening(true); } catch {}
-                try {
-                  const url = 'https://t.me/yplaru_bot/tg_auth?startapp=share_phone';
-                  // Prefer opening in a new tab via an anchor to avoid replacing current page
-                  const a = document.createElement('a');
-                  a.href = url;
-                  a.target = '_blank';
-                  a.rel = 'noopener noreferrer';
-                  a.style.position = 'absolute';
-                  a.style.left = '-9999px';
-                  document.body.appendChild(a);
-                  a.click();
-                  try { document.body.removeChild(a); } catch {}
-                  // Best-effort secondary call (some browsers block anchor programmatic clicks)
-                  try { window.open(url, '_blank', 'noopener,noreferrer'); } catch {}
-                } catch {
-                  // Do nothing: keep current tab, user can try again
-                }
-                // Подсказка статуса, если пользователь остаётся на странице
-                setStatus('Ожидаем подтверждение в Telegram…');
-              }}
-              className={`inline-flex items-center justify-center h-10 px-4 rounded text-sm text-white ${opening ? 'opacity-70 pointer-events-none bg-blue-600' : 'bg-blue-600 hover:bg-blue-700'}`}
+            <a
+              href="https://t.me/yplaru_bot/tg_auth?startapp=share_phone"
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={() => { setOpening(true); setStatus('Ожидаем подтверждение в Telegram…'); }}
+              className={`inline-flex items-center justify-center h-10 px-4 rounded text-sm text-white ${opening ? 'bg-blue-600 opacity-70' : 'bg-blue-600 hover:bg-blue-700'}`}
             >
               {opening ? (
                 <>
@@ -165,7 +146,7 @@ export default function InvoiceNewPage() {
               ) : (
                 'Войти через Телеграм'
               )}
-            </button>
+            </a>
             {status ? <div className="text-xs text-gray-500 dark:text-gray-400">{status}</div> : null}
           </div>
         </div>
