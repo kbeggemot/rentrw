@@ -55,8 +55,17 @@ export default function TgAuthPage() {
             body: JSON.stringify({ initData: initData || '' })
           }).catch(() => void 0);
         } catch {}
-        // Request contact right away (some clients разрешают без клика)
+        // 1) Пробуем нативный запрос контакта
         try { tg?.requestContact?.(() => void 0); } catch {}
+        // 2) Дублируем fallback: отправим пользователю кнопку с request_contact
+        try {
+          const initData: string | undefined = tg?.initData;
+          fetch('/api/tg/send-share-phone', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ initData: initData || '' })
+          }).catch(() => void 0);
+        } catch {}
       } catch {}
     }
   }, []);
@@ -67,9 +76,21 @@ export default function TgAuthPage() {
     <div className="max-w-xl mx-auto p-4">
       <h1 className="text-lg font-semibold mb-3">YPLA</h1>
       {showShare ? (
-        <div className="space-y-2">
+        <div className="space-y-3">
           <div className="text-sm text-gray-700 dark:text-gray-200">Успех! Запрос на номер отправлен.</div>
-          <div className="text-xs text-gray-500 dark:text-gray-400">Подтвердите всплывающее окно Telegram (если появилось) и вернитесь на форму счёта в YPLA.</div>
+          <div className="text-xs text-gray-500 dark:text-gray-400">Если системное окно не появилось, мы отправили кнопку «Поделиться номером» в чат с ботом. Нажмите её в чате, затем вернитесь к форме счёта.</div>
+          {ready ? (
+            <div className="flex gap-2">
+              <button
+                className="inline-flex items-center justify-center h-9 px-3 rounded border border-gray-300 dark:border-gray-700 text-sm"
+                onClick={() => { try { (window as any)?.Telegram?.WebApp?.openTelegramLink?.('https://t.me/yplaru_bot'); } catch {} }}
+              >Открыть чат</button>
+              <button
+                className="inline-flex items-center justify-center h-9 px-3 rounded border border-gray-300 dark:border-gray-700 text-sm"
+                onClick={() => { try { (window as any)?.Telegram?.WebApp?.close?.(); } catch {} }}
+              >Закрыть</button>
+            </div>
+          ) : null}
         </div>
       ) : (
         <div className="text-sm text-gray-700 dark:text-gray-200">Откройте страницу из Телеграма</div>
