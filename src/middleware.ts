@@ -16,7 +16,7 @@ export function middleware(req: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  const protectedPaths = ['/dashboard', '/settings', '/sales', '/partners', '/link', '/products'];
+  const protectedPaths = ['/dashboard', '/settings', '/sales', '/partners', '/link', '/products', '/inbox'];
   const isProtected = protectedPaths.some((p) => pathname.startsWith(p));
   // Public link pages that must be accessible without auth
   const isPublicLink = (
@@ -42,6 +42,11 @@ export function middleware(req: NextRequest) {
     return NextResponse.next();
   }
 
+  // Allow public invoice pages without auth
+  if (pathname === '/invoice' || pathname.startsWith('/invoice/')) {
+    return NextResponse.next();
+  }
+
   if (!user) {
     const url = req.nextUrl.clone();
     url.pathname = '/auth';
@@ -52,7 +57,7 @@ export function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/', '/auth', '/dashboard/:path*', '/settings/:path*', '/sales/:path*', '/partners/:path*', '/link/:path*', '/products/:path*', '/admin/:path*'],
+  matcher: ['/', '/auth', '/dashboard/:path*', '/settings/:path*', '/sales/:path*', '/partners/:path*', '/link/:path*', '/products/:path*', '/admin/:path*', '/inbox/:path*'],
 };
 
 
