@@ -45,6 +45,53 @@ export default function TgAuthPage() {
 
   const showShare = useMemo(() => start === 'share_phone', [start]);
 
+  // Unified handler to start share flow
+  function startShareFlow(): void {
+    try {
+      const tg = (window as any)?.Telegram?.WebApp;
+      // Optional write access
+      try { tg?.requestWriteAccess?.(() => void 0); } catch {}
+      // Tell backend we're awaiting contact
+      try {
+        const initData: string | undefined = tg?.initData;
+        fetch('/api/phone/await-contact', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ initData: initData || '' })
+        }).catch(() => void 0);
+      } catch {}
+      // Native contact request
+      tg?.requestContact?.((shared: boolean) => {
+        if (shared) {
+          try { tg?.showAlert?.('Спасибо! Проверяем номер…'); } catch {}
+        } else {
+          try { tg?.showAlert?.('Вы отменили доступ к номеру'); } catch {}
+        }
+      });
+    } catch {}
+  }
+
+  // Show Telegram Bottom (Main) Button for better reliability inside WebView
+  useEffect(() => {
+    if (!ready || !showShare) return;
+    let cleanup: (() => void) | null = null;
+    try {
+      const tg = (window as any)?.Telegram?.WebApp;
+      const btn = (tg?.BottomButton || tg?.MainButton);
+      if (btn) {
+        try { btn.setText?.('Поделиться номером'); } catch {}
+        try { btn.show?.(); } catch {}
+        const handler = () => startShareFlow();
+        try { tg?.onEvent?.('mainButtonClicked', handler); } catch {}
+        cleanup = () => {
+          try { tg?.offEvent?.('mainButtonClicked', handler); } catch {}
+          try { btn.hide?.(); } catch {}
+        };
+      }
+    } catch {}
+    return () => { try { cleanup?.(); } catch {} };
+  }, [ready, showShare]);
+
   return (
     <div className="max-w-xl mx-auto p-4">
       <h1 className="text-lg font-semibold mb-3">YPLA</h1>
@@ -54,30 +101,7 @@ export default function TgAuthPage() {
           {ready ? (
             <button
               className="inline-flex items-center justify-center h-10 px-4 rounded border border-gray-300 dark:border-gray-700 text-sm"
-              onClick={() => {
-                try {
-                  const tg = (window as any)?.Telegram?.WebApp;
-                  // (1) Необязательно: запрос права писать пользователю
-                  try { tg?.requestWriteAccess?.(() => void 0); } catch {}
-                  // (2) Сообщаем бэку, что ждём контакт
-                  try {
-                    const initData: string | undefined = tg?.initData;
-                    fetch('/api/phone/await-contact', {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ initData: initData || '' })
-                    }).catch(() => void 0);
-                  } catch {}
-                  // (3) Нативный запрос номера
-                  tg?.requestContact?.((shared: boolean) => {
-                    if (shared) {
-                      try { tg?.showAlert?.('Спасибо! Проверяем номер…'); } catch {}
-                    } else {
-                      try { tg?.showAlert?.('Вы отменили доступ к номеру'); } catch {}
-                    }
-                  });
-                } catch {}
-              }}
+              onClick={() => startShareFlow()}
             >Поделиться номером</button>
           ) : null}
         </div>
