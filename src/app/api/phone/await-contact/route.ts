@@ -46,12 +46,17 @@ export async function POST(req: Request) {
     const v = validateTelegramInitData(initData);
     if (!v.ok) return NextResponse.json({ ok: false, error: v.error || 'INVALID' }, { status: 400 });
     const uid = v.userId || null;
+    let waitId: string | null = null;
+    try {
+      const url = new URL(req.url);
+      waitId = url.searchParams.get('wait');
+    } catch {}
 
     // Mark that we expect a contact for this user id (webhook should correlate)
     try {
       const { writeText } = await import('@/server/storage');
-      const key = `.data/tg_phone_wait_${uid ?? 'unknown'}.json`;
-      const rec = { ts: new Date().toISOString(), userId: uid };
+      const key = `.data/tg_phone_wait_${encodeURIComponent(waitId || String(uid ?? 'unknown'))}.json`;
+      const rec = { ts: new Date().toISOString(), userId: uid, waitId: waitId || null } as any;
       await writeText(key, JSON.stringify(rec));
     } catch {}
 

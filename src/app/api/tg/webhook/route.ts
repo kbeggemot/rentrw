@@ -22,13 +22,23 @@ export async function POST(req: Request) {
       const digits = String(contact.phone_number || '').replace(/\D/g, '');
       try {
         const { readText, writeText } = await import('@/server/storage');
-        // If we were awaiting this user's contact, mark phone as confirmed
-        const waitPath = `.data/tg_phone_wait_${encodeURIComponent(tgUserId)}.json`;
-        const hadWait = await readText(waitPath);
-        if (hadWait != null) {
-          const savePath = `.data/tg_phone_${encodeURIComponent(tgUserId)}.json`;
-          await writeText(savePath, JSON.stringify({ userId: tgUserId, phone: digits, source: 'telegram_contact', ts: new Date().toISOString() }));
-        }
+        // Persist per-user phone
+        const savePath = `.data/tg_phone_${encodeURIComponent(tgUserId)}.json`;
+        await writeText(savePath, JSON.stringify({ userId: tgUserId, phone: digits, source: 'telegram_contact', ts: new Date().toISOString() }));
+        // Also mark any pending wait tokens as complete (best-effort)
+        try {
+          const { list } = await import('@/server/storage');
+          const all = await list('.data');
+          const waits = all.filter((p: string) => /\.data\/tg_phone_wait_.*\.json$/.test(p));
+          for (const w of waits) {
+            try {
+              const txt = await readText(w); const obj = txt ? JSON.parse(txt as any) : null;
+              if (obj && (!obj.userId || String(obj.userId) === tgUserId)) {
+                await writeText(w, JSON.stringify({ ...obj, userId: tgUserId, phone: digits, ts: new Date().toISOString() }));
+              }
+            } catch {}
+          }
+        } catch {}
       } catch {}
     }
 

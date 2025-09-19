@@ -12,6 +12,7 @@ export default function InvoiceNewPage() {
   const [phone, setPhone] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
   const [opening, setOpening] = useState(false);
+  const [waitId, setWaitId] = useState<string | null>(null);
 
   useEffect(() => {
     try {
@@ -36,7 +37,7 @@ export default function InvoiceNewPage() {
     } catch {}
   }, []);
 
-  // Poll for saved phone if we know user id (after sharing in mini-app)
+  // Poll for saved phone by waitId (cross-app safe) or by user id as fallback
   useEffect(() => {
     // Try get uid from cookie if not set
     function readCookie(name: string): string | null {
@@ -47,16 +48,24 @@ export default function InvoiceNewPage() {
         return m ? decodeURIComponent(m[1]) : null;
       } catch { return null; }
     }
+    // Initialize or reuse wait id
+    try {
+      let wid = sessionStorage.getItem('tg_wait_id');
+      if (!wid) {
+        wid = 'w' + Math.random().toString(36).slice(2, 10);
+        sessionStorage.setItem('tg_wait_id', wid);
+      }
+      setWaitId(wid);
+    } catch {}
     if (!tgUserId) {
       const uidFromCookie = readCookie('tg_uid');
       if (uidFromCookie) setTgUserId(uidFromCookie);
     }
-    if (!tgUserId) return;
     let cancelled = false;
     let timer: number | null = null;
     const fetchStatus = async () => {
       try {
-        const r = await fetch(`/api/phone/status?uid=${encodeURIComponent(String(tgUserId))}`, { cache: 'no-store' });
+        const r = await fetch(waitId ? `/api/phone/status?wait=${encodeURIComponent(String(waitId))}` : (tgUserId ? `/api/phone/status?uid=${encodeURIComponent(String(tgUserId))}` : '/api/phone/status'), { cache: 'no-store' });
         const d = await r.json().catch(() => ({}));
         const ph = d?.phone ? String(d.phone) : null;
         if (!cancelled && ph) {
@@ -68,7 +77,7 @@ export default function InvoiceNewPage() {
     };
     fetchStatus();
     return () => { cancelled = true; if (timer) window.clearTimeout(timer); };
-  }, [tgUserId, phone]);
+  }, [tgUserId, phone, waitId]);
 
   const requestPhone = useCallback(async () => {
     try {
@@ -129,7 +138,7 @@ export default function InvoiceNewPage() {
           <p className="text-sm text-gray-700 dark:text-gray-200">Поделитесь своим номером телефона — он должен совпадать с номером из Рокет Ворк.</p>
           <div className="flex flex-col gap-3">
             <a
-              href="https://t.me/yplaru_bot/tg_auth?startapp=share_phone"
+              href={`https://t.me/yplaru_bot/tg_auth?startapp=${encodeURIComponent(`share_phone_${waitId || ''}`)}`}
               target="_blank"
               rel="noopener noreferrer"
               onClick={() => { setOpening(true); setStatus('Ожидаем подтверждение в Telegram…'); }}
@@ -141,13 +150,14 @@ export default function InvoiceNewPage() {
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
                   </svg>
-                  Открываем Телеграм…
+                  Ожидаем подтверждение в Telegram…
                 </>
               ) : (
                 'Войти через Телеграм'
               )}
             </a>
-            {status ? <div className="text-xs text-gray-500 dark:text-gray-400">{status}</div> : null}
+            {/* статус показываем только вне кнопки (например для ошибок) */}
+            {(!opening && status) ? <div className="text-xs text-gray-500 dark:text-gray-400">{status}</div> : null}
           </div>
         </div>
       ) : (
