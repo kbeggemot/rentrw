@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from 'react';
-Пimport Script from 'next/script';
+import Script from 'next/script';
 
 declare global {
   interface Window { Telegram?: any }
