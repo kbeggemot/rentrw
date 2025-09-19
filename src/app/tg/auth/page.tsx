@@ -23,6 +23,7 @@ function getStartParam(): string | null {
 export default function TgAuthPage() {
   const [start, setStart] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
+  const [waitToken, setWaitToken] = useState<string | null>(null);
   useEffect(() => {
     try {
       const tg = (window as any)?.Telegram?.WebApp;
@@ -32,6 +33,14 @@ export default function TgAuthPage() {
     setReady(true);
     const s = getStartParam();
     setStart(s);
+    // Extract wait token from start_param: share_phone or share_phone_<token>
+    try {
+      if (s && typeof s === 'string' && s.startsWith('share_phone')) {
+        const m = /^share_phone[_-]?([A-Za-z0-9_-]{2,64})?$/.exec(s);
+        const tok = m && m[1] ? String(m[1]) : null;
+        if (tok) setWaitToken(tok);
+      }
+    } catch {}
     // Persist Telegram user id in a short-lived cookie for cross-page correlation
     try {
       const tg = (window as any)?.Telegram?.WebApp;
@@ -44,7 +53,7 @@ export default function TgAuthPage() {
     // Для корректной работы на iOS/desktop запрос номера запускаем только по клику пользователя
   }, []);
 
-  const showShare = useMemo(() => start === 'share_phone', [start]);
+  const showShare = useMemo(() => !!start && start.startsWith('share_phone'), [start]);
 
   // Unified handler to start share flow
   function startShareFlow(): void {
@@ -56,7 +65,8 @@ export default function TgAuthPage() {
       // Tell backend we're awaiting contact
       try {
         const initData: string | undefined = tg?.initData;
-        fetch('/api/phone/await-contact', {
+        const url = `/api/phone/await-contact${waitToken ? `?wait=${encodeURIComponent(waitToken)}` : ''}`;
+        fetch(url, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ initData: initData || '' })
