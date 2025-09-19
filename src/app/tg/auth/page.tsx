@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from 'react';
-import Script from 'next/script';
+Пimport Script from 'next/script';
 
 declare global {
   interface Window { Telegram?: any }
@@ -50,7 +50,7 @@ export default function TgAuthPage() {
   function startShareFlow(): void {
     try {
       const tg = (window as any)?.Telegram?.WebApp;
-      try { tg?.showAlert?.('Запрашиваем доступ к номеру…'); } catch {}
+      // Не показываем предварительный алерт — сразу системный запрос
       // Optional write access
       try { tg?.requestWriteAccess?.(() => void 0); } catch {}
       // Tell backend we're awaiting contact
@@ -66,7 +66,7 @@ export default function TgAuthPage() {
       if (typeof tg?.requestContact === 'function') {
         tg.requestContact((shared: boolean) => {
           if (shared) {
-            try { tg?.showAlert?.('Спасибо! Проверяем номер…'); } catch {}
+            try { tg?.showAlert?.('Спасибо! Для продолжения вернитесь на экран создания счета'); } catch {}
           } else {
             try { tg?.showAlert?.('Вы отменили доступ к номеру'); } catch {}
           }
@@ -107,7 +107,7 @@ export default function TgAuthPage() {
           <div className="text-sm text-gray-700 dark:text-gray-200">Поделиться номером телефона</div>
           {ready ? (
             <button
-              className="inline-flex items-center justify-center h-10 px-4 rounded border border-gray-300 dark:border-gray-700 text-sm"
+              className="inline-flex items-center justify-center h-10 px-4 rounded bg-blue-600 hover:bg-blue-700 text-white text-sm w-full"
               onClick={() => startShareFlow()}
             >Поделиться номером</button>
           ) : null}
