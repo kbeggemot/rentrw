@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from 'react';
+import Script from 'next/script';
 
 declare global {
   interface Window { Telegram?: any }
@@ -49,6 +50,7 @@ export default function TgAuthPage() {
   function startShareFlow(): void {
     try {
       const tg = (window as any)?.Telegram?.WebApp;
+      try { tg?.showAlert?.('Запрашиваем доступ к номеру…'); } catch {}
       // Optional write access
       try { tg?.requestWriteAccess?.(() => void 0); } catch {}
       // Tell backend we're awaiting contact
@@ -61,13 +63,17 @@ export default function TgAuthPage() {
         }).catch(() => void 0);
       } catch {}
       // Native contact request
-      tg?.requestContact?.((shared: boolean) => {
-        if (shared) {
-          try { tg?.showAlert?.('Спасибо! Проверяем номер…'); } catch {}
-        } else {
-          try { tg?.showAlert?.('Вы отменили доступ к номеру'); } catch {}
-        }
-      });
+      if (typeof tg?.requestContact === 'function') {
+        tg.requestContact((shared: boolean) => {
+          if (shared) {
+            try { tg?.showAlert?.('Спасибо! Проверяем номер…'); } catch {}
+          } else {
+            try { tg?.showAlert?.('Вы отменили доступ к номеру'); } catch {}
+          }
+        });
+      } else {
+        try { tg?.showPopup?.({ title: 'Не поддерживается', message: 'Ваш клиент Telegram не поддерживает запрос номера из мини‑аппа. Обновите приложение и попробуйте снова.' }); } catch {}
+      }
     } catch {}
   }
 
@@ -94,6 +100,7 @@ export default function TgAuthPage() {
 
   return (
     <div className="max-w-xl mx-auto p-4">
+      <Script src="https://telegram.org/js/telegram-web-app.js" strategy="lazyOnload" />
       <h1 className="text-lg font-semibold mb-3">YPLA</h1>
       {showShare ? (
         <div className="space-y-3">
