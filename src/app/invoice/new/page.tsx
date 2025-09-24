@@ -246,7 +246,7 @@ export default function InvoiceNewPage() {
                       </svg>
                       Проверяем…
                     </>
-                  ) : 'Повторить'}
+                  ) : 'Проверить еще раз'}
                 </button>
               ) : null}
             </div>
