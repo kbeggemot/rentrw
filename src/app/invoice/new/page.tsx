@@ -13,6 +13,9 @@ export default function InvoiceNewPage() {
   const [status, setStatus] = useState<string | null>(null);
   const [opening, setOpening] = useState(false);
   const [waitId, setWaitId] = useState<string | null>(null);
+  const [checking, setChecking] = useState(false);
+  const [checkMsg, setCheckMsg] = useState<string | null>(null);
+  const [checkOk, setCheckOk] = useState<boolean | null>(null);
 
   useEffect(() => {
     try {
@@ -135,7 +138,7 @@ export default function InvoiceNewPage() {
 
       {showLogin ? (
         <div className="space-y-3">
-          <p className="text-sm text-gray-700 dark:text-gray-200">Поделитесь своим номером телефона — он должен совпадать с номером из Рокет Ворк.</p>
+          <p className="text-sm text-gray-700 dark:text-gray-200">Поделитесь своим номером телефона — он должен совпадать с номером из Рокет Ворка.</p>
           <div className="flex flex-col gap-3">
             <a
               href={`https://t.me/yplaru_bot/tg_auth?startapp=${encodeURIComponent(`share_phone_${waitId || ''}`)}`}
@@ -165,6 +168,42 @@ export default function InvoiceNewPage() {
           <div className="rounded border border-gray-200 dark:border-gray-800 p-4">
             <div className="text-sm font-medium mb-2">Исполнитель</div>
             <div className="text-sm text-gray-700 dark:text-gray-200">Телефон: <strong>{phone}</strong></div>
+            <div className="mt-3 flex items-center gap-3">
+              <button
+                disabled={checking}
+                onClick={async () => {
+                  setChecking(true); setCheckMsg(null); setCheckOk(null);
+                  try {
+                    const r = await fetch('/api/invoice/validate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ phone }) });
+                    const d = await r.json().catch(() => ({}));
+                    if (r.ok && d?.ok) { setCheckOk(true); setCheckMsg('Статус: Все в порядке'); }
+                    else { setCheckOk(false); setCheckMsg(`Ошибка: ${d?.message || d?.error || 'Неизвестная ошибка'}`); }
+                  } catch {
+                    setCheckOk(false); setCheckMsg('Ошибка запроса');
+                  } finally {
+                    setChecking(false);
+                  }
+                }}
+                className={`inline-flex items-center justify-center h-9 px-3 rounded text-sm ${checking ? 'bg-gray-300 dark:bg-gray-700 text-gray-600 dark:text-gray-300' : 'bg-blue-600 hover:bg-blue-700 text-white'}`}
+              >{checking ? (
+                <>
+                  <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" viewBox="0 0 24 24" aria-hidden="true">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+                  </svg>
+                  Проверяем…
+                </>
+              ) : 'Проверить повторно'}</button>
+              {checkMsg ? (
+                <div className={`text-sm ${checkOk ? 'text-green-600' : 'text-red-600'}`}>{checkMsg}</div>
+              ) : null}
+            </div>
+            {checkOk === false ? (
+              <div className="mt-3 text-xs text-gray-600 dark:text-gray-300 flex items-center gap-2">
+                <span>Проверьте регистрацию в Рокет Ворке</span>
+                <a href="https://trk.mail.ru/c/ss6nd8" target="_blank" rel="noopener noreferrer" className="inline-flex items-center h-7 px-2 rounded border border-gray-300 dark:border-gray-700 text-xs">Перейти</a>
+              </div>
+            ) : null}
           </div>
           <div className="text-xs text-gray-500 dark:text-gray-400">Продолжение создания счёта добавим следующим шагом.</div>
         </div>
