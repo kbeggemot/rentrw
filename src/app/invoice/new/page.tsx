@@ -219,26 +219,28 @@ export default function InvoiceNewPage() {
           <div className="rounded border border-gray-200 dark:border-gray-800 p-4">
             <div className="text-sm font-medium mb-2">Исполнитель</div>
             <div className="text-sm text-gray-700 dark:text-gray-200">Телефон: <strong>{phone}</strong></div>
-            <div className="mt-3 flex items-center gap-3">
+            <div className="mt-3 flex items-center justify-between gap-3 flex-wrap">
+              {(checkOk != null || checkMsg) ? (
+                <div className="text-sm text-gray-700 dark:text-gray-200">
+                  Статус в Рокет Ворке: {checkOk ? (<strong>{checkMsg || 'Все в порядке'}</strong>) : (<strong>{checkMsg || '—'}</strong>)}
+                </div>
+              ) : <div className="text-sm text-gray-700 dark:text-gray-200">Статус в Рокет Ворке: —</div>}
               {checkOk !== true ? (
                 <button
                   disabled={checking}
                   onClick={runCheck}
                   className={`inline-flex items-center justify-center h-9 px-3 rounded text-sm ${checking ? 'bg-gray-300 dark:bg-gray-700 text-gray-600 dark:text-gray-300' : 'bg-blue-600 hover:bg-blue-700 text-white'}`}
-                >{checking ? (
-                  <>
-                    <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" viewBox="0 0 24 24" aria-hidden="true">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
-                    </svg>
-                    Проверяем…
-                  </>
-                ) : 'Проверить повторно'}</button>
-              ) : null}
-              {(checkOk != null || checkMsg) ? (
-                <div className="text-sm text-gray-700 dark:text-gray-200">
-                  Статус в Рокет Ворке: {checkOk ? (<strong>{checkMsg || 'Все в порядке'}</strong>) : (checkMsg || '—')}
-                </div>
+                >
+                  {checking ? (
+                    <>
+                      <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" viewBox="0 0 24 24" aria-hidden="true">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+                      </svg>
+                      Проверяем…
+                    </>
+                  ) : 'Повторить'}
+                </button>
               ) : null}
             </div>
             {fio ? (
