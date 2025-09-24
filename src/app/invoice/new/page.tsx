@@ -35,10 +35,10 @@ export default function InvoiceNewPage() {
         // Маппинг ошибок под стиль партнёров
         let msg = '';
         const code = String(d?.error || '').toUpperCase();
-        if (code === 'PARTNER_NOT_REGISTERED') msg = 'Партнёр не завершил регистрацию в Рокет Ворк';
-        else if (code === 'PARTNER_NOT_VALIDATED') msg = 'Партнёр не может принять оплату: нет статуса самозанятого';
-        else if (code === 'PARTNER_NOT_VALIDATED_OR_NOT_SE_IP') msg = 'Партнёр не может принять оплату: не смз или ип';
-        else if (code === 'PARTNER_NO_PAYMENT_INFO') msg = 'У партнёра нет платёжных реквизитов';
+        if (code === 'PARTNER_NOT_REGISTERED') msg = 'Вы не завершили регистрацию в Рокет Ворке';
+        else if (code === 'PARTNER_NOT_VALIDATED') msg = 'Вы не можете принять оплату: нет статуса самозанятого';
+        else if (code === 'PARTNER_NOT_VALIDATED_OR_NOT_SE_IP') msg = 'Вы не можете принять оплату: вы не самозанятый (НПД) или ИП';
+        else if (code === 'PARTNER_NO_PAYMENT_INFO') msg = 'У вас нет платёжных реквизитов';
         else msg = `${d?.message || d?.error || 'Ошибка'}`;
         setCheckMsg(msg);
         try { sessionStorage.setItem(key, JSON.stringify({ ok: false, msg, fio: null, ts: Date.now() })); } catch {}

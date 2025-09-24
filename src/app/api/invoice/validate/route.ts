@@ -55,7 +55,7 @@ export async function POST(req: Request) {
 
     // Ошибки регистрации
     if (res.status === 404 || data == null) {
-      return NextResponse.json({ ok: false, error: 'PARTNER_NOT_REGISTERED', message: 'Партнёр не завершил регистрацию в Рокет Ворк' }, { status: 400 });
+      return NextResponse.json({ ok: false, error: 'PARTNER_NOT_REGISTERED', message: 'Вы не завершили регистрацию в Рокет Ворке' }, { status: 400 });
     }
     if (!res.ok) {
       const msg = (data && typeof data === 'object' && typeof (data as any).error === 'string') ? (data as any).error : 'Ошибка РВ';
@@ -65,21 +65,21 @@ export async function POST(req: Request) {
     // В счетах пропускаем только самозанятых (selfemployed) с валидированным статусом
     const kind = (employmentKindRaw ?? 'selfemployed').toLowerCase();
     if (kind !== 'selfemployed') {
-      return NextResponse.json({ ok: false, error: 'PARTNER_NOT_VALIDATED_OR_NOT_SE_IP', message: 'Партнёр не может принять оплату: не смз или ип' }, { status: 400 });
+      return NextResponse.json({ ok: false, error: 'PARTNER_NOT_VALIDATED_OR_NOT_SE_IP', message: 'Вы не можете принять оплату: вы не самозанятый (НПД) или ИП' }, { status: 400 });
     }
     // readiness может дать общий «готов к оплатам», но нам всё равно нужна валидация НПД
     if (!(status && status.toLowerCase() === 'validated')) {
-      return NextResponse.json({ ok: false, error: 'PARTNER_NOT_VALIDATED', message: 'Партнёр не может принять оплату: нет статуса самозанятого' }, { status: 400 });
+      return NextResponse.json({ ok: false, error: 'PARTNER_NOT_VALIDATED', message: 'Вы не можете принять оплату: нет статуса самозанятого' }, { status: 400 });
     }
 
     // Доп. подсказки при readiness
     if (readiness && typeof readiness === 'string') {
       const r = readiness.toLowerCase();
       if (r === 'no_payments') {
-        return NextResponse.json({ ok: false, error: 'PARTNER_NOT_REGISTERED', message: 'Партнёр не завершил регистрацию в Рокет Ворк' }, { status: 400 });
+        return NextResponse.json({ ok: false, error: 'PARTNER_NOT_REGISTERED', message: 'Вы не завершили регистрацию в Рокет Ворке' }, { status: 400 });
       }
       if (r === 'no_requisites') {
-        return NextResponse.json({ ok: false, error: 'PARTNER_NO_PAYMENT_INFO', message: 'У партнёра нет платёжных реквизитов' }, { status: 400 });
+        return NextResponse.json({ ok: false, error: 'PARTNER_NO_PAYMENT_INFO', message: 'У вас нет платёжных реквизитов' }, { status: 400 });
       }
     }
 
