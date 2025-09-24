@@ -32,7 +32,14 @@ export default function InvoiceNewPage() {
         try { sessionStorage.setItem(key, JSON.stringify({ ok: true, msg: 'Все в порядке', fio: d?.fio || null, ts: Date.now() })); } catch {}
       } else {
         setCheckOk(false);
-        const msg = `${d?.message || d?.error || 'Ошибка'}`;
+        // Маппинг ошибок под стиль партнёров
+        let msg = '';
+        const code = String(d?.error || '').toUpperCase();
+        if (code === 'PARTNER_NOT_REGISTERED') msg = 'Партнёр не завершил регистрацию в Рокет Ворк';
+        else if (code === 'PARTNER_NOT_VALIDATED') msg = 'Партнёр не может принять оплату: нет статуса самозанятого';
+        else if (code === 'PARTNER_NOT_VALIDATED_OR_NOT_SE_IP') msg = 'Партнёр не может принять оплату: не смз или ип';
+        else if (code === 'PARTNER_NO_PAYMENT_INFO') msg = 'У партнёра нет платёжных реквизитов';
+        else msg = `${d?.message || d?.error || 'Ошибка'}`;
         setCheckMsg(msg);
         try { sessionStorage.setItem(key, JSON.stringify({ ok: false, msg, fio: null, ts: Date.now() })); } catch {}
       }
