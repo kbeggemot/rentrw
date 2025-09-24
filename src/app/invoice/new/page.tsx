@@ -18,6 +18,34 @@ export default function InvoiceNewPage() {
   const [checkOk, setCheckOk] = useState<boolean | null>(null);
   const [fio, setFio] = useState<string | null>(null);
 
+  const runCheck = useCallback(async () => {
+    if (!phone || checking) return;
+    setChecking(true); setCheckMsg(null); setCheckOk(null); setFio(null);
+    const key = (() => { try { return `inv_check_${String(phone).replace(/\D/g, '')}`; } catch { return 'inv_check'; } })();
+    try {
+      const r = await fetch('/api/invoice/validate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ phone }) });
+      const d = await r.json().catch(() => ({}));
+      if (r.ok && d?.ok) {
+        setCheckOk(true);
+        setCheckMsg('Все в порядке');
+        if (d?.fio) setFio(String(d.fio));
+        try { sessionStorage.setItem(key, JSON.stringify({ ok: true, msg: 'Все в порядке', fio: d?.fio || null, ts: Date.now() })); } catch {}
+      } else {
+        setCheckOk(false);
+        const msg = `${d?.message || d?.error || 'Ошибка'}`;
+        setCheckMsg(msg);
+        try { sessionStorage.setItem(key, JSON.stringify({ ok: false, msg, fio: null, ts: Date.now() })); } catch {}
+      }
+    } catch {
+      setCheckOk(false);
+      const msg = 'Ошибка запроса';
+      setCheckMsg(msg);
+      try { const key = `inv_check_${String(phone || '').replace(/\D/g, '')}`; sessionStorage.setItem(key, JSON.stringify({ ok: false, msg, fio: null, ts: Date.now() })); } catch {}
+    } finally {
+      setChecking(false);
+    }
+  }, [phone, checking]);
+
   useEffect(() => {
     try {
       const tg = (window as any)?.Telegram?.WebApp;
@@ -82,6 +110,28 @@ export default function InvoiceNewPage() {
     fetchStatus();
     return () => { cancelled = true; if (timer) window.clearTimeout(timer); };
   }, [tgUserId, phone, waitId]);
+
+  // Auto-show last known status and/or auto-check once when phone appears
+  useEffect(() => {
+    if (!phone) return;
+    try {
+      const key = `inv_check_${String(phone).replace(/\D/g, '')}`;
+      const raw = sessionStorage.getItem(key);
+      if (raw) {
+        try {
+          const obj = JSON.parse(raw);
+          if (obj && typeof obj === 'object') {
+            setCheckOk(Boolean(obj.ok));
+            setCheckMsg(typeof obj.msg === 'string' ? obj.msg : null);
+            setFio(obj.fio ? String(obj.fio) : null);
+            return; // show cached status; кнопку спрячем если ok
+          }
+        } catch {}
+      }
+    } catch {}
+    // If no cache — run initial check silently
+    runCheck();
+  }, [phone, runCheck]);
 
   const requestPhone = useCallback(async () => {
     try {
@@ -173,19 +223,7 @@ export default function InvoiceNewPage() {
               {checkOk !== true ? (
                 <button
                   disabled={checking}
-                  onClick={async () => {
-                    setChecking(true); setCheckMsg(null); setCheckOk(null); setFio(null);
-                    try {
-                      const r = await fetch('/api/invoice/validate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ phone }) });
-                      const d = await r.json().catch(() => ({}));
-                      if (r.ok && d?.ok) { setCheckOk(true); setCheckMsg('Статус в Рокет Ворке: Все в порядке'); if (d?.fio) setFio(String(d.fio)); }
-                      else { setCheckOk(false); setCheckMsg(`Статус в Рокет Ворке: ${d?.message || d?.error || 'Ошибка'}`); }
-                    } catch {
-                      setCheckOk(false); setCheckMsg('Статус в Рокет Ворке: Ошибка запроса');
-                    } finally {
-                      setChecking(false);
-                    }
-                  }}
+                  onClick={runCheck}
                   className={`inline-flex items-center justify-center h-9 px-3 rounded text-sm ${checking ? 'bg-gray-300 dark:bg-gray-700 text-gray-600 dark:text-gray-300' : 'bg-blue-600 hover:bg-blue-700 text-white'}`}
                 >{checking ? (
                   <>
@@ -197,8 +235,10 @@ export default function InvoiceNewPage() {
                   </>
                 ) : 'Проверить повторно'}</button>
               ) : null}
-              {checkMsg ? (
-                <div className="text-sm text-gray-700 dark:text-gray-200">{checkMsg}</div>
+              {(checkOk != null || checkMsg) ? (
+                <div className="text-sm text-gray-700 dark:text-gray-200">
+                  Статус в Рокет Ворке: {checkOk ? (<strong>{checkMsg || 'Все в порядке'}</strong>) : (checkMsg || '—')}
+                </div>
               ) : null}
             </div>
             {fio ? (
