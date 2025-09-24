@@ -16,6 +16,7 @@ export default function InvoiceNewPage() {
   const [checking, setChecking] = useState(false);
   const [checkMsg, setCheckMsg] = useState<string | null>(null);
   const [checkOk, setCheckOk] = useState<boolean | null>(null);
+  const [fio, setFio] = useState<string | null>(null);
 
   useEffect(() => {
     try {
@@ -169,35 +170,40 @@ export default function InvoiceNewPage() {
             <div className="text-sm font-medium mb-2">Исполнитель</div>
             <div className="text-sm text-gray-700 dark:text-gray-200">Телефон: <strong>{phone}</strong></div>
             <div className="mt-3 flex items-center gap-3">
-              <button
-                disabled={checking}
-                onClick={async () => {
-                  setChecking(true); setCheckMsg(null); setCheckOk(null);
-                  try {
-                    const r = await fetch('/api/invoice/validate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ phone }) });
-                    const d = await r.json().catch(() => ({}));
-                    if (r.ok && d?.ok) { setCheckOk(true); setCheckMsg('Статус: Все в порядке'); }
-                    else { setCheckOk(false); setCheckMsg(`Ошибка: ${d?.message || d?.error || 'Неизвестная ошибка'}`); }
-                  } catch {
-                    setCheckOk(false); setCheckMsg('Ошибка запроса');
-                  } finally {
-                    setChecking(false);
-                  }
-                }}
-                className={`inline-flex items-center justify-center h-9 px-3 rounded text-sm ${checking ? 'bg-gray-300 dark:bg-gray-700 text-gray-600 dark:text-gray-300' : 'bg-blue-600 hover:bg-blue-700 text-white'}`}
-              >{checking ? (
-                <>
-                  <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" viewBox="0 0 24 24" aria-hidden="true">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
-                  </svg>
-                  Проверяем…
-                </>
-              ) : 'Проверить повторно'}</button>
+              {checkOk !== true ? (
+                <button
+                  disabled={checking}
+                  onClick={async () => {
+                    setChecking(true); setCheckMsg(null); setCheckOk(null); setFio(null);
+                    try {
+                      const r = await fetch('/api/invoice/validate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ phone }) });
+                      const d = await r.json().catch(() => ({}));
+                      if (r.ok && d?.ok) { setCheckOk(true); setCheckMsg('Статус в Рокет Ворке: Все в порядке'); if (d?.fio) setFio(String(d.fio)); }
+                      else { setCheckOk(false); setCheckMsg(`Статус в Рокет Ворке: ${d?.message || d?.error || 'Ошибка'}`); }
+                    } catch {
+                      setCheckOk(false); setCheckMsg('Статус в Рокет Ворке: Ошибка запроса');
+                    } finally {
+                      setChecking(false);
+                    }
+                  }}
+                  className={`inline-flex items-center justify-center h-9 px-3 rounded text-sm ${checking ? 'bg-gray-300 dark:bg-gray-700 text-gray-600 dark:text-gray-300' : 'bg-blue-600 hover:bg-blue-700 text-white'}`}
+                >{checking ? (
+                  <>
+                    <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" viewBox="0 0 24 24" aria-hidden="true">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+                    </svg>
+                    Проверяем…
+                  </>
+                ) : 'Проверить повторно'}</button>
+              ) : null}
               {checkMsg ? (
-                <div className={`text-sm ${checkOk ? 'text-green-600' : 'text-red-600'}`}>{checkMsg}</div>
+                <div className="text-sm text-gray-700 dark:text-gray-200">{checkMsg}</div>
               ) : null}
             </div>
+            {fio ? (
+              <div className="mt-2 text-sm text-gray-700 dark:text-gray-200">ФИО: <strong>{fio}</strong></div>
+            ) : null}
             {checkOk === false ? (
               <div className="mt-3 text-xs text-gray-600 dark:text-gray-300 flex items-center gap-2">
                 <span>Проверьте регистрацию в Рокет Ворке</span>
