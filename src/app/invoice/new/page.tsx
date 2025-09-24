@@ -37,7 +37,7 @@ export default function InvoiceNewPage() {
         const code = String(d?.error || '').toUpperCase();
         if (code === 'PARTNER_NOT_REGISTERED') msg = 'Вы не завершили регистрацию в Рокет Ворке';
         else if (code === 'PARTNER_NOT_VALIDATED') msg = 'Вы не можете принять оплату: нет статуса самозанятого';
-        else if (code === 'PARTNER_NOT_VALIDATED_OR_NOT_SE_IP') msg = 'Вы не можете принять оплату: вы не самозанятый (НПД) или ИП';
+        else if (code === 'PARTNER_NOT_VALIDATED_OR_NOT_SE_IP') msg = 'Вы не можете принять оплату: вы не самозанятый (НПД)';
         else if (code === 'PARTNER_NO_PAYMENT_INFO') msg = 'У вас нет платёжных реквизитов';
         else msg = `${d?.message || d?.error || 'Ошибка'}`;
         setCheckMsg(msg);

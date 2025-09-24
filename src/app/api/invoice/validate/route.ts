@@ -65,7 +65,7 @@ export async function POST(req: Request) {
     // В счетах пропускаем только самозанятых (selfemployed) с валидированным статусом
     const kind = (employmentKindRaw ?? 'selfemployed').toLowerCase();
     if (kind !== 'selfemployed') {
-      return NextResponse.json({ ok: false, error: 'PARTNER_NOT_VALIDATED_OR_NOT_SE_IP', message: 'Вы не можете принять оплату: вы не самозанятый (НПД) или ИП' }, { status: 400 });
+      return NextResponse.json({ ok: false, error: 'PARTNER_NOT_VALIDATED_OR_NOT_SE_IP', message: 'Вы не можете принять оплату: вы не самозанятый (НПД)' }, { status: 400 });
     }
     // readiness может дать общий «готов к оплатам», но нам всё равно нужна валидация НПД
     if (!(status && status.toLowerCase() === 'validated')) {
