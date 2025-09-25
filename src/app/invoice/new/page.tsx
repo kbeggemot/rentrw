@@ -214,6 +214,29 @@ export default function InvoiceNewPage() {
 
   const showLogin = useMemo(() => !phone, [phone]);
 
+  const handleLogout = useCallback(() => {
+    try {
+      // Clear TG cookies used for linking mini-app sessions
+      document.cookie = 'tg_uid=; Path=/; Max-Age=0';
+      document.cookie = 'tg_fn=; Path=/; Max-Age=0';
+      document.cookie = 'tg_ln=; Path=/; Max-Age=0';
+      document.cookie = 'tg_un=; Path=/; Max-Age=0';
+    } catch {}
+    try { sessionStorage.removeItem('tg_shared_phone'); } catch {}
+    try { sessionStorage.removeItem('tg_wait_id'); } catch {}
+    try {
+      const digits = String(phone || '').replace(/\D/g, '');
+      if (digits) sessionStorage.removeItem(`inv_check_${digits}`);
+    } catch {}
+    setPhone(null);
+    setTgUserId(null);
+    setCheckOk(null);
+    setCheckMsg(null);
+    setFio(null);
+    setOpening(false);
+    setStatus(null);
+  }, [phone]);
+
   return (
     <div className="max-w-xl mx-auto pt-4 md:pt-6">
       <header className="mb-4" style={{minHeight: '40px'}}>
@@ -253,7 +276,10 @@ export default function InvoiceNewPage() {
       ) : (
         <div className="space-y-3">
           <div className="rounded border border-gray-200 dark:border-gray-800 p-4">
-            <div className="text-base font-semibold mb-2">Исполнитель</div>
+            <div className="text-base font-semibold mb-2 flex items-center justify-between">
+              <div>Исполнитель</div>
+              <button type="button" onClick={handleLogout} className="text-xs text-gray-500 hover:underline">выйти</button>
+            </div>
             <div className="text-sm text-gray-700 dark:text-gray-200">Телефон: <strong>{phone}</strong></div>
             <div className="mt-3 flex items-center gap-3">
               <div className="flex-1 min-w-0 text-sm text-gray-700 dark:text-gray-200">
