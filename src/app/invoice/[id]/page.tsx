@@ -16,7 +16,7 @@ export default async function InvoicePublicPage(props: { params: Promise<{ id?: 
     invoice = null;
   }
   return (
-    <div className="max-w-xl mx-auto pt-4 md:pt-6 pb-8 md:pb-10">
+    <div className="max-w-xl mx-auto p-4 md:p-6 pb-8 md:pb-10">
       <h1 className="text-2xl font-bold mb-3">{invoice ? `Счёт № ${invoice?.id}` : 'Счёт'}</h1>
       {invoice ? (
         <div className="space-y-4 text-sm text-gray-800 dark:text-gray-200">
