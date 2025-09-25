@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Input } from '@/components/ui/Input';
 
 declare global {
   interface Window { Telegram?: any }
@@ -258,6 +259,18 @@ export default function InvoiceNewPage() {
               </div>
             ) : null}
           </div>
+          {checkOk === true ? (
+            <div className="rounded border border-gray-200 dark:border-gray-800 p-4">
+              <div className="text-base font-semibold mb-2">Заказчик (Компания)</div>
+              <Input
+                label="ИНН плательщика"
+                placeholder="7729…"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                hint="Укажите ИНН компании, которой вы оказываете услугу."
+              />
+            </div>
+          ) : null}
           <div className="text-xs text-gray-500 dark:text-gray-400">Продолжение создания счёта добавим следующим шагом.</div>
         </div>
       )}
