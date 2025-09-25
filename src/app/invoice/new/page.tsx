@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Input } from '@/components/ui/Input';
 import { Textarea } from '@/components/ui/Textarea';
 
@@ -27,6 +27,16 @@ export default function InvoiceNewPage() {
   const [serviceDescription, setServiceDescription] = useState('');
   const [serviceAmount, setServiceAmount] = useState('');
   const [customerEmail, setCustomerEmail] = useState('');
+  const [createdList, setCreatedList] = useState<Array<{ id: number; createdAt: string }>>([]);
+  const [listCursor, setListCursor] = useState<number | null>(0);
+  const [listLoading, setListLoading] = useState(false);
+  const canCreate = useMemo(() => {
+    return (
+      !!phone && !!payerName && payerInnValid() && serviceDescription.trim().length > 0 && serviceAmount.trim().length > 0
+    );
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phone, payerName, serviceDescription, serviceAmount]);
+  function payerInnValid(): boolean { try { const d = (payerInn||'').replace(/\D/g,''); return d.length===10 || d.length===12; } catch { return false; } }
   const confirmDisabled = useMemo(() => {
     try { return (payerInn.replace(/\D/g, '').length < 10); } catch { return true; }
   }, [payerInn]);
@@ -380,12 +390,111 @@ export default function InvoiceNewPage() {
               </div>
             </div>
           ) : null}
+          {canCreate ? (
+            <div className="mt-4">
+              <button
+                className="w-full h-10 rounded bg-blue-600 hover:bg-blue-700 text-white text-sm"
+                onClick={async () => {
+                  try {
+                    const payload = {
+                      phone,
+                      orgInn: payerInn,
+                      orgName: payerName,
+                      email: customerEmail || null,
+                      description: serviceDescription.slice(0,128),
+                      amount: serviceAmount
+                    };
+                    const r = await fetch('/api/invoice', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+                    const d = await r.json().catch(()=>({}));
+                    if (r.ok && d?.ok && d?.invoice?.id) {
+                      const url = `/invoice/${d.invoice.id}`;
+                      try { await navigator.clipboard.writeText(new URL(url, window.location.origin).toString()); } catch {}
+                      showToast('Счёт создан, ссылка скопирована', 'success');
+                      // Redirect or update view later; пока просто переходим
+                      // Подгрузим список и остаёмся на странице пока — чтобы показать таблицу
+                      try { setCreatedList([{ id: d.invoice.id, createdAt: d.invoice.createdAt }, ...createdList]); } catch {}
+                    } else {
+                      showToast('Не удалось создать счёт', 'error');
+                    }
+                  } catch { showToast('Не удалось создать счёт', 'error'); }
+                }}
+              >Создать счёт</button>
+            </div>
+          ) : null}
+          {/* Список созданных счетов */}
+          <div className="mt-6">
+            <div className="text-base font-semibold mb-2">Созданные счета</div>
+            <CreatedInvoices createdList={createdList} setCreatedList={setCreatedList} cursor={listCursor} setCursor={setListCursor} loading={listLoading} setLoading={setListLoading} />
+          </div>
           {toast ? (
             <div className={`fixed bottom-4 right-4 z-50 rounded-lg px-3 py-2 text-sm shadow-md ${toast.kind === 'success' ? 'bg-green-600 text-white' : toast.kind === 'error' ? 'bg-red-600 text-white' : 'bg-gray-800 text-white'}`}>{toast.msg}</div>
           ) : null}
           
         </div>
       )}
+    </div>
+  );
+}
+
+function CreatedInvoices({ createdList, setCreatedList, cursor, setCursor, loading, setLoading }: { createdList: Array<{ id: number; createdAt: string }>; setCreatedList: (v: any) => void; cursor: number | null; setCursor: (v: number | null) => void; loading: boolean; setLoading: (v: boolean) => void }) {
+  const [initialized, setInitialized] = React.useState(false as any);
+  React.useEffect(() => {
+    let cancelled = false;
+    if (initialized) return;
+    (async () => {
+      try {
+        setLoading(true);
+        const r = await fetch('/api/invoice?limit=5&cursor=0', { cache: 'no-store' });
+        const d = await r.json().catch(() => ({}));
+        if (!cancelled && Array.isArray(d?.items)) {
+          setCreatedList(d.items.map((it: any) => ({ id: it.id, createdAt: it.createdAt })));
+          setCursor(typeof d?.nextCursor === 'number' ? d.nextCursor : null);
+        }
+      } catch {}
+      setLoading(false);
+      setInitialized(true);
+    })();
+    return () => { cancelled = true; };
+  }, [initialized, setCreatedList, setCursor, setLoading]);
+
+  return (
+    <div className="border rounded border-gray-200 dark:border-gray-800">
+      <table className="w-full text-sm">
+        <thead className="bg-gray-50 dark:bg-gray-900">
+          <tr><th className="text-left px-3 py-2">Номер</th><th className="text-left px-3 py-2">Создан</th><th className="text-left px-3 py-2">Ссылка</th></tr>
+        </thead>
+        <tbody>
+          {createdList.length === 0 ? (
+            <tr><td colSpan={3} className="px-3 py-4 text-gray-500">Пока пусто</td></tr>
+          ) : createdList.map((it) => (
+            <tr key={it.id} className="border-t border-gray-100 dark:border-gray-800">
+              <td className="px-3 py-2">{it.id}</td>
+              <td className="px-3 py-2">{new Date(it.createdAt).toLocaleString('ru-RU', { timeZone: 'Europe/Moscow' })}</td>
+              <td className="px-3 py-2"><a className="text-blue-600 hover:underline" href={`/invoice/${it.id}`} target="_blank" rel="noopener noreferrer">/invoice/{it.id}</a></td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <div className="p-3">
+        {cursor !== null ? (
+          <button
+            className="h-9 px-3 rounded border text-sm"
+            disabled={loading}
+            onClick={async () => {
+              try {
+                setLoading(true);
+                const r = await fetch(`/api/invoice?limit=5&cursor=${cursor}`, { cache: 'no-store' });
+                const d = await r.json().catch(() => ({}));
+                if (Array.isArray(d?.items) && d.items.length > 0) {
+                  setCreatedList([...createdList, ...d.items.map((it: any) => ({ id: it.id, createdAt: it.createdAt }))]);
+                  setCursor(typeof d?.nextCursor === 'number' ? d.nextCursor : null);
+                } else setCursor(null);
+              } catch { setCursor(null); }
+              setLoading(false);
+            }}
+          >{loading ? 'Загрузка…' : 'Показать ещё'}</button>
+        ) : null}
+      </div>
     </div>
   );
 }
