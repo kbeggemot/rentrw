@@ -21,33 +21,11 @@ export default async function InvoicePublicPage(props: { params: Promise<{ id?: 
       {invoice ? (
         <div className="space-y-4 text-sm text-gray-800 dark:text-gray-200">
           <div className="rounded border border-gray-200 dark:border-gray-800 p-4">
-            <div>Исполнитель: {(invoice.executorFio || '—')} / {(invoice.executorInn || '—')}</div>
-            <div>Заказчик: {invoice.orgName} / {invoice.orgInn}</div>
-          </div>
-          <div className="rounded border border-gray-200 dark:border-gray-800 p-4">
+            <div className="mb-1">Исполнитель: {(invoice.executorFio || '—')} / {(invoice.executorInn || '—')}</div>
+            <div className="mb-3">Заказчик: {invoice.orgName} / {invoice.orgInn}</div>
             <div className="font-medium mb-1">Описание услуги:</div>
-            <div>{invoice.description}</div>
-          </div>
-          <div className="rounded border border-gray-200 dark:border-gray-800 p-4">
+            <div className="mb-3">{invoice.description}</div>
             <div>Сумма: {invoice.amount} ₽</div>
-          </div>
-
-          <div className="pt-2 rounded border border-gray-200 dark:border-gray-800 p-4">
-            <div className="font-semibold mb-1">Условия оплаты</div>
-            <div className="space-y-2">
-              <p>
-                Это счёт в пользу самозанятого. Оплатите его на номинальный счёт оператора платформы «Рокет Ворк» по реквизитам ниже. После зачисления средств оператор перечислит выплату исполнителю на реквизиты, указанные им в Рокет Ворке.
-              </p>
-              <p>
-                Оплачивайте только с расчётного счёта вашей организации, строго соблюдая назначение платежа, указанное в счёте.
-              </p>
-              <p>
-                Оплачивая, вы присоединяетесь к <a className="text-blue-600 hover:underline" href="https://files.rocketwork.ru/roketwork/Соглашение_Рокет_Ворк.pdf" target="_blank" rel="noreferrer">Соглашению об использовании электронного сервиса «Рокет Ворк»</a>.
-              </p>
-              <p>
-                Комиссия составит 3% и будет удержена с исполнителя, если у вас с Рокет Ворком не согласованы индивидуальные условия обслуживания.
-              </p>
-            </div>
           </div>
 
           <div className="pt-2 rounded border border-gray-200 dark:border-gray-800 p-4">
@@ -80,9 +58,27 @@ export default async function InvoicePublicPage(props: { params: Promise<{ id?: 
               <div className="sm:col-span-2">
                 <div className="text-gray-600">Назначение платежа</div>
                 <div>
-                  {`Перечисление собственных денежных средств "${invoice.orgName}", ИНН "${invoice.orgInn}" по Соглашению об использовании электронного сервиса "Рокет Ворк" для оплаты по счёту #${invoice.id}. Без НДС`}
+                  {`Перечисление собственных денежных средств ${invoice.orgName}, ИНН ${invoice.orgInn} по Соглашению об использовании электронного сервиса "Рокет Ворк" для оплаты по счёту #${invoice.id}. Без НДС`}
                 </div>
               </div>
+            </div>
+          </div>
+
+          <div className="pt-2 rounded border border-gray-200 dark:border-gray-800 p-4">
+            <div className="font-semibold mb-1">Условия оплаты</div>
+            <div className="space-y-2">
+              <p>
+                Это счёт в пользу самозанятого. Оплатите его на номинальный счёт оператора платформы «Рокет Ворк» по реквизитам ниже. После зачисления средств оператор перечислит выплату исполнителю на реквизиты, указанные им в Рокет Ворке.
+              </p>
+              <p>
+                Оплачивайте только с расчётного счёта вашей организации, строго соблюдая назначение платежа, указанное в счёте.
+              </p>
+              <p>
+                Оплачивая, вы присоединяетесь к <a className="text-blue-600 hover:underline" href="https://files.rocketwork.ru/roketwork/Соглашение_Рокет_Ворк.pdf" target="_blank" rel="noreferrer">Соглашению об использовании электронного сервиса «Рокет Ворк»</a>.
+              </p>
+              <p>
+                Комиссия составит 3% и будет удержена с исполнителя, если у вас с Рокет Ворком не согласованы индивидуальные условия обслуживания.
+              </p>
             </div>
           </div>
         </div>
