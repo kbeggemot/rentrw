@@ -215,7 +215,7 @@ export default function InvoiceNewPage() {
   const showLogin = useMemo(() => !phone, [phone]);
 
   return (
-    <div className="max-w-xl mx-auto p-4 md:p-6">
+    <div className="max-w-3xl mx-auto p-4 md:p-6">
       <h1 className="text-2xl font-bold mb-4">Создать счёт</h1>
 
       {showLogin ? (
@@ -313,7 +313,6 @@ export default function InvoiceNewPage() {
                       const d = await r.json().catch(() => ({}));
                       if (r.ok && d?.ok && d?.name) {
                         setPayerName(String(d.name));
-                        showToast('Организация найдена', 'success');
                       } else if (r.status === 404 || String(d?.error || '') === 'NOT_FOUND') {
                         showToast('ИНН не найден, проверьте и попробуйте еще раз', 'error');
                       } else {
