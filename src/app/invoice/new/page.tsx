@@ -462,6 +462,11 @@ export default function InvoiceNewPage() {
           ) : null}
           {/* Список созданных счетов (не показываем, если пусто) */}
           <CreatedInvoices createdList={createdList} setCreatedList={setCreatedList} cursor={listCursor} setCursor={setListCursor} loading={listLoading} setLoading={setListLoading} onRepeat={(inv)=>{
+            if (checkOk !== true) {
+              const msg = (checkMsg && String(checkMsg).trim().length > 0) ? String(checkMsg) : 'Вы не можете создать счёт: пройдите проверку в Рокет Ворке';
+              showToast(msg, 'error');
+              return;
+            }
             setPayerInn(String(inv.orgInn||''));
             setPayerName(inv.orgName ? String(inv.orgName) : null);
             setCustomerEmail(inv.email ? String(inv.email) : '');
