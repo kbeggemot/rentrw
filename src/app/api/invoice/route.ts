@@ -4,6 +4,7 @@ export const runtime = 'nodejs';
 
 type Invoice = {
   id: number; // 6-digit
+  code: string; // 4+ char unique public code
   createdAt: string;
   phone: string;
   orgInn: string;
@@ -54,7 +55,24 @@ export async function POST(req: Request) {
       return list.some((x) => x.id === n) ? gen() : n;
     };
     const id = await gen();
-    const inv: Invoice = { id, createdAt: new Date().toISOString(), phone, orgInn, orgName, email, description, amount };
+    // 4-char unique code (expand length if too many collisions)
+    const genCode = async (): Promise<string> => {
+      const alphabet = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+      const make = (len: number) => Array.from({ length: len }).map(() => alphabet[Math.floor(Math.random() * alphabet.length)]).join('');
+      const list = await readStore();
+      const exists = new Set(list.map((x) => x.code));
+      let len = 4;
+      let attempts = 0;
+      let code = make(len);
+      while (exists.has(code)) {
+        attempts += 1;
+        if (attempts > 2000) { len += 1; attempts = 0; }
+        code = make(len);
+      }
+      return code;
+    };
+    const code = await genCode();
+    const inv: Invoice = { id, code, createdAt: new Date().toISOString(), phone, orgInn, orgName, email, description, amount };
     const list = await readStore();
     list.push(inv);
     await writeStore(list);

@@ -27,7 +27,7 @@ export default function InvoiceNewPage() {
   const [serviceDescription, setServiceDescription] = useState('');
   const [serviceAmount, setServiceAmount] = useState('');
   const [customerEmail, setCustomerEmail] = useState('');
-  type StoredInvoice = { id: number; createdAt: string; phone?: string; orgInn?: string; orgName?: string; email?: string | null; description?: string; amount?: string };
+  type StoredInvoice = { id: number; code?: string; createdAt: string; phone?: string; orgInn?: string; orgName?: string; email?: string | null; description?: string; amount?: string };
   const [createdList, setCreatedList] = useState<Array<StoredInvoice>>([]);
   const [listCursor, setListCursor] = useState<number | null>(0);
   const [listLoading, setListLoading] = useState(false);
@@ -440,7 +440,7 @@ export default function InvoiceNewPage() {
                     const r = await fetch('/api/invoice', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
                     const d = await r.json().catch(()=>({}));
                     if (r.ok && d?.ok && d?.invoice?.id) {
-                      const url = `/invoice/${d.invoice.id}`;
+                      const url = `/invoice/${d?.invoice?.code || d.invoice.id}`;
                       // Обновляем таблицу и очищаем поля
                       try { setCreatedList([{ ...d.invoice }, ...createdList]); } catch {}
                       // Очистим поля заказчика и услуги
@@ -519,7 +519,7 @@ function CreatedInvoices({ createdList, setCreatedList, cursor, setCursor, loadi
             <tr key={it.id} className="border-t border-gray-100 dark:border-gray-800">
               <td className="px-3 py-2">{it.id}</td>
               <td className="px-3 py-2">{new Date(it.createdAt).toLocaleString('ru-RU', { timeZone: 'Europe/Moscow' })}</td>
-              <td className="px-3 py-2"><a className="text-blue-600 hover:underline" href={`/invoice/${it.id}`} target="_blank" rel="noopener noreferrer">/invoice/{it.id}</a></td>
+              <td className="px-3 py-2"><a className="text-blue-600 hover:underline" href={`/invoice/${(it as any).code || it.id}`} target="_blank" rel="noopener noreferrer">/invoice/{(it as any).code || it.id}</a></td>
               <td className="px-3 py-2"><button className="h-8 px-2 rounded border text-sm" onClick={() => onRepeat(it)}>Повторить</button></td>
             </tr>
           ))}

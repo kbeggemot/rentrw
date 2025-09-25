@@ -10,7 +10,7 @@ export default function InvoicePublicPage(props: { params: Promise<{ id?: string
   const id = (global as any).React?.use?.(props.params)?.id ?? undefined;
   return (
     <div className="max-w-xl mx-auto pt-4 md:pt-6">
-      <h1 className="text-2xl font-bold mb-3">Счёт № {id}</h1>
+      <h1 className="text-2xl font-bold mb-3">Счёт {id ? `/${id}` : ''}</h1>
       <div className="text-sm text-gray-600">Страница будет доступна позже.</div>
     </div>
   );
