@@ -19,6 +19,7 @@ export default function InvoiceNewPage() {
   const [checkOk, setCheckOk] = useState<boolean | null>(null);
   const [fio, setFio] = useState<string | null>(null);
   const [payerInn, setPayerInn] = useState<string>('');
+  const [payerName, setPayerName] = useState<string | null>(null);
   const confirmDisabled = useMemo(() => {
     try { return (payerInn.replace(/\D/g, '').length < 10); } catch { return true; }
   }, [payerInn]);
@@ -285,9 +286,31 @@ export default function InvoiceNewPage() {
                 <button
                   type="button"
                   disabled={confirmDisabled}
+                  onClick={async () => {
+                    const inn = payerInn.replace(/\D/g, '');
+                    if (inn.length < 10) return;
+                    try {
+                      const r = await fetch('/api/invoice/dadata', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ inn }) });
+                      const d = await r.json().catch(() => ({}));
+                      if (r.ok && d?.ok && d?.name) {
+                        setPayerName(String(d.name));
+                      } else if (r.status === 404 || String(d?.error || '') === 'NOT_FOUND') {
+                        try { alert('ИНН не найден, проверьте и попробуйте еще раз'); } catch {}
+                      } else {
+                        try { alert('Что-то пошло не так. Попробуйте позднее'); } catch {}
+                      }
+                    } catch {
+                      try { alert('Что-то пошло не так. Попробуйте позднее'); } catch {}
+                    }
+                  }}
                   className={`shrink-0 inline-flex items-center justify-center h-9 px-3 rounded text-sm ${confirmDisabled ? 'bg-gray-300 dark:bg-gray-700 text-gray-600 dark:text-gray-300 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700 text-white'}`}
                 >Подтвердить</button>
               </div>
+              {payerName ? (
+                <div className="mt-3">
+                  <Input label="Наименование" value={payerName} readOnly />
+                </div>
+              ) : null}
             </div>
           ) : null}
           <div className="text-xs text-gray-500 dark:text-gray-400">Продолжение создания счёта добавим следующим шагом.</div>
