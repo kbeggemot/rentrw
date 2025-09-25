@@ -481,8 +481,8 @@ function CreatedInvoices({ createdList, setCreatedList, cursor, setCursor, loadi
           ))}
         </tbody>
       </table>
-      <div className="p-3">
-        {cursor !== null ? (
+      {cursor !== null ? (
+        <div className="p-3">
           <button
             className="h-9 px-3 rounded border text-sm"
             disabled={loading}
@@ -499,8 +499,8 @@ function CreatedInvoices({ createdList, setCreatedList, cursor, setCursor, loadi
               setLoading(false);
             }}
           >{loading ? 'Загрузка…' : 'Показать ещё'}</button>
-        ) : null}
-      </div>
+        </div>
+      ) : null}
       </div>
     </div>
   );
