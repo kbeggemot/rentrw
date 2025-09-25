@@ -35,9 +35,9 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false, error: 'NOT_FOUND' }, { status: 404 });
     }
     const first = suggestions[0];
-    const nameFull = first?.data?.name?.full_with_opf || first?.unrestricted_value || first?.value || null;
-    if (!nameFull) return NextResponse.json({ ok: false, error: 'NOT_FOUND' }, { status: 404 });
-    return NextResponse.json({ ok: true, name: nameFull });
+    const nameShort = first?.data?.name?.short_with_opf || first?.data?.name?.full_with_opf || first?.value || first?.unrestricted_value || null;
+    if (!nameShort) return NextResponse.json({ ok: false, error: 'NOT_FOUND' }, { status: 404 });
+    return NextResponse.json({ ok: true, name: nameShort });
   } catch (e) {
     return NextResponse.json({ ok: false, error: 'SERVER_ERROR' }, { status: 500 });
   }

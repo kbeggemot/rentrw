@@ -20,6 +20,9 @@ export default function InvoiceNewPage() {
   const [fio, setFio] = useState<string | null>(null);
   const [payerInn, setPayerInn] = useState<string>('');
   const [payerName, setPayerName] = useState<string | null>(null);
+  const [confirming, setConfirming] = useState(false);
+  const [toast, setToast] = useState<{ msg: string; kind: 'success' | 'error' | 'info' } | null>(null);
+  const showToast = (msg: string, kind: 'success' | 'error' | 'info' = 'info') => { setToast({ msg, kind }); setTimeout(() => setToast(null), 2500); };
   const confirmDisabled = useMemo(() => {
     try { return (payerInn.replace(/\D/g, '').length < 10); } catch { return true; }
   }, [payerInn]);
@@ -285,26 +288,43 @@ export default function InvoiceNewPage() {
                 />
                 <button
                   type="button"
-                  disabled={confirmDisabled}
+                  disabled={confirmDisabled || confirming}
                   onClick={async () => {
                     const inn = payerInn.replace(/\D/g, '');
                     if (inn.length < 10) return;
                     try {
+                      setConfirming(true);
                       const r = await fetch('/api/invoice/dadata', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ inn }) });
                       const d = await r.json().catch(() => ({}));
                       if (r.ok && d?.ok && d?.name) {
                         setPayerName(String(d.name));
+                        showToast('Организация найдена', 'success');
                       } else if (r.status === 404 || String(d?.error || '') === 'NOT_FOUND') {
-                        try { alert('ИНН не найден, проверьте и попробуйте еще раз'); } catch {}
+                        showToast('ИНН не найден, проверьте и попробуйте еще раз', 'error');
                       } else {
-                        try { alert('Что-то пошло не так. Попробуйте позднее'); } catch {}
+                        showToast('Что-то пошло не так. Попробуйте позднее', 'error');
                       }
                     } catch {
-                      try { alert('Что-то пошло не так. Попробуйте позднее'); } catch {}
+                      showToast('Что-то пошло не так. Попробуйте позднее', 'error');
+                    } finally {
+                      setConfirming(false);
                     }
                   }}
-                  className={`shrink-0 inline-flex items-center justify-center h-9 px-3 rounded text-sm ${confirmDisabled ? 'bg-gray-300 dark:bg-gray-700 text-gray-600 dark:text-gray-300 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700 text-white'}`}
-                >Подтвердить</button>
+                  className={`shrink-0 inline-flex items-center justify-center h-9 px-3 rounded text-sm ${confirmDisabled || confirming
+                    ? 'bg-gray-300 dark:bg-gray-700 text-gray-600 dark:text-gray-300 cursor-not-allowed'
+                    : (payerName ? 'bg-gray-200 dark:bg-gray-800 text-gray-800 dark:text-gray-100 border border-gray-300 dark:border-gray-700'
+                      : 'bg-blue-600 hover:bg-blue-700 text-white')}`}
+                >
+                  {confirming ? (
+                    <>
+                      <svg className="animate-spin -ml-1 mr-2 h-4 w-4" viewBox="0 0 24 24" aria-hidden="true">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+                      </svg>
+                      Подтверждаем…
+                    </>
+                  ) : 'Подтвердить'}
+                </button>
               </div>
               {payerName ? (
                 <div className="mt-3">
@@ -313,7 +333,10 @@ export default function InvoiceNewPage() {
               ) : null}
             </div>
           ) : null}
-          <div className="text-xs text-gray-500 dark:text-gray-400">Продолжение создания счёта добавим следующим шагом.</div>
+          {toast ? (
+            <div className={`fixed bottom-4 right-4 z-50 rounded-lg px-3 py-2 text-sm shadow-md ${toast.kind === 'success' ? 'bg-green-600 text-white' : toast.kind === 'error' ? 'bg-red-600 text-white' : 'bg-gray-800 text-white'}`}>{toast.msg}</div>
+          ) : null}
+          
         </div>
       )}
     </div>
