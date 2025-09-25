@@ -224,7 +224,7 @@ export default function InvoiceNewPage() {
       ) : (
         <div className="space-y-3">
           <div className="rounded border border-gray-200 dark:border-gray-800 p-4">
-            <div className="text-sm font-medium mb-2">Исполнитель</div>
+            <div className="text-base font-semibold mb-2">Исполнитель</div>
             <div className="text-sm text-gray-700 dark:text-gray-200">Телефон: <strong>{phone}</strong></div>
             <div className="mt-3 flex items-center gap-3">
               <div className="flex-1 min-w-0 text-sm text-gray-700 dark:text-gray-200">
