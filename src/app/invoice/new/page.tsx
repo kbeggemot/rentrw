@@ -515,10 +515,10 @@ function CreatedInvoices({ createdList, setCreatedList, cursor, setCursor, loadi
 
   if (createdList.length === 0) return null;
   return (
-    <div className="mt-6">
+    <div className="mt-6 overflow-x-auto">
       <div className="text-base font-semibold mb-2">Созданные счета</div>
       <div className="border rounded border-gray-200 dark:border-gray-800">
-      <table className="w-full text-sm">
+      <table className="min-w-[36rem] w-full text-sm">
         <thead className="bg-gray-50 dark:bg-gray-900">
           <tr><th className="text-left px-3 py-2">Номер</th><th className="text-left px-3 py-2">Создан</th><th className="text-left px-3 py-2">Ссылка</th><th className="text-left px-3 py-2">Действия</th></tr>
         </thead>
