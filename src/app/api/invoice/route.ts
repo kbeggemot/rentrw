@@ -12,6 +12,8 @@ type Invoice = {
   email?: string | null;
   description: string;
   amount: string; // keep as string with comma
+  executorFio?: string | null;
+  executorInn?: string | null;
 };
 
 async function readStore(): Promise<Invoice[]> {
@@ -47,6 +49,8 @@ export async function POST(req: Request) {
     const email = (body?.email ? String(body.email).trim() : '') || null;
     const description = String(body?.description || '').trim();
     const amount = String(body?.amount || '').trim();
+    const executorFio = body?.executorFio ? String(body.executorFio).trim() : null;
+    const executorInn = body?.executorInn ? String(body.executorInn).replace(/\D/g, '') : null;
     if (!phone || !orgInn || !orgName || !description || !amount) return NextResponse.json({ error: 'MISSING_FIELDS' }, { status: 400 });
     // 6-digit unique id
     const gen = async (): Promise<number> => {
@@ -72,7 +76,7 @@ export async function POST(req: Request) {
       return code;
     };
     const code = await genCode();
-    const inv: Invoice = { id, code, createdAt: new Date().toISOString(), phone, orgInn, orgName, email, description, amount };
+    const inv: Invoice = { id, code, createdAt: new Date().toISOString(), phone, orgInn, orgName, email, description, amount, executorFio, executorInn };
     const list = await readStore();
     list.push(inv);
     await writeStore(list);

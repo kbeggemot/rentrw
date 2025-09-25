@@ -435,7 +435,9 @@ export default function InvoiceNewPage() {
                       orgName: payerName,
                       email: customerEmail || null,
                       description: serviceDescription.slice(0,128),
-                      amount: serviceAmount
+                      amount: serviceAmount,
+                      executorFio: fio || null,
+                      executorInn: '7729542170'
                     };
                     const r = await fetch('/api/invoice', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
                     const d = await r.json().catch(()=>({}));
