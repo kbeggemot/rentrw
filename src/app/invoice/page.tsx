@@ -4,7 +4,7 @@ export default function InvoiceLandingPage() {
   return (
     <div className="max-w-3xl mx-auto p-4 md:p-6">
       <h1 className="text-2xl md:text-3xl font-bold mb-2">Счета</h1>
-      <h2 className="text-lg md:text-xl font-semibold mb-4 text-gray-800 dark:text-gray-100">Выставляйте счёт ЮЛ и принимайте оплату — чек и налоги оформим автоматически</h2>
+      <h2 className="text-lg md:text-xl font-semibold mb-4 text-gray-800 dark:text-gray-100">Выставляйте счёт и принимайте оплату — чек и налоги оформим автоматически</h2>
       <div className="space-y-4 text-sm md:text-base text-gray-700 dark:text-gray-200">
         <p>
           <strong>YPLA + Рокет Ворк</strong> помогают самозанятым получать деньги от компаний прозрачно и безопасно.<br />
@@ -27,7 +27,7 @@ export default function InvoiceLandingPage() {
           <h2 className="text-lg font-semibold mb-2">Как это работает</h2>
           <ol className="list-decimal pl-6 space-y-1">
             <li>Регистрируетесь в Рокет Ворке как самозанятый.</li>
-            <li>В YPLA создаёте счёт для ЮЛ и отправляете ссылку.</li>
+            <li>В YPLA создаёте счёт и отправляете ссылку.</li>
             <li>Заказчик оплачивает через безопасную форму (номинальный счёт).</li>
             <li>Чек и регистрация дохода по НПД — автоматически, налог перечислим за вас, деньги поступают вам (за вычетом комиссии и налога).</li>
           </ol>
