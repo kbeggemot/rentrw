@@ -59,6 +59,24 @@ export default function InvoicePublicPage(props: { params: Promise<{ id?: string
               </p>
             </div>
           </div>
+
+          <div className="pt-2">
+            <div className="font-semibold mb-1">Реквизиты для оплаты</div>
+            <div className="space-y-1">
+              <div><span className="text-gray-600">Номер счета</span><br/>40702810620028000001</div>
+              <div><span className="text-gray-600">Сокращенное наименование</span><br/>ООО «РОКЕТ ВОРК»</div>
+              <div><span className="text-gray-600">Корреспондентский счет</span><br/>30101810800000000388</div>
+              <div><span className="text-gray-600">ИНН</span><br/>7720496561</div>
+              <div><span className="text-gray-600">БИК</span><br/>044525388</div>
+              <div><span className="text-gray-600">КПП</span><br/>770101001</div>
+              <div className="mt-2">
+                <div className="text-gray-600">Назначение платежа</div>
+                <div>
+                  {`Перечисление собственных денежных средств "${invoice.orgName}", ИНН "${invoice.orgInn}" по Соглашению об использовании электронного сервиса "Рокет Ворк" для оплаты по счёту #${invoice.id}. Без НДС`}
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       ) : notFound ? (
         <div className="text-sm text-gray-600">Счёт не найден</div>
