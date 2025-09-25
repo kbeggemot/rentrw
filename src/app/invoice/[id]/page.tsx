@@ -16,16 +16,16 @@ export default async function InvoicePublicPage(props: { params: Promise<{ id?: 
     invoice = null;
   }
   return (
-    <div className="max-w-xl mx-auto pt-4 md:pt-6">
+    <div className="max-w-xl mx-auto pt-4 md:pt-6 pb-8 md:pb-10">
       <h1 className="text-2xl font-bold mb-3">{invoice ? `Счёт № ${invoice?.id}` : 'Счёт'}</h1>
       {invoice ? (
         <div className="space-y-4 text-sm text-gray-800 dark:text-gray-200">
           <div className="rounded border border-gray-200 dark:border-gray-800 p-4">
-            <div className="mb-1">Исполнитель: {(invoice.executorFio || '—')} / {(invoice.executorInn || '—')}</div>
-            <div className="mb-3">Заказчик: {invoice.orgName} / {invoice.orgInn}</div>
-            <div className="font-medium mb-1">Описание услуги:</div>
-            <div className="mb-3">{invoice.description}</div>
-            <div>Сумма: {invoice.amount} ₽</div>
+            <div className="mb-1"><span className="font-semibold">Исполнитель:</span> {(invoice.executorFio || '—')} / {(invoice.executorInn || '—')}</div>
+            <div className="mb-3"><span className="font-semibold">Заказчик:</span> {invoice.orgName} / {invoice.orgInn}</div>
+            <div className="font-semibold mb-1">Описание услуги:</div>
+            <div className="mb-3 whitespace-pre-line">{invoice.description}</div>
+            <div><span className="font-semibold">Сумма:</span> {invoice.amount} ₽</div>
           </div>
 
           <div className="pt-2 rounded border border-gray-200 dark:border-gray-800 p-4">
