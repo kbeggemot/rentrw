@@ -338,7 +338,7 @@ export default function InvoiceNewPage() {
           ) : null}
           {payerName ? (
             <div className="rounded border border-gray-200 dark:border-gray-800 p-4">
-              <div className="text-base font-semibold mb-2">Описание услуги</div>
+              <div className="text-base font-semibold mb-2">Услуги</div>
               <Textarea
                 label="Описание"
                 placeholder="Например: разработка дизайн-проекта логотипа компании согласно ТЗ"
