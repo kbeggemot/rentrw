@@ -19,6 +19,9 @@ export default function InvoiceNewPage() {
   const [checkOk, setCheckOk] = useState<boolean | null>(null);
   const [fio, setFio] = useState<string | null>(null);
   const [payerInn, setPayerInn] = useState<string>('');
+  const confirmDisabled = useMemo(() => {
+    try { return (payerInn.replace(/\D/g, '').length < 10); } catch { return true; }
+  }, [payerInn]);
 
   const runCheck = useCallback(async () => {
     if (!phone || checking) return;
@@ -269,14 +272,20 @@ export default function InvoiceNewPage() {
                   label="ИНН плательщика"
                   placeholder="10 или 12 цифр"
                   inputMode="numeric"
+                  type="tel"
                   pattern="[0-9]*"
+                  maxLength={12}
                   value={payerInn}
-                  onChange={(e) => setPayerInn(e.target.value)}
+                  onChange={(e) => {
+                    const digits = e.target.value.replace(/\D/g, '').slice(0, 12);
+                    setPayerInn(digits);
+                  }}
                   hint="Укажите ИНН компании, которой вы оказываете услугу."
                 />
                 <button
                   type="button"
-                  className="shrink-0 inline-flex items-center justify-center h-9 px-3 rounded text-sm bg-blue-600 hover:bg-blue-700 text-white"
+                  disabled={confirmDisabled}
+                  className={`shrink-0 inline-flex items-center justify-center h-9 px-3 rounded text-sm ${confirmDisabled ? 'bg-gray-300 dark:bg-gray-700 text-gray-600 dark:text-gray-300 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700 text-white'}`}
                 >Подтвердить</button>
               </div>
             </div>
