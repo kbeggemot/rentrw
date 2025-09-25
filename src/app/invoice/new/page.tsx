@@ -215,7 +215,7 @@ export default function InvoiceNewPage() {
   const showLogin = useMemo(() => !phone, [phone]);
 
   return (
-    <div className="max-w-xl mx-auto">
+    <div className="max-w-xl mx-auto pt-4 md:pt-6">
       <h1 className="text-2xl font-bold mb-4">Создать счёт</h1>
 
       {showLogin ? (
