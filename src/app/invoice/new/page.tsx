@@ -331,20 +331,22 @@ export default function InvoiceNewPage() {
                 </button>
               </div>
               {payerName ? (
-                <div className="mt-3">
-                  <Input label="Наименование" value={payerName} readOnly />
-                </div>
+                <>
+                  <div className="mt-3">
+                    <Input label="Наименование" value={payerName} readOnly />
+                  </div>
+                  <div className="mt-3 grid grid-cols-1">
+                    <Input
+                      label="Email (необязательно)"
+                      placeholder="roboto@example.com"
+                      type="email"
+                      value={customerEmail}
+                      onChange={(e) => setCustomerEmail(e.target.value)}
+                      hint="Укажите контактную почту, если хотите, чтобы мы автоматически отправили счёт Заказчику"
+                    />
+                  </div>
+                </>
               ) : null}
-              <div className="mt-3 grid grid-cols-1">
-                <Input
-                  label="Email (необязательно)"
-                  placeholder="roboto@example.com"
-                  type="email"
-                  value={customerEmail}
-                  onChange={(e) => setCustomerEmail(e.target.value)}
-                  hint="Укажите контактную почту, если хотите, чтобы мы автоматически отправили счёт Заказчику"
-                />
-              </div>
             </div>
           ) : null}
           {payerName ? (
