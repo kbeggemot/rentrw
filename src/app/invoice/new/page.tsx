@@ -226,17 +226,16 @@ export default function InvoiceNewPage() {
           <div className="rounded border border-gray-200 dark:border-gray-800 p-4">
             <div className="text-sm font-medium mb-2">Исполнитель</div>
             <div className="text-sm text-gray-700 dark:text-gray-200">Телефон: <strong>{phone}</strong></div>
-            <div className="mt-3 flex items-center justify-between gap-3 flex-wrap">
-              {(checkOk != null || checkMsg) ? (
-                <div className="text-sm text-gray-700 dark:text-gray-200">
-                  Статус в Рокет Ворке: {checkOk ? (<strong>{checkMsg || 'Все в порядке'}</strong>) : (<strong>{checkMsg || '—'}</strong>)}
-                </div>
-              ) : <div className="text-sm text-gray-700 dark:text-gray-200">Статус в Рокет Ворке: —</div>}
+            <div className="mt-3 flex items-start gap-3">
+              <div className="flex-1 text-sm text-gray-700 dark:text-gray-200">
+                <div>Статус в Рокет Ворке:</div>
+                <div>{checkOk ? (<strong>{checkMsg || 'Все в порядке'}</strong>) : (<strong>{checkMsg || '—'}</strong>)}</div>
+              </div>
               {checkOk !== true ? (
                 <button
                   disabled={checking}
                   onClick={runCheck}
-                  className={`inline-flex items-center justify-center h-9 px-3 rounded text-sm ${checking ? 'bg-gray-300 dark:bg-gray-700 text-gray-600 dark:text-gray-300' : 'bg-blue-600 hover:bg-blue-700 text-white'}`}
+                  className={`ml-auto inline-flex items-center justify-center h-9 px-3 rounded text-sm ${checking ? 'bg-gray-300 dark:bg-gray-700 text-gray-600 dark:text-gray-300' : 'bg-blue-600 hover:bg-blue-700 text-white'}`}
                 >
                   {checking ? (
                     <>
