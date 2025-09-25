@@ -8,7 +8,7 @@ async function fetchInvoice(id: string) {
 
 export default function InvoicePublicPage(props: { params: Promise<{ id?: string }> }) {
   const React = (global as any).React as typeof import('react');
-  const code = React.use((props.params as any))?.id as string | undefined;
+  const code = (React.use(props.params as any) as any)?.id as string | undefined;
   const [invoice, setInvoice] = React.useState<any | null>(null);
   const [notFound, setNotFound] = React.useState(false);
   React.useEffect(() => {
