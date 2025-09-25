@@ -216,7 +216,12 @@ export default function InvoiceNewPage() {
 
   return (
     <div className="max-w-xl mx-auto pt-4 md:pt-6">
-      <h1 className="text-2xl font-bold mb-4">Создать счёт</h1>
+      <header className="mb-4" style={{minHeight: '40px'}}>
+        <div className="flex items-center justify-between">
+          <h1 className="text-2xl font-bold">Создать счёт</h1>
+          <a href="/invoice" className="p-2 rounded hover:bg-gray-50 dark:hover:bg-gray-900" aria-label="Закрыть">✕</a>
+        </div>
+      </header>
 
       {showLogin ? (
         <div className="space-y-3">
