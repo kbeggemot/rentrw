@@ -263,11 +263,11 @@ export default function InvoiceNewPage() {
           {checkOk === true ? (
             <div className="rounded border border-gray-200 dark:border-gray-800 p-4">
               <div className="text-base font-semibold mb-2">Заказчик (Компания)</div>
-              <div className="flex items-end gap-3">
+              <div className="flex items-center gap-3">
                 <Input
                   className="flex-1"
                   label="ИНН плательщика"
-                  placeholder="7729…"
+                  placeholder="10 или 12 цифр"
                   inputMode="numeric"
                   pattern="[0-9]*"
                   value={payerInn}
