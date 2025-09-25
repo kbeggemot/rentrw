@@ -26,6 +26,7 @@ export default function InvoiceNewPage() {
   const showToast = (msg: string, kind: 'success' | 'error' | 'info' = 'info') => { setToast({ msg, kind }); setTimeout(() => setToast(null), 2500); };
   const [serviceDescription, setServiceDescription] = useState('');
   const [serviceAmount, setServiceAmount] = useState('');
+  const [customerEmail, setCustomerEmail] = useState('');
   const confirmDisabled = useMemo(() => {
     try { return (payerInn.replace(/\D/g, '').length < 10); } catch { return true; }
   }, [payerInn]);
@@ -334,6 +335,16 @@ export default function InvoiceNewPage() {
                   <Input label="Наименование" value={payerName} readOnly />
                 </div>
               ) : null}
+              <div className="mt-3 grid grid-cols-1">
+                <Input
+                  label="Email (необязательно)"
+                  placeholder="roboto@example.com"
+                  type="email"
+                  value={customerEmail}
+                  onChange={(e) => setCustomerEmail(e.target.value)}
+                  hint="Укажите контактную почту, если хотите, чтобы мы автоматически отправили счёт Заказчику"
+                />
+              </div>
             </div>
           ) : null}
           {payerName ? (
