@@ -347,16 +347,20 @@ export default function InvoiceNewPage() {
                 onChange={(e) => setServiceDescription(e.target.value)}
                 hint="Укажите, за что вы выставляете счёт Заказчику. Этот текст попадёт в чек НПД. Не более 128 символов"
               />
-              <div className="mt-3 grid grid-cols-1 sm:grid-cols-[12rem_1fr] items-end gap-3">
+              <div className="mt-3">
                 <Input
+                  className="w-full"
                   label="Стоимость"
                   placeholder="0"
                   inputMode="decimal"
                   type="text"
                   value={serviceAmount}
                   onChange={(e) => {
-                    const v = e.target.value.replace(/[^0-9.,]/g, '').replace(',', '.');
-                    setServiceAmount(v);
+                    // Allow only digits and separators; display comma, keep only one comma
+                    const raw = e.target.value.replace(/[^0-9.,]/g, '').replace(/\./g, ',');
+                    const i = raw.indexOf(',');
+                    const val = i === -1 ? raw : raw.slice(0, i + 1) + raw.slice(i + 1).replace(/,/g, '');
+                    setServiceAmount(val);
                   }}
                   hint="Укажите стоимость ваших услуг до удержания налогов и комиссий в рублях"
                 />
