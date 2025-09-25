@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Input } from '@/components/ui/Input';
+import { Textarea } from '@/components/ui/Textarea';
 
 declare global {
   interface Window { Telegram?: any }
@@ -23,6 +24,8 @@ export default function InvoiceNewPage() {
   const [confirming, setConfirming] = useState(false);
   const [toast, setToast] = useState<{ msg: string; kind: 'success' | 'error' | 'info' } | null>(null);
   const showToast = (msg: string, kind: 'success' | 'error' | 'info' = 'info') => { setToast({ msg, kind }); setTimeout(() => setToast(null), 2500); };
+  const [serviceDescription, setServiceDescription] = useState('');
+  const [serviceAmount, setServiceAmount] = useState('');
   const confirmDisabled = useMemo(() => {
     try { return (payerInn.replace(/\D/g, '').length < 10); } catch { return true; }
   }, [payerInn]);
@@ -284,7 +287,7 @@ export default function InvoiceNewPage() {
                     const digits = e.target.value.replace(/\D/g, '').slice(0, 12);
                     setPayerInn(digits);
                   }}
-                  hint="Укажите ИНН компании, которой вы оказываете услугу."
+                  hint="Укажите ИНН компании, которой вы оказываете услугу"
                 />
                 <button
                   type="button"
@@ -331,6 +334,33 @@ export default function InvoiceNewPage() {
                   <Input label="Наименование" value={payerName} readOnly />
                 </div>
               ) : null}
+            </div>
+          ) : null}
+          {payerName ? (
+            <div className="rounded border border-gray-200 dark:border-gray-800 p-4">
+              <div className="text-base font-semibold mb-2">Описание услуги</div>
+              <Textarea
+                label="Описание"
+                placeholder="Например: разработка дизайн-проекта логотипа компании согласно ТЗ"
+                maxLength={128}
+                value={serviceDescription}
+                onChange={(e) => setServiceDescription(e.target.value)}
+                hint="Укажите, за что вы выставляете счёт Заказчику. Этот текст попадёт в чек НПД. Не более 128 символов"
+              />
+              <div className="mt-3 grid grid-cols-1 sm:grid-cols-[12rem_1fr] items-end gap-3">
+                <Input
+                  label="Стоимость"
+                  placeholder="0"
+                  inputMode="decimal"
+                  type="text"
+                  value={serviceAmount}
+                  onChange={(e) => {
+                    const v = e.target.value.replace(/[^0-9.,]/g, '').replace(',', '.');
+                    setServiceAmount(v);
+                  }}
+                  hint="Укажите стоимость ваших услуг до удержания налогов и комиссий в рублях"
+                />
+              </div>
             </div>
           ) : null}
           {toast ? (
