@@ -20,15 +20,19 @@ export default async function InvoicePublicPage(props: { params: Promise<{ id?: 
       <h1 className="text-2xl font-bold mb-3">{invoice ? `Счёт № ${invoice?.id}` : 'Счёт'}</h1>
       {invoice ? (
         <div className="space-y-4 text-sm text-gray-800 dark:text-gray-200">
-          <div>Исполнитель: {(invoice.executorFio || '—')} / {(invoice.executorInn || '—')}</div>
-          <div>Заказчик: {invoice.orgName} / {invoice.orgInn}</div>
-          <div>
-            <div className="font-medium">Описание услуги:</div>
+          <div className="rounded border border-gray-200 dark:border-gray-800 p-4">
+            <div>Исполнитель: {(invoice.executorFio || '—')} / {(invoice.executorInn || '—')}</div>
+            <div>Заказчик: {invoice.orgName} / {invoice.orgInn}</div>
+          </div>
+          <div className="rounded border border-gray-200 dark:border-gray-800 p-4">
+            <div className="font-medium mb-1">Описание услуги:</div>
             <div>{invoice.description}</div>
           </div>
-          <div>Сумма: {invoice.amount} ₽</div>
+          <div className="rounded border border-gray-200 dark:border-gray-800 p-4">
+            <div>Сумма: {invoice.amount} ₽</div>
+          </div>
 
-          <div className="pt-2">
+          <div className="pt-2 rounded border border-gray-200 dark:border-gray-800 p-4">
             <div className="font-semibold mb-1">Условия оплаты</div>
             <div className="space-y-2">
               <p>
@@ -46,16 +50,34 @@ export default async function InvoicePublicPage(props: { params: Promise<{ id?: 
             </div>
           </div>
 
-          <div className="pt-2">
-            <div className="font-semibold mb-1">Реквизиты для оплаты</div>
-            <div className="space-y-1">
-              <div><span className="text-gray-600">Номер счета</span><br/>40702810620028000001</div>
-              <div><span className="text-gray-600">Сокращенное наименование</span><br/>ООО «РОКЕТ ВОРК»</div>
-              <div><span className="text-gray-600">Корреспондентский счет</span><br/>30101810800000000388</div>
-              <div><span className="text-gray-600">ИНН</span><br/>7720496561</div>
-              <div><span className="text-gray-600">БИК</span><br/>044525388</div>
-              <div><span className="text-gray-600">КПП</span><br/>770101001</div>
-              <div className="mt-2">
+          <div className="pt-2 rounded border border-gray-200 dark:border-gray-800 p-4">
+            <div className="font-semibold mb-2">Реквизиты для оплаты</div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <div className="text-gray-600">Номер счета</div>
+                <div>40702810620028000001</div>
+              </div>
+              <div>
+                <div className="text-gray-600">Сокращенное наименование</div>
+                <div>ООО «РОКЕТ ВОРК»</div>
+              </div>
+              <div>
+                <div className="text-gray-600">Корреспондентский счет</div>
+                <div>30101810800000000388</div>
+              </div>
+              <div>
+                <div className="text-gray-600">ИНН</div>
+                <div>7720496561</div>
+              </div>
+              <div>
+                <div className="text-gray-600">БИК</div>
+                <div>044525388</div>
+              </div>
+              <div>
+                <div className="text-gray-600">КПП</div>
+                <div>770101001</div>
+              </div>
+              <div className="sm:col-span-2">
                 <div className="text-gray-600">Назначение платежа</div>
                 <div>
                   {`Перечисление собственных денежных средств "${invoice.orgName}", ИНН "${invoice.orgInn}" по Соглашению об использовании электронного сервиса "Рокет Ворк" для оплаты по счёту #${invoice.id}. Без НДС`}

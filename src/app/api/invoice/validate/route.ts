@@ -52,6 +52,7 @@ export async function POST(req: Request) {
       ?? (raw?.status as string | undefined);
     const readiness = (ex?.payment_readiness as string | undefined) ?? (raw?.payment_readiness as string | undefined);
     const fio = ex ? [ex.last_name, ex.first_name, ex.second_name].filter(Boolean).join(' ').trim() || null : null;
+    const inn = (ex && (ex.inn || ex.tax_id)) ? String(ex.inn || ex.tax_id) : (raw && (raw.inn || raw.tax_id) ? String(raw.inn || raw.tax_id) : null);
 
     // Ошибки регистрации
     if (res.status === 404 || data == null) {
@@ -83,7 +84,7 @@ export async function POST(req: Request) {
       }
     }
 
-    return NextResponse.json({ ok: true, message: 'Все в порядке', fio });
+    return NextResponse.json({ ok: true, message: 'Все в порядке', fio, inn });
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'Server error';
     return NextResponse.json({ ok: false, error: 'SERVER_ERROR', message: msg }, { status: 500 });

@@ -53,6 +53,7 @@ export default function InvoiceNewPage() {
         setCheckOk(true);
         setCheckMsg('Все в порядке');
         if (d?.fio) setFio(String(d.fio));
+        try { if (d?.inn) sessionStorage.setItem('inv_executor_inn', String(d.inn)); } catch {}
         try { sessionStorage.setItem(key, JSON.stringify({ ok: true, msg: 'Все в порядке', fio: d?.fio || null, ts: Date.now() })); } catch {}
       } else {
         setCheckOk(false);
@@ -235,6 +236,7 @@ export default function InvoiceNewPage() {
     setFio(null);
     setOpening(false);
     setStatus(null);
+    try { sessionStorage.removeItem('inv_executor_inn'); } catch {}
   }, [phone]);
 
   return (
@@ -437,7 +439,7 @@ export default function InvoiceNewPage() {
                       description: serviceDescription.slice(0,128),
                       amount: serviceAmount,
                       executorFio: fio || null,
-                      executorInn: '7729542170'
+                      executorInn: (sessionStorage.getItem('inv_executor_inn') || null)
                     };
                     const r = await fetch('/api/invoice', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
                     const d = await r.json().catch(()=>({}));
