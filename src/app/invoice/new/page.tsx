@@ -27,7 +27,8 @@ export default function InvoiceNewPage() {
   const [serviceDescription, setServiceDescription] = useState('');
   const [serviceAmount, setServiceAmount] = useState('');
   const [customerEmail, setCustomerEmail] = useState('');
-  const [createdList, setCreatedList] = useState<Array<{ id: number; createdAt: string }>>([]);
+  type StoredInvoice = { id: number; createdAt: string; phone?: string; orgInn?: string; orgName?: string; email?: string | null; description?: string; amount?: string };
+  const [createdList, setCreatedList] = useState<Array<StoredInvoice>>([]);
   const [listCursor, setListCursor] = useState<number | null>(0);
   const [listLoading, setListLoading] = useState(false);
   const canCreate = useMemo(() => {
@@ -411,7 +412,7 @@ export default function InvoiceNewPage() {
                     if (r.ok && d?.ok && d?.invoice?.id) {
                       const url = `/invoice/${d.invoice.id}`;
                       // Обновляем таблицу и очищаем поля
-                      try { setCreatedList([{ id: d.invoice.id, createdAt: d.invoice.createdAt }, ...createdList]); } catch {}
+                      try { setCreatedList([{ ...d.invoice }, ...createdList]); } catch {}
                       // Очистим поля заказчика и услуги
                       setPayerInn('');
                       setPayerName(null);
@@ -430,7 +431,14 @@ export default function InvoiceNewPage() {
             </div>
           ) : null}
           {/* Список созданных счетов (не показываем, если пусто) */}
-          <CreatedInvoices createdList={createdList} setCreatedList={setCreatedList} cursor={listCursor} setCursor={setListCursor} loading={listLoading} setLoading={setListLoading} />
+          <CreatedInvoices createdList={createdList} setCreatedList={setCreatedList} cursor={listCursor} setCursor={setListCursor} loading={listLoading} setLoading={setListLoading} onRepeat={(inv)=>{
+            setPayerInn(String(inv.orgInn||''));
+            setPayerName(inv.orgName ? String(inv.orgName) : null);
+            setCustomerEmail(inv.email ? String(inv.email) : '');
+            setServiceDescription(inv.description ? String(inv.description) : '');
+            setServiceAmount(inv.amount ? String(inv.amount) : '');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }} />
           {toast ? (
             <div className={`fixed bottom-4 right-4 z-50 rounded-lg px-3 py-2 text-sm shadow-md ${toast.kind === 'success' ? 'bg-green-600 text-white' : toast.kind === 'error' ? 'bg-red-600 text-white' : 'bg-gray-800 text-white'}`}>{toast.msg}</div>
           ) : null}
@@ -441,7 +449,7 @@ export default function InvoiceNewPage() {
   );
 }
 
-function CreatedInvoices({ createdList, setCreatedList, cursor, setCursor, loading, setLoading }: { createdList: Array<{ id: number; createdAt: string }>; setCreatedList: (v: any) => void; cursor: number | null; setCursor: (v: number | null) => void; loading: boolean; setLoading: (v: boolean) => void }) {
+function CreatedInvoices({ createdList, setCreatedList, cursor, setCursor, loading, setLoading, onRepeat }: { createdList: Array<{ id: number; createdAt: string; phone?: string; orgInn?: string; orgName?: string; email?: string | null; description?: string; amount?: string }>; setCreatedList: (v: any) => void; cursor: number | null; setCursor: (v: number | null) => void; loading: boolean; setLoading: (v: boolean) => void; onRepeat: (inv: any) => void }) {
   const [initialized, setInitialized] = React.useState(false as any);
   React.useEffect(() => {
     let cancelled = false;
@@ -452,7 +460,7 @@ function CreatedInvoices({ createdList, setCreatedList, cursor, setCursor, loadi
         const r = await fetch('/api/invoice?limit=5&cursor=0', { cache: 'no-store' });
         const d = await r.json().catch(() => ({}));
         if (!cancelled && Array.isArray(d?.items)) {
-          setCreatedList(d.items.map((it: any) => ({ id: it.id, createdAt: it.createdAt })));
+          setCreatedList(d.items.map((it: any) => ({ ...it })));
           setCursor(typeof d?.nextCursor === 'number' ? d.nextCursor : null);
         }
       } catch {}
@@ -469,7 +477,7 @@ function CreatedInvoices({ createdList, setCreatedList, cursor, setCursor, loadi
       <div className="border rounded border-gray-200 dark:border-gray-800">
       <table className="w-full text-sm">
         <thead className="bg-gray-50 dark:bg-gray-900">
-          <tr><th className="text-left px-3 py-2">Номер</th><th className="text-left px-3 py-2">Создан</th><th className="text-left px-3 py-2">Ссылка</th></tr>
+          <tr><th className="text-left px-3 py-2">Номер</th><th className="text-left px-3 py-2">Создан</th><th className="text-left px-3 py-2">Ссылка</th><th className="text-left px-3 py-2">Действия</th></tr>
         </thead>
         <tbody>
           {createdList.map((it) => (
@@ -477,6 +485,7 @@ function CreatedInvoices({ createdList, setCreatedList, cursor, setCursor, loadi
               <td className="px-3 py-2">{it.id}</td>
               <td className="px-3 py-2">{new Date(it.createdAt).toLocaleString('ru-RU', { timeZone: 'Europe/Moscow' })}</td>
               <td className="px-3 py-2"><a className="text-blue-600 hover:underline" href={`/invoice/${it.id}`} target="_blank" rel="noopener noreferrer">/invoice/{it.id}</a></td>
+              <td className="px-3 py-2"><button className="h-8 px-2 rounded border text-sm" onClick={() => onRepeat(it)}>Повторить</button></td>
             </tr>
           ))}
         </tbody>
@@ -492,7 +501,7 @@ function CreatedInvoices({ createdList, setCreatedList, cursor, setCursor, loadi
                 const r = await fetch(`/api/invoice?limit=5&cursor=${cursor}`, { cache: 'no-store' });
                 const d = await r.json().catch(() => ({}));
                 if (Array.isArray(d?.items) && d.items.length > 0) {
-                  setCreatedList([...createdList, ...d.items.map((it: any) => ({ id: it.id, createdAt: it.createdAt }))]);
+                  setCreatedList([...createdList, ...d.items.map((it: any) => ({ ...it }))]);
                   setCursor(typeof d?.nextCursor === 'number' ? d.nextCursor : null);
                 } else setCursor(null);
               } catch { setCursor(null); }
