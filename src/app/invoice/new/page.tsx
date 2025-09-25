@@ -393,9 +393,11 @@ export default function InvoiceNewPage() {
           {canCreate ? (
             <div className="mt-4">
               <button
-                className="w-full h-10 rounded bg-blue-600 hover:bg-blue-700 text-white text-sm"
+                className={`w-full h-10 rounded text-white text-sm ${listLoading ? 'bg-gray-300 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'}`}
+                disabled={listLoading}
                 onClick={async () => {
                   try {
+                    setListLoading(true);
                     const payload = {
                       phone,
                       orgInn: payerInn,
@@ -408,17 +410,23 @@ export default function InvoiceNewPage() {
                     const d = await r.json().catch(()=>({}));
                     if (r.ok && d?.ok && d?.invoice?.id) {
                       const url = `/invoice/${d.invoice.id}`;
+                      // Обновляем таблицу и очищаем поля
+                      try { setCreatedList([{ id: d.invoice.id, createdAt: d.invoice.createdAt }, ...createdList]); } catch {}
+                      // Очистим поля заказчика и услуги
+                      setPayerInn('');
+                      setPayerName(null);
+                      setCustomerEmail('');
+                      setServiceDescription('');
+                      setServiceAmount('');
+                      // После появления строки в таблице — копируем ссылку и показываем тост
                       try { await navigator.clipboard.writeText(new URL(url, window.location.origin).toString()); } catch {}
                       showToast('Счёт создан, ссылка скопирована', 'success');
-                      // Redirect or update view later; пока просто переходим
-                      // Подгрузим список и остаёмся на странице пока — чтобы показать таблицу
-                      try { setCreatedList([{ id: d.invoice.id, createdAt: d.invoice.createdAt }, ...createdList]); } catch {}
                     } else {
                       showToast('Не удалось создать счёт', 'error');
                     }
-                  } catch { showToast('Не удалось создать счёт', 'error'); }
+                  } catch { showToast('Не удалось создать счёт', 'error'); } finally { setListLoading(false); }
                 }}
-              >Создать счёт</button>
+              >{listLoading ? 'Создаём…' : 'Создать счёт'}</button>
             </div>
           ) : null}
           {/* Список созданных счетов (не показываем, если пусто) */}
