@@ -515,10 +515,10 @@ function CreatedInvoices({ createdList, setCreatedList, cursor, setCursor, loadi
 
   if (createdList.length === 0) return null;
   return (
-    <div className="mt-6 overflow-x-auto">
+    <div className="mt-6">
       <div className="text-base font-semibold mb-2">Созданные счета</div>
-      <div className="border rounded border-gray-200 dark:border-gray-800">
-      <table className="min-w-[36rem] w-full text-sm">
+      <div className="border rounded border-gray-200 dark:border-gray-800 overflow-x-auto">
+      <table className="min-w-[32rem] w-full text-sm">
         <thead className="bg-gray-50 dark:bg-gray-900">
           <tr><th className="text-left px-3 py-2">Номер</th><th className="text-left px-3 py-2">Создан</th><th className="text-left px-3 py-2">Ссылка</th><th className="text-left px-3 py-2">Действия</th></tr>
         </thead>
@@ -526,7 +526,7 @@ function CreatedInvoices({ createdList, setCreatedList, cursor, setCursor, loadi
           {createdList.map((it) => (
             <tr key={it.id} className="border-t border-gray-100 dark:border-gray-800">
               <td className="px-3 py-2">{it.id}</td>
-              <td className="px-3 py-2">{new Date(it.createdAt).toLocaleString('ru-RU', { timeZone: 'Europe/Moscow' })}</td>
+              <td className="px-3 py-2">{(() => { const dt = new Date(it.createdAt); const dS = dt.toLocaleDateString('ru-RU', { timeZone: 'Europe/Moscow' }); const tS = dt.toLocaleTimeString('ru-RU', { timeZone: 'Europe/Moscow' }); return (<><span className="sm:inline">{dS}, </span><span className="block sm:inline">{tS}</span></>); })()}</td>
               <td className="px-3 py-2"><a className="text-blue-600 hover:underline" href={`/invoice/${(it as any).code || it.id}`} target="_blank" rel="noopener noreferrer">/invoice/{(it as any).code || it.id}</a></td>
               <td className="px-3 py-2"><button className="h-8 px-2 rounded border text-sm" onClick={() => onRepeat(it)}>Повторить</button></td>
             </tr>
