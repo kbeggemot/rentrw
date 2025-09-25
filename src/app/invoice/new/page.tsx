@@ -18,6 +18,7 @@ export default function InvoiceNewPage() {
   const [checkMsg, setCheckMsg] = useState<string | null>(null);
   const [checkOk, setCheckOk] = useState<boolean | null>(null);
   const [fio, setFio] = useState<string | null>(null);
+  const [payerInn, setPayerInn] = useState<string>('');
 
   const runCheck = useCallback(async () => {
     if (!phone || checking) return;
@@ -262,13 +263,22 @@ export default function InvoiceNewPage() {
           {checkOk === true ? (
             <div className="rounded border border-gray-200 dark:border-gray-800 p-4">
               <div className="text-base font-semibold mb-2">Заказчик (Компания)</div>
-              <Input
-                label="ИНН плательщика"
-                placeholder="7729…"
-                inputMode="numeric"
-                pattern="[0-9]*"
-                hint="Укажите ИНН компании, которой вы оказываете услугу."
-              />
+              <div className="flex items-end gap-3">
+                <Input
+                  className="flex-1"
+                  label="ИНН плательщика"
+                  placeholder="7729…"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  value={payerInn}
+                  onChange={(e) => setPayerInn(e.target.value)}
+                  hint="Укажите ИНН компании, которой вы оказываете услугу."
+                />
+                <button
+                  type="button"
+                  className="shrink-0 inline-flex items-center justify-center h-9 px-3 rounded text-sm bg-blue-600 hover:bg-blue-700 text-white"
+                >Подтвердить</button>
+              </div>
             </div>
           ) : null}
           <div className="text-xs text-gray-500 dark:text-gray-400">Продолжение создания счёта добавим следующим шагом.</div>
