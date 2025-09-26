@@ -50,7 +50,19 @@ export async function GET(req: Request, ctx: { params: Promise<{ id?: string }> 
     const page = pdf.addPage([595.28, 841.89]); // A4
     const { width } = page.getSize();
     const margin = 40;
-    const origin = (() => { try { const u = new URL(req.url); return `${u.protocol}//${u.host}`; } catch { return '';} })();
+    const origin = (() => {
+      try { const u = new URL(req.url); return `${u.protocol}//${u.host}`; } catch {
+        try { const h = (req as any).headers?.get?.('host'); return h ? `https://${h}` : ''; } catch { return ''; }
+      }
+    })();
+    const debugJson = (() => {
+      try { const u = new URL(req.url); return u.searchParams.get('debug') === '1' || u.searchParams.get('format') === 'json'; } catch {
+        try {
+          const q = (req.url.split('?')[1] || '').toLowerCase();
+          return /(?:^|&)debug=1(?:&|$)/.test(q) || /(?:^|&)format=json(?:&|$)/.test(q);
+        } catch { return false; }
+      }
+    })();
     async function loadFont(localPath: string, urls: string[]): Promise<any | null> {
       // 1) try FS: public/fonts/* (packaged with app)
       try {
@@ -153,6 +165,17 @@ export async function GET(req: Request, ctx: { params: Promise<{ id?: string }> 
       const color = opts.color ?? rgb(0,0,0);
       page.drawText(t(text), { x, y, size: s, font: f, color });
     };
+
+    // If debug requested, return JSON with font status
+    if (debugJson) {
+      return NextResponse.json({
+        ok: true,
+        usedEmbedded,
+        usingWinAnsi,
+        fontLoaded: !!font,
+        fontBoldLoaded: !!fontBold,
+      }, { status: 200, headers: { 'Cache-Control': 'no-store' } });
+    }
 
     // Header
     drawText('YPLA', { x: margin, y, size: 20, bold: true });
