@@ -85,6 +85,9 @@ export default async function InvoicePublicPage(props: { params: Promise<{ id?: 
                 </div>
               </div>
             </div>
+            <div className="mt-3">
+              <a className="text-blue-600 hover:underline" href={`/api/invoice/${encodeURIComponent(String(code))}/pdf`} target="_blank" rel="noreferrer">Скачать в PDF</a>
+            </div>
           </div>
 
           <div className="pt-2 rounded border border-gray-200 dark:border-gray-800 p-4">
