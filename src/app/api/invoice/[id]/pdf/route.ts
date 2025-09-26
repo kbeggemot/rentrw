@@ -50,6 +50,13 @@ export async function GET(_: Request, ctx: { params: Promise<{ id?: string }> })
           try { return await pdf.embedFont(new Uint8Array(b.data)); } catch {}
         }
       } catch {}
+      // try bundled public asset (no network dependency)
+      try {
+        const b = await readBinary('public/' + localPath.replace(/^\.data\//, 'fonts/'));
+        if (b && b.data) {
+          try { return await pdf.embedFont(new Uint8Array(b.data)); } catch {}
+        }
+      } catch {}
       for (const u of urls) {
         try {
           const r = await fetch(u, { cache: 'no-store' });
@@ -63,12 +70,12 @@ export async function GET(_: Request, ctx: { params: Promise<{ id?: string }> })
     }
 
     // Candidate mirrors for reliable access
-    const fontRegular = await loadFont('.data/fonts/CYR-Regular.ttf', [
+    const fontRegular = await loadFont('.data/fonts/NotoSans-Regular.ttf', [
       'https://raw.githubusercontent.com/google/fonts/main/ofl/notosans/NotoSans-Regular.ttf',
       'https://github.com/google/fonts/raw/main/ofl/notosans/NotoSans-Regular.ttf?raw=1',
       'https://github.com/google/fonts/raw/main/apache/roboto/Roboto-Regular.ttf?raw=1'
     ]);
-    const fontBoldCand = await loadFont('.data/fonts/CYR-Bold.ttf', [
+    const fontBoldCand = await loadFont('.data/fonts/NotoSans-Bold.ttf', [
       'https://raw.githubusercontent.com/google/fonts/main/ofl/notosans/NotoSans-Bold.ttf',
       'https://github.com/google/fonts/raw/main/ofl/notosans/NotoSans-Bold.ttf?raw=1',
       'https://github.com/google/fonts/raw/main/apache/roboto/Roboto-Bold.ttf?raw=1'
