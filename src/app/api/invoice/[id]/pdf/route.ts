@@ -99,14 +99,15 @@ export async function GET(req: Request, ctx: { params: Promise<{ id?: string }> 
     // 0) Try embedded fonts first
     let font: any | null = null;
     let fontBold: any | null = null;
+    let usedEmbedded = false;
     try {
       const embReg = getEmbeddedRegularFont();
       const embBold = getEmbeddedBoldFont();
       if (embReg) {
-        try { font = await pdf.embedFont(embReg); } catch {}
+        try { font = await pdf.embedFont(embReg); usedEmbedded = true; } catch {}
       }
       if (embBold) {
-        try { fontBold = await pdf.embedFont(embBold); } catch {}
+        try { fontBold = await pdf.embedFont(embBold); usedEmbedded = true; } catch {}
       }
       if (font && !fontBold) fontBold = font;
       if (fontBold && !font) font = fontBold;
@@ -206,7 +207,11 @@ export async function GET(req: Request, ctx: { params: Promise<{ id?: string }> 
     return new NextResponse(Buffer.from(pdfBytes) as any, {
       headers: {
         'Content-Type': 'application/pdf',
-        'Content-Disposition': `inline; filename="invoice_${invoice.id}.pdf"`
+        'Content-Disposition': `inline; filename="invoice_${invoice.id}.pdf"`,
+        'Cache-Control': 'no-store, no-cache, must-revalidate',
+        'Pragma': 'no-cache',
+        'X-PDF-Embedded-Fonts': usedEmbedded ? '1' : '0',
+        'X-PDF-WinAnsi': usingWinAnsi ? '1' : '0'
       }
     });
   } catch (e) {
