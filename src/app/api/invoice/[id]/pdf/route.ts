@@ -37,8 +37,15 @@ export async function GET(_: Request, ctx: { params: Promise<{ id?: string }> })
       return arr;
     }
 
-    const regularBytes = await ensureFont('.data/fonts/Inter-Regular.ttf', 'https://github.com/rsms/inter/releases/download/v3.19/Inter-Regular.ttf');
-    const boldBytes = await ensureFont('.data/fonts/Inter-Bold.ttf', 'https://github.com/rsms/inter/releases/download/v3.19/Inter-Bold.ttf');
+    // Use Noto Sans TTF from Google fonts repo (direct raw URL, works in serverless)
+    const regularBytes = await ensureFont(
+      '.data/fonts/NotoSans-Regular.ttf',
+      'https://raw.githubusercontent.com/google/fonts/main/ofl/notosans/NotoSans-Regular.ttf'
+    );
+    const boldBytes = await ensureFont(
+      '.data/fonts/NotoSans-Bold.ttf',
+      'https://raw.githubusercontent.com/google/fonts/main/ofl/notosans/NotoSans-Bold.ttf'
+    );
 
     const pdf = await PDFDocument.create();
     pdf.registerFontkit(fontkit as any);
