@@ -102,7 +102,8 @@ export async function GET(_: Request, ctx: { params: Promise<{ id?: string }> })
       }
     });
   } catch (e) {
-    return NextResponse.json({ error: 'SERVER_ERROR' }, { status: 500 });
+    const msg = (e as any)?.message || String(e);
+    return NextResponse.json({ error: 'SERVER_ERROR', message: msg }, { status: 500 });
   }
 }
 
