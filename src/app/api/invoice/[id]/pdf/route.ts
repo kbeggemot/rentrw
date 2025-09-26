@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
+import { PDFDocument, rgb } from 'pdf-lib';
+import { readBinary, writeBinary, statFile } from '@/server/storage';
 
 export const runtime = 'nodejs';
 
@@ -23,12 +24,27 @@ export async function GET(_: Request, ctx: { params: Promise<{ id?: string }> })
     if (!invoice) return NextResponse.json({ error: 'NOT_FOUND' }, { status: 404 });
 
     // Build PDF with pdf-lib (no font files on FS required)
+    // Ensure Cyrillic-capable fonts (download once and cache in .data)
+    async function ensureFont(localPath: string, url: string): Promise<Uint8Array> {
+      try {
+        const b = await readBinary(localPath);
+        if (b && b.data) return new Uint8Array(b.data);
+      } catch {}
+      const res = await fetch(url, { cache: 'no-store' });
+      const arr = new Uint8Array(await res.arrayBuffer());
+      try { await writeBinary(localPath, Buffer.from(arr), 'font/ttf'); } catch {}
+      return arr;
+    }
+
+    const regularBytes = await ensureFont('.data/fonts/Inter-Regular.ttf', 'https://github.com/rsms/inter/releases/download/v3.19/Inter-Regular.ttf');
+    const boldBytes = await ensureFont('.data/fonts/Inter-Bold.ttf', 'https://github.com/rsms/inter/releases/download/v3.19/Inter-Bold.ttf');
+
     const pdf = await PDFDocument.create();
     const page = pdf.addPage([595.28, 841.89]); // A4
     const { width } = page.getSize();
     const margin = 40;
-    const font = await pdf.embedFont(StandardFonts.Helvetica);
-    const fontBold = await pdf.embedFont(StandardFonts.HelveticaBold);
+    const font = await pdf.embedFont(regularBytes);
+    const fontBold = await pdf.embedFont(boldBytes);
     let y = 800;
 
     const drawText = (text: string, opts: { x?: number; y?: number; size?: number; bold?: boolean; color?: any } = {}) => {
