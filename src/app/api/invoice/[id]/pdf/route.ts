@@ -52,16 +52,29 @@ export async function GET(_: Request, ctx: { params: Promise<{ id?: string }> })
     const page = pdf.addPage([595.28, 841.89]); // A4
     const { width } = page.getSize();
     const margin = 40;
-    const font = await pdf.embedFont(regularBytes);
-    const fontBold = await pdf.embedFont(boldBytes);
+    let font = await pdf.embedFont(regularBytes).catch(() => null as any);
+    let fontBold = await pdf.embedFont(boldBytes).catch(() => null as any);
+    let usingWinAnsi = false;
+    if (!font || !fontBold) {
+      font = await pdf.embedFont(StandardFonts.Helvetica);
+      fontBold = await pdf.embedFont(StandardFonts.HelveticaBold);
+      usingWinAnsi = true;
+    }
     let y = 800;
+
+    const translitMap: Record<string, string> = {
+      'А':'A','Б':'B','В':'V','Г':'G','Д':'D','Е':'E','Ё':'E','Ж':'Zh','З':'Z','И':'I','Й':'Y','К':'K','Л':'L','М':'M','Н':'N','О':'O','П':'P','Р':'R','С':'S','Т':'T','У':'U','Ф':'F','Х':'Kh','Ц':'Ts','Ч':'Ch','Ш':'Sh','Щ':'Sch','Ъ':'','Ы':'Y','Ь':'','Э':'E','Ю':'Yu','Я':'Ya',
+      'а':'a','б':'b','в':'v','г':'g','д':'d','е':'e','ё':'e','ж':'zh','з':'z','и':'i','й':'y','к':'k','л':'l','м':'m','н':'n','о':'o','п':'p','р':'r','с':'s','т':'t','у':'u','ф':'f','х':'kh','ц':'ts','ч':'ch','ш':'sh','щ':'sch','ъ':'','ы':'y','ь':'','э':'e','ю':'yu','я':'ya',
+      '«':'"','»':'"','“':'"','”':'"'
+    };
+    const t = (s: string) => usingWinAnsi ? s.replace(/[\u0400-\u04FF«»“”]/g, ch => translitMap[ch] ?? '?') : s;
 
     const drawText = (text: string, opts: { x?: number; y?: number; size?: number; bold?: boolean; color?: any } = {}) => {
       const x = opts.x ?? margin;
       const s = opts.size ?? 10;
       const f = opts.bold ? fontBold : font;
       const color = opts.color ?? rgb(0,0,0);
-      page.drawText(text, { x, y, size: s, font: f, color });
+      page.drawText(t(text), { x, y, size: s, font: f, color });
     };
 
     // Header
@@ -83,7 +96,7 @@ export async function GET(_: Request, ctx: { params: Promise<{ id?: string }> })
     // Description & amount
     drawText('Описание услуги:', { y, bold: true }); y -= 14;
     const desc = String(invoice.description || '');
-    page.drawText(desc, { x: margin, y, size: 10, font, maxWidth: width - margin*2, lineHeight: 12 }); y -= Math.max(12, Math.ceil(desc.length / 90) * 12);
+    page.drawText(t(desc), { x: margin, y, size: 10, font, maxWidth: width - margin*2, lineHeight: 12 }); y -= Math.max(12, Math.ceil(desc.length / 90) * 12);
     const amt = (() => { try { const n = Number(String(invoice.amount||'').replace(',', '.')); return Number.isFinite(n) ? n.toFixed(2) : String(invoice.amount||''); } catch { return String(invoice.amount||''); } })();
     drawText('Сумма: ', { y, bold: true });
     drawText(`${amt} ₽`, { x: margin + 50, y }); y -= 22;
@@ -100,7 +113,7 @@ export async function GET(_: Request, ctx: { params: Promise<{ id?: string }> })
     row('КПП', '770101001', rightX);
     y -= 6; drawText('Назначение платежа', { y, bold: true }); y -= 14;
     const appoint = `Перечисление собственных денежных средств ${invoice.orgName}, ИНН ${invoice.orgInn} по Соглашению об использовании электронного сервиса "Рокет Ворк" для оплаты по счёту #${invoice.id}. Без НДС`;
-    page.drawText(appoint, { x: margin, y, size: 10, font, maxWidth: width - margin*2, lineHeight: 12 }); y -= Math.max(12, Math.ceil(appoint.length / 90) * 12) + 6;
+    page.drawText(t(appoint), { x: margin, y, size: 10, font, maxWidth: width - margin*2, lineHeight: 12 }); y -= Math.max(12, Math.ceil(appoint.length / 90) * 12) + 6;
 
     // Terms
     drawText('Условия оплаты', { y, bold: true }); y -= 14;
@@ -111,7 +124,7 @@ export async function GET(_: Request, ctx: { params: Promise<{ id?: string }> })
       'Комиссия составит 3% и будет удержена с исполнителя, если у вас с Рокет Ворком не согласованы индивидуальные условия обслуживания.',
       'Рокет Ворк оставляет за собой право без объяснения причин вернуть платёж отправителю без удержания комиссии.'
     ];
-    for (const t of terms) { page.drawText(t, { x: margin, y, size: 10, font, maxWidth: width - margin*2, lineHeight: 12 }); y -= Math.max(12, Math.ceil(t.length / 90) * 12) + 4; }
+    for (const line of terms) { page.drawText(t(line), { x: margin, y, size: 10, font, maxWidth: width - margin*2, lineHeight: 12 }); y -= Math.max(12, Math.ceil(line.length / 90) * 12) + 4; }
 
     const pdfBytes = await pdf.save();
     return new NextResponse(Buffer.from(pdfBytes) as any, {
