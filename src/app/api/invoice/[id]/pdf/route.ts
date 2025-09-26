@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { PDFDocument, rgb } from 'pdf-lib';
+import fontkit from '@pdf-lib/fontkit';
 import { readBinary, writeBinary, statFile } from '@/server/storage';
 
 export const runtime = 'nodejs';
@@ -40,6 +41,7 @@ export async function GET(_: Request, ctx: { params: Promise<{ id?: string }> })
     const boldBytes = await ensureFont('.data/fonts/Inter-Bold.ttf', 'https://github.com/rsms/inter/releases/download/v3.19/Inter-Bold.ttf');
 
     const pdf = await PDFDocument.create();
+    pdf.registerFontkit(fontkit as any);
     const page = pdf.addPage([595.28, 841.89]); // A4
     const { width } = page.getSize();
     const margin = 40;
