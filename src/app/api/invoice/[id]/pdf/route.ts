@@ -126,14 +126,12 @@ export async function GET(req: Request, ctx: { params: Promise<{ id?: string }> 
     } catch {}
 
     const fontRegular = font ? font : await loadFont('.data/fonts/NotoSans-Regular.ttf', [
-      'https://raw.githubusercontent.com/google/fonts/main/ofl/notosans/NotoSans-Regular.ttf',
-      'https://github.com/google/fonts/raw/main/ofl/notosans/NotoSans-Regular.ttf?raw=1',
-      'https://github.com/google/fonts/raw/main/apache/roboto/Roboto-Regular.ttf?raw=1'
+      'https://raw.githubusercontent.com/notofonts/noto-fonts/main/hinted/ttf/NotoSans/NotoSans-Regular.ttf',
+      'https://github.com/notofonts/noto-fonts/raw/main/hinted/ttf/NotoSans/NotoSans-Regular.ttf?raw=1'
     ]);
     const fontBoldCand = fontBold ? fontBold : await loadFont('.data/fonts/NotoSans-Bold.ttf', [
-      'https://raw.githubusercontent.com/google/fonts/main/ofl/notosans/NotoSans-Bold.ttf',
-      'https://github.com/google/fonts/raw/main/ofl/notosans/NotoSans-Bold.ttf?raw=1',
-      'https://github.com/google/fonts/raw/main/apache/roboto/Roboto-Bold.ttf?raw=1'
+      'https://raw.githubusercontent.com/notofonts/noto-fonts/main/hinted/ttf/NotoSans/NotoSans-Bold.ttf',
+      'https://github.com/notofonts/noto-fonts/raw/main/hinted/ttf/NotoSans/NotoSans-Bold.ttf?raw=1'
     ]);
 
     // Prefer any available Noto font; if only one is available, use it for both regular and bold

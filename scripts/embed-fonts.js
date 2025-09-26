@@ -1,14 +1,50 @@
 #!/usr/bin/env node
 const fs = require('fs');
 const path = require('path');
+const https = require('https');
 
-function readBase64(p) {
+function readFileBuffer(p) {
   const abs = path.join(process.cwd(), p);
-  if (!fs.existsSync(abs)) {
-    console.error(`File not found: ${abs}`);
-    process.exit(1);
+  if (!fs.existsSync(abs)) return null;
+  try { return fs.readFileSync(abs); } catch { return null; }
+}
+
+function isProbablyTtf(buf) {
+  if (!buf || buf.length < 4) return false;
+  const b0 = buf[0], b1 = buf[1], b2 = buf[2], b3 = buf[3];
+  // TrueType: 0x00010000, OpenType CFF: 'OTTO'
+  const isTrueType = (b0 === 0x00 && b1 === 0x01 && b2 === 0x00 && b3 === 0x00);
+  const isOtf = (b0 === 0x4F && b1 === 0x54 && b2 === 0x54 && b3 === 0x4F); // 'OTTO'
+  return isTrueType || isOtf;
+}
+
+function fetchBuffer(url) {
+  return new Promise((resolve, reject) => {
+    https.get(url, (res) => {
+      if (res.statusCode !== 200) {
+        reject(new Error('HTTP ' + res.statusCode + ' for ' + url));
+        res.resume();
+        return;
+      }
+      const chunks = [];
+      res.on('data', (c) => chunks.push(c));
+      res.on('end', () => resolve(Buffer.concat(chunks)));
+    }).on('error', reject);
+  });
+}
+
+async function obtainFontBase64(kind) {
+  const localPath = kind === 'regular' ? 'public/fonts/NotoSans-Regular.ttf' : 'public/fonts/NotoSans-Bold.ttf';
+  const remoteUrl = kind === 'regular'
+    ? 'https://raw.githubusercontent.com/google/fonts/main/ofl/notosans/NotoSans-Regular.ttf'
+    : 'https://raw.githubusercontent.com/google/fonts/main/ofl/notosans/NotoSans-Bold.ttf';
+  let buf = readFileBuffer(localPath);
+  if (!isProbablyTtf(buf)) {
+    try { buf = await fetchBuffer(remoteUrl); } catch (e) {
+      console.error('Failed to fetch remote font for', kind, e && e.message);
+      process.exit(1);
+    }
   }
-  const buf = fs.readFileSync(abs);
   return buf.toString('base64');
 }
 
@@ -36,12 +72,14 @@ export function getEmbeddedBoldFont(): Uint8Array | null {
   fs.writeFileSync(target, s);
 }
 
-const regular = readBase64('public/fonts/NotoSans-Regular.ttf');
-const bold = readBase64('public/fonts/NotoSans-Bold.ttf');
-writeEmbeddedModule(regular, bold);
-console.log('Embedded fonts updated:', {
-  regularSize: regular.length,
-  boldSize: bold.length,
-});
+(async () => {
+  const regular = await obtainFontBase64('regular');
+  const bold = await obtainFontBase64('bold');
+  writeEmbeddedModule(regular, bold);
+  console.log('Embedded fonts updated:', {
+    regularSize: regular.length,
+    boldSize: bold.length,
+  });
+})();
 
 
