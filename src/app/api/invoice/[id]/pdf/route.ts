@@ -164,6 +164,53 @@ export async function GET(req: Request, ctx: { params: Promise<{ id?: string }> 
       page.drawText(t(text), { x, y, size: s, font: f, color });
     };
 
+    // Helpers: word wrapping and paragraphs
+    const wrapText = (text: string, maxWidth: number, size = 10, bold = false): string[] => {
+      const f = bold ? fontBold : font;
+      const safe = t(String(text || ''));
+      const words = safe.split(/\s+/);
+      const lines: string[] = [];
+      let cur = '';
+      const measure = (s: string) => f.widthOfTextAtSize(s, size);
+      const breakLong = (w: string) => {
+        const out: string[] = [];
+        let buf = '';
+        for (const ch of w.split('')) {
+          const next = buf + ch;
+          if (measure(next) > maxWidth && buf) { out.push(buf); buf = ch; }
+          else { buf = next; }
+        }
+        if (buf) out.push(buf);
+        return out;
+      };
+      for (const w of words) {
+        const candidate = cur ? cur + ' ' + w : w;
+        if (measure(candidate) <= maxWidth) { cur = candidate; continue; }
+        if (cur) { lines.push(cur); cur = ''; }
+        if (measure(w) <= maxWidth) { cur = w; continue; }
+        const parts = breakLong(w);
+        for (const part of parts) {
+          if (measure(part) <= maxWidth) lines.push(part);
+          else {
+            let acc = '';
+            for (const ch of part) {
+              if (measure(acc + ch) > maxWidth && acc) { lines.push(acc); acc = ch; } else acc += ch;
+            }
+            if (acc) lines.push(acc);
+          }
+        }
+      }
+      if (cur) lines.push(cur);
+      return lines;
+    };
+
+    const drawParagraph = (text: string, x: number, yStart: number, maxWidth: number, size = 10, bold = false, lineGap = 2) => {
+      const lines = wrapText(text, maxWidth, size, bold);
+      let yy = yStart;
+      for (const ln of lines) { page.drawText(ln, { x, y: yy, size, font: bold ? fontBold : font }); yy -= (size + lineGap); }
+      return yy;
+    };
+
     // If debug requested, return JSON with font status
     if (debugJson) {
       return NextResponse.json({
@@ -175,46 +222,92 @@ export async function GET(req: Request, ctx: { params: Promise<{ id?: string }> 
       }, { status: 200, headers: { 'Cache-Control': 'no-store' } });
     }
 
-    // Header
-    drawText('YPLA', { x: margin, y, size: 20, bold: true });
-    drawText('Платёжная касса', { x: margin, y: y - 18, size: 10 });
+    // Header with logo
+    try {
+      const logo = await readBinary('public/logo.png');
+      if (logo && logo.data) {
+        const img = await pdf.embedPng(new Uint8Array(logo.data));
+        const h = 24; const wLogo = img.width * (h / img.height);
+        page.drawImage(img, { x: margin, y: y - h + 8, width: wLogo, height: h });
+        drawText('YPLA', { x: margin + wLogo + 8, y, size: 20, bold: true });
+        drawText('Платёжная касса', { x: margin + wLogo + 8, y: y - 18, size: 10 });
+      } else {
+        drawText('YPLA', { x: margin, y, size: 20, bold: true });
+        drawText('Платёжная касса', { x: margin, y: y - 18, size: 10 });
+      }
+    } catch {
+      drawText('YPLA', { x: margin, y, size: 20, bold: true });
+      drawText('Платёжная касса', { x: margin, y: y - 18, size: 10 });
+    }
     page.drawLine({ start: { x: margin, y: y - 26 }, end: { x: width - margin, y: y - 26 }, thickness: 0.5, color: rgb(0.8,0.8,0.8) });
     y -= 40;
-    drawText(`Счёт № ${invoice.id}`, { y, size: 16, bold: true }); y -= 16;
+    drawText(`Счёт № ${invoice.id}`, { y, size: 16, bold: true }); y -= 18;
     const dt = new Date(invoice.createdAt || Date.now());
-    drawText(`Дата выставления: ${dt.toLocaleString('ru-RU', { timeZone: 'Europe/Moscow' })}`, { y: y - 4 }); y -= 18;
-    try { const url = `https://ypla.ru/invoice/${encodeURIComponent(String(invoice.code || invoice.id))}`; drawText(`Ссылка: ${url}`, { y }); y -= 18; } catch {}
+    drawText(`Дата выставления: ${dt.toLocaleString('ru-RU', { timeZone: 'Europe/Moscow' })}`, { y }); y -= 14;
+    try { const url = `https://ypla.ru/invoice/${encodeURIComponent(String(invoice.code || invoice.id))}`; drawText(`Ссылка: ${url}`, { y }); } catch {}
+    y -= 18;
 
-    // Parties
-    drawText('Исполнитель: ', { y, bold: true });
-    drawText(`${invoice.executorFio || '—'} / ${invoice.executorInn || '—'}`, { x: margin + 80, y }); y -= 14;
-    drawText('Заказчик: ', { y, bold: true });
-    drawText(`${invoice.orgName} / ${invoice.orgInn}`, { x: margin + 80, y }); y -= 20;
-
-    // Description & amount
-    drawText('Описание услуги:', { y, bold: true }); y -= 14;
+    // Combined details block
+    const detailsTopY = y;
+    drawText('Исполнитель:', { y, bold: true });
+    drawText(`${invoice.executorFio || '—'} / ${invoice.executorInn || '—'}`, { x: margin + 100, y }); y -= 14;
+    drawText('Заказчик:', { y, bold: true });
+    drawText(`${invoice.orgName} / ${invoice.orgInn}`, { x: margin + 100, y }); y -= 16;
+    drawText('Описание услуги:', { y, bold: true }); y -= 12;
     const desc = String(invoice.description || '');
-    page.drawText(t(desc), { x: margin, y, size: 10, font, maxWidth: width - margin*2, lineHeight: 12 }); y -= Math.max(12, Math.ceil(desc.length / 90) * 12);
+    // paragraph wrap
+    const paragraphEnd = (text: string) => {
+      const lines = text.split(/\n/);
+      let yy = y;
+      for (const ln of lines) {
+        const w = (font as any).widthOfTextAtSize ? (font as any).widthOfTextAtSize(ln, 10) : (ln.length * 5);
+        if (w <= width - margin*2) { page.drawText(t(ln), { x: margin, y: yy, size: 10, font }); yy -= 12; continue; }
+        // naive wrap by words
+        const words = ln.split(/\s+/);
+        let cur = '';
+        for (const w2 of words) {
+          const cand = cur ? cur + ' ' + w2 : w2;
+          const candW = (font as any).widthOfTextAtSize ? (font as any).widthOfTextAtSize(cand, 10) : (cand.length * 5);
+          if (candW <= width - margin*2) { cur = cand; }
+          else { if (cur) { page.drawText(t(cur), { x: margin, y: yy, size: 10, font }); yy -= 12; } cur = w2; }
+        }
+        if (cur) { page.drawText(t(cur), { x: margin, y: yy, size: 10, font }); yy -= 12; }
+      }
+      return yy;
+    };
+    y = paragraphEnd(desc);
     const amt = (() => { try { const n = Number(String(invoice.amount||'').replace(',', '.')); return Number.isFinite(n) ? n.toFixed(2) : String(invoice.amount||''); } catch { return String(invoice.amount||''); } })();
-    drawText('Сумма: ', { y, bold: true });
-    drawText(`${amt} ₽`, { x: margin + 50, y }); y -= 22;
+    y -= 4;
+    drawText('Сумма:', { y, bold: true });
+    drawText(`${amt} ₽`, { x: margin + 60, y });
+    const detailsBottomY = y - 12;
+    page.drawRectangle({ x: margin - 6, y: detailsBottomY, width: (width - margin*2) + 12, height: detailsTopY - detailsBottomY + 8, borderWidth: 1, color: undefined, borderColor: rgb(0.8,0.8,0.8) });
+    y = detailsBottomY - 18;
 
-    // Bank details
+    // remove old duplicated description block (now included in framed block above)
+
+    // Bank details (framed grid)
     drawText('Реквизиты для оплаты', { y, bold: true }); y -= 14;
-    const leftX = margin, rightX = margin + 260;
-    const row = (l: string, v: string, x = leftX) => { drawText(l, { x, y }); drawText(v, { x: x + 140, y, bold: true }); y -= 14; };
+    const bankTopY = y + 8;
+    const contentWidth = width - margin*2;
+    const leftX = margin, rightX = margin + contentWidth/2 + 10;
+    const labelWidth = 150;
+    const row = (l: string, v: string, x = leftX) => { drawText(l, { x, y }); drawText(v, { x: x + labelWidth, y, bold: true }); y -= 14; };
     row('Номер счета', '40702810620028000001');
     row('Сокр. наименование', 'ООО «РОКЕТ ВОРК»', rightX);
     row('Корр. счёт', '30101810800000000388');
     row('ИНН', '7720496561', rightX);
     row('БИК', '044525388');
     row('КПП', '770101001', rightX);
-    y -= 6; drawText('Назначение платежа', { y, bold: true }); y -= 14;
+    y -= 6; drawText('Назначение платежа', { y, bold: true }); y -= 12;
     const appoint = `Перечисление собственных денежных средств ${invoice.orgName}, ИНН ${invoice.orgInn} по Соглашению об использовании электронного сервиса "Рокет Ворк" для оплаты по счёту #${invoice.id}. Без НДС`;
-    page.drawText(t(appoint), { x: margin, y, size: 10, font, maxWidth: width - margin*2, lineHeight: 12 }); y -= Math.max(12, Math.ceil(appoint.length / 90) * 12) + 6;
+    y = paragraphEnd(appoint);
+    const bankBottomY = y - 6;
+    page.drawRectangle({ x: margin - 6, y: bankBottomY, width: (width - margin*2) + 12, height: bankTopY - bankBottomY + 6, borderWidth: 1, color: undefined, borderColor: rgb(0.8,0.8,0.8) });
+    y = bankBottomY - 18;
 
-    // Terms
-    drawText('Условия оплаты', { y, bold: true }); y -= 14;
+    // Terms (paragraphs)
+    drawText('Условия оплаты', { y, bold: true }); y -= 12;
     const terms: string[] = [
       'Это счёт в пользу самозанятого. Оплатите его на номинальный счёт оператора платформы «Рокет Ворк» по реквизитам выше. После зачисления средств оператор перечислит выплату исполнителю на указанные им реквизиты в Рокет Ворке и сформирует чек НПД.',
       'Оплачивайте только с расчётного счёта вашей организации, строго соблюдая назначение платежа, указанное в счёте.',
@@ -222,7 +315,28 @@ export async function GET(req: Request, ctx: { params: Promise<{ id?: string }> 
       'Комиссия составит 3% и будет удержена с исполнителя, если у вас с Рокет Ворком не согласованы индивидуальные условия обслуживания.',
       'Рокет Ворк оставляет за собой право без объяснения причин вернуть платёж отправителю без удержания комиссии.'
     ];
-    for (const line of terms) { page.drawText(t(line), { x: margin, y, size: 10, font, maxWidth: width - margin*2, lineHeight: 12 }); y -= Math.max(12, Math.ceil(line.length / 90) * 12) + 4; }
+    for (const line of terms) {
+      // reuse paragraphEnd helper; y is already in closure
+      const startY = y;
+      y = (function(text: string, yStart: number) {
+        const lines = text.split(/\n/);
+        let yy = yStart;
+        for (const ln of lines) {
+          const w = (font as any).widthOfTextAtSize ? (font as any).widthOfTextAtSize(ln, 10) : (ln.length * 5);
+          if (w <= width - margin*2) { page.drawText(t(ln), { x: margin, y: yy, size: 10, font }); yy -= 12; continue; }
+          const words = ln.split(/\s+/);
+          let cur = '';
+          for (const w2 of words) {
+            const cand = cur ? cur + ' ' + w2 : w2;
+            const candW = (font as any).widthOfTextAtSize ? (font as any).widthOfTextAtSize(cand, 10) : (cand.length * 5);
+            if (candW <= width - margin*2) { cur = cand; }
+            else { if (cur) { page.drawText(t(cur), { x: margin, y: yy, size: 10, font }); yy -= 12; } cur = w2; }
+          }
+          if (cur) { page.drawText(t(cur), { x: margin, y: yy, size: 10, font }); yy -= 12; }
+        }
+        return yy;
+      })(line, startY) - 2;
+    }
 
     const pdfBytes = await pdf.save();
     return new NextResponse(Buffer.from(pdfBytes) as any, {
