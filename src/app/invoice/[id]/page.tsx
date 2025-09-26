@@ -15,13 +15,36 @@ export default async function InvoicePublicPage(props: { params: Promise<{ id?: 
   } catch {
     invoice = null;
   }
+  // Fallback: if старые счета не хранят ФИО/ИНН — попробуем подтянуть их по телефону из РВ (одноразово на сервере)
+  let fallbackFio: string | null = null;
+  let fallbackInn: string | null = null;
+  if (invoice && (!invoice.executorFio || !invoice.executorInn) && invoice.phone) {
+    try {
+      const HARD_ORG_INN = '7729542170';
+      const { listActiveTokensForOrg } = await import('@/server/orgStore');
+      const tokenList = await listActiveTokensForOrg(HARD_ORG_INN);
+      const token = Array.isArray(tokenList) && tokenList.length > 0 ? tokenList[0] : null;
+      if (token) {
+        const base = process.env.ROCKETWORK_API_BASE_URL || 'https://app.rocketwork.ru/api/';
+        const url = new URL(`executors/${encodeURIComponent(String(invoice.phone).replace(/\D/g,''))}`, base.endsWith('/') ? base : base + '/').toString();
+        const r = await fetch(url, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }, cache: 'no-store' });
+        const txt = await r.text();
+        let data: any = null; try { data = txt ? JSON.parse(txt) : null; } catch { data = null; }
+        const ex = (data && typeof data === 'object' && data.executor) ? data.executor : data;
+        const fio = ex ? [ex.last_name, ex.first_name, ex.second_name].filter(Boolean).join(' ').trim() : null;
+        const inn = ex?.inn || (data?.inn ?? null) || null;
+        fallbackFio = fio || null;
+        fallbackInn = inn || null;
+      }
+    } catch {}
+  }
   return (
     <div className="max-w-xl mx-auto p-4 md:p-6 pb-8 md:pb-10">
       <h1 className="text-2xl font-bold mb-3">{invoice ? `Счёт № ${invoice?.id}` : 'Счёт'}</h1>
       {invoice ? (
         <div className="space-y-4 text-sm text-gray-800 dark:text-gray-200">
           <div className="rounded border border-gray-200 dark:border-gray-800 p-4">
-            <div className="mb-1"><span className="font-semibold">Исполнитель:</span> {(invoice.executorFio || '—')} / {(invoice.executorInn || '—')}</div>
+            <div className="mb-1"><span className="font-semibold">Исполнитель:</span> {(invoice.executorFio || fallbackFio || '—')} / {(invoice.executorInn || fallbackInn || '—')}</div>
             <div className="mb-3"><span className="font-semibold">Заказчик:</span> {invoice.orgName} / {invoice.orgInn}</div>
             <div className="font-semibold mb-1">Описание услуги:</div>
             <div className="mb-3 whitespace-pre-line">{invoice.description}</div>
