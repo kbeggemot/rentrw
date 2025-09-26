@@ -17,7 +17,7 @@ async function readInvoiceByCode(code: string) {
   }
 }
 
-export async function GET(_: Request, ctx: { params: Promise<{ id?: string }> }) {
+export async function GET(req: Request, ctx: { params: Promise<{ id?: string }> }) {
   try {
     const p = await ctx.params;
     const code = typeof p?.id === 'string' ? p.id : '';
@@ -49,6 +49,7 @@ export async function GET(_: Request, ctx: { params: Promise<{ id?: string }> })
     const page = pdf.addPage([595.28, 841.89]); // A4
     const { width } = page.getSize();
     const margin = 40;
+    const origin = (() => { try { const u = new URL(req.url); return `${u.protocol}//${u.host}`; } catch { return '';} })();
     async function loadFont(localPath: string, urls: string[]): Promise<any | null> {
       // try local cache first
       try {
@@ -64,6 +65,19 @@ export async function GET(_: Request, ctx: { params: Promise<{ id?: string }> })
           try { return await pdf.embedFont(new Uint8Array(b.data)); } catch {}
         }
       } catch {}
+      // fetch from same-origin public path
+      if (origin) {
+        try {
+          const url = `${origin}/fonts/${localPath.split('/').pop()}`;
+          const r = await fetch(url, { cache: 'no-store' });
+          if (r.ok) {
+            const a = new Uint8Array(await r.arrayBuffer());
+            const f = await pdf.embedFont(a);
+            try { await writeBinary(localPath, Buffer.from(a), 'font/ttf'); } catch {}
+            return f;
+          }
+        } catch {}
+      }
       for (const u of urls) {
         try {
           const r = await fetch(u, { cache: 'no-store' });
