@@ -51,16 +51,20 @@ export async function GET(req: Request, ctx: { params: Promise<{ id?: string }> 
     const margin = 40;
     const origin = (() => { try { const u = new URL(req.url); return `${u.protocol}//${u.host}`; } catch { return '';} })();
     async function loadFont(localPath: string, urls: string[]): Promise<any | null> {
-      // try local cache first
+      // 1) try FS: public/fonts/* (packaged with app)
       try {
-        const b = await readBinary(localPath);
-        if (b && b.data) {
-          try { return await pdf.embedFont(new Uint8Array(b.data)); } catch {}
+        const fs = await import('fs');
+        const abs = `${process.cwd()}/public/${localPath.replace(/^\.data\//, '')}`.replace(/\/+/g, '/');
+        if (fs.existsSync(abs)) {
+          const buf: Buffer = fs.readFileSync(abs);
+          if (buf && buf.length) {
+            try { return await pdf.embedFont(new Uint8Array(buf)); } catch {}
+          }
         }
       } catch {}
-      // try bundled public asset (no network dependency)
+      // 2) try S3/local storage .data cache
       try {
-        const b = await readBinary('public/' + localPath.replace(/^\.data\//, 'fonts/'));
+        const b = await readBinary(localPath);
         if (b && b.data) {
           try { return await pdf.embedFont(new Uint8Array(b.data)); } catch {}
         }
