@@ -255,27 +255,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ id?: string }> 
     drawText(`${invoice.orgName} / ${invoice.orgInn}`, { x: margin + 100, y }); y -= 16;
     drawText('Описание услуги:', { y, bold: true }); y -= 12;
     const desc = String(invoice.description || '');
-    // paragraph wrap
-    const paragraphEnd = (text: string) => {
-      const lines = text.split(/\n/);
-      let yy = y;
-      for (const ln of lines) {
-        const w = (font as any).widthOfTextAtSize ? (font as any).widthOfTextAtSize(ln, 10) : (ln.length * 5);
-        if (w <= width - margin*2) { page.drawText(t(ln), { x: margin, y: yy, size: 10, font }); yy -= 12; continue; }
-        // naive wrap by words
-        const words = ln.split(/\s+/);
-        let cur = '';
-        for (const w2 of words) {
-          const cand = cur ? cur + ' ' + w2 : w2;
-          const candW = (font as any).widthOfTextAtSize ? (font as any).widthOfTextAtSize(cand, 10) : (cand.length * 5);
-          if (candW <= width - margin*2) { cur = cand; }
-          else { if (cur) { page.drawText(t(cur), { x: margin, y: yy, size: 10, font }); yy -= 12; } cur = w2; }
-        }
-        if (cur) { page.drawText(t(cur), { x: margin, y: yy, size: 10, font }); yy -= 12; }
-      }
-      return yy;
-    };
-    y = paragraphEnd(desc);
+    y = drawParagraph(desc, margin, y, width - margin*2, 10, false, 2);
     const amt = (() => { try { const n = Number(String(invoice.amount||'').replace(',', '.')); return Number.isFinite(n) ? n.toFixed(2) : String(invoice.amount||''); } catch { return String(invoice.amount||''); } })();
     y -= 4;
     drawText('Сумма:', { y, bold: true });
@@ -290,18 +270,21 @@ export async function GET(req: Request, ctx: { params: Promise<{ id?: string }> 
     drawText('Реквизиты для оплаты', { y, bold: true }); y -= 14;
     const bankTopY = y + 8;
     const contentWidth = width - margin*2;
-    const leftX = margin, rightX = margin + contentWidth/2 + 10;
-    const labelWidth = 150;
-    const row = (l: string, v: string, x = leftX) => { drawText(l, { x, y }); drawText(v, { x: x + labelWidth, y, bold: true }); y -= 14; };
-    row('Номер счета', '40702810620028000001');
-    row('Сокр. наименование', 'ООО «РОКЕТ ВОРК»', rightX);
-    row('Корр. счёт', '30101810800000000388');
-    row('ИНН', '7720496561', rightX);
-    row('БИК', '044525388');
-    row('КПП', '770101001', rightX);
+    const leftX = margin, rightX = margin + contentWidth/2 + 12;
+    const labelWidth = 160;
+    const row2 = (l1: string, v1: string, l2: string, v2: string) => {
+      drawText(l1, { x: leftX, y });
+      drawText(v1, { x: leftX + labelWidth, y, bold: true });
+      drawText(l2, { x: rightX, y });
+      drawText(v2, { x: rightX + labelWidth, y, bold: true });
+      y -= 14;
+    };
+    row2('Номер счета', '40702810620028000001', 'Сокр. наименование', 'ООО «РОКЕТ ВОРК»');
+    row2('Корр. счёт', '30101810800000000388', 'ИНН', '7720496561');
+    row2('БИК', '044525388', 'КПП', '770101001');
     y -= 6; drawText('Назначение платежа', { y, bold: true }); y -= 12;
     const appoint = `Перечисление собственных денежных средств ${invoice.orgName}, ИНН ${invoice.orgInn} по Соглашению об использовании электронного сервиса "Рокет Ворк" для оплаты по счёту #${invoice.id}. Без НДС`;
-    y = paragraphEnd(appoint);
+    y = drawParagraph(appoint, margin, y, width - margin*2, 10, false, 2);
     const bankBottomY = y - 6;
     page.drawRectangle({ x: margin - 6, y: bankBottomY, width: (width - margin*2) + 12, height: bankTopY - bankBottomY + 6, borderWidth: 1, color: undefined, borderColor: rgb(0.8,0.8,0.8) });
     y = bankBottomY - 18;
@@ -315,28 +298,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ id?: string }> 
       'Комиссия составит 3% и будет удержена с исполнителя, если у вас с Рокет Ворком не согласованы индивидуальные условия обслуживания.',
       'Рокет Ворк оставляет за собой право без объяснения причин вернуть платёж отправителю без удержания комиссии.'
     ];
-    for (const line of terms) {
-      // reuse paragraphEnd helper; y is already in closure
-      const startY = y;
-      y = (function(text: string, yStart: number) {
-        const lines = text.split(/\n/);
-        let yy = yStart;
-        for (const ln of lines) {
-          const w = (font as any).widthOfTextAtSize ? (font as any).widthOfTextAtSize(ln, 10) : (ln.length * 5);
-          if (w <= width - margin*2) { page.drawText(t(ln), { x: margin, y: yy, size: 10, font }); yy -= 12; continue; }
-          const words = ln.split(/\s+/);
-          let cur = '';
-          for (const w2 of words) {
-            const cand = cur ? cur + ' ' + w2 : w2;
-            const candW = (font as any).widthOfTextAtSize ? (font as any).widthOfTextAtSize(cand, 10) : (cand.length * 5);
-            if (candW <= width - margin*2) { cur = cand; }
-            else { if (cur) { page.drawText(t(cur), { x: margin, y: yy, size: 10, font }); yy -= 12; } cur = w2; }
-          }
-          if (cur) { page.drawText(t(cur), { x: margin, y: yy, size: 10, font }); yy -= 12; }
-        }
-        return yy;
-      })(line, startY) - 2;
-    }
+    for (const line of terms) { y = drawParagraph(line, margin, y, width - margin*2, 10, false, 2) - 2; }
 
     const pdfBytes = await pdf.save();
     return new NextResponse(Buffer.from(pdfBytes) as any, {
