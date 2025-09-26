@@ -18,12 +18,13 @@
     "@tailwindcss/postcss": "^4",
     "next": "15.4.6",
     "nodemailer": "^6.9.14",
+    "pdf-lib": "^1.17.1",
+    "pdfkit": "^0.13.0",
     "qrcode": "^1.5.4",
     "react": "19.1.0",
     "react-dom": "19.1.0",
     "sharp": "^0.34.3",
-    "tailwindcss": "^4",
-    "pdfkit": "^0.13.0"
+    "tailwindcss": "^4"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
