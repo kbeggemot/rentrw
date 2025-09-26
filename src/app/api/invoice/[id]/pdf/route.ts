@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
 import fontkit from '@pdf-lib/fontkit';
 import { readBinary, writeBinary, statFile } from '@/server/storage';
+import { getEmbeddedRegularFont, getEmbeddedBoldFont } from '@/server/embeddedFonts';
 
 export const runtime = 'nodejs';
 
@@ -95,24 +96,45 @@ export async function GET(req: Request, ctx: { params: Promise<{ id?: string }> 
     }
 
     // Candidate mirrors for reliable access
-    const fontRegular = await loadFont('.data/fonts/NotoSans-Regular.ttf', [
+    // 0) Try embedded fonts first
+    let font: any | null = null;
+    let fontBold: any | null = null;
+    try {
+      const embReg = getEmbeddedRegularFont();
+      const embBold = getEmbeddedBoldFont();
+      if (embReg) {
+        try { font = await pdf.embedFont(embReg); } catch {}
+      }
+      if (embBold) {
+        try { fontBold = await pdf.embedFont(embBold); } catch {}
+      }
+      if (font && !fontBold) fontBold = font;
+      if (fontBold && !font) font = fontBold;
+    } catch {}
+
+    const fontRegular = font ? font : await loadFont('.data/fonts/NotoSans-Regular.ttf', [
       'https://raw.githubusercontent.com/google/fonts/main/ofl/notosans/NotoSans-Regular.ttf',
       'https://github.com/google/fonts/raw/main/ofl/notosans/NotoSans-Regular.ttf?raw=1',
       'https://github.com/google/fonts/raw/main/apache/roboto/Roboto-Regular.ttf?raw=1'
     ]);
-    const fontBoldCand = await loadFont('.data/fonts/NotoSans-Bold.ttf', [
+    const fontBoldCand = fontBold ? fontBold : await loadFont('.data/fonts/NotoSans-Bold.ttf', [
       'https://raw.githubusercontent.com/google/fonts/main/ofl/notosans/NotoSans-Bold.ttf',
       'https://github.com/google/fonts/raw/main/ofl/notosans/NotoSans-Bold.ttf?raw=1',
       'https://github.com/google/fonts/raw/main/apache/roboto/Roboto-Bold.ttf?raw=1'
     ]);
 
-    let font = fontRegular;
-    let fontBold = fontBoldCand;
+    // Prefer any available Noto font; if only one is available, use it for both regular and bold
+    font = font || fontRegular || fontBoldCand || null;
+    fontBold = fontBold || fontBoldCand || fontRegular || null;
     let usingWinAnsi = false;
-    if (!font || !fontBold) {
+    if (!font) {
+      // No Cyrillic-capable font found → fallback to Standard, enable transliteration
       font = await pdf.embedFont(StandardFonts.Helvetica);
-      fontBold = await pdf.embedFont(StandardFonts.HelveticaBold);
+      fontBold = font;
       usingWinAnsi = true;
+    } else if (!fontBold) {
+      // Use regular for bold too to preserve Cyrillic
+      fontBold = font;
     }
     let y = 800;
 
