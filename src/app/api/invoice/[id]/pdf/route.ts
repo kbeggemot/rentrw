@@ -272,12 +272,29 @@ export async function GET(req: Request, ctx: { params: Promise<{ id?: string }> 
     const contentWidth = width - margin*2;
     const leftX = margin, rightX = margin + contentWidth/2 + 12;
     const labelWidth = 160;
+    const minGap = 16;
     const row2 = (l1: string, v1: string, l2: string, v2: string) => {
+      // Left column
       drawText(l1, { x: leftX, y });
       drawText(v1, { x: leftX + labelWidth, y, bold: true });
-      drawText(l2, { x: rightX, y });
-      drawText(v2, { x: rightX + labelWidth, y, bold: true });
-      y -= 14;
+      // Decide if right column fits this line
+      let fitsSameLine = true;
+      try {
+        const wLeftVal = (fontBold as any).widthOfTextAtSize ? (fontBold as any).widthOfTextAtSize(t(v1), 10) : (String(v1).length * 5);
+        const rightEdge = leftX + labelWidth + wLeftVal;
+        fitsSameLine = rightEdge + minGap <= rightX - 4;
+      } catch {}
+      if (fitsSameLine) {
+        drawText(l2, { x: rightX, y });
+        drawText(v2, { x: rightX + labelWidth, y, bold: true });
+        y -= 14;
+      } else {
+        // Move right column to next line to avoid overlap
+        y -= 14;
+        drawText(l2, { x: rightX, y });
+        drawText(v2, { x: rightX + labelWidth, y, bold: true });
+        y -= 14;
+      }
     };
     row2('Номер счета', '40702810620028000001', 'Сокр. наименование', 'ООО «РОКЕТ ВОРК»');
     row2('Корр. счёт', '30101810800000000388', 'ИНН', '7720496561');
