@@ -30,11 +30,20 @@ export async function GET(_: Request, ctx: { params: Promise<{ id?: string }> })
       stream.on('end', () => resolve(Buffer.concat(chunks as any)));
     });
 
-    // Header with brand
-    doc.fontSize(18).font('Helvetica-Bold').text('YPLA', { continued: true }).fontSize(10).font('Helvetica').text('  — инвойс', 120, 52);
-    doc.moveDown(1);
+    // Header with brand (logo + name + line)
+    try {
+      const path = `${process.cwd()}/public/logo.png`;
+      doc.image(path, 40, 30, { width: 64 });
+    } catch {}
+    doc.fontSize(20).font('Helvetica-Bold').text('YPLA', 110, 32);
+    doc.fontSize(10).font('Helvetica').text('Платёжная касса', 110, 52);
+    doc.moveTo(40, 76).lineTo(555, 76).strokeColor('#CCCCCC').stroke();
+    doc.moveDown(1.2);
     doc.fontSize(16).font('Helvetica-Bold').text(`Счёт № ${invoice.id}`);
-    doc.moveDown(0.5);
+    const dt = new Date(invoice.createdAt || Date.now());
+    doc.fontSize(10).font('Helvetica').text(`Дата выставления: ${dt.toLocaleString('ru-RU', { timeZone: 'Europe/Moscow' })}`);
+    try { const url = `https://ypla.ru/invoice/${encodeURIComponent(String(invoice.code || invoice.id))}`; doc.text(`Ссылка: ${url}`); } catch {}
+    doc.moveDown(0.6);
 
     // Parties
     doc.font('Helvetica-Bold').text('Исполнитель: ', { continued: true });
@@ -47,7 +56,8 @@ export async function GET(_: Request, ctx: { params: Promise<{ id?: string }> })
     doc.font('Helvetica-Bold').text('Описание услуги:');
     doc.font('Helvetica').text(String(invoice.description || ''), { align: 'left' });
     doc.moveDown(0.3);
-    doc.font('Helvetica-Bold').text(`Сумма: `, { continued: true }).font('Helvetica').text(`${invoice.amount} ₽`);
+    const amt = (() => { try { const n = Number(String(invoice.amount||'').replace(',', '.')); return Number.isFinite(n) ? n.toFixed(2) : String(invoice.amount||''); } catch { return String(invoice.amount||''); } })();
+    doc.font('Helvetica-Bold').text(`Сумма: `, { continued: true }).font('Helvetica').text(`${amt} ₽`);
     doc.moveDown(0.8);
 
     // Bank details block
