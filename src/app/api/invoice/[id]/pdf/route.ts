@@ -31,6 +31,13 @@ export async function GET(_: Request, ctx: { params: Promise<{ id?: string }> })
         const b = await readBinary(localPath);
         if (b && b.data) return new Uint8Array(b.data);
       } catch {}
+      // Explicit FS fallback (bypass S3 logic)
+      try {
+        const pubAbs = `${process.cwd()}/public/${localPath.replace(/^\.data\//, '')}`;
+        const fs = await import('fs');
+        const buf: Buffer = await new Promise((res, rej) => fs.readFile(pubAbs, (e: any, d: any) => e ? rej(e) : res(d)));
+        if (buf && buf.length) return new Uint8Array(buf);
+      } catch {}
       const res = await fetch(url, { cache: 'no-store' });
       const arr = new Uint8Array(await res.arrayBuffer());
       try { await writeBinary(localPath, Buffer.from(arr), 'font/ttf'); } catch {}
