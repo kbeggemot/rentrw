@@ -45,9 +45,9 @@ export default async function InvoicePublicPage(props: { params: Promise<{ id?: 
         <div className="space-y-4 text-sm text-gray-800 dark:text-gray-200">
           <div className="rounded border border-gray-200 dark:border-gray-800 p-4">
             <div className="mb-1"><span className="font-semibold">Исполнитель:</span> {(invoice.executorFio || fallbackFio || '—')} / {(invoice.executorInn || fallbackInn || '—')}</div>
-            <div className="mb-3"><span className="font-semibold">Заказчик:</span> {invoice.orgName} / {invoice.orgInn}</div>
-            <div className="font-semibold mb-1">Описание услуги:</div>
-            <div className="mb-3 whitespace-pre-line">{invoice.description}</div>
+            <div className="mb-1"><span className="font-semibold">Заказчик:</span> {invoice.orgName} / {invoice.orgInn}</div>
+            <div className="font-semibold mb-0">Описание услуги:</div>
+            <div className="mb-1 whitespace-pre-line">{invoice.description}</div>
             <div><span className="font-semibold">Сумма:</span> {invoice.amount} ₽</div>
           </div>
 
@@ -91,7 +91,7 @@ export default async function InvoicePublicPage(props: { params: Promise<{ id?: 
             <div className="font-semibold mb-1">Условия оплаты</div>
             <div className="space-y-2">
               <p>
-                Это счёт в пользу самозанятого. Оплатите его на номинальный счёт оператора платформы «Рокет Ворк» по реквизитам ниже. После зачисления средств оператор перечислит выплату исполнителю на реквизиты, указанные им в Рокет Ворке.
+                Это счёт в пользу самозанятого. Оплатите его на номинальный счёт оператора платформы «Рокет Ворк» по реквизитам ниже. После зачисления средств оператор перечислит выплату исполнителю на указанные им реквизиты в Рокет Ворке и сформирует чек НПД.
               </p>
               <p>
                 Оплачивайте только с расчётного счёта вашей организации, строго соблюдая назначение платежа, указанное в счёте.
