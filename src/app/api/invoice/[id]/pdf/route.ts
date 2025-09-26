@@ -37,23 +37,45 @@ export async function GET(_: Request, ctx: { params: Promise<{ id?: string }> })
       return arr;
     }
 
-    // Use Noto Sans TTF from Google fonts repo (direct raw URL, works in serverless)
-    const regularBytes = await ensureFont(
-      '.data/fonts/NotoSans-Regular.ttf',
-      'https://raw.githubusercontent.com/google/fonts/main/ofl/notosans/NotoSans-Regular.ttf'
-    );
-    const boldBytes = await ensureFont(
-      '.data/fonts/NotoSans-Bold.ttf',
-      'https://raw.githubusercontent.com/google/fonts/main/ofl/notosans/NotoSans-Bold.ttf'
-    );
-
     const pdf = await PDFDocument.create();
     pdf.registerFontkit(fontkit as any);
     const page = pdf.addPage([595.28, 841.89]); // A4
     const { width } = page.getSize();
     const margin = 40;
-    let font = await pdf.embedFont(regularBytes).catch(() => null as any);
-    let fontBold = await pdf.embedFont(boldBytes).catch(() => null as any);
+    async function loadFont(localPath: string, urls: string[]): Promise<any | null> {
+      // try local cache first
+      try {
+        const b = await readBinary(localPath);
+        if (b && b.data) {
+          try { return await pdf.embedFont(new Uint8Array(b.data)); } catch {}
+        }
+      } catch {}
+      for (const u of urls) {
+        try {
+          const r = await fetch(u, { cache: 'no-store' });
+          const a = new Uint8Array(await r.arrayBuffer());
+          const f = await pdf.embedFont(a);
+          try { await writeBinary(localPath, Buffer.from(a), 'font/ttf'); } catch {}
+          return f;
+        } catch {}
+      }
+      return null;
+    }
+
+    // Candidate mirrors for reliable access
+    const fontRegular = await loadFont('.data/fonts/CYR-Regular.ttf', [
+      'https://raw.githubusercontent.com/google/fonts/main/ofl/notosans/NotoSans-Regular.ttf',
+      'https://github.com/google/fonts/raw/main/ofl/notosans/NotoSans-Regular.ttf?raw=1',
+      'https://github.com/google/fonts/raw/main/apache/roboto/Roboto-Regular.ttf?raw=1'
+    ]);
+    const fontBoldCand = await loadFont('.data/fonts/CYR-Bold.ttf', [
+      'https://raw.githubusercontent.com/google/fonts/main/ofl/notosans/NotoSans-Bold.ttf',
+      'https://github.com/google/fonts/raw/main/ofl/notosans/NotoSans-Bold.ttf?raw=1',
+      'https://github.com/google/fonts/raw/main/apache/roboto/Roboto-Bold.ttf?raw=1'
+    ]);
+
+    let font = fontRegular;
+    let fontBold = fontBoldCand;
     let usingWinAnsi = false;
     if (!font || !fontBold) {
       font = await pdf.embedFont(StandardFonts.Helvetica);
