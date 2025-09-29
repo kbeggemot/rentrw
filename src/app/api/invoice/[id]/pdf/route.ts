@@ -230,22 +230,19 @@ export async function GET(req: Request, ctx: { params: Promise<{ id?: string }> 
         const h = 24; const wLogo = img.width * (h / img.height);
         page.drawImage(img, { x: margin, y: y - h + 8, width: wLogo, height: h });
         drawText('YPLA', { x: margin + wLogo + 8, y, size: 20, bold: true });
-        drawText('Платёжная касса', { x: margin + wLogo + 8, y: y - 18, size: 10 });
       } else {
         drawText('YPLA', { x: margin, y, size: 20, bold: true });
-        drawText('Платёжная касса', { x: margin, y: y - 18, size: 10 });
       }
     } catch {
       drawText('YPLA', { x: margin, y, size: 20, bold: true });
-      drawText('Платёжная касса', { x: margin, y: y - 18, size: 10 });
     }
     page.drawLine({ start: { x: margin, y: y - 26 }, end: { x: width - margin, y: y - 26 }, thickness: 0.5, color: rgb(0.8,0.8,0.8) });
-    y -= 40;
+    y -= 52; // extra vertical gap before title
     drawText(`Счёт № ${invoice.id}`, { y, size: 16, bold: true }); y -= 18;
     const dt = new Date(invoice.createdAt || Date.now());
     drawText(`Дата выставления: ${dt.toLocaleString('ru-RU', { timeZone: 'Europe/Moscow' })}`, { y }); y -= 14;
     try { const url = `https://ypla.ru/invoice/${encodeURIComponent(String(invoice.code || invoice.id))}`; drawText(`Ссылка: ${url}`, { y }); } catch {}
-    y -= 18;
+    y -= 26; // extra gap before details block
 
     // Combined details block
     const detailsTopY = y;
@@ -271,7 +268,9 @@ export async function GET(req: Request, ctx: { params: Promise<{ id?: string }> 
     const bankTopY = y + 8;
     const contentWidth = width - margin*2;
     const leftX = margin, rightX = margin + contentWidth/2 + 12;
-    const labelWidth = 160;
+    const labelProbe = 'Сокр. наименование';
+    let labelWidth = 140;
+    try { labelWidth = Math.ceil(((font as any).widthOfTextAtSize ? (font as any).widthOfTextAtSize(labelProbe, 10) : (labelProbe.length * 5))) + 6; } catch {}
     const minGap = 16;
     const row2 = (l1: string, v1: string, l2: string, v2: string) => {
       // Left column
@@ -304,7 +303,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ id?: string }> 
     y = drawParagraph(appoint, margin, y, width - margin*2, 10, false, 2);
     const bankBottomY = y - 6;
     page.drawRectangle({ x: margin - 6, y: bankBottomY, width: (width - margin*2) + 12, height: bankTopY - bankBottomY + 6, borderWidth: 1, color: undefined, borderColor: rgb(0.8,0.8,0.8) });
-    y = bankBottomY - 18;
+    y = bankBottomY - 26; // extra gap after bank details
 
     // Terms (paragraphs)
     drawText('Условия оплаты', { y, bold: true }); y -= 12;
