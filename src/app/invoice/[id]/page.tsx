@@ -46,8 +46,7 @@ export default async function InvoicePublicPage(props: { params: Promise<{ id?: 
           <div className="rounded border border-gray-200 dark:border-gray-800 p-4">
             <div className="mb-1"><span className="font-semibold">Исполнитель:</span> {(invoice.executorFio || fallbackFio || '—')} / {(invoice.executorInn || fallbackInn || '—')}</div>
             <div className="mb-1"><span className="font-semibold">Заказчик:</span> {invoice.orgName} / {invoice.orgInn}</div>
-            <div className="font-semibold mb-0">Описание услуги:</div>
-            <div className="mb-1 whitespace-pre-line">{invoice.description}</div>
+            <div className="mb-1"><span className="font-semibold">Описание услуги:</span> <span className="whitespace-pre-line align-top inline-block">{invoice.description}</span></div>
             <div><span className="font-semibold">Сумма:</span> {invoice.amount} ₽</div>
           </div>
 
