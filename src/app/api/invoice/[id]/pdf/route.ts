@@ -246,6 +246,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ id?: string }> 
 
     // Combined details block
     const detailsTopY = y;
+    y -= 8; // inner top padding inside details frame
     drawText('Исполнитель:', { y, bold: true });
     drawText(`${invoice.executorFio || '—'} / ${invoice.executorInn || '—'}`, { x: margin + 100, y }); y -= 14;
     drawText('Заказчик:', { y, bold: true });
@@ -265,7 +266,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ id?: string }> 
 
     // Bank details (framed grid)
     drawText('Реквизиты для оплаты', { y, bold: true }); y -= 14;
-    const bankTopY = y + 8;
+    const bankTopY = y + 14; // extra gap between heading and top frame
     const contentWidth = width - margin*2;
     const leftX = margin, rightX = margin + contentWidth/2 + 12;
     const labelProbe = 'Сокр. наименование';
