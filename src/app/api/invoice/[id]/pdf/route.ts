@@ -25,6 +25,36 @@ export async function GET(req: Request, ctx: { params: Promise<{ id?: string }> 
     const invoice = await readInvoiceByCode(code);
     if (!invoice) return NextResponse.json({ error: 'NOT_FOUND' }, { status: 404 });
 
+    // Ensure we have executor FIO/INN even for старые счета
+    let execFio: string | null = (invoice as any)?.executorFio || null;
+    let execInn: string | null = (invoice as any)?.executorInn || null;
+    if (!execFio || !execInn) {
+      try {
+        const HARD_ORG_INN = '7729542170';
+        const { listActiveTokensForOrg } = await import('@/server/orgStore');
+        const tokens = await listActiveTokensForOrg(HARD_ORG_INN).catch(() => [] as string[]);
+        const token = Array.isArray(tokens) && tokens.length > 0 ? tokens[0] : null;
+        if (token && invoice?.phone) {
+          const base = process.env.ROCKETWORK_API_BASE_URL || 'https://app.rocketwork.ru/api/';
+          const digits = String(invoice.phone).replace(/\D/g, '');
+          const url = new URL(`executors/${encodeURIComponent(digits)}`, base.endsWith('/') ? base : base + '/').toString();
+          const r = await fetch(url, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }, cache: 'no-store' });
+          const txt = await r.text();
+          let data: any = null; try { data = txt ? JSON.parse(txt) : null; } catch { data = null; }
+          const raw: any = data && typeof data === 'object' ? data : {};
+          const ex = (raw.executor && typeof raw.executor === 'object') ? raw.executor : raw;
+          if (!execFio) {
+            const fio = [ex?.last_name, ex?.first_name, ex?.second_name].filter(Boolean).join(' ').trim();
+            if (fio) execFio = fio;
+          }
+          if (!execInn) {
+            const inn = (ex && (ex.inn || ex.tax_id)) ? String(ex.inn || ex.tax_id) : null;
+            if (inn) execInn = inn.replace(/\D/g, '');
+          }
+        }
+      } catch {}
+    }
+
     // Build PDF with pdf-lib (no font files on FS required)
     // Ensure Cyrillic-capable fonts (download once and cache in .data)
     async function ensureFont(localPath: string, url: string): Promise<Uint8Array> {
@@ -248,7 +278,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ id?: string }> 
     const detailsTopY = y;
     y -= 8; // inner top padding inside details frame
     drawText('Исполнитель:', { y, bold: true });
-    drawText(`${invoice.executorFio || '—'} / ${invoice.executorInn || '—'}`, { x: margin + 100, y }); y -= 14;
+    drawText(`${execFio || '—'} / ${execInn || '—'}`, { x: margin + 100, y }); y -= 14;
     drawText('Заказчик:', { y, bold: true });
     drawText(`${invoice.orgName} / ${invoice.orgInn}`, { x: margin + 100, y }); y -= 16;
     drawText('Описание услуги:', { y, bold: true }); y -= 12;
@@ -266,7 +296,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ id?: string }> 
 
     // Bank details (framed grid)
     drawText('Реквизиты для оплаты', { y, bold: true }); y -= 14;
-    const bankTopY = y + 14; // extra gap between heading and top frame
+    const bankTopY = y + 18; // extra gap between heading and top frame
     const contentWidth = width - margin*2;
     const leftX = margin, rightX = margin + contentWidth/2 + 12;
     const labelProbe = 'Сокр. наименование';
