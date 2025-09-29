@@ -297,7 +297,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ id?: string }> 
 
     // Bank details (framed grid)
     drawText('Реквизиты для оплаты', { y, bold: true }); y -= 14;
-    const bankInnerPad = 10; // inner padding inside frame above the first row
+    const bankInnerPad = 6; // inner padding inside frame above the first row (reduced)
     const bankTopY = y + bankInnerPad; // rectangle top will sit above rows by innerPad
     y -= bankInnerPad; // create actual gap before first row
     const contentWidth = width - margin*2;
