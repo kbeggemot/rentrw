@@ -61,7 +61,7 @@ function AdminLogin({ onLogged }: { onLogged: () => void }) {
 // Deprecated: moved to LkUsersPanel as LkUserOptions
 
 function AdminDashboard({ showToast, role }: { showToast: (m: string, k?: any) => void; role: 'superadmin' | 'admin' | null }) {
-  const [tab, setTab] = useState<'users' | 'sales' | 'links' | 'partners' | 'orgs' | 'files' | 'lk_users' | 'tokens' | 'withdrawals' | 'docs'>(() => {
+  const [tab, setTab] = useState<'users' | 'sales' | 'links' | 'partners' | 'orgs' | 'files' | 'lk_users' | 'tokens' | 'withdrawals' | 'docs' | 'invoices'>(() => {
     try { const u = new URL(window.location.href); const t = (u.searchParams.get('tab')||'') as any; if (t) return t; } catch {}
     return 'sales';
   });
@@ -73,6 +73,7 @@ function AdminDashboard({ showToast, role }: { showToast: (m: string, k?: any) =
         <Button variant={tab==='sales'?'secondary':'ghost'} onClick={() => setTab('sales')}>Продажи</Button>
         <Button variant={tab==='partners'?'secondary':'ghost'} onClick={() => setTab('partners')}>Партнёры</Button>
         <Button variant={tab==='links'?'secondary':'ghost'} onClick={() => setTab('links')}>Ссылки</Button>
+        <Button variant={tab==='invoices'?'secondary':'ghost'} onClick={() => setTab('invoices')}>Счета</Button>
         <Button variant={tab==='orgs'?'secondary':'ghost'} onClick={() => setTab('orgs')}>Организации</Button>
         <Button variant={tab==='lk_users'?'secondary':'ghost'} onClick={() => setTab('lk_users')}>Пользователи ЛК</Button>
         <Button variant={tab==='tokens'?'secondary':'ghost'} onClick={() => setTab('tokens')}>Токены</Button>
@@ -95,6 +96,7 @@ function AdminDashboard({ showToast, role }: { showToast: (m: string, k?: any) =
       {tab === 'tokens' ? <TokensPanel /> : null}
       {tab === 'withdrawals' ? <WithdrawalsPanel /> : null}
       {tab === 'docs' ? <DocsPanel /> : null}
+      {tab === 'invoices' ? <InvoicesPanel /> : null}
     </div>
   );
 }
@@ -632,6 +634,73 @@ function FilesPanel() {
         </div>
       </div>
       <textarea className="w-full h-96 border rounded p-2 font-mono text-xs" readOnly value={content} />
+    </div>
+  );
+}
+
+function InvoicesPanel() {
+  const [items, setItems] = useState<Array<any>>([]);
+  const [q, setQ] = useState('');
+  const [page, setPage] = useState(1);
+  const load = async () => {
+    try {
+      const r = await fetch('/api/admin/data/invoices', { cache: 'no-store' });
+      const d = await r.json();
+      setItems(Array.isArray(d?.items) ? d.items : []);
+    } catch {
+      setItems([]);
+    }
+  };
+  useEffect(()=>{ void load(); },[]);
+  const filtered = items.filter((x)=>{
+    const v = q.trim().toLowerCase();
+    if (!v) return true;
+    const hay = [x.id, x.code, x.orgInn, x.orgName, x.email, x.description, x.amount, x.executorFio, x.executorInn, x.phone].join(' ').toLowerCase();
+    return hay.includes(v);
+  });
+  const pageItems = filtered.slice((page-1)*100, page*100);
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center gap-2">
+        <Button variant="secondary" onClick={load}>Обновить</Button>
+        <input className="border rounded px-2 h-9 text-sm ml-auto" placeholder="Фильтр... (id, ИНН, email, описание)" value={q} onChange={(e)=>{ setQ(e.target.value); setPage(1); }} />
+      </div>
+      <div className="border rounded overflow-x-auto">
+        <table className="min-w-full text-sm">
+          <thead>
+            <tr>
+              <th className="text-left px-2 py-1">createdAt</th>
+              <th className="text-left px-2 py-1">id</th>
+              <th className="text-left px-2 py-1">code</th>
+              <th className="text-left px-2 py-1">orgInn</th>
+              <th className="text-left px-2 py-1">orgName</th>
+              <th className="text-left px-2 py-1">email</th>
+              <th className="text-left px-2 py-1">amount</th>
+              <th className="text-left px-2 py-1">executor</th>
+              <th className="text-left px-2 py-1">Действия</th>
+            </tr>
+          </thead>
+          <tbody>
+            {pageItems.map((it)=> (
+              <tr key={it.id} className="border-t">
+                <td className="px-2 py-1 whitespace-nowrap">{it.createdAt?new Date(it.createdAt).toLocaleString('ru-RU',{ timeZone:'Europe/Moscow' }):'—'}</td>
+                <td className="px-2 py-1">{it.id}</td>
+                <td className="px-2 py-1">{it.code}</td>
+                <td className="px-2 py-1 whitespace-nowrap">{it.orgInn||'—'}</td>
+                <td className="px-2 py-1">{it.orgName||'—'}</td>
+                <td className="px-2 py-1"><div className="max-w-[240px] break-all">{it.email||'—'}</div></td>
+                <td className="px-2 py-1 whitespace-nowrap">{it.amount||'—'}</td>
+                <td className="px-2 py-1"><div className="max-w-[240px] break-words">{it.executorFio||'—'}{it.executorInn?` (${it.executorInn})`:''}</div></td>
+                <td className="px-2 py-1">
+                  <a className="inline-block px-2 py-1" href={`/invoice/${encodeURIComponent(String(it.code||it.id))}`} target="_blank">Публичная страница</a>
+                  <a className="inline-block px-2 py-1" href={`/admin/invoices/${encodeURIComponent(String(it.id))}`}>Открыть</a>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <Pager total={filtered.length} page={page} setPage={setPage} />
     </div>
   );
 }
