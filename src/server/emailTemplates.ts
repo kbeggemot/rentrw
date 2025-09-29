@@ -116,3 +116,39 @@ export function renderPasswordResetEmail(params: { resetUrl: string; expiresHour
 }
 
 
+export function renderInvoiceForCustomerEmail(params: { invoiceNumber: string | number; amount: string; sellerName: string; invoiceLink: string; brandLogoUrl?: string }): string {
+  const { invoiceNumber, amount, sellerName, invoiceLink } = params;
+  const brandLogoUrl = params.brandLogoUrl || getBrandLogoUrl();
+  const title = `Счёт на оплату №${invoiceNumber} — ${amount} ₽`;
+  return `<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width">
+  <title>${title}</title>
+  <style>
+    .btn { display:inline-block;padding:12px 16px;border-radius:6px;background:#111;color:#fff;text-decoration:none; }
+    .muted { color:#6b7280;font-size:12px; }
+    .wrap { max-width:640px;margin:0 auto;padding:24px;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;line-height:1.5;color:#111; }
+    .card { border:1px solid #e5e7eb;border-radius:8px;padding:16px; }
+  </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <h2 style="margin:0 0 8px 0;">${title}</h2>
+      <div class="card" style="margin:0 0 16px 0;">
+        <p style="margin:0 0 8px 0;">Здравствуйте!</p>
+        <p style="margin:0 0 8px 0;">Вам выставлен счёт в пользу самозанятого <b>${sellerName}</b>. Оплата — на номинальный счёт оператора «Рокет Ворк» (реквизиты в счёте).</p>
+        <p style="margin:12px 0;">
+          <a class="btn" href="${invoiceLink}" style="display:inline-block;padding:12px 16px;border-radius:6px;background:#111;color:#fff !important;text-decoration:none;">Открыть счёт</a>
+        </p>
+        <p style="margin:0 0 8px 0;">Ссылка на счёт: <a href="${invoiceLink}" style="color:#2563eb;text-decoration:underline;">${invoiceLink}</a></p>
+        <p class="muted" style="margin-top:12px;">Оплачивая, вы присоединяетесь к Условиям Рокет Ворка. Комиссия 3% удерживается с исполнителя (если нет индивидуальных условий). Чек НПД будет сформирован автоматически.</p>
+      </div>
+      <p class="muted"><img src="${brandLogoUrl}" alt="YPLA" height="16" style="height:16px;vertical-align:middle;"></p>
+    </div>
+  </body>
+  </html>`;
+}
+
+

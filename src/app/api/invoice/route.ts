@@ -108,6 +108,19 @@ export async function POST(req: Request) {
     const list = await readStore();
     list.push(inv);
     await writeStore(list);
+
+    // If customer email provided — send email with invoice link (best-effort, no blocking)
+    if (email && /@/.test(email)) {
+      try {
+        const { renderInvoiceForCustomerEmail } = await import('@/server/emailTemplates');
+        const { sendEmail } = await import('@/server/email');
+        const link = (process.env.NEXT_PUBLIC_BASE_URL || 'https://ypla.ru').replace(/\/$/, '') + `/invoice/${encodeURIComponent(inv.code || inv.id)}`;
+        const subject = `Счёт на оплату №${inv.id} — ${inv.amount} ₽`;
+        const html = renderInvoiceForCustomerEmail({ invoiceNumber: inv.id, amount: `${inv.amount}`, sellerName: inv.executorFio || 'Исполнитель', invoiceLink: link });
+        await sendEmail({ to: email, subject, html });
+      } catch {}
+    }
+
     return NextResponse.json({ ok: true, invoice: inv });
   } catch (e) {
     return NextResponse.json({ error: 'SERVER_ERROR' }, { status: 500 });
