@@ -244,7 +244,7 @@ export default function InvoiceNewPage() {
   }, [phone]);
 
   return (
-    <div className="max-w-xl mx-auto mt-6 md:mt-8">
+    <div className="max-w-xl mx-auto mt-6 md:mt-8 px-4 md:px-0">
       <header className="mb-4" style={{minHeight: '40px'}}>
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-bold">Создать счёт</h1>

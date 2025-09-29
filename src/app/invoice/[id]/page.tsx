@@ -39,7 +39,7 @@ export default async function InvoicePublicPage(props: { params: Promise<{ id?: 
     } catch {}
   }
   return (
-    <div className="max-w-xl mx-auto mt-6 md:mt-8">
+    <div className="max-w-xl mx-auto mt-6 md:mt-8 px-4 md:px-0">
       <h1 className="text-2xl font-bold mb-3">{invoice ? `Счёт № ${invoice?.id}` : 'Счёт'}</h1>
       {invoice ? (
         <div className="space-y-4 text-sm text-gray-800 dark:text-gray-200">
