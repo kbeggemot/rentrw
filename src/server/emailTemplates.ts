@@ -138,7 +138,8 @@ export function renderInvoiceForCustomerEmail(params: { invoiceNumber: string | 
       <h2 style="margin:0 0 8px 0;">${title}</h2>
       <div class="card" style="margin:0 0 16px 0;">
         <p style="margin:0 0 8px 0;">Здравствуйте!</p>
-        <p style="margin:0 0 8px 0;">Вам выставлен счёт в пользу самозанятого <b>${sellerName}</b>. Оплата — на номинальный счёт оператора «Рокет Ворк» (реквизиты в счёте).</p>
+        <p style="margin:0 0 8px 0;">Вам выставлен счёт в пользу самозанятого <b>${sellerName}</b>.</p>
+        <p style="margin:0 0 8px 0;">Оплата — на номинальный счёт оператора «Рокет Ворк» (подробности и реквизиты в счёте).</p>
         <p style="margin:12px 0;">
           <a class="btn" href="${invoiceLink}" style="display:inline-block;padding:12px 16px;border-radius:6px;background:#111;color:#fff !important;text-decoration:none;">Открыть счёт</a>
         </p>
