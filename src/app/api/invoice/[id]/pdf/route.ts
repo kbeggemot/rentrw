@@ -277,20 +277,21 @@ export async function GET(req: Request, ctx: { params: Promise<{ id?: string }> 
     // Combined details block
     const detailsTopY = y;
     y -= 8; // inner top padding inside details frame
+    const valueX = margin + 100;
     drawText('Исполнитель:', { y, bold: true });
-    drawText(`${execFio || '—'} / ${execInn || '—'}`, { x: margin + 100, y }); y -= 14;
+    drawText(`${execFio || '—'} / ${execInn || '—'}`, { x: valueX, y }); y -= 14;
     drawText('Заказчик:', { y, bold: true });
-    drawText(`${invoice.orgName} / ${invoice.orgInn}`, { x: margin + 100, y }); y -= 16;
-    drawText('Описание услуги:', { y, bold: true }); y -= 12;
+    drawText(`${invoice.orgName} / ${invoice.orgInn}`, { x: valueX, y }); y -= 16;
+    drawText('Описание услуги:', { y, bold: true });
     const desc = String(invoice.description || '');
-    y = drawParagraph(desc, margin, y, width - margin*2, 10, false, 2);
+    y = drawParagraph(desc, valueX, y, (width - margin) - valueX - 6, 10, false, 2);
     const amt = (() => { try { const n = Number(String(invoice.amount||'').replace(',', '.')); return Number.isFinite(n) ? n.toFixed(2) : String(invoice.amount||''); } catch { return String(invoice.amount||''); } })();
     y -= 4;
     drawText('Сумма:', { y, bold: true });
-    drawText(`${amt} ₽`, { x: margin + 60, y });
+    drawText(`${amt} ₽`, { x: valueX, y });
     const detailsBottomY = y - 12;
     page.drawRectangle({ x: margin - 6, y: detailsBottomY, width: (width - margin*2) + 12, height: detailsTopY - detailsBottomY + 8, borderWidth: 1, color: undefined, borderColor: rgb(0.8,0.8,0.8) });
-    y = detailsBottomY - 18;
+    y = detailsBottomY - 28; // extra gap between details frame and bank details
 
     // remove old duplicated description block (now included in framed block above)
 
