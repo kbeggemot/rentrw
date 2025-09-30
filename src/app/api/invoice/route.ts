@@ -37,7 +37,17 @@ export async function GET(req: Request) {
         try { return String(x.phone || '').replace(/\D/g, '') === phoneDigits; } catch { return false; }
       });
     })();
-    const sorted = [...filtered].sort((a, b) => (a.id < b.id ? 1 : -1));
+    const sorted = [...filtered].sort((a: any, b: any) => {
+      const at = Date.parse((a && a.createdAt) || 0);
+      const bt = Date.parse((b && b.createdAt) || 0);
+      if (!Number.isNaN(at) || !Number.isNaN(bt)) {
+        if (Number.isNaN(at)) return 1;
+        if (Number.isNaN(bt)) return -1;
+        return bt - at; // newest first
+      }
+      // Fallback by id desc
+      return a.id < b.id ? 1 : -1;
+    });
     const start = Math.max(0, cursor);
     const items = sorted.slice(start, start + limit);
     const nextCursor = start + limit < sorted.length ? start + limit : null;
