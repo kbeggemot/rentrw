@@ -29,8 +29,15 @@ export async function GET(req: Request) {
     const url = new URL(req.url);
     const cursor = Number(url.searchParams.get('cursor') || '0');
     const limit = Math.max(1, Math.min(50, Number(url.searchParams.get('limit') || '5')));
+    const phoneDigits = (() => { try { return String(url.searchParams.get('phone') || '').replace(/\D/g, ''); } catch { return ''; } })();
     const all = await readStore();
-    const sorted = [...all].sort((a, b) => (a.id < b.id ? 1 : -1));
+    const filtered = (() => {
+      if (!phoneDigits) return all;
+      return all.filter((x) => {
+        try { return String(x.phone || '').replace(/\D/g, '') === phoneDigits; } catch { return false; }
+      });
+    })();
+    const sorted = [...filtered].sort((a, b) => (a.id < b.id ? 1 : -1));
     const start = Math.max(0, cursor);
     const items = sorted.slice(start, start + limit);
     const nextCursor = start + limit < sorted.length ? start + limit : null;

@@ -469,7 +469,7 @@ export default function InvoiceNewPage() {
             </div>
           ) : null}
           {/* Список созданных счетов (не показываем, если пусто) */}
-          <CreatedInvoices createdList={createdList} setCreatedList={setCreatedList} cursor={listCursor} setCursor={setListCursor} loading={listLoading} setLoading={setListLoading} onRepeat={(inv)=>{
+          <CreatedInvoices phoneDigits={String(phone||'').replace(/\D/g,'')} createdList={createdList} setCreatedList={setCreatedList} cursor={listCursor} setCursor={setListCursor} loading={listLoading} setLoading={setListLoading} onRepeat={(inv)=>{
             if (checkOk !== true) {
               const msg = (checkMsg && String(checkMsg).trim().length > 0) ? String(checkMsg) : 'Вы не можете создать счёт: пройдите проверку в Рокет Ворке';
               showToast(msg, 'error');
@@ -492,7 +492,7 @@ export default function InvoiceNewPage() {
   );
 }
 
-function CreatedInvoices({ createdList, setCreatedList, cursor, setCursor, loading, setLoading, onRepeat }: { createdList: Array<{ id: number; createdAt: string; phone?: string; orgInn?: string; orgName?: string; email?: string | null; description?: string; amount?: string }>; setCreatedList: (v: any) => void; cursor: number | null; setCursor: (v: number | null) => void; loading: boolean; setLoading: (v: boolean) => void; onRepeat: (inv: any) => void }) {
+function CreatedInvoices({ phoneDigits, createdList, setCreatedList, cursor, setCursor, loading, setLoading, onRepeat }: { phoneDigits: string; createdList: Array<{ id: number; createdAt: string; phone?: string; orgInn?: string; orgName?: string; email?: string | null; description?: string; amount?: string }>; setCreatedList: (v: any) => void; cursor: number | null; setCursor: (v: number | null) => void; loading: boolean; setLoading: (v: boolean) => void; onRepeat: (inv: any) => void }) {
   const [initialized, setInitialized] = React.useState(false as any);
   React.useEffect(() => {
     let cancelled = false;
@@ -500,7 +500,7 @@ function CreatedInvoices({ createdList, setCreatedList, cursor, setCursor, loadi
     (async () => {
       try {
         setLoading(true);
-        const r = await fetch('/api/invoice?limit=5&cursor=0', { cache: 'no-store' });
+        const r = await fetch(`/api/invoice?limit=5&cursor=0${phoneDigits?`&phone=${encodeURIComponent(phoneDigits)}`:''}`, { cache: 'no-store' });
         const d = await r.json().catch(() => ({}));
         if (!cancelled && Array.isArray(d?.items)) {
           setCreatedList(d.items.map((it: any) => ({ ...it })));
@@ -511,7 +511,7 @@ function CreatedInvoices({ createdList, setCreatedList, cursor, setCursor, loadi
       setInitialized(true);
     })();
     return () => { cancelled = true; };
-  }, [initialized, setCreatedList, setCursor, setLoading]);
+  }, [initialized, setCreatedList, setCursor, setLoading, phoneDigits]);
 
   if (createdList.length === 0) return null;
   return (
@@ -541,7 +541,7 @@ function CreatedInvoices({ createdList, setCreatedList, cursor, setCursor, loadi
             onClick={async () => {
               try {
                 setLoading(true);
-                const r = await fetch(`/api/invoice?limit=5&cursor=${cursor}`, { cache: 'no-store' });
+                const r = await fetch(`/api/invoice?limit=5&cursor=${cursor}${phoneDigits?`&phone=${encodeURIComponent(phoneDigits)}`:''}`, { cache: 'no-store' });
                 const d = await r.json().catch(() => ({}));
                 if (Array.isArray(d?.items) && d.items.length > 0) {
                   setCreatedList([...createdList, ...d.items.map((it: any) => ({ ...it }))]);
