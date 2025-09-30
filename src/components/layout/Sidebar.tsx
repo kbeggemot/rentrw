@@ -100,19 +100,6 @@ export function Sidebar() {
         >
           Настройки
         </Link>
-        <Link
-          href="/admin?tab=invoices"
-          onMouseDown={() => setPressedHref('/admin?tab=invoices')}
-          onTouchStart={() => setPressedHref('/admin?tab=invoices')}
-          prefetch={false}
-          className={`px-3 py-2 rounded-md text-sm w-full text-left transition-colors ${
-            isActive('/admin') && typeof window !== 'undefined' && new URL(window.location.href).searchParams.get('tab') === 'invoices' || pressedHref === '/admin?tab=invoices'
-              ? 'bg-gray-100 dark:bg-gray-900 font-medium'
-              : 'hover:bg-gray-50 dark:hover:bg-gray-900 active:bg-gray-100 active:dark:bg-gray-900'
-          }`}
-        >
-          Счета (админ)
-        </Link>
       </nav>
       <div className="block md:hidden p-2 pt-0 mt-auto">
         {/* Организация: перенесена вниз, над кнопкой выхода */}
