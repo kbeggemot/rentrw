@@ -19,7 +19,10 @@ export default function InvoiceNewPage() {
   const [checkMsg, setCheckMsg] = useState<string | null>(null);
   const [checkOk, setCheckOk] = useState<boolean | null>(null);
   const [fio, setFio] = useState<string | null>(null);
+  const [companyType, setCompanyType] = useState<'ru' | 'foreign' | null>(null);
   const [payerInn, setPayerInn] = useState<string>('');
+  const [payerTaxId, setPayerTaxId] = useState<string>('');
+  const [payerAddress, setPayerAddress] = useState<string>('');
   const [payerName, setPayerName] = useState<string | null>(null);
   const [confirming, setConfirming] = useState(false);
   const [toast, setToast] = useState<{ msg: string; kind: 'success' | 'error' | 'info' } | null>(null);
@@ -27,20 +30,31 @@ export default function InvoiceNewPage() {
   const [serviceDescription, setServiceDescription] = useState('');
   const [serviceAmount, setServiceAmount] = useState('');
   const [customerEmail, setCustomerEmail] = useState('');
+  const [servicePeriodStart, setServicePeriodStart] = useState('');
+  const [servicePeriodEnd, setServicePeriodEnd] = useState('');
+  const [currency, setCurrency] = useState<'USD' | 'EUR'>('USD');
   type StoredInvoice = { id: number; code?: string; createdAt: string; phone?: string; orgInn?: string; orgName?: string; email?: string | null; description?: string; amount?: string };
   const [createdList, setCreatedList] = useState<Array<StoredInvoice>>([]);
   const [listCursor, setListCursor] = useState<number | null>(0);
   const [listLoading, setListLoading] = useState(false);
+  const isValidEmail = (s: string) => /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/.test(s.trim());
   const canCreate = useMemo(() => {
-    return (
-      !!phone && !!payerName && payerInnValid() && serviceDescription.trim().length > 0 && serviceAmount.trim().length > 0
-    );
+    if (!phone || !payerName || serviceDescription.trim().length === 0 || serviceAmount.trim().length === 0 || customerEmail.trim().length === 0) return false;
+    if (companyType === 'ru') return payerInnValid();
+    if (companyType === 'foreign') {
+      if (payerTaxId.trim().length === 0 || payerAddress.trim().length === 0) return false;
+      if (servicePeriodStart.trim().length === 0 || servicePeriodEnd.trim().length === 0) return false;
+      return true;
+    }
+    return false;
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phone, payerName, serviceDescription, serviceAmount]);
+  }, [phone, payerName, serviceDescription, serviceAmount, companyType, payerInn, payerTaxId, payerAddress, servicePeriodStart, servicePeriodEnd, customerEmail]);
   function payerInnValid(): boolean { try { const d = (payerInn||'').replace(/\D/g,''); return d.length===10 || d.length===12; } catch { return false; } }
   const confirmDisabled = useMemo(() => {
-    try { return (payerInn.replace(/\D/g, '').length < 10); } catch { return true; }
-  }, [payerInn]);
+    if (companyType === 'ru') { try { return (payerInn.replace(/\D/g, '').length < 10); } catch { return true; } }
+    if (companyType === 'foreign') return payerTaxId.trim().length === 0;
+    return true;
+  }, [payerInn, companyType, payerTaxId]);
 
   const runCheck = useCallback(async () => {
     if (!phone || checking) return;
@@ -260,7 +274,16 @@ export default function InvoiceNewPage() {
               href={`https://t.me/yplaru_bot/tg_auth?startapp=${encodeURIComponent(`share_phone_${waitId || ''}`)}`}
               target="_blank"
               rel="noopener noreferrer"
-              onClick={() => { setOpening(true); setStatus('Ожидаем подтверждение в Telegram…'); }}
+              onClick={(e) => {
+                const isLocal = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+                if (isLocal) {
+                  e.preventDefault();
+                  setPhone('+79851679287');
+                  try { sessionStorage.setItem('tg_shared_phone', '+79851679287'); } catch {}
+                  return;
+                }
+                setOpening(true); setStatus('Ожидаем подтверждение в Telegram…');
+              }}
               className={`inline-flex items-center justify-center h-10 px-4 rounded text-sm text-white ${opening ? 'bg-blue-600 opacity-70' : 'bg-blue-600 hover:bg-blue-700'}`}
             >
               {opening ? (
@@ -321,7 +344,23 @@ export default function InvoiceNewPage() {
           </div>
           {checkOk === true ? (
             <div className="rounded border border-gray-200 dark:border-gray-800 p-4">
-              <div className="text-base font-semibold mb-2">Заказчик (Компания)</div>
+              <div className="text-base font-semibold mb-2">Заказчик</div>
+              {!companyType ? (
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setCompanyType('ru')}
+                    className="flex-1 h-10 rounded border border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-900"
+                  >Российская компания</button>
+                  <button
+                    type="button"
+                    onClick={() => setCompanyType('foreign')}
+                    className="flex-1 h-10 rounded border border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-900"
+                  >Иностранная компания</button>
+                </div>
+              ) : null}
+              {companyType === 'ru' ? (
+              <>
               <div className="flex items-center gap-3">
                 <Input
                   className="flex-1"
@@ -384,47 +423,147 @@ export default function InvoiceNewPage() {
                   </div>
                   <div className="mt-3 grid grid-cols-1">
                     <Input
-                      label="Email (необязательно)"
+                      label="Email"
                       placeholder="roboto@example.com"
                       type="email"
                       value={customerEmail}
                       onChange={(e) => setCustomerEmail(e.target.value)}
-                      hint="Укажите контактную почту, если хотите, чтобы мы автоматически отправили счёт Заказчику"
+                      hint="Укажите контактную почту для отправки счёта Заказчику"
+                    />
+                  </div>
+                </>
+              ) : null}
+              </>
+              ) : null}
+              {companyType === 'foreign' ? (
+                <>
+                  <Input
+                    label="TAX ID плательщика"
+                    placeholder="Например: GB123456789"
+                    value={payerTaxId}
+                    onChange={(e) => {
+                      setPayerTaxId(e.target.value);
+                      if (e.target.value.trim().length > 0) setPayerName(`Компания (Tax ID: ${e.target.value})`);
+                    }}
+                    hint="Укажите регистрационный налоговый номер компании (VAT, TIN, EIN и т.п.). Этот номер необходим для корректного оформления документов"
+                  />
+                  <div className="mt-3">
+                    <Textarea
+                      label="Адрес юридического лица-плательщика"
+                      placeholder="Например: 123 Main St, New York, NY 10001, USA"
+                      rows={3}
+                      value={payerAddress}
+                      onChange={(e) => setPayerAddress(e.target.value)}
+                      hint="Укажите адрес компании на английском языке (включая страну регистрации)"
+                    />
+                  </div>
+                  <div className="mt-3 grid grid-cols-1">
+                    <Input
+                      label="Email"
+                      placeholder="roboto@example.com"
+                      type="email"
+                      value={customerEmail}
+                      onChange={(e) => setCustomerEmail(e.target.value)}
+                      hint="Укажите контактную почту для отправки счёта Заказчику"
                     />
                   </div>
                 </>
               ) : null}
             </div>
           ) : null}
-          {payerName ? (
+          {(() => {
+            if (companyType === 'ru') {
+              return payerName && customerEmail.trim().length > 0;
+            }
+            if (companyType === 'foreign') {
+              return payerTaxId.trim().length > 0 && payerAddress.trim().length > 0 && customerEmail.trim().length > 0;
+            }
+            return false;
+          })() ? (
             <div className="rounded border border-gray-200 dark:border-gray-800 p-4">
               <div className="text-base font-semibold mb-2">Услуги</div>
-              <Textarea
-                label="Описание"
-                placeholder="Например: разработка дизайн-проекта логотипа компании согласно ТЗ"
-                maxLength={128}
-                value={serviceDescription}
-                onChange={(e) => setServiceDescription(e.target.value)}
-                hint="Укажите, за что вы выставляете счёт Заказчику. Этот текст попадёт в чек НПД. Не более 128 символов"
-              />
-              <div className="mt-3">
-                <Input
-                  className="w-full"
-                  label="Стоимость"
-                  placeholder="0"
-                  inputMode="decimal"
-                  type="text"
-                  value={serviceAmount}
-                  onChange={(e) => {
-                    // Allow only digits and separators; display comma, keep only one comma
-                    const raw = e.target.value.replace(/[^0-9.,]/g, '').replace(/\./g, ',');
-                    const i = raw.indexOf(',');
-                    const val = i === -1 ? raw : raw.slice(0, i + 1) + raw.slice(i + 1).replace(/,/g, '');
-                    setServiceAmount(val);
-                  }}
-                  hint="Укажите стоимость ваших услуг до удержания налогов и комиссий в рублях"
-                />
-              </div>
+              {companyType === 'foreign' ? (
+                <>
+                  <Textarea
+                    label="Описание на английском языке"
+                    placeholder="Например: Design project development according to specifications"
+                    maxLength={128}
+                    value={serviceDescription}
+                    onChange={(e) => setServiceDescription(e.target.value)}
+                    hint="Укажите, за что вы выставляете счёт Заказчику. Не более 128 символов"
+                  />
+                  <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <Input
+                      label="Дата начала"
+                      type="date"
+                      value={servicePeriodStart}
+                      onChange={(e) => setServicePeriodStart(e.target.value)}
+                    />
+                    <Input
+                      label="Дата окончания"
+                      type="date"
+                      value={servicePeriodEnd}
+                      onChange={(e) => setServicePeriodEnd(e.target.value)}
+                    />
+                  </div>
+                  <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-sm text-gray-700 dark:text-gray-300 mb-1">Валюта счета</label>
+                      <select
+                        className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white text-black dark:bg-gray-800 dark:text-white px-3 h-9 text-sm"
+                        value={currency}
+                        onChange={(e) => setCurrency(e.target.value as 'USD' | 'EUR')}
+                      >
+                        <option value="USD">USD</option>
+                        <option value="EUR">EUR</option>
+                      </select>
+                    </div>
+                    <Input
+                      label="Стоимость"
+                      placeholder="200"
+                      inputMode="decimal"
+                      type="text"
+                      value={serviceAmount}
+                      onChange={(e) => {
+                        const raw = e.target.value.replace(/[^0-9.,]/g, '').replace(/\./g, ',');
+                        const i = raw.indexOf(',');
+                        const val = i === -1 ? raw : raw.slice(0, i + 1) + raw.slice(i + 1).replace(/,/g, '');
+                        setServiceAmount(val);
+                      }}
+                      hint={`Укажите стоимость ваших услуг в выбранной валюте. С этой суммы будет удержана комиссия сервиса в размере 6%+25 ${currency}`}
+                    />
+                  </div>
+                </>
+              ) : (
+                <>
+                  <Textarea
+                    label="Описание"
+                    placeholder="Например: разработка дизайн-проекта логотипа компании согласно ТЗ"
+                    maxLength={128}
+                    value={serviceDescription}
+                    onChange={(e) => setServiceDescription(e.target.value)}
+                    hint="Укажите, за что вы выставляете счёт Заказчику. Этот текст попадёт в чек НПД. Не более 128 символов"
+                  />
+                  <div className="mt-3">
+                    <Input
+                      className="w-full"
+                      label="Стоимость"
+                      placeholder="0"
+                      inputMode="decimal"
+                      type="text"
+                      value={serviceAmount}
+                      onChange={(e) => {
+                        // Allow only digits and separators; display comma, keep only one comma
+                        const raw = e.target.value.replace(/[^0-9.,]/g, '').replace(/\./g, ',');
+                        const i = raw.indexOf(',');
+                        const val = i === -1 ? raw : raw.slice(0, i + 1) + raw.slice(i + 1).replace(/,/g, '');
+                        setServiceAmount(val);
+                      }}
+                      hint="Укажите стоимость ваших услуг до удержания налогов и комиссий в рублях"
+                    />
+                  </div>
+                </>
+              )}
             </div>
           ) : null}
           {canCreate ? (
@@ -433,15 +572,38 @@ export default function InvoiceNewPage() {
                 className={`w-full h-10 rounded text-white text-sm ${listLoading ? 'bg-gray-300 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'}`}
                 disabled={listLoading}
                 onClick={async () => {
+                  if (!customerEmail || !isValidEmail(customerEmail)) {
+                    showToast('Укажите корректный email', 'error');
+                    return;
+                  }
+                  if (companyType === 'foreign') {
+                    const amt = Number(String(serviceAmount).replace(',', '.'));
+                    if (!Number.isFinite(amt) || amt < 200) {
+                      showToast('Минимальная стоимость для иностранной компании — 200 в выбранной валюте', 'error');
+                      return;
+                    }
+                    const startDate = new Date(servicePeriodStart);
+                    const endDate = new Date(servicePeriodEnd);
+                    if (endDate < startDate) {
+                      showToast('Дата окончания не может быть раньше даты начала', 'error');
+                      return;
+                    }
+                  }
                   try {
                     setListLoading(true);
                     const payload = {
                       phone,
-                      orgInn: payerInn,
+                      payerType: companyType || 'ru',
+                      orgInn: companyType === 'ru' ? payerInn : '',
                       orgName: payerName,
+                      taxId: companyType === 'foreign' ? payerTaxId : null,
+                      address: companyType === 'foreign' ? payerAddress : null,
                       email: customerEmail || null,
                       description: serviceDescription.slice(0,128),
                       amount: serviceAmount,
+                      currency: companyType === 'foreign' ? currency : null,
+                      servicePeriodStart: companyType === 'foreign' ? servicePeriodStart : null,
+                      servicePeriodEnd: companyType === 'foreign' ? servicePeriodEnd : null,
                       executorFio: fio || (sessionStorage.getItem('inv_executor_fio') || null),
                       executorInn: (sessionStorage.getItem('inv_executor_inn') || null)
                     };
@@ -452,11 +614,17 @@ export default function InvoiceNewPage() {
                       // Обновляем таблицу и очищаем поля
                       try { setCreatedList([{ ...d.invoice }, ...createdList]); } catch {}
                       // Очистим поля заказчика и услуги
+                      setCompanyType(null);
                       setPayerInn('');
+                      setPayerTaxId('');
+                      setPayerAddress('');
                       setPayerName(null);
                       setCustomerEmail('');
                       setServiceDescription('');
                       setServiceAmount('');
+                      setServicePeriodStart('');
+                      setServicePeriodEnd('');
+                      setCurrency('USD');
                       // После появления строки в таблице — копируем ссылку и показываем тост
                       try { await navigator.clipboard.writeText(new URL(url, window.location.origin).toString()); } catch {}
                       showToast('Счёт создан, ссылка скопирована', 'success');

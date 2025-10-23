@@ -42,6 +42,10 @@ export default async function AdminInvoicePage(props: { params: Promise<{ id: st
             <div className="text-base font-semibold mb-2">Исполнитель / Заказчик</div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
               <div>
+                <div className="text-gray-500">Тип компании</div>
+                <div>{inv.payerType === 'foreign' ? 'Иностранная' : 'Российская'}</div>
+              </div>
+              <div>
                 <div className="text-gray-500">Исполнитель</div>
                 <div>{inv.executorFio||'—'}{inv.executorInn?` / ИНН ${inv.executorInn}`:''}</div>
               </div>
@@ -49,6 +53,18 @@ export default async function AdminInvoicePage(props: { params: Promise<{ id: st
                 <div className="text-gray-500">Заказчик</div>
                 <div>{inv.orgName||'—'}{inv.orgInn?` / ИНН ${inv.orgInn}`:''}</div>
               </div>
+              {inv.payerType === 'foreign' ? (
+                <>
+                  <div>
+                    <div className="text-gray-500">Tax ID</div>
+                    <div>{inv.taxId||'—'}</div>
+                  </div>
+                  <div>
+                    <div className="text-gray-500">Адрес</div>
+                    <div className="break-words">{inv.address||'—'}</div>
+                  </div>
+                </>
+              ) : null}
             </div>
           </div>
 
@@ -63,8 +79,48 @@ export default async function AdminInvoicePage(props: { params: Promise<{ id: st
                 <div className="text-gray-500">Сумма</div>
                 <div>{inv.amount||'—'}</div>
               </div>
+              {inv.payerType === 'foreign' ? (
+                <>
+                  <div>
+                    <div className="text-gray-500">Валюта</div>
+                    <div>{inv.currency||'—'}</div>
+                  </div>
+                  <div>
+                    <div className="text-gray-500">Период услуги</div>
+                    <div>{inv.servicePeriodStart && inv.servicePeriodEnd ? `${inv.servicePeriodStart} — ${inv.servicePeriodEnd}` : '—'}</div>
+                  </div>
+                </>
+              ) : null}
             </div>
           </div>
+
+          {inv.payerType === 'foreign' ? (
+            <div className="rounded border border-gray-200 dark:border-gray-800 p-4">
+              <div className="text-base font-semibold mb-2">Расчётные данные (иностранная компания)</div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+                <div>
+                  <div className="text-gray-500">invoice_amount</div>
+                  <div>{inv.invoice_amount != null ? `${inv.invoice_amount} ${inv.currency}` : '—'}</div>
+                </div>
+                <div>
+                  <div className="text-gray-500">sum_convert_cur</div>
+                  <div>{inv.sum_convert_cur != null ? `${inv.sum_convert_cur.toFixed(2)} ${inv.currency}` : '—'}</div>
+                </div>
+                <div>
+                  <div className="text-gray-500">get_bcc_weighted_average_rate</div>
+                  <div>{inv.get_bcc_weighted_average_rate != null ? `${inv.get_bcc_weighted_average_rate.toFixed(4)} RUB/${inv.currency}` : '—'}</div>
+                </div>
+                <div>
+                  <div className="text-gray-500">sum_convert_rub</div>
+                  <div>{inv.sum_convert_rub != null ? `${inv.sum_convert_rub.toFixed(2)} ₽` : '—'}</div>
+                </div>
+                <div>
+                  <div className="text-gray-500">total_amount_rub (к выплате)</div>
+                  <div className="font-semibold">{inv.total_amount_rub != null ? `${inv.total_amount_rub.toFixed(2)} ₽` : '—'}</div>
+                </div>
+              </div>
+            </div>
+          ) : null}
 
           <div className="rounded border border-gray-200 dark:border-gray-800 p-4">
             <div className="text-base font-semibold mb-2">Ссылки</div>

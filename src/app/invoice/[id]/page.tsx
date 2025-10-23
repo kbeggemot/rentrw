@@ -43,13 +43,43 @@ export default async function InvoicePublicPage(props: { params: Promise<{ id?: 
       <h1 className="text-2xl font-bold mb-3">{invoice ? `Счёт № ${invoice?.id}` : 'Счёт'}</h1>
       {invoice ? (
         <div className="space-y-4 text-sm text-gray-800 dark:text-gray-200">
-          <div className="rounded border border-gray-200 dark:border-gray-800 p-4">
-            <div className="mb-1"><span className="font-semibold">Исполнитель:</span> {(invoice.executorFio || fallbackFio || '—')} / {(invoice.executorInn || fallbackInn || '—')}</div>
-            <div className="mb-1"><span className="font-semibold">Заказчик:</span> {invoice.orgName} / {invoice.orgInn}</div>
-            <div className="mb-1"><span className="font-semibold">Описание услуги:</span> <span className="whitespace-pre-line align-top inline-block">{invoice.description}</span></div>
-            <div><span className="font-semibold">Сумма:</span> {invoice.amount} ₽</div>
-          </div>
+          {invoice.payerType === 'foreign' ? (
+            <>
+              <div className="rounded border border-gray-200 dark:border-gray-800 p-4">
+                <div className="mb-1"><span className="font-semibold">Top-up Amount:</span> {invoice.invoice_amount || invoice.amount} {invoice.currency || '—'}</div>
+                <div><span className="font-semibold">Contractor will receive:</span> {invoice.total_amount_rub ? `${invoice.total_amount_rub.toFixed(2)} ₽` : '—'}</div>
+              </div>
+            </>
+          ) : (
+            <div className="rounded border border-gray-200 dark:border-gray-800 p-4">
+              <div className="mb-1"><span className="font-semibold">Исполнитель:</span> {(invoice.executorFio || fallbackFio || '—')} / {(invoice.executorInn || fallbackInn || '—')}</div>
+              <div className="mb-1"><span className="font-semibold">Заказчик:</span> {invoice.orgName} / {invoice.orgInn}</div>
+              <div className="mb-1"><span className="font-semibold">Описание услуги:</span> <span className="whitespace-pre-line align-top inline-block">{invoice.description}</span></div>
+              <div><span className="font-semibold">Сумма:</span> {invoice.amount} ₽</div>
+            </div>
+          )}
 
+          {invoice.payerType === 'foreign' ? (
+            <div className="pt-2 rounded border border-gray-200 dark:border-gray-800 p-4">
+              <div className="font-semibold mb-2">Payment Details</div>
+              <div className="space-y-1 text-sm">
+                <div><span className="font-semibold">Sky Rock LLP</span></div>
+                <div>CITY OF ALMATY, ALMALI DISTRICT, ST. NURMAKOVA, 65, Apt. 10, 050026, Republic of Kazakhstan, BIN 240940015346</div>
+                <div><span className="font-semibold">Bank Name:</span> PKO Bank Polski S.A.</div>
+                <div><span className="font-semibold">Beneficiary name:</span> Payholding International sp. z o.o. sp. K.</div>
+                <div><span className="font-semibold">Beneficiary address:</span> ul. Laciarska 4B, 50-104 Wroclaw Poland</div>
+                <div><span className="font-semibold">Bank SWIFT:</span> BPKOPLPW</div>
+                <div><span className="font-semibold">Account or IBAN:</span> PL34 1020 1068 0000 1102 0354 4665</div>
+              </div>
+              <div className="mt-3">
+                <div className="font-semibold mb-1">Payment Reference</div>
+                <div>NODABANK Sky Rock LLP Payment under Agreement No. {invoice.id} for {invoice.description}. VAT not applicable.</div>
+              </div>
+              <div className="mt-3">
+                <a className="text-blue-600 hover:underline" href={`/api/invoice/${encodeURIComponent(String(code))}/pdf`} target="_blank" rel="noreferrer">Скачать в PDF</a>
+              </div>
+            </div>
+          ) : (
           <div className="pt-2 rounded border border-gray-200 dark:border-gray-800 p-4">
             <div className="font-semibold mb-2">Реквизиты для оплаты</div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -88,7 +118,22 @@ export default async function InvoicePublicPage(props: { params: Promise<{ id?: 
               <a className="text-blue-600 hover:underline" href={`/api/invoice/${encodeURIComponent(String(code))}/pdf`} target="_blank" rel="noreferrer">Скачать в PDF</a>
             </div>
           </div>
+          )}
 
+          {invoice.payerType === 'foreign' ? (
+            <div className="pt-2 rounded border border-gray-200 dark:border-gray-800 p-4">
+              <div className="font-semibold mb-1">Payment Terms</div>
+              <div className="space-y-2">
+                <p>This invoice is issued for the payment of services provided by a foreign contractor. Kindly remit payment to the account of the agent, a partner of the "Rocket Work" platform, using the details provided below.</p>
+                <p>Upon receipt of funds, the operator will convert the foreign currency amount into rubles and transfer the payment to the contractor's details as registered in the "Rocket Work" service.</p>
+                <p><strong>Please be advised that your contractor is registered under the self-employed tax status. We will remit the applicable taxes on their behalf.</strong></p>
+                <p>Payments must be made exclusively from your organization's corporate bank account, strictly adhering to the payment reference specified in this invoice.</p>
+                <p>By executing this payment, you agree to be bound by the terms of the "Rocket Work" Electronic Service User Agreement.</p>
+                <p>A service fee of 6% plus a fixed charge of 25 {invoice.currency || 'USD/EUR'} will be applied and deducted from the contractor's payment, unless individual service terms have been mutually agreed upon with "Rocket Work".</p>
+                <p>"Rocket Work" reserves the right to return the payment to the sender at its sole discretion, without providing a reason and without deducting any fees.</p>
+              </div>
+            </div>
+          ) : (
           <div className="pt-2 rounded border border-gray-200 dark:border-gray-800 p-4">
             <div className="font-semibold mb-1">Условия оплаты</div>
             <div className="space-y-2">
@@ -109,6 +154,7 @@ export default async function InvoicePublicPage(props: { params: Promise<{ id?: 
               </p>
             </div>
           </div>
+          )}
         </div>
       ) : (
         <div className="text-sm text-gray-600">Счёт не найден</div>

@@ -152,4 +152,38 @@ export function renderInvoiceForCustomerEmail(params: { invoiceNumber: string | 
   </html>`;
 }
 
+export function renderInvoiceForCustomerEmailForeign(params: { invoiceNumber: string | number; invoiceAmount: string; currency: string; contractorName: string; invoiceLink: string; brandLogoUrl?: string }): string {
+  const { invoiceNumber, invoiceAmount, currency, contractorName, invoiceLink } = params;
+  const brandLogoUrl = params.brandLogoUrl || getBrandLogoUrl();
+  const title = `Invoice No. ${invoiceNumber} ${invoiceAmount} ${currency}`;
+  return `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width">
+  <title>${title}</title>
+  <style>
+    .btn { display:inline-block;padding:12px 16px;border-radius:6px;background:#111;color:#fff;text-decoration:none; }
+    .muted { color:#6b7280;font-size:12px; }
+    .wrap { max-width:640px;margin:0 auto;padding:24px;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;line-height:1.5;color:#111; }
+    .card { border:1px solid #e5e7eb;border-radius:8px;padding:16px; }
+  </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <h2 style="margin:0 0 8px 0;">${title}</h2>
+      <div class="card" style="margin:0 0 16px 0;">
+        <p style="margin:0 0 8px 0;">This is a notification from "Rocket Work" to inform you that <b>${contractorName}</b> has issued an invoice for professional services rendered.</p>
+        <p style="margin:12px 0;">
+          <a class="btn" href="${invoiceLink}" style="display:inline-block;padding:12px 16px;border-radius:6px;background:#111;color:#fff !important;text-decoration:none;">Open Invoice</a>
+        </p>
+        <p style="margin:0 0 8px 0;">Invoice link: <a href="${invoiceLink}" style="color:#2563eb;text-decoration:underline;">${invoiceLink}</a></p>
+        <p class="muted" style="margin-top:12px;">Execution of this payment constitutes your acceptance of the "Rocket Work" Terms of Service. A service fee of 6%+25 ${currency} will be withheld from the contractor's remuneration.</p>
+      </div>
+      <p class="muted"><img src="${brandLogoUrl}" alt="YPLA" height="16" style="height:16px;vertical-align:middle;"></p>
+    </div>
+  </body>
+  </html>`;
+}
+
 

@@ -257,46 +257,89 @@ export async function GET(req: Request, ctx: { params: Promise<{ id?: string }> 
       const logo = await readBinary('public/logo.png');
       if (logo && logo.data) {
         const img = await pdf.embedPng(new Uint8Array(logo.data));
-        const h = 24; const wLogo = img.width * (h / img.height);
+        const h = 32; const wLogo = img.width * (h / img.height);
         page.drawImage(img, { x: margin, y: y - h + 8, width: wLogo, height: h });
-        drawText('YPLA', { x: margin + wLogo + 8, y, size: 20, bold: true });
       } else {
         drawText('YPLA', { x: margin, y, size: 20, bold: true });
       }
     } catch {
       drawText('YPLA', { x: margin, y, size: 20, bold: true });
     }
-    page.drawLine({ start: { x: margin, y: y - 26 }, end: { x: width - margin, y: y - 26 }, thickness: 0.5, color: rgb(0.8,0.8,0.8) });
-    y -= 52; // extra vertical gap before title
-    drawText(`Счёт № ${invoice.id}`, { y, size: 16, bold: true }); y -= 18;
-    const dt = new Date(invoice.createdAt || Date.now());
-    drawText(`Дата выставления: ${dt.toLocaleString('ru-RU', { timeZone: 'Europe/Moscow' })}`, { y }); y -= 14;
-    try { const url = `https://ypla.ru/invoice/${encodeURIComponent(String(invoice.code || invoice.id))}`; drawText(`Ссылка: ${url}`, { y }); } catch {}
-    y -= 26; // extra gap before details block
+    page.drawLine({ start: { x: margin, y: y - 36 }, end: { x: width - margin, y: y - 36 }, thickness: 0.5, color: rgb(0.8,0.8,0.8) });
+    y -= 60; // extra vertical gap under logo/line before title
+    
+    // Combined details block (разный для RU/Foreign)
+    const isForeign = (invoice as any).payerType === 'foreign';
+    
+    if (isForeign) {
+      drawText(`Invoice № ${invoice.id}`, { y, size: 16, bold: true }); y -= 18;
+      const dt = new Date(invoice.createdAt || Date.now());
+      drawText(`Date of issue: ${dt.toLocaleString('en-US', { timeZone: 'Europe/Moscow' })}`, { y }); y -= 14;
+      try { const url = `https://ypla.ru/invoice/${encodeURIComponent(String(invoice.code || invoice.id))}`; drawText(`Link: ${url}`, { y }); } catch {}
+      y -= 26;
+    } else {
+      drawText(`Счёт № ${invoice.id}`, { y, size: 16, bold: true }); y -= 18;
+      const dt = new Date(invoice.createdAt || Date.now());
+      drawText(`Дата выставления: ${dt.toLocaleString('ru-RU', { timeZone: 'Europe/Moscow' })}`, { y }); y -= 14;
+      try { const url = `https://ypla.ru/invoice/${encodeURIComponent(String(invoice.code || invoice.id))}`; drawText(`Ссылка: ${url}`, { y }); } catch {}
+      y -= 26;
+    }
 
-    // Combined details block
     const detailsTopY = y;
     y -= 8; // inner top padding inside details frame
-    const valueX = margin + 100;
-    drawText('Исполнитель:', { y, bold: true });
-    drawText(`${execFio || '—'} / ${execInn || '—'}`, { x: valueX, y }); y -= 14;
-    drawText('Заказчик:', { y, bold: true });
-    drawText(`${invoice.orgName} / ${invoice.orgInn}`, { x: valueX, y }); y -= 16;
-    drawText('Описание услуги:', { y, bold: true });
-    const desc = String(invoice.description || '');
-    y = drawParagraph(desc, valueX, y, (width - margin) - valueX - 6, 10, false, 2);
-    const amt = (() => { try { const n = Number(String(invoice.amount||'').replace(',', '.')); return Number.isFinite(n) ? n.toFixed(2) : String(invoice.amount||''); } catch { return String(invoice.amount||''); } })();
-    y -= 4;
-    drawText('Сумма:', { y, bold: true });
-    drawText(`${amt} ₽`, { x: valueX, y });
+    if (isForeign) {
+      // Foreign invoice: Top-up Amount / Contractor will receive
+      const labelCol = margin;
+      const valueCol = margin + 180;
+      drawText('Top-up Amount:', { x: labelCol, y, bold: true });
+      const topUpAmt = `${(invoice as any).invoice_amount || (invoice as any).amount} ${(invoice as any).currency || ''}`;
+      drawText(topUpAmt, { x: valueCol, y }); y -= 14;
+      drawText('Contractor will receive:', { x: labelCol, y, bold: true });
+      const totalRub = (invoice as any).total_amount_rub;
+      const totalStr = totalRub ? `${Number(totalRub).toFixed(2)} RUB` : '—';
+      drawText(totalStr, { x: valueCol, y });
+    } else {
+      // Russian invoice
+      const valueX = margin + 100;
+      drawText('Исполнитель:', { y, bold: true });
+      drawText(`${execFio || '—'} / ${execInn || '—'}`, { x: valueX, y }); y -= 14;
+      drawText('Заказчик:', { y, bold: true });
+      drawText(`${invoice.orgName} / ${invoice.orgInn}`, { x: valueX, y }); y -= 16;
+      drawText('Описание услуги:', { y, bold: true });
+      const desc = String(invoice.description || '');
+      y = drawParagraph(desc, valueX, y, (width - margin) - valueX - 6, 10, false, 2);
+      const amt = (() => { try { const n = Number(String(invoice.amount||'').replace(',', '.')); return Number.isFinite(n) ? n.toFixed(2) : String(invoice.amount||''); } catch { return String(invoice.amount||''); } })();
+      y -= 4;
+      drawText('Сумма:', { y, bold: true });
+      drawText(`${amt} ₽`, { x: valueX, y });
+    }
     const detailsBottomY = y - 12;
     page.drawRectangle({ x: margin - 6, y: detailsBottomY, width: (width - margin*2) + 12, height: detailsTopY - detailsBottomY + 8, borderWidth: 1, color: undefined, borderColor: rgb(0.8,0.8,0.8) });
     y = detailsBottomY - 28; // extra gap between details frame and bank details
 
     // remove old duplicated description block (now included in framed block above)
 
-    // Bank details (framed grid)
-    const bankHeaderY = y; // remember header baseline to include it in the frame
+    // Bank details (разные для RU/Foreign)
+    const bankHeaderY = y;
+    if (isForeign) {
+      drawText('Payment Details', { y, bold: true }); y -= 14;
+      const bankTopY = bankHeaderY + 12;
+      y -= 2;
+      drawText('Sky Rock LLP', { y, bold: true }); y -= 12;
+      y = drawParagraph('CITY OF ALMATY, ALMALI DISTRICT, ST. NURMAKOVA, 65, Apt. 10, 050026, Republic of Kazakhstan, BIN 240940015346', margin, y, width - margin*2, 10, false, 2);
+      drawText('Bank Name: PKO Bank Polski S.A.', { y }); y -= 12;
+      y = drawParagraph('Beneficiary name: Payholding International sp. z o.o. sp. K.', margin, y, width - margin*2, 10, false, 2);
+      drawText('Beneficiary address: ul. Laciarska 4B, 50-104 Wroclaw Poland', { y }); y -= 12;
+      drawText('Bank SWIFT: BPKOPLPW', { y }); y -= 12;
+      drawText('Account or IBAN: PL34 1020 1068 0000 1102 0354 4665', { y }); y -= 16;
+      drawText('Payment Reference', { y, bold: true }); y -= 12;
+      const payRef = `NODABANK Sky Rock LLP Payment under Agreement No. ${invoice.id} for ${invoice.description}. VAT not applicable.`;
+      y = drawParagraph(payRef, margin, y, width - margin*2, 10, false, 2);
+      const bankBottomY = y - 6;
+      page.drawRectangle({ x: margin - 6, y: bankBottomY, width: (width - margin*2) + 12, height: bankTopY - bankBottomY + 6, borderWidth: 1, color: undefined, borderColor: rgb(0.8,0.8,0.8) });
+      y = bankBottomY - 26;
+    } else {
+    const bankHeaderY2 = y;
     drawText('Реквизиты для оплаты', { y, bold: true });
     y -= 14;
     const bankTopY = bankHeaderY + 12; // frame top slightly above header baseline -> header inside frame
@@ -338,9 +381,23 @@ export async function GET(req: Request, ctx: { params: Promise<{ id?: string }> 
     y = drawParagraph(appoint, margin, y, width - margin*2, 10, false, 2);
     const bankBottomY = y - 6;
     page.drawRectangle({ x: margin - 6, y: bankBottomY, width: (width - margin*2) + 12, height: bankTopY - bankBottomY + 6, borderWidth: 1, color: undefined, borderColor: rgb(0.8,0.8,0.8) });
-    y = bankBottomY - 26; // extra gap after bank details
+    y = bankBottomY - 26;
+    }
 
-    // Terms (paragraphs)
+    // Terms (разные для RU/Foreign)
+    if (isForeign) {
+      drawText('Payment Terms', { y, bold: true }); y -= 12;
+      const termsForeign: string[] = [
+        'This invoice is issued for the payment of services provided by a foreign contractor. Kindly remit payment to the account of the agent, a partner of the "Rocket Work" platform, using the details provided below.',
+        'Upon receipt of funds, the operator will convert the foreign currency amount into rubles and transfer the payment to the contractor\'s details as registered in the "Rocket Work" service.',
+        'Please be advised that your contractor is registered under the self-employed tax status. We will remit the applicable taxes on their behalf.',
+        'Payments must be made exclusively from your organization\'s corporate bank account, strictly adhering to the payment reference specified in this invoice.',
+        'By executing this payment, you agree to be bound by the terms of the "Rocket Work" Electronic Service User Agreement.',
+        `A service fee of 6% plus a fixed charge of 25 ${(invoice as any).currency || 'USD/EUR'} will be applied and deducted from the contractor\'s payment, unless individual service terms have been mutually agreed upon with "Rocket Work".`,
+        '"Rocket Work" reserves the right to return the payment to the sender at its sole discretion, without providing a reason and without deducting any fees.'
+      ];
+      for (const line of termsForeign) { y = drawParagraph(line, margin, y, width - margin*2, 10, false, 2) - 2; }
+    } else {
     drawText('Условия оплаты', { y, bold: true }); y -= 12;
     const terms: string[] = [
       'Это счёт в пользу самозанятого. Оплатите его на номинальный счёт оператора платформы «Рокет Ворк» по реквизитам выше. После зачисления средств оператор перечислит выплату исполнителю на указанные им реквизиты в Рокет Ворке и сформирует чек НПД.',
@@ -350,6 +407,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ id?: string }> 
       'Рокет Ворк оставляет за собой право без объяснения причин вернуть платёж отправителю без удержания комиссии.'
     ];
     for (const line of terms) { y = drawParagraph(line, margin, y, width - margin*2, 10, false, 2) - 2; }
+    }
 
     const pdfBytes = await pdf.save();
     return new NextResponse(Buffer.from(pdfBytes) as any, {

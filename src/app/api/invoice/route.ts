@@ -7,13 +7,25 @@ type Invoice = {
   code: string; // 4+ char unique public code
   createdAt: string;
   phone: string;
+  payerType: 'ru' | 'foreign'; // тип компании-плательщика
   orgInn: string;
   orgName: string;
+  taxId?: string | null; // для иностранных
+  address?: string | null; // юридический адрес для иностранных
   email?: string | null;
   description: string;
   amount: string; // keep as string with comma
+  currency?: 'USD' | 'EUR' | null; // для иностранных
+  servicePeriodStart?: string | null; // YYYY-MM-DD
+  servicePeriodEnd?: string | null; // YYYY-MM-DD
   executorFio?: string | null;
   executorInn?: string | null;
+  // Расчётные поля (для иностранных)
+  invoice_amount?: number | null; // сумма инвойса в валюте
+  sum_convert_cur?: number | null; // сумма к конвертации в валюте
+  sum_convert_rub?: number | null; // сумма к конвертации в рублях
+  get_bcc_weighted_average_rate?: number | null; // курс для конвертации
+  total_amount_rub?: number | null; // итоговая сумма к выплате в рублях
 };
 
 async function readStore(): Promise<Invoice[]> {
@@ -61,14 +73,22 @@ export async function POST(req: Request) {
   try {
     const body = await req.json().catch(() => null as any);
     const phone = String(body?.phone || '').trim();
+    const payerType: 'ru' | 'foreign' = (body?.payerType === 'foreign' || body?.payerType === 'ru') ? body.payerType : 'ru';
     const orgInn = String(body?.orgInn || '').trim();
     const orgName = String(body?.orgName || '').trim();
+    const taxId = body?.taxId ? String(body.taxId).trim() : null;
+    const address = body?.address ? String(body.address).trim() : null;
     const email = (body?.email ? String(body.email).trim() : '') || null;
     const description = String(body?.description || '').trim();
     const amount = String(body?.amount || '').trim();
+    const currency = (body?.currency === 'USD' || body?.currency === 'EUR') ? body.currency : null;
+    const servicePeriodStart = body?.servicePeriodStart ? String(body.servicePeriodStart).trim() : null;
+    const servicePeriodEnd = body?.servicePeriodEnd ? String(body.servicePeriodEnd).trim() : null;
     let executorFio = body?.executorFio ? String(body.executorFio).trim() : null;
     let executorInn = body?.executorInn ? String(body.executorInn).replace(/\D/g, '') : null;
-    if (!phone || !orgInn || !orgName || !description || !amount) return NextResponse.json({ error: 'MISSING_FIELDS' }, { status: 400 });
+    if (!phone || !orgName || !description || !amount) return NextResponse.json({ error: 'MISSING_FIELDS' }, { status: 400 });
+    if (payerType === 'ru' && !orgInn) return NextResponse.json({ error: 'MISSING_INN' }, { status: 400 });
+    if (payerType === 'foreign' && (!taxId || !address)) return NextResponse.json({ error: 'MISSING_FOREIGN_FIELDS' }, { status: 400 });
     // 6-digit unique id
     const gen = async (): Promise<number> => {
       const n = Math.floor(100000 + Math.random() * 900000);
@@ -121,7 +141,71 @@ export async function POST(req: Request) {
     }
 
     const code = await genCode();
-    const inv: Invoice = { id, code, createdAt: new Date().toISOString(), phone, orgInn, orgName, email, description, amount, executorFio, executorInn };
+    
+    // Расчёт для иностранных компаний
+    let invoice_amount: number | null = null;
+    let sum_convert_cur: number | null = null;
+    let sum_convert_rub: number | null = null;
+    let get_bcc_weighted_average_rate: number | null = null;
+    let total_amount_rub: number | null = null;
+    
+    if (payerType === 'foreign' && currency) {
+      try {
+        const amtNum = Number(String(amount).replace(',', '.'));
+        if (!Number.isFinite(amtNum)) throw new Error('INVALID_AMOUNT');
+        invoice_amount = amtNum;
+        sum_convert_cur = invoice_amount - (invoice_amount * 0.04) - 25;
+        
+        // Fetch BCC rates from website (parse from data-legal JSON attribute)
+        async function fetchBccRates(): Promise<{ rub_kzt_buy: number; rub_kzt_sell: number; cur_kzt_buy: number; cur_kzt_sell: number }> {
+          const url = 'https://www.bcc.kz/personal/currency-rates/';
+          const r = await fetch(url, { cache: 'no-store' });
+          if (!r.ok) throw new Error('BCC_FETCH_FAILED');
+          const html = await r.text();
+          // Extract JSON from data-legal attribute
+          const m = /data-legal='([^']+)'/.exec(html);
+          if (!m || !m[1]) throw new Error('RATE_DATA_NOT_FOUND');
+          const jsonStr = m[1].replace(/&quot;/g, '"');
+          const data = JSON.parse(jsonStr);
+          if (!Array.isArray(data)) throw new Error('INVALID_RATE_DATA');
+          
+          const usd = data.find((x: any) => String(x.name).toLowerCase() === 'usd');
+          const eur = data.find((x: any) => String(x.name).toLowerCase() === 'eur');
+          const rub = data.find((x: any) => String(x.name).toLowerCase() === 'rub');
+          if (!usd || !eur || !rub) throw new Error('MISSING_CURRENCY_DATA');
+          
+          const parse = (val: any) => {
+            const n = Number(String(val).replace(',', '.'));
+            if (!Number.isFinite(n) || n <= 0) throw new Error('INVALID_RATE_VALUE');
+            return n;
+          };
+          
+          const rub_kzt_buy = parse(rub.buy);
+          const rub_kzt_sell = parse(rub.sell);
+          const cur_kzt_buy = parse(currency === 'USD' ? usd.buy : eur.buy);
+          const cur_kzt_sell = parse(currency === 'USD' ? usd.sell : eur.sell);
+          
+          return { rub_kzt_buy, rub_kzt_sell, cur_kzt_buy, cur_kzt_sell };
+        }
+        
+        const rates = await fetchBccRates();
+        const cross_rate_sell = rates.cur_kzt_sell / rates.rub_kzt_buy;
+        const cross_rate_buy = rates.cur_kzt_buy / rates.rub_kzt_sell;
+        const cross_rate_average = (cross_rate_buy + cross_rate_sell) / 2;
+        const spread = (cross_rate_sell - cross_rate_buy) / 2;
+        get_bcc_weighted_average_rate = cross_rate_average - spread;
+        
+        // Сумма в рублях после конвертации
+        sum_convert_rub = sum_convert_cur * get_bcc_weighted_average_rate;
+        
+        // Списываем комиссию сервиса
+        total_amount_rub = sum_convert_rub - (sum_convert_rub * 0.02);
+      } catch (e) {
+        return NextResponse.json({ error: 'BCC_RATES_UNAVAILABLE', message: 'Не удалось получить актуальные курсы валют. Попробуйте позже' }, { status: 503 });
+      }
+    }
+    
+    const inv: Invoice = { id, code, createdAt: new Date().toISOString(), phone, payerType, orgInn, orgName, taxId, address, email, description, amount, currency, servicePeriodStart, servicePeriodEnd, executorFio, executorInn, invoice_amount, sum_convert_cur, sum_convert_rub, get_bcc_weighted_average_rate, total_amount_rub };
     const list = await readStore();
     list.push(inv);
     await writeStore(list);
@@ -129,12 +213,26 @@ export async function POST(req: Request) {
     // If customer email provided — send email with invoice link (best-effort, no blocking)
     if (email && /@/.test(email)) {
       try {
-        const { renderInvoiceForCustomerEmail } = await import('@/server/emailTemplates');
         const { sendEmail } = await import('@/server/email');
         const link = (process.env.NEXT_PUBLIC_BASE_URL || 'https://ypla.ru').replace(/\/$/, '') + `/invoice/${encodeURIComponent(inv.code || inv.id)}`;
-        const subject = `Счёт на оплату №${inv.id} — ${inv.amount} ₽`;
-        const html = renderInvoiceForCustomerEmail({ invoiceNumber: inv.id, amount: `${inv.amount}`, sellerName: inv.executorFio || 'Исполнитель', invoiceLink: link });
-        await sendEmail({ to: email, subject, html });
+        
+        if (payerType === 'foreign') {
+          const { renderInvoiceForCustomerEmailForeign } = await import('@/server/emailTemplates');
+          const subject = `Invoice No. ${inv.id} ${inv.invoice_amount || inv.amount} ${inv.currency || ''}`;
+          const html = renderInvoiceForCustomerEmailForeign({
+            invoiceNumber: inv.id,
+            invoiceAmount: String(inv.invoice_amount || inv.amount),
+            currency: inv.currency || 'USD',
+            contractorName: inv.executorFio || 'Contractor',
+            invoiceLink: link
+          });
+          await sendEmail({ to: email, subject, html });
+        } else {
+          const { renderInvoiceForCustomerEmail } = await import('@/server/emailTemplates');
+          const subject = `Счёт на оплату №${inv.id} — ${inv.amount} ₽`;
+          const html = renderInvoiceForCustomerEmail({ invoiceNumber: inv.id, amount: `${inv.amount}`, sellerName: inv.executorFio || 'Исполнитель', invoiceLink: link });
+          await sendEmail({ to: email, subject, html });
+        }
       } catch {}
     }
 
