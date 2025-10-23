@@ -530,7 +530,7 @@ export default function InvoiceNewPage() {
                         const val = i === -1 ? raw : raw.slice(0, i + 1) + raw.slice(i + 1).replace(/,/g, '');
                         setServiceAmount(val);
                       }}
-                      hint={`Укажите стоимость ваших услуг в выбранной валюте. С этой суммы будет удержана комиссия сервиса в размере 6%+25 ${currency}`}
+                      hint={`Укажите стоимость ваших услуг в выбранной валюте. С этой суммы будет удержана комиссия сервиса в размере до 6%+25 ${currency}`}
                     />
                   </div>
                 </>

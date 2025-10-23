@@ -40,7 +40,7 @@ export default async function InvoicePublicPage(props: { params: Promise<{ id?: 
   }
   return (
     <div className="max-w-xl mx-auto mt-6 md:mt-8 px-4 md:px-0 pb-10 md:pb-12">
-      <h1 className="text-2xl font-bold mb-3">{invoice ? `Счёт № ${invoice?.id}` : 'Счёт'}</h1>
+      <h1 className="text-2xl font-bold mb-3">{invoice ? (invoice.payerType === 'foreign' ? `Invoice № ${invoice.id}` : `Счёт № ${invoice.id}`) : 'Счёт'}</h1>
       {invoice ? (
         <div className="space-y-4 text-sm text-gray-800 dark:text-gray-200">
           {invoice.payerType === 'foreign' ? (
@@ -76,7 +76,7 @@ export default async function InvoicePublicPage(props: { params: Promise<{ id?: 
                 <div>NODABANK Sky Rock LLP Payment under Agreement No. {invoice.id} for {invoice.description}. VAT not applicable.</div>
               </div>
               <div className="mt-3">
-                <a className="text-blue-600 hover:underline" href={`/api/invoice/${encodeURIComponent(String(code))}/pdf`} target="_blank" rel="noreferrer">Скачать в PDF</a>
+                <a className="text-blue-600 hover:underline" href={`/api/invoice/${encodeURIComponent(String(code))}/pdf`} target="_blank" rel="noreferrer">{invoice.payerType === 'foreign' ? 'Download in PDF' : 'Скачать в PDF'}</a>
               </div>
             </div>
           ) : (
