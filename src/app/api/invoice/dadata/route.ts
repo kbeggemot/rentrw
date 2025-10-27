@@ -22,7 +22,7 @@ export async function POST(req: Request) {
         'Authorization': `Token ${token}`,
         ...(secret ? { 'X-Secret': secret } as Record<string, string> : {})
       },
-      body: JSON.stringify({ query: inn, branch_type: 'MAIN', type: 'LEGAL', count: 1 }),
+      body: JSON.stringify({ query: inn }),
       cache: 'no-store'
     });
     const txt = await res.text();
