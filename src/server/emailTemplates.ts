@@ -144,7 +144,7 @@ export function renderInvoiceForCustomerEmail(params: { invoiceNumber: string | 
           <a class="btn" href="${invoiceLink}" style="display:inline-block;padding:12px 16px;border-radius:6px;background:#111;color:#fff !important;text-decoration:none;">Открыть счёт</a>
         </p>
         <p style="margin:0 0 8px 0;">Ссылка на счёт: <a href="${invoiceLink}" style="color:#2563eb;text-decoration:underline;">${invoiceLink}</a></p>
-        <p class="muted" style="margin-top:12px;">Оплачивая, вы присоединяетесь к Условиям Рокет Ворка. Комиссия 3% удерживается с исполнителя (если нет индивидуальных условий). Чек НПД будет сформирован автоматически.</p>
+        <p class="muted" style="margin-top:12px;">Оплачивая, вы присоединяетесь к Условиям Рокет Ворка. Комиссия 1,5% удерживается с исполнителя (если нет индивидуальных условий). Чек НПД будет сформирован автоматически.</p>
       </div>
       <p class="muted"><img src="${brandLogoUrl}" alt="YPLA" height="16" style="height:16px;vertical-align:middle;"></p>
     </div>
