@@ -2,6 +2,16 @@ import { NextResponse } from 'next/server';
 
 export const runtime = 'nodejs';
 
+async function logInvoiceDebug(entry: Record<string, any>): Promise<void> {
+  try {
+    const { writeText } = await import('@/server/storage');
+    const ts = new Date().toISOString();
+    const fileTs = ts.replace(/[:.]/g, '-');
+    const key = `.data/logs/telegram_invoice/${fileTs}-${Math.random().toString(36).slice(2, 8)}.json`;
+    await writeText(key, JSON.stringify({ ts, ...entry }, null, 2));
+  } catch {}
+}
+
 export async function POST(req: Request) {
   try {
     // Verify Telegram secret header for invoice bot
@@ -10,10 +20,7 @@ export async function POST(req: Request) {
       if (configured) {
         const got = req.headers.get('x-telegram-bot-api-secret-token');
         if (!got || got !== configured) {
-          try {
-            const fs = await import('fs/promises');
-            await fs.appendFile('.data/telegram_invoice_debug.log', `[${new Date().toISOString()}] secret_mismatch got=${JSON.stringify(got)}\n`);
-          } catch {}
+          await logInvoiceDebug({ event: 'secret_mismatch', got: got || null });
           return NextResponse.json({ ok: false }, { status: 403 });
         }
       }
@@ -45,10 +52,7 @@ export async function POST(req: Request) {
             } catch {}
           }
         } catch {}
-        try {
-          const fs = await import('fs/promises');
-          await fs.appendFile('.data/telegram_invoice_debug.log', `[${new Date().toISOString()}] contact_saved user=${tgUserId} phone=${digits}\n`);
-        } catch {}
+        await logInvoiceDebug({ event: 'contact_saved', userId: tgUserId, phone: digits });
       } catch {}
     }
 
