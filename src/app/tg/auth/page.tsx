@@ -117,13 +117,10 @@ export default function TgAuthPage() {
             const message = 'Спасибо! Чтобы продолжить, вернитесь на экран «Создание счёта» в браузере, либо продолжите в Telegram';
             const target = buildInvoiceUrl(waitToken);
             try {
-              tg?.openLink?.(target, { try_instant_view: false });
+              tg?.showAlert?.(message, () => redirectToInvoice(waitToken));
             } catch {
-              window.location.href = target;
+              redirectToInvoice(waitToken);
             }
-            try {
-              tg?.showAlert?.(message, () => void 0);
-            } catch {}
           } else {
             try { tg?.showAlert?.('Вы отменили доступ к номеру'); } catch {}
           }

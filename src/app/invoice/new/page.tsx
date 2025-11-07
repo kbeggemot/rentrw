@@ -284,6 +284,7 @@ export default function InvoiceNewPage() {
                   return;
                 }
                 setOpening(true); setStatus('Ожидаем подтверждение в Telegram…');
+                try { sessionStorage.setItem('tg_shared_phone', ''); } catch {}
                 void registerAwaitOnServer();
               }}
               className={`inline-flex items-center justify-center h-10 px-4 rounded text-sm text-white ${opening ? 'bg-blue-600 opacity-70' : 'bg-blue-600 hover:bg-blue-700'}`}
