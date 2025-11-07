@@ -43,16 +43,24 @@ export async function POST(req: Request) {
   try {
     const body = await req.json().catch(() => null);
     const initData = String(body?.initData || '');
-    const v = validateTelegramInitData(initData);
-    if (!v.ok) return NextResponse.json({ ok: false, error: v.error || 'INVALID' }, { status: 400 });
-    const uid = v.userId || null;
     let waitId: string | null = null;
     try {
       const url = new URL(req.url);
       waitId = url.searchParams.get('wait');
     } catch {}
+    
+    let uid: string | null = null;
+    
+    // Try to validate initData if present (for mini-app flow)
+    if (initData && initData.trim().length > 0) {
+      const v = validateTelegramInitData(initData);
+      if (v.ok) {
+        uid = v.userId || null;
+      }
+      // If validation fails but we have waitId, continue anyway (browser flow)
+    }
 
-    // Mark that we expect a contact for this user id (webhook should correlate)
+    // Mark that we expect a contact for this user id or waitId (webhook should correlate)
     try {
       const { writeText } = await import('@/server/storage');
       const key = `.data/tg_phone_wait_${encodeURIComponent(waitId || String(uid ?? 'unknown'))}.json`;
