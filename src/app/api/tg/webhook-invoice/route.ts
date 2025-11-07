@@ -39,6 +39,7 @@ export async function POST(req: Request) {
         const savePath = `.data/tg_phone_${encodeURIComponent(tgUserId)}.json`;
         await writeText(savePath, JSON.stringify({ userId: tgUserId, phone: digits, source: 'telegram_contact_invoice', ts: new Date().toISOString() }));
         // Also mark any pending wait tokens as complete (best-effort)
+        const updatedWaits: string[] = [];
         try {
           const { list } = await import('@/server/storage');
           const all = await list('.data');
@@ -48,11 +49,16 @@ export async function POST(req: Request) {
               const txt = await readText(w); const obj = txt ? JSON.parse(txt as any) : null;
               if (obj && (!obj.userId || String(obj.userId) === tgUserId)) {
                 await writeText(w, JSON.stringify({ ...obj, userId: tgUserId, phone: digits, ts: new Date().toISOString() }));
+                if (obj?.waitId) updatedWaits.push(String(obj.waitId));
+                else {
+                  const m = /tg_phone_wait_(.*)\.json$/.exec(w);
+                  if (m) updatedWaits.push(m[1]);
+                }
               }
             } catch {}
           }
         } catch {}
-        await logInvoiceDebug({ event: 'contact_saved', userId: tgUserId, phone: digits });
+        await logInvoiceDebug({ event: 'contact_saved', userId: tgUserId, phone: digits, updatedWaits });
       } catch {}
     }
 
