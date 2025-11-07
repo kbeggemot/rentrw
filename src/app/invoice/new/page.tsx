@@ -271,7 +271,7 @@ export default function InvoiceNewPage() {
           <p className="text-sm text-gray-700 dark:text-gray-200">Поделитесь своим номером телефона — он должен совпадать с номером из Рокет Ворка.</p>
           <div className="flex flex-col gap-3">
             <a
-              href={`https://t.me/yplaru_bot/tg_auth?startapp=${encodeURIComponent(`share_phone_${waitId || ''}`)}`}
+              href={`https://t.me/yplaru_ibot/tg_auth?startapp=${encodeURIComponent(`share_phone_${waitId || ''}`)}`}
               target="_blank"
               rel="noopener noreferrer"
               onClick={(e) => {
