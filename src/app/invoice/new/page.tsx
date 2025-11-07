@@ -218,7 +218,7 @@ export default function InvoiceNewPage() {
       // Сообщим бэку, что ждём контакт (для маппинга webhook-а)
       try {
         const initData: string | undefined = (window as any)?.Telegram?.WebApp?.initData;
-        await fetch('/api/phone/await-contact', {
+        await fetch('/api/phone/await-contact-invoice', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ initData: initData || '' })
