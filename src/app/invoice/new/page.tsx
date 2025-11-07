@@ -131,12 +131,26 @@ export default function InvoiceNewPage() {
     }
     // Initialize or reuse wait id
     try {
-      let wid = sessionStorage.getItem('tg_wait_id');
+      let wid: string | null = null;
+      try {
+        const current = new URL(window.location.href);
+        const param = current.searchParams.get('wait');
+        if (param && /^[A-Za-z0-9_-]{3,64}$/.test(param)) {
+          wid = param;
+        }
+      } catch {}
+      if (!wid) {
+        wid = sessionStorage.getItem('tg_wait_id');
+      }
+      if (!wid) {
+        try { wid = localStorage.getItem('tg_invoice_last_wait'); } catch { wid = null; }
+      }
       if (!wid) {
         wid = 'w' + Math.random().toString(36).slice(2, 10);
-        sessionStorage.setItem('tg_wait_id', wid);
       }
       setWaitId(wid);
+      try { sessionStorage.setItem('tg_wait_id', wid); } catch {}
+      try { localStorage.setItem('tg_invoice_last_wait', wid); } catch {}
     } catch {}
     if (!tgUserId) {
       const uidFromCookie = readCookie('tg_uid');
@@ -146,12 +160,25 @@ export default function InvoiceNewPage() {
     let timer: number | null = null;
     const fetchStatus = async () => {
       try {
-        const r = await fetch(waitId ? `/api/phone/status?wait=${encodeURIComponent(String(waitId))}` : (tgUserId ? `/api/phone/status?uid=${encodeURIComponent(String(tgUserId))}` : '/api/phone/status'), { cache: 'no-store' });
+        const primaryUrl = waitId ? `/api/phone/status?wait=${encodeURIComponent(String(waitId))}` : (tgUserId ? `/api/phone/status?uid=${encodeURIComponent(String(tgUserId))}` : '/api/phone/status');
+        const r = await fetch(primaryUrl, { cache: 'no-store' });
         const d = await r.json().catch(() => ({}));
-        const ph = d?.phone ? String(d.phone) : null;
+        let ph = d?.phone ? String(d.phone) : null;
+        if (!ph && tgUserId) {
+          try {
+            const r2 = await fetch(`/api/phone/status?uid=${encodeURIComponent(String(tgUserId))}`, { cache: 'no-store' });
+            const d2 = await r2.json().catch(() => ({}));
+            if (d2?.phone) ph = String(d2.phone);
+          } catch {}
+        }
         if (!cancelled && ph) {
           setPhone(ph);
+          setOpening(false);
+          setStatus(null);
           try { sessionStorage.setItem('tg_shared_phone', ph); } catch {}
+          if (waitId) {
+            try { localStorage.setItem('tg_invoice_last_wait', waitId); } catch {}
+          }
         }
       } catch {}
       if (!cancelled && !phone) timer = window.setTimeout(fetchStatus, 2000) as unknown as number;
@@ -183,9 +210,10 @@ export default function InvoiceNewPage() {
   }, [phone, runCheck]);
 
   const registerAwaitOnServer = useCallback(async () => {
+    if (!waitId) return;
     try {
       const initData: string | undefined = (window as any)?.Telegram?.WebApp?.initData;
-      const url = waitId ? `/api/phone/await-contact-invoice?wait=${encodeURIComponent(waitId)}` : '/api/phone/await-contact-invoice';
+      const url = `/api/phone/await-contact-invoice?wait=${encodeURIComponent(waitId)}`;
       await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

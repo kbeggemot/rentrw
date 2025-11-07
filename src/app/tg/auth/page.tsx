@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import Script from 'next/script';
 
 declare global {
@@ -20,10 +20,31 @@ function getStartParam(): string | null {
   return null;
 }
 
+function buildInvoiceUrl(waitToken?: string | null): string {
+  const base = 'https://ypla.ru/invoice/new';
+  if (waitToken && waitToken.length > 0) {
+    return `${base}?wait=${encodeURIComponent(waitToken)}&from=tg`;
+  }
+  return `${base}?from=tg`;
+}
+
 export default function TgAuthPage() {
   const [start, setStart] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
   const [waitToken, setWaitToken] = useState<string | null>(null);
+  const redirectToInvoice = useCallback((token?: string | null) => {
+    const url = buildInvoiceUrl(token);
+    try {
+      const tg = (window as any)?.Telegram?.WebApp;
+      if (tg?.openLink) {
+        tg.openLink(url, { try_instant_view: false } as any);
+      } else {
+        window.location.href = url;
+      }
+    } catch {
+      window.location.href = url;
+    }
+  }, []);
   useEffect(() => {
     try {
       const tg = (window as any)?.Telegram?.WebApp;
@@ -55,6 +76,22 @@ export default function TgAuthPage() {
 
   const showShare = useMemo(() => !!start && start.startsWith('share_phone'), [start]);
 
+  useEffect(() => {
+    if (waitToken) {
+      try { localStorage.setItem('tg_invoice_last_wait', waitToken); } catch {}
+    }
+  }, [waitToken]);
+
+  useEffect(() => {
+    if (!ready) return;
+    try {
+      const lastWait = localStorage.getItem('tg_invoice_last_wait');
+      if (lastWait && (!start || !start.startsWith('share_phone'))) {
+        redirectToInvoice(lastWait);
+      }
+    } catch {}
+  }, [ready, start, redirectToInvoice]);
+
   // Unified handler to start share flow
   function startShareFlow(): void {
     try {
@@ -65,7 +102,7 @@ export default function TgAuthPage() {
       // Tell backend we're awaiting contact
       try {
         const initData: string | undefined = tg?.initData;
-        const url = `/api/phone/await-contact${waitToken ? `?wait=${encodeURIComponent(waitToken)}` : ''}`;
+        const url = `/api/phone/await-contact-invoice${waitToken ? `?wait=${encodeURIComponent(waitToken)}` : ''}`;
         fetch(url, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -76,7 +113,14 @@ export default function TgAuthPage() {
       if (typeof tg?.requestContact === 'function') {
         tg.requestContact((shared: boolean) => {
           if (shared) {
-            try { tg?.showAlert?.('Спасибо! Чтобы продолжить, вернитесь на экран «Создание счёта». Telegram можно закрыть.'); } catch {}
+            try { localStorage.setItem('tg_invoice_last_wait', waitToken || ''); } catch {}
+            const message = 'Спасибо! Чтобы продолжить, вернитесь на экран «Создание счёта» в браузере, либо продолжите в Telegram';
+            const target = buildInvoiceUrl(waitToken);
+            try {
+              tg?.showAlert?.(message, () => redirectToInvoice(waitToken));
+            } catch {
+              redirectToInvoice(waitToken);
+            }
           } else {
             try { tg?.showAlert?.('Вы отменили доступ к номеру'); } catch {}
           }
