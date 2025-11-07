@@ -66,6 +66,10 @@ export async function POST(req: Request) {
       const key = `.data/tg_phone_wait_${encodeURIComponent(waitId || String(uid ?? 'unknown'))}.json`;
       const rec = { ts: new Date().toISOString(), userId: uid, waitId: waitId || null } as any;
       await writeText(key, JSON.stringify(rec));
+      try {
+        const logKey = `.data/logs/telegram_invoice/await-${new Date().toISOString().replace(/[:.]/g, '-')}-${Math.random().toString(36).slice(2, 8)}.json`;
+        await writeText(logKey, JSON.stringify({ ts: new Date().toISOString(), waitId, userId: uid }, null, 2));
+      } catch {}
     } catch {}
 
     return NextResponse.json({ ok: true, userId: uid });
