@@ -182,54 +182,17 @@ export default function InvoiceNewPage() {
     runCheck();
   }, [phone, runCheck]);
 
-  const requestPhone = useCallback(async () => {
+  const registerAwaitOnServer = useCallback(async () => {
     try {
-      const tg = (window as any)?.Telegram?.WebApp;
-      if (!tg) return;
-      // 1) Попросим разрешение на сообщения, 2) затем запросим номер — оба запроса из одного клика
-      setStatus('Запрашиваем разрешение на сообщения…');
-      try {
-        await new Promise<void>((resolve) => {
-          try {
-            tg.requestWriteAccess?.((allowed: boolean) => {
-              if (allowed) {
-                try { tg.showAlert?.('Спасибо! Мы сможем присылать уведомления в Telegram.'); } catch {}
-              }
-              resolve();
-            });
-          } catch { resolve(); }
-        });
-      } catch {}
-
-      setStatus('Запрашиваем номер в Telegram…');
-      await new Promise<void>((resolve) => {
-        try {
-          tg.requestContact((shared: any) => {
-            if (shared) {
-              try { tg.showAlert?.('Спасибо! Проверяем номер…'); } catch {}
-              resolve();
-            } else {
-              try { tg.showAlert?.('Вы отменили доступ к номеру'); } catch {}
-              resolve();
-            }
-          });
-        } catch { resolve(); }
+      const initData: string | undefined = (window as any)?.Telegram?.WebApp?.initData;
+      const url = waitId ? `/api/phone/await-contact-invoice?wait=${encodeURIComponent(waitId)}` : '/api/phone/await-contact-invoice';
+      await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ initData: initData || '' })
       });
-      // Сообщим бэку, что ждём контакт (для маппинга webhook-а)
-      try {
-        const initData: string | undefined = (window as any)?.Telegram?.WebApp?.initData;
-        const url = waitId ? `/api/phone/await-contact-invoice?wait=${encodeURIComponent(waitId)}` : '/api/phone/await-contact-invoice';
-        await fetch(url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ initData: initData || '' })
-        });
-      } catch {}
-      setStatus('Ожидание контакта от Telegram…');
-    } catch {
-      setStatus('Не удалось запросить номер. Попробуйте ещё раз.');
-    }
-  }, []);
+    } catch {}
+  }, [waitId]);
 
   const showLogin = useMemo(() => !phone, [phone]);
 
@@ -284,6 +247,7 @@ export default function InvoiceNewPage() {
                   return;
                 }
                 setOpening(true); setStatus('Ожидаем подтверждение в Telegram…');
+                void registerAwaitOnServer();
               }}
               className={`inline-flex items-center justify-center h-10 px-4 rounded text-sm text-white ${opening ? 'bg-blue-600 opacity-70' : 'bg-blue-600 hover:bg-blue-700'}`}
             >
