@@ -9,7 +9,13 @@ export async function POST(req: Request) {
       const configured = process.env.TELEGRAM_INVOICE_SECRET_TOKEN;
       if (configured) {
         const got = req.headers.get('x-telegram-bot-api-secret-token');
-        if (!got || got !== configured) return NextResponse.json({ ok: false }, { status: 403 });
+        if (!got || got !== configured) {
+          try {
+            const fs = await import('fs/promises');
+            await fs.appendFile('.data/telegram_invoice_debug.log', `[${new Date().toISOString()}] secret_mismatch got=${JSON.stringify(got)}\n`);
+          } catch {}
+          return NextResponse.json({ ok: false }, { status: 403 });
+        }
       }
     } catch {}
 
@@ -38,6 +44,10 @@ export async function POST(req: Request) {
               }
             } catch {}
           }
+        } catch {}
+        try {
+          const fs = await import('fs/promises');
+          await fs.appendFile('.data/telegram_invoice_debug.log', `[${new Date().toISOString()}] contact_saved user=${tgUserId} phone=${digits}\n`);
         } catch {}
       } catch {}
     }
