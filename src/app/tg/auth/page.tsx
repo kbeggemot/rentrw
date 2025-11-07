@@ -35,14 +35,9 @@ export default function TgAuthPage() {
   const redirectToInvoice = useCallback((token?: string | null) => {
     const url = buildInvoiceUrl(token);
     try {
-      const tg = (window as any)?.Telegram?.WebApp;
-      if (tg?.openLink) {
-        tg.openLink(url, { try_instant_view: false } as any);
-      } else {
-        window.location.href = url;
-      }
-    } catch {
       window.location.href = url;
+    } catch {
+      // ignore
     }
   }, []);
   useEffect(() => {
