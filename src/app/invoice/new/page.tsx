@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Input } from '@/components/ui/Input';
 import { Textarea } from '@/components/ui/Textarea';
 
@@ -19,6 +19,7 @@ export default function InvoiceNewPage() {
   const [checkMsg, setCheckMsg] = useState<string | null>(null);
   const [checkOk, setCheckOk] = useState<boolean | null>(null);
   const [fio, setFio] = useState<string | null>(null);
+  const logoutVersionRef = useRef(0);
   const [companyType, setCompanyType] = useState<'ru' | 'foreign' | null>(null);
   const [payerInn, setPayerInn] = useState<string>('');
   const [payerTaxId, setPayerTaxId] = useState<string>('');
@@ -159,6 +160,7 @@ export default function InvoiceNewPage() {
     let cancelled = false;
     let timer: number | null = null;
     const fetchStatus = async () => {
+      const versionAtStart = logoutVersionRef.current;
       try {
         const primaryUrl = waitId ? `/api/phone/status?wait=${encodeURIComponent(String(waitId))}` : (tgUserId ? `/api/phone/status?uid=${encodeURIComponent(String(tgUserId))}` : '/api/phone/status');
         const r = await fetch(primaryUrl, { cache: 'no-store' });
@@ -171,7 +173,7 @@ export default function InvoiceNewPage() {
             if (d2?.phone) ph = String(d2.phone);
           } catch {}
         }
-        if (!cancelled && ph) {
+        if (!cancelled && ph && logoutVersionRef.current === versionAtStart) {
           setPhone(ph);
           setOpening(false);
           setStatus(null);
@@ -225,6 +227,7 @@ export default function InvoiceNewPage() {
   const showLogin = useMemo(() => !phone, [phone]);
 
   const handleLogout = useCallback(() => {
+    logoutVersionRef.current += 1;
     try {
       // Clear TG cookies used for linking mini-app sessions
       document.cookie = 'tg_uid=; Path=/; Max-Age=0';
@@ -246,14 +249,11 @@ export default function InvoiceNewPage() {
     setFio(null);
     setOpening(false);
     setStatus(null);
-    setWaitId(prev => {
-      try {
-        const fresh = 'w' + Math.random().toString(36).slice(2, 10);
-        sessionStorage.setItem('tg_wait_id', fresh);
-        return fresh;
-      } catch {}
-      return prev;
-    });
+    try {
+      const fresh = 'w' + Math.random().toString(36).slice(2, 10);
+      sessionStorage.setItem('tg_wait_id', fresh);
+      setWaitId(fresh);
+    } catch {}
     try { sessionStorage.removeItem('inv_executor_inn'); } catch {}
     try { sessionStorage.removeItem('inv_executor_fio'); } catch {}
   }, [phone]);
