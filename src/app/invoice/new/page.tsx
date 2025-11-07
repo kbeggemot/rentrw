@@ -234,6 +234,7 @@ export default function InvoiceNewPage() {
     } catch {}
     try { sessionStorage.removeItem('tg_shared_phone'); } catch {}
     try { sessionStorage.removeItem('tg_wait_id'); } catch {}
+    try { localStorage.removeItem('tg_invoice_last_wait'); } catch {}
     try {
       const digits = String(phone || '').replace(/\D/g, '');
       if (digits) sessionStorage.removeItem(`inv_check_${digits}`);
@@ -245,6 +246,14 @@ export default function InvoiceNewPage() {
     setFio(null);
     setOpening(false);
     setStatus(null);
+    setWaitId(prev => {
+      try {
+        const fresh = 'w' + Math.random().toString(36).slice(2, 10);
+        sessionStorage.setItem('tg_wait_id', fresh);
+        return fresh;
+      } catch {}
+      return prev;
+    });
     try { sessionStorage.removeItem('inv_executor_inn'); } catch {}
     try { sessionStorage.removeItem('inv_executor_fio'); } catch {}
   }, [phone]);
