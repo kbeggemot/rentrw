@@ -154,7 +154,7 @@ export async function POST(req: Request) {
         const amtNum = Number(String(amount).replace(',', '.'));
         if (!Number.isFinite(amtNum)) throw new Error('INVALID_AMOUNT');
         invoice_amount = amtNum;
-        sum_convert_cur = invoice_amount - (invoice_amount * 0.04) - 25;
+        sum_convert_cur = Math.max(invoice_amount - (invoice_amount * 0.03), 0);
         
         // Fetch BCC rates from website (parse from data-legal JSON attribute)
         async function fetchBccRates(): Promise<{ rub_kzt_buy: number; rub_kzt_sell: number; cur_kzt_buy: number; cur_kzt_sell: number }> {
@@ -195,11 +195,9 @@ export async function POST(req: Request) {
         const spread = (cross_rate_sell - cross_rate_buy) / 2;
         get_bcc_weighted_average_rate = cross_rate_average - spread;
         
-        // Сумма в рублях после конвертации
+        // Сумма в рублях после конвертации (комиссия 3% уже учтена в sum_convert_cur)
         sum_convert_rub = sum_convert_cur * get_bcc_weighted_average_rate;
-        
-        // Списываем комиссию сервиса
-        total_amount_rub = sum_convert_rub - (sum_convert_rub * 0.02);
+        total_amount_rub = sum_convert_rub;
       } catch (e) {
         return NextResponse.json({ error: 'BCC_RATES_UNAVAILABLE', message: 'Не удалось получить актуальные курсы валют. Попробуйте позже' }, { status: 503 });
       }

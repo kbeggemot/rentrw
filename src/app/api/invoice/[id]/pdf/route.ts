@@ -393,7 +393,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ id?: string }> 
         'Please be advised that your contractor is registered under the self-employed tax status. We will remit the applicable taxes on their behalf.',
         'Payments must be made exclusively from your organization\'s corporate bank account, strictly adhering to the payment reference specified in this invoice.',
         'By executing this payment, you agree to be bound by the terms of the "Rocket Work" Electronic Service User Agreement.',
-        `A service fee of 6% plus a fixed charge of 25 ${(invoice as any).currency || 'USD/EUR'} will be applied and deducted from the contractor\'s payment, unless individual service terms have been mutually agreed upon with "Rocket Work".`,
+        'A service fee of 3% of the invoice amount will be applied and deducted from the contractor\'s payment, unless individual service terms have been mutually agreed upon with "Rocket Work".',
         '"Rocket Work" reserves the right to return the payment to the sender at its sole discretion, without providing a reason and without deducting any fees.'
       ];
       for (const line of termsForeign) { y = drawParagraph(line, margin, y, width - margin*2, 10, false, 2) - 2; }

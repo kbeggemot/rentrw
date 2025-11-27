@@ -178,7 +178,7 @@ export function renderInvoiceForCustomerEmailForeign(params: { invoiceNumber: st
           <a class="btn" href="${invoiceLink}" style="display:inline-block;padding:12px 16px;border-radius:6px;background:#111;color:#fff !important;text-decoration:none;">Open Invoice</a>
         </p>
         <p style="margin:0 0 8px 0;">Invoice link: <a href="${invoiceLink}" style="color:#2563eb;text-decoration:underline;">${invoiceLink}</a></p>
-        <p class="muted" style="margin-top:12px;">Execution of this payment constitutes your acceptance of the "Rocket Work" Terms of Service. A service fee of 6%+25 ${currency} will be withheld from the contractor's remuneration.</p>
+        <p class="muted" style="margin-top:12px;">Execution of this payment constitutes your acceptance of the "Rocket Work" Terms of Service. A service fee of 3% of the invoice amount will be withheld from the contractor's remuneration.</p>
       </div>
       <p class="muted"><img src="${brandLogoUrl}" alt="YPLA" height="16" style="height:16px;vertical-align:middle;"></p>
     </div>

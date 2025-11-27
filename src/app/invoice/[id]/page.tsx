@@ -129,7 +129,7 @@ export default async function InvoicePublicPage(props: { params: Promise<{ id?: 
                 <p><strong>Please be advised that your contractor is registered under the self-employed tax status. We will remit the applicable taxes on their behalf.</strong></p>
                 <p>Payments must be made exclusively from your organization's corporate bank account, strictly adhering to the payment reference specified in this invoice.</p>
                 <p>By executing this payment, you agree to be bound by the terms of the "Rocket Work" Electronic Service User Agreement.</p>
-                <p>A service fee of 6% plus a fixed charge of 25 {invoice.currency || 'USD/EUR'} will be applied and deducted from the contractor's payment, unless individual service terms have been mutually agreed upon with "Rocket Work".</p>
+                <p>A service fee of 3% of the invoice amount will be applied and deducted from the contractor's payment, unless individual service terms have been mutually agreed upon with "Rocket Work".</p>
                 <p>"Rocket Work" reserves the right to return the payment to the sender at its sole discretion, without providing a reason and without deducting any fees.</p>
               </div>
             </div>
