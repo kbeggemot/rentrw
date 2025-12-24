@@ -781,7 +781,7 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
               return h as any;
             })(),
             body: JSON.stringify({ phone: digits })
-          }, 15_000);
+          }, 25_000);
           
           if (!res.ok) {
             const errorData = await res.json();

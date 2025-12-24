@@ -47,7 +47,8 @@ export async function POST(req: Request) {
     const url = new URL(`executors/${encodeURIComponent(digits)}`, base.endsWith('/') ? base : base + '/').toString();
     let res: Response;
     try {
-      res = await fetchWithTimeout(url, { cache: 'no-store', headers: commonHeaders }, 15_000);
+      // Keep server-side timeout below client-side to return a JSON error instead of client abort.
+      res = await fetchWithTimeout(url, { cache: 'no-store', headers: commonHeaders }, 10_000);
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       return NextResponse.json({ error: `NETWORK_ERROR: ${msg}` }, { status: 502 });
