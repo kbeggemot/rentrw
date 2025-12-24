@@ -3,7 +3,7 @@ import { promises as fs } from 'fs';
 import path from 'path';
 import { resolveRwTokenWithFingerprint } from '@/server/rwToken';
 import { getSelectedOrgInn } from '@/server/orgContext';
-import { fireAndForgetFetch } from '@/server/http';
+import { fetchWithTimeout, fireAndForgetFetch } from '@/server/http';
 
 export const runtime = 'nodejs';
 
@@ -45,7 +45,13 @@ export async function POST(req: Request) {
     } catch {}
     
     const url = new URL(`executors/${encodeURIComponent(digits)}`, base.endsWith('/') ? base : base + '/').toString();
-    const res = await fetch(url, { cache: 'no-store', headers: commonHeaders });
+    let res: Response;
+    try {
+      res = await fetchWithTimeout(url, { cache: 'no-store', headers: commonHeaders }, 15_000);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      return NextResponse.json({ error: `NETWORK_ERROR: ${msg}` }, { status: 502 });
+    }
     const txt = await res.text();
     // Persist last executor validate response for debugging
     try {
