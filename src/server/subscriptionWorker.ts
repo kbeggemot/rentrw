@@ -1,6 +1,7 @@
 import { promises as fs } from 'fs';
 import path from 'path';
 import { getDecryptedApiToken } from './secureStore';
+import { discardResponseBody, fetchWithTimeout } from './http';
 
 const DATA_DIR = path.join(process.cwd(), '.data');
 const JOBS_FILE = path.join(DATA_DIR, 'subscription_jobs.json');
@@ -61,7 +62,7 @@ async function upsert(stream: 'tasks' | 'executors', token: string, base: string
   const headers = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', Accept: 'application/json' } as Record<string, string>;
   async function list(pathname: string) {
     const url = new URL(pathname, base.endsWith('/') ? base : base + '/').toString();
-    const res = await fetch(url, { method: 'GET', headers, cache: 'no-store' });
+    const res = await fetchWithTimeout(url, { method: 'GET', headers, cache: 'no-store' }, 15_000);
     const txt = await res.text();
     let data: any = null; try { data = txt ? JSON.parse(txt) : null; } catch { data = txt; }
     return { ok: res.ok, data } as const;
@@ -87,7 +88,9 @@ async function upsert(stream: 'tasks' | 'executors', token: string, base: string
         const url = new URL(path, base.endsWith('/') ? base : base + '/').toString();
         // v2 expects: http_method, uri, subscribed_on
         const payload = { http_method: 'post', uri: callbackUrl, subscribed_on: [stream] } as any;
-        const res = await fetch(url, { method: 'POST', headers, body: JSON.stringify(payload) });
+        const res = await fetchWithTimeout(url, { method: 'POST', headers, body: JSON.stringify(payload), cache: 'no-store' }, 15_000);
+        // IMPORTANT: drain body to avoid undici socket leaks
+        await discardResponseBody(res);
         if (res.ok) return true;
       } catch {}
     }

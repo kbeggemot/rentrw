@@ -23,6 +23,7 @@ import { appendRwError, writeRwLastRequest } from '@/server/rwAudit';
 import { appendAdminEntityLog } from '@/server/adminAudit';
 import { getTokenForOrg } from '@/server/orgStore';
 import { findLinkByCode } from '@/server/paymentLinkStore';
+import { discardResponseBody, fetchWithTimeout } from '@/server/http';
 
 export const runtime = 'nodejs';
 
@@ -119,7 +120,11 @@ export async function POST(req: Request) {
         await fs.mkdir(dataDir, { recursive: true });
         await fs.writeFile(path.join(dataDir, 'last_withdrawal_request.json'), JSON.stringify({ ts: new Date().toISOString(), url, payload }, null, 2), 'utf8');
       } catch {}
-      const res = await fetch(url, { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify(payload), cache: 'no-store' });
+      const res = await fetchWithTimeout(
+        url,
+        { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify(payload), cache: 'no-store' },
+        20_000
+      );
       const text = await res.text();
       try {
         const dataDir = path.join(process.cwd(), '.data');
@@ -242,21 +247,23 @@ export async function POST(req: Request) {
       // 1) Сначала отправляем инвайт и дожидаемся ответа RW
       try {
         const inviteUrl = new URL('executors/invite', base.endsWith('/') ? base : base + '/').toString();
-        await fetch(inviteUrl, {
+        const inviteRes = await fetchWithTimeout(inviteUrl, {
           method: 'POST',
           headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', Accept: 'application/json' },
           body: JSON.stringify({ phone: partnerPhone, with_framework_agreement: false }),
           cache: 'no-store',
-        });
+        }, 15_000);
+        // IMPORTANT: drain body to avoid undici socket leaks
+        await discardResponseBody(inviteRes);
       } catch {}
 
       async function getExecutorById(id: string) {
         const url = new URL(`executors/${encodeURIComponent(id)}`, base.endsWith('/') ? base : base + '/').toString();
-        const res = await fetch(url, {
+        const res = await fetchWithTimeout(url, {
           method: 'GET',
           headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
           cache: 'no-store',
-        });
+        }, 15_000);
         const text = await res.text();
         let data: any = null;
         try { data = text ? JSON.parse(text) : null; } catch { data = text; }
@@ -458,7 +465,7 @@ export async function POST(req: Request) {
 
     let res: Response;
     try {
-      res = await fetch(url, {
+      res = await fetchWithTimeout(url, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${token}`,
@@ -467,7 +474,7 @@ export async function POST(req: Request) {
         },
         body: JSON.stringify(payload),
         cache: 'no-store',
-      });
+      }, 20_000);
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       try { await appendRwError({ ts: new Date().toISOString(), scope: 'tasks:create', method: 'POST', url, status: null, requestBody: payload, error: msg, userId }); } catch {}
@@ -568,7 +575,13 @@ export async function POST(req: Request) {
         if (!hasTasks || !hasExecutors) {
           const query = !hasTasks && !hasExecutors ? '' : (!hasTasks ? '&stream=tasks' : '&stream=executors');
           const upsertUrl = new URL(`/api/rocketwork/postbacks?ensure=1${query}`, callbackBase).toString();
-          await fetch(upsertUrl, { method: 'GET', headers: { cookie: `session_user=${encodeURIComponent(userId)}` }, cache: 'no-store' });
+          const upsertRes = await fetchWithTimeout(
+            upsertUrl,
+            { method: 'GET', headers: { cookie: `session_user=${encodeURIComponent(userId)}` }, cache: 'no-store' },
+            15_000
+          );
+          // IMPORTANT: drain body to avoid undici socket leaks
+          await discardResponseBody(upsertRes);
         }
       } catch {}
     }

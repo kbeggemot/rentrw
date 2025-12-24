@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { fetchWithTimeout } from '@/server/http';
 
 export const runtime = 'nodejs';
 
@@ -14,7 +15,7 @@ export async function POST(req: Request) {
     if (!token) return NextResponse.json({ ok: false, error: 'NO_TOKEN' }, { status: 500 });
 
     const url = 'https://suggestions.dadata.ru/suggestions/api/4_1/rs/findById/party';
-    const res = await fetch(url, {
+    const res = await fetchWithTimeout(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -24,7 +25,7 @@ export async function POST(req: Request) {
       },
       body: JSON.stringify({ query: inn }),
       cache: 'no-store'
-    });
+    }, 15_000);
     const txt = await res.text();
     let data: any = null; try { data = txt ? JSON.parse(txt) : null; } catch { data = txt; }
     if (!res.ok) {

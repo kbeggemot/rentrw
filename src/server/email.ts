@@ -1,5 +1,6 @@
 import { writeText } from './storage';
 import dns from 'dns';
+import { discardResponseBody } from './http';
 
 type SendEmailParams = {
   to: string;
@@ -85,6 +86,8 @@ export async function sendEmail(params: SendEmailParams): Promise<void> {
         try { await writeText('.data/last_sendgrid_error.json', JSON.stringify({ ts: new Date().toISOString(), status: res.status, text: txt }, null, 2)); } catch {}
         throw new Error(`SendGrid error ${res.status}`);
       }
+      // IMPORTANT: drain body to avoid undici socket leaks (even if SendGrid returns an empty body)
+      await discardResponseBody(res);
     } finally {
       clearTimeout(timer);
     }

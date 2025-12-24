@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getDecryptedApiToken } from '@/server/secureStore';
 import { listPartners, listPartnersForOrg, upsertPartner, softDeletePartner, upsertPartnerFromValidation, listAllPartnersForOrg } from '@/server/partnerStore';
 import { getSelectedOrgInn } from '@/server/orgContext';
+import { fireAndForgetFetch } from '@/server/http';
 
 export const runtime = 'nodejs';
 
@@ -89,12 +90,12 @@ export async function POST(req: Request) {
     // 1) Invite (best-effort; offline ok)
     try {
       const inviteUrl = new URL('executors/invite', base.endsWith('/') ? base : base + '/').toString();
-      await fetch(inviteUrl, {
+      fireAndForgetFetch(inviteUrl, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', Accept: 'application/json' },
         body: JSON.stringify({ phone, with_framework_agreement: false }),
         cache: 'no-store',
-      });
+      }, 15_000);
     } catch {}
 
     // 2) Validate by fetching executor info

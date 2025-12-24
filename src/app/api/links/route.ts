@@ -5,6 +5,7 @@ import { listProductsForOrg } from '@/server/productsStore';
 import { getSelectedOrgInn } from '@/server/orgContext';
 import { partnerExists, upsertPartnerFromValidation } from '@/server/partnerStore';
 import { applyAgentCommissionToCart } from '@/lib/pricing';
+import { fireAndForgetFetch } from '@/server/http';
 
 export const runtime = 'nodejs';
 
@@ -182,8 +183,11 @@ export async function POST(req: Request) {
         if (!token) return NextResponse.json({ error: 'NO_TOKEN' }, { status: 400 });
         const base = process.env.ROCKETWORK_API_BASE_URL || 'https://app.rocketwork.ru/api/';
         const digits = String(partnerPhone).replace(/\D/g, '');
-        // invite best-effort
-        try { await fetch(new URL('executors/invite', base.endsWith('/') ? base : base + '/').toString(), { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify({ phone: digits, with_framework_agreement: false }), cache: 'no-store' }); } catch {}
+        // invite best-effort (fire-and-forget with timeout + body drain to avoid undici socket leaks)
+        try {
+          const inviteUrl = new URL('executors/invite', base.endsWith('/') ? base : base + '/').toString();
+          fireAndForgetFetch(inviteUrl, { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify({ phone: digits, with_framework_agreement: false }), cache: 'no-store' }, 15_000);
+        } catch {}
         const url = new URL(`executors/${encodeURIComponent(digits)}`, base.endsWith('/') ? base : base + '/').toString();
         const res = await fetch(url, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }, cache: 'no-store' });
         const txt = await res.text();

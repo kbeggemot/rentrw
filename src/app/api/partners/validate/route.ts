@@ -3,6 +3,7 @@ import { promises as fs } from 'fs';
 import path from 'path';
 import { resolveRwTokenWithFingerprint } from '@/server/rwToken';
 import { getSelectedOrgInn } from '@/server/orgContext';
+import { fireAndForgetFetch } from '@/server/http';
 
 export const runtime = 'nodejs';
 
@@ -35,12 +36,12 @@ export async function POST(req: Request) {
     
     // invite best-effort
     try { 
-      await fetch(new URL('executors/invite', base.endsWith('/') ? base : base + '/').toString(), { 
+      fireAndForgetFetch(new URL('executors/invite', base.endsWith('/') ? base : base + '/').toString(), { 
         method: 'POST', 
         headers: { ...commonHeaders, 'Content-Type': 'application/json' }, 
         body: JSON.stringify({ phone: digits, with_framework_agreement: false }), 
         cache: 'no-store' 
-      }); 
+      }, 15_000); 
     } catch {}
     
     const url = new URL(`executors/${encodeURIComponent(digits)}`, base.endsWith('/') ? base : base + '/').toString();

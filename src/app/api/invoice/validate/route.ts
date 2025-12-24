@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { fireAndForgetFetch, fetchWithTimeout } from '@/server/http';
 
 export const runtime = 'nodejs';
 
@@ -28,17 +29,18 @@ export async function POST(req: Request) {
     // 1) Приглашение (best-effort)
     try {
       const inviteUrl = new URL('executors/invite', base.endsWith('/') ? base : base + '/').toString();
-      await fetch(inviteUrl, {
+      // IMPORTANT: fire-and-forget with timeout + body drain (avoids undici socket leaks)
+      fireAndForgetFetch(inviteUrl, {
         method: 'POST',
         headers: { ...headers, 'Content-Type': 'application/json' },
         body: JSON.stringify({ phone: digits, with_framework_agreement: false }),
         cache: 'no-store'
-      }).catch(() => void 0);
+      }, 15_000);
     } catch {}
 
     // 2) Проверка
     const checkUrl = new URL(`executors/${encodeURIComponent(digits)}`, base.endsWith('/') ? base : base + '/').toString();
-    const res = await fetch(checkUrl, { method: 'GET', headers, cache: 'no-store' });
+    const res = await fetchWithTimeout(checkUrl, { method: 'GET', headers, cache: 'no-store' }, 15_000);
     const text = await res.text();
     let data: any = null; try { data = text ? JSON.parse(text) : null; } catch { data = text; }
 

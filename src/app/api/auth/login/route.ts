@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { findUserByPhoneLoose, verifyPassword } from '@/server/userStore';
 import { listUserOrganizations } from '@/server/orgStore';
+import { fireAndForgetFetch } from '@/server/http';
 
 export const runtime = 'nodejs';
 
@@ -49,7 +50,12 @@ export async function POST(req: Request) {
       const scheme = (proto === 'http' && isPublic) ? 'https' : proto;
       const url = `${scheme}://${host}/api/sales?refresh=1`;
       for (const o of orgs) {
-        fetch(url, { method: 'GET', cache: 'no-store', headers: { cookie: `session_user=${encodeURIComponent(user.id)}; org_inn=${encodeURIComponent(o.inn)}` } }).catch(() => {});
+        // IMPORTANT: drain response to avoid undici socket leaks; also enforce a timeout
+        fireAndForgetFetch(
+          url,
+          { method: 'GET', cache: 'no-store', headers: { cookie: `session_user=${encodeURIComponent(user.id)}; org_inn=${encodeURIComponent(o.inn)}` } },
+          15_000
+        );
       }
     } catch {}
     return res;

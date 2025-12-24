@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { fetchWithTimeout } from '@/server/http';
 
 export const runtime = 'nodejs';
 
@@ -123,7 +124,7 @@ export async function POST(req: Request) {
           const base = process.env.ROCKETWORK_API_BASE_URL || 'https://app.rocketwork.ru/api/';
           const digits = phone.replace(/\D/g, '');
           const url = new URL(`executors/${encodeURIComponent(digits)}`, base.endsWith('/') ? base : base + '/').toString();
-          const r = await fetch(url, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }, cache: 'no-store' });
+          const r = await fetchWithTimeout(url, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }, cache: 'no-store' }, 15_000);
           const txt = await r.text();
           let data: any = null; try { data = txt ? JSON.parse(txt) : null; } catch { data = null; }
           const raw: any = data && typeof data === 'object' ? data : {};
@@ -159,7 +160,7 @@ export async function POST(req: Request) {
         // Fetch BCC rates from website (parse from data-legal JSON attribute)
         async function fetchBccRates(): Promise<{ rub_kzt_buy: number; rub_kzt_sell: number; cur_kzt_buy: number; cur_kzt_sell: number }> {
           const url = 'https://www.bcc.kz/personal/currency-rates/';
-          const r = await fetch(url, { cache: 'no-store' });
+          const r = await fetchWithTimeout(url, { cache: 'no-store' }, 15_000);
           if (!r.ok) throw new Error('BCC_FETCH_FAILED');
           const html = await r.text();
           // Extract JSON from data-legal attribute
