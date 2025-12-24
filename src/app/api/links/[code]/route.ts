@@ -3,6 +3,7 @@ import { applyAgentCommissionToCart } from '@/lib/pricing';
 import { deletePaymentLink, findLinkByCode, markLinkAccessed, updatePaymentLink } from '@/server/paymentLinkStore';
 import { getUserPayoutRequisites } from '@/server/userStore';
 import { listProductsForOrg } from '@/server/productsStore';
+import { fetchWithTimeout } from '@/server/http';
 
 export const runtime = 'nodejs';
 
@@ -39,7 +40,7 @@ export async function GET(req: Request) {
             try {
               const base = process.env.ROCKETWORK_API_BASE_URL || 'https://app.rocketwork.ru/api/';
               const url = new URL('account', base.endsWith('/') ? base : base + '/').toString();
-              const res = await fetch(url, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }, cache: 'no-store' });
+                  const res = await fetchWithTimeout(url, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }, cache: 'no-store' }, 15_000);
               const txt = await res.text();
               let data: any = null; try { data = txt ? JSON.parse(txt) : null; } catch { data = txt; }
               if (res.ok && data) {

@@ -7,6 +7,30 @@ let s3Client: any = null;
 let s3Bucket: string | null = null;
 let s3Prefix = '';
 
+function msFromEnv(name: string, fallback: number): number {
+  const raw = process.env[name];
+  const n = raw != null ? Number(raw) : NaN;
+  if (Number.isFinite(n) && n > 0) return Math.floor(n);
+  return fallback;
+}
+
+function withAbortTimeout<T>(ms: number, fn: (signal: AbortSignal) => Promise<T>): Promise<T> {
+  const timeoutMs = Math.max(1, Math.floor(ms));
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  return fn(controller.signal).finally(() => clearTimeout(timer));
+}
+
+function resetS3Client(): void {
+  try {
+    // Best-effort destroy internal http agents (NodeHttpHandler keeps agents)
+    if (s3Client && typeof s3Client.destroy === 'function') s3Client.destroy();
+  } catch {}
+  s3Client = null;
+  s3Bucket = null;
+  s3Prefix = '';
+}
+
 function shouldDebugS3(): boolean {
   return (process.env.S3_DEBUG_LOG || '0') === '1';
 }
@@ -25,10 +49,17 @@ function ensureS3() {
   if (s3Client) return;
   if (process.env.S3_ENABLED !== '1') return;
   const { S3Client, PutObjectCommand, GetObjectCommand, ListObjectsV2Command, HeadObjectCommand } = require('@aws-sdk/client-s3');
+  const { NodeHttpHandler } = require('@smithy/node-http-handler');
   const region = process.env.S3_REGION || 'ru-central1';
   const endpoint = process.env.S3_ENDPOINT || undefined;
   s3Bucket = process.env.S3_BUCKET || null;
   s3Prefix = process.env.S3_PREFIX || '';
+  const connectionTimeout = msFromEnv('S3_CONN_TIMEOUT_MS', 3_000);
+  const socketTimeout = msFromEnv('S3_SOCKET_TIMEOUT_MS', 15_000);
+  const requestHandler = new NodeHttpHandler({
+    connectionTimeout,
+    socketTimeout,
+  });
   s3Client = new S3Client({
     region,
     endpoint,
@@ -37,6 +68,12 @@ function ensureS3() {
       secretAccessKey: String(process.env.S3_SECRET_ACCESS_KEY || ''),
     },
     forcePathStyle: true,
+    requestHandler,
+    maxAttempts: (() => {
+      const raw = process.env.S3_MAX_ATTEMPTS;
+      const n = raw != null ? Number(raw) : NaN;
+      return Number.isFinite(n) && n > 0 ? Math.floor(n) : 2;
+    })(),
   });
   (s3Client as any)._Put = PutObjectCommand;
   (s3Client as any)._Get = GetObjectCommand;
@@ -51,13 +88,15 @@ export async function readText(relPath: string): Promise<string | null> {
     try {
       const key = (s3Prefix + relPath).replace(/^\/+/, '');
       const cmd = new (s3Client as any)._Get({ Bucket: s3Bucket, Key: key });
-      const out = await s3Client.send(cmd);
+      const out: any = await withAbortTimeout(msFromEnv('S3_GET_TIMEOUT_MS', 15_000), (abortSignal) => s3Client.send(cmd, { abortSignal }));
       const chunks: Uint8Array[] = [];
       for await (const c of out.Body as any) chunks.push(c as Uint8Array);
       const buf = Buffer.concat(chunks);
       try { await logS3Io('GET', key, buf.length); } catch {}
       return buf.toString('utf8');
     } catch {
+      // If S3 path hangs/breaks, reset client so next request re-inits it
+      try { resetS3Client(); } catch {}
       return null;
     }
   }
@@ -148,7 +187,12 @@ export async function writeText(relPath: string, text: string): Promise<void> {
       if (!s3Client || !s3Bucket) return;
       const key = (s3Prefix + p).replace(/^\/+/, '');
       const cmd = new (s3Client as any)._Put({ Bucket: s3Bucket, Key: key, Body: body, ContentType: 'application/json; charset=utf-8' });
-      await s3Client.send(cmd);
+      try {
+        await withAbortTimeout(msFromEnv('S3_PUT_TIMEOUT_MS', 15_000), (abortSignal) => s3Client.send(cmd, { abortSignal }));
+      } catch {
+        try { resetS3Client(); } catch {}
+        throw new Error('S3_PUT_FAILED');
+      }
       try { await logS3Io('PUT', key, Buffer.byteLength(body)); } catch {}
       return;
     }
@@ -227,7 +271,12 @@ export async function writeBinary(relPath: string, data: Buffer | Uint8Array, co
     if (!s3Client || !s3Bucket) return;
     const key = (s3Prefix + relPath).replace(/^\/+/, '');
     const cmd = new (s3Client as any)._Put({ Bucket: s3Bucket, Key: key, Body: data, ContentType: contentType });
-    await s3Client.send(cmd);
+    try {
+      await withAbortTimeout(msFromEnv('S3_PUT_TIMEOUT_MS', 15_000), (abortSignal) => s3Client.send(cmd, { abortSignal }));
+    } catch {
+      try { resetS3Client(); } catch {}
+      throw new Error('S3_PUT_FAILED');
+    }
     return;
   }
   const abs = path.join(process.cwd(), relPath);
@@ -244,11 +293,12 @@ export async function statFile(relPath: string): Promise<{ size: number; modifie
       const { HeadObjectCommand } = require('@aws-sdk/client-s3');
       const key = (s3Prefix + relPath).replace(/^\/+/, '');
       const cmd = new HeadObjectCommand({ Bucket: s3Bucket, Key: key });
-      const out = await s3Client.send(cmd);
+      const out: any = await withAbortTimeout(msFromEnv('S3_HEAD_TIMEOUT_MS', 10_000), (abortSignal) => s3Client.send(cmd, { abortSignal }));
       const size = Number(out?.ContentLength || 0);
       const modified = out?.LastModified ? new Date(out.LastModified as any).toISOString() : null;
       return { size, modified };
     } catch {
+      try { resetS3Client(); } catch {}
       return null;
     }
   }
@@ -271,11 +321,12 @@ export async function readRangeFile(relPath: string, start: number, endInclusive
       const { GetObjectCommand } = require('@aws-sdk/client-s3');
       const rangeHeader = `bytes=${start}-${endInclusive}`;
       const cmd = new GetObjectCommand({ Bucket: s3Bucket, Key: key, Range: rangeHeader });
-      const out = await s3Client.send(cmd);
+      const out: any = await withAbortTimeout(msFromEnv('S3_GET_TIMEOUT_MS', 15_000), (abortSignal) => s3Client.send(cmd, { abortSignal }));
       const chunks: Uint8Array[] = [];
       for await (const c of out.Body as any) chunks.push(c as Uint8Array);
       return Buffer.concat(chunks).toString('utf8');
     } catch {
+      try { resetS3Client(); } catch {}
       return null;
     }
   }
@@ -304,7 +355,7 @@ export async function list(prefix: string): Promise<string[]> {
       do {
         // Use any to avoid TS recursive inference issue
         const listCmd: any = new (s3Client as any)._List({ Bucket: s3Bucket, Prefix: pfx, ContinuationToken: token });
-        const resp: any = await (s3Client as any).send(listCmd);
+        const resp: any = await withAbortTimeout(msFromEnv('S3_LIST_TIMEOUT_MS', 15_000), (abortSignal) => (s3Client as any).send(listCmd, { abortSignal }));
         for (const obj of (resp?.Contents || [])) {
           const k = obj.Key as string;
           if (!k) continue;
@@ -313,6 +364,7 @@ export async function list(prefix: string): Promise<string[]> {
         token = resp && resp.IsTruncated ? resp.NextContinuationToken : undefined;
       } while (token);
     } catch {
+      try { resetS3Client(); } catch {}
       return [];
     }
     return out;
@@ -383,13 +435,14 @@ export async function readBinary(relPath: string): Promise<{ data: Buffer; conte
       const { GetObjectCommand } = require('@aws-sdk/client-s3');
       const key = (s3Prefix + relPath).replace(/^\/+/, '');
       const cmd = new GetObjectCommand({ Bucket: s3Bucket, Key: key });
-      const out = await s3Client.send(cmd);
+      const out: any = await withAbortTimeout(msFromEnv('S3_GET_TIMEOUT_MS', 15_000), (abortSignal) => s3Client.send(cmd, { abortSignal }));
       const chunks: Uint8Array[] = [];
       for await (const c of out.Body as any) chunks.push(c as Uint8Array);
       const buf = Buffer.concat(chunks);
       const ct = (out?.ContentType as string | undefined) || guessContentType(relPath) || 'application/octet-stream';
       return { data: buf, contentType: ct };
     } catch {
+      try { resetS3Client(); } catch {}
       return null;
     }
   }
