@@ -297,6 +297,27 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
     return () => { if (timer) window.clearInterval(timer); };
   }, [loading, taskId, payUrl, awaitingPay, receipts.prepay, receipts.full, receipts.commission, receipts.npd, data?.isAgent]);
 
+  // Client-side fetch with timeout (browser fetch has no default timeout and may hang indefinitely)
+  const fetchWithTimeout = async (input: RequestInfo | URL, init: RequestInit = {}, timeoutMs = 15_000) => {
+    const ms = Number.isFinite(Number(timeoutMs)) ? Math.max(1, Math.floor(Number(timeoutMs))) : 15_000;
+    const controller = new AbortController();
+    const t = window.setTimeout(() => controller.abort(), ms) as unknown as number;
+    try {
+      return await fetch(input, { ...init, signal: controller.signal });
+    } finally {
+      try { window.clearTimeout(t); } catch {}
+    }
+  };
+
+  const toErrMsg = (e: unknown, fallback: string) => {
+    if (e instanceof Error) {
+      if ((e as any).name === 'AbortError') return 'Таймаут запроса. Попробуйте ещё раз.';
+      const m = String(e.message || '').trim();
+      return m || fallback;
+    }
+    return fallback;
+  };
+
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -601,7 +622,7 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
     if (pollRef.current) return;
     const tick = async () => {
       try {
-        const r = await fetch(`/api/rocketwork/tasks/${encodeURIComponent(String(uid))}?t=${Date.now()}`, {
+        const r = await fetchWithTimeout(`/api/rocketwork/tasks/${encodeURIComponent(String(uid))}?t=${Date.now()}`, {
           cache: 'no-store',
           headers: (() => {
             const h: Record<string, string> = {};
@@ -609,7 +630,7 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
             try { const inn = (data as any)?.orgInn ? String((data as any).orgInn).replace(/\D/g,'') : ''; if (inn) h['x-org-inn'] = inn; } catch {}
             return h as any;
           })(),
-        });
+        }, 15_000);
         if (!r.ok) {
           const d = await r.json().catch(() => ({} as any));
           const msg = String(d?.error || `Ошибка ${r.status}`);
@@ -667,7 +688,17 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
             return;
           }
         }
-      } catch {}
+      } catch (e) {
+        const msg = toErrMsg(e, 'Ошибка сети. Попробуйте ещё раз.');
+        statusFailRef.current += 1;
+        if (statusFailRef.current >= 6) {
+          setPayError(true);
+          setMsg(msg);
+          if (pollRef.current) { window.clearTimeout(pollRef.current); pollRef.current = null; }
+          setAwaitingPay(false);
+          return;
+        }
+      }
       pollRef.current = window.setTimeout(tick, 2000) as unknown as number;
     };
     pollRef.current = window.setTimeout(tick, 1000) as unknown as number;
@@ -677,7 +708,7 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
     if (payUrlPollRef.current) return;
     const tick = async () => {
       try {
-        const r = await fetch(`/api/rocketwork/task-status/${encodeURIComponent(String(uid))}`, {
+        const r = await fetchWithTimeout(`/api/rocketwork/task-status/${encodeURIComponent(String(uid))}`, {
           cache: 'no-store',
           headers: (() => {
             const h: Record<string, string> = {};
@@ -685,7 +716,7 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
             try { const inn = (data as any)?.orgInn ? String((data as any).orgInn).replace(/\D/g,'') : ''; if (inn) h['x-org-inn'] = inn; } catch {}
             return h as any;
           })(),
-        });
+        }, 15_000);
         if (!r.ok) {
           const d = await r.json().catch(() => ({} as any));
           const msg = String(d?.error || `Ошибка ${r.status}`);
@@ -708,7 +739,17 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
           if (payUrlPollRef.current) { window.clearTimeout(payUrlPollRef.current); payUrlPollRef.current = null; }
           return;
         }
-      } catch {}
+      } catch (e) {
+        const msg = toErrMsg(e, 'Ошибка сети. Попробуйте ещё раз.');
+        payUrlFailRef.current += 1;
+        if (payUrlFailRef.current >= 6) {
+          setPayError(true);
+          setMsg(msg);
+          if (payUrlPollRef.current) { window.clearTimeout(payUrlPollRef.current); payUrlPollRef.current = null; }
+          setAwaitingPay(false);
+          return;
+        }
+      }
       payUrlPollRef.current = window.setTimeout(tick, 1500) as unknown as number;
     };
     payUrlPollRef.current = window.setTimeout(tick, 1000) as unknown as number;
@@ -732,11 +773,11 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
       if (data.isAgent && data.partnerPhone) {
         try {
           const digits = String(data.partnerPhone).replace(/\D/g, '');
-          const res = await fetch('/api/partners/validate', {
+          const res = await fetchWithTimeout('/api/partners/validate', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'x-user-id': data.userId },
             body: JSON.stringify({ phone: digits })
-          });
+          }, 15_000);
           
           if (!res.ok) {
             const errorData = await res.json();
@@ -827,7 +868,7 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
         payerTgLastName: (tgMeta.last_name ?? undefined),
         payerTgUsername: (tgMeta.username ?? undefined),
       };
-      const res = await fetch('/api/rocketwork/tasks', {
+      const res = await fetchWithTimeout('/api/rocketwork/tasks', {
         method: 'POST',
         headers: (() => {
           const h: Record<string, string> = { 'Content-Type': 'application/json' };
@@ -836,7 +877,7 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
           return h as any;
         })(),
         body: JSON.stringify(body)
-      });
+      }, 30_000);
       const txt = await res.text();
       const d = txt ? JSON.parse(txt) : {};
       if (!res.ok) {
@@ -873,10 +914,11 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
       setAwaitingPay(false);
       startPoll(tId);
     } catch (e) {
-      const msg = e instanceof Error ? e.message : 'Не удалось сформировать платежную ссылку';
+      const msg = toErrMsg(e, 'Не удалось сформировать платежную ссылку');
       showToast('Не удалось сформировать платежную ссылку');
       setMsg(msg);
       setPayError(true);
+      setStarted(false);
     } finally { setLoading(false); }
   };
 
