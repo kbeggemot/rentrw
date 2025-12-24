@@ -19,10 +19,23 @@ type SecureStoreData = {
   plainToken?: string;
 };
 
+// ---- perf: cache derived key + per-user secure store reads ----
+let cachedKey: Buffer | null | undefined = undefined;
+let cachedSecret: string | null | undefined = undefined;
+const secureCache = new Map<string, { ts: number; data: SecureStoreData }>();
+const SECURE_STORE_CACHE_MS = (() => {
+  const raw = Number(process.env.SECURE_STORE_CACHE_MS || 10_000);
+  return Number.isFinite(raw) && raw > 0 ? Math.floor(raw) : 10_000;
+})();
+
 function getKey(): Buffer | null {
   const secret = process.env.TOKEN_SECRET;
   if (!secret) return null;
-  return scryptSync(secret, SCRYPT_SALT, 32);
+  // scryptSync is CPU-heavy; cache the derived key to avoid blocking the event loop on every decrypt.
+  if (cachedKey !== undefined && cachedSecret === secret) return cachedKey;
+  cachedSecret = secret;
+  cachedKey = scryptSync(secret, SCRYPT_SALT, 32);
+  return cachedKey;
 }
 
 function encode(payload: Buffer): string {
@@ -61,13 +74,26 @@ export async function decryptToken(payload: EncryptedPayload): Promise<string> {
 }
 
 async function readStore(userId: string): Promise<SecureStoreData> {
+  const now = Date.now();
+  const cached = secureCache.get(userId);
+  if (cached && (now - cached.ts) < SECURE_STORE_CACHE_MS) return cached.data;
+
   const raw = await readText(userStoreFile(userId));
-  if (!raw) return {} as SecureStoreData;
-  return JSON.parse(raw) as SecureStoreData;
+  if (!raw) {
+    // If storage is temporarily unavailable (S3 hiccups), use stale cache instead of breaking auth.
+    if (cached) return cached.data;
+    const empty = {} as SecureStoreData;
+    secureCache.set(userId, { ts: now, data: empty });
+    return empty;
+  }
+  const data = JSON.parse(raw) as SecureStoreData;
+  secureCache.set(userId, { ts: now, data });
+  return data;
 }
 
 async function writeStore(userId: string, data: SecureStoreData): Promise<void> {
   await writeText(userStoreFile(userId), JSON.stringify(data, null, 2));
+  try { secureCache.set(userId, { ts: Date.now(), data }); } catch {}
 }
 
 export async function saveApiToken(userId: string, plainToken: string): Promise<void> {

@@ -18,15 +18,53 @@ export type UserRecord = {
 
 const USERS_FILE = '.data/users.json';
 
+// perf: cache reads to avoid repeated storage/S3 hits (auth endpoints can be hot)
+let usersCache: { ts: number; users: UserRecord[] } | null = null;
+let usersInFlight: Promise<UserRecord[]> | null = null;
+const USERS_CACHE_MS = (() => {
+  const raw = Number(process.env.USERS_CACHE_MS || 5_000);
+  return Number.isFinite(raw) && raw > 0 ? Math.floor(raw) : 5_000;
+})();
+
 async function readUsers(): Promise<UserRecord[]> {
-  const raw = await readText(USERS_FILE);
-  if (!raw) return [];
-  const parsed = JSON.parse(raw) as { users?: UserRecord[] };
-  return Array.isArray(parsed?.users) ? parsed.users : [];
+  const now = Date.now();
+  if (usersCache && (now - usersCache.ts) < USERS_CACHE_MS) return usersCache.users;
+  if (usersInFlight) return usersInFlight;
+
+  usersInFlight = (async () => {
+    const raw = await readText(USERS_FILE);
+    if (!raw) {
+      // If storage is temporarily unavailable, use stale cache instead of breaking auth.
+      if (usersCache) {
+        usersCache.ts = now;
+        return usersCache.users;
+      }
+      usersCache = { ts: now, users: [] };
+      return [];
+    }
+    try {
+      const parsed = JSON.parse(raw) as { users?: UserRecord[] };
+      const users = Array.isArray(parsed?.users) ? parsed.users : [];
+      usersCache = { ts: now, users };
+      return users;
+    } catch {
+      if (usersCache) {
+        usersCache.ts = now;
+        return usersCache.users;
+      }
+      usersCache = { ts: now, users: [] };
+      return [];
+    }
+  })().finally(() => {
+    usersInFlight = null;
+  });
+
+  return usersInFlight;
 }
 
 async function writeUsers(users: UserRecord[]): Promise<void> {
   await writeText(USERS_FILE, JSON.stringify({ users }, null, 2));
+  try { usersCache = { ts: Date.now(), users }; } catch {}
 }
 
 export async function findUserByPhone(phone: string): Promise<UserRecord | undefined> {

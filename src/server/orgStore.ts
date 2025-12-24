@@ -38,14 +38,54 @@ type OrgStore = {
 
 const FILE = '.data/orgs.json';
 
+// perf: cache org store reads to avoid repeated storage/S3 hits on hot paths (payments/auth)
+let orgStoreCache: { ts: number; store: OrgStore } | null = null;
+let orgStoreInFlight: Promise<OrgStore> | null = null;
+const ORG_STORE_CACHE_MS = (() => {
+  const raw = Number(process.env.ORG_STORE_CACHE_MS || 5_000);
+  return Number.isFinite(raw) && raw > 0 ? Math.floor(raw) : 5_000;
+})();
+
 async function readStore(): Promise<OrgStore> {
-  const raw = await readText(FILE);
-  if (!raw) return { orgs: {} };
-  try { return JSON.parse(raw) as OrgStore; } catch { return { orgs: {} }; }
+  const now = Date.now();
+  if (orgStoreCache && (now - orgStoreCache.ts) < ORG_STORE_CACHE_MS) return orgStoreCache.store;
+  if (orgStoreInFlight) return orgStoreInFlight;
+
+  orgStoreInFlight = (async () => {
+    const raw = await readText(FILE);
+    if (!raw) {
+      // If storage is temporarily unavailable, use stale cache instead of returning empty orgs.
+      if (orgStoreCache) {
+        orgStoreCache.ts = now;
+        return orgStoreCache.store;
+      }
+      const empty = { orgs: {} } as OrgStore;
+      orgStoreCache = { ts: now, store: empty };
+      return empty;
+    }
+    try {
+      const parsed = JSON.parse(raw) as OrgStore;
+      orgStoreCache = { ts: now, store: parsed };
+      return parsed;
+    } catch {
+      if (orgStoreCache) {
+        orgStoreCache.ts = now;
+        return orgStoreCache.store;
+      }
+      const empty = { orgs: {} } as OrgStore;
+      orgStoreCache = { ts: now, store: empty };
+      return empty;
+    }
+  })().finally(() => {
+    orgStoreInFlight = null;
+  });
+
+  return orgStoreInFlight;
 }
 
 async function writeStore(s: OrgStore): Promise<void> {
   await writeText(FILE, JSON.stringify(s, null, 2));
+  try { orgStoreCache = { ts: Date.now(), store: s }; } catch {}
 }
 
 function onlyDigits(s: string | null | undefined): string {

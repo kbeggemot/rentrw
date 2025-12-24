@@ -212,7 +212,7 @@ export async function writeText(relPath: string, text: string): Promise<void> {
         const { DeleteObjectCommand } = require('@aws-sdk/client-s3');
         const key = (s3Prefix + p).replace(/^\/+/, '');
         const cmd = new DeleteObjectCommand({ Bucket: s3Bucket, Key: key });
-        await s3Client.send(cmd);
+        await withAbortTimeout(msFromEnv('S3_DEL_TIMEOUT_MS', 10_000), (abortSignal) => s3Client.send(cmd, { abortSignal }));
       } catch {}
       return;
     }
@@ -241,7 +241,12 @@ export async function writeText(relPath: string, text: string): Promise<void> {
       }
     } catch {}
     const cmd = new (s3Client as any)._Put({ Bucket: s3Bucket, Key: key, Body: text, ContentType: 'application/json; charset=utf-8' });
-    await s3Client.send(cmd);
+    try {
+      await withAbortTimeout(msFromEnv('S3_PUT_TIMEOUT_MS', 15_000), (abortSignal) => s3Client.send(cmd, { abortSignal }));
+    } catch {
+      try { resetS3Client(); } catch {}
+      throw new Error('S3_PUT_FAILED');
+    }
     try { await logS3Io('PUT', key, Buffer.byteLength(text)); } catch {}
     return;
   }
@@ -408,7 +413,7 @@ async function rotateWal(ttlDays: number): Promise<void> {
               const { DeleteObjectCommand } = require('@aws-sdk/client-s3');
               const key = (s3Prefix + p).replace(/^\/+/, '');
               const cmd = new DeleteObjectCommand({ Bucket: s3Bucket, Key: key });
-              await s3Client.send(cmd);
+              await withAbortTimeout(msFromEnv('S3_DEL_TIMEOUT_MS', 10_000), (abortSignal) => s3Client.send(cmd, { abortSignal }));
             }
           } catch {}
         } else {
