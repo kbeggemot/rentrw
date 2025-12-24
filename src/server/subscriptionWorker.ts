@@ -110,12 +110,18 @@ export async function ensureSubscriptions(userId: string, callbackBase: string):
 
 let started = false;
 let timer: NodeJS.Timer | null = null;
+let running = false;
 
 export function startSubscriptionWorker(): void {
   if (started) return;
   started = true;
+  const runSafe = async () => {
+    if (running) return;
+    running = true;
+    try { await runDueSubscriptionJobs(); } catch {} finally { running = false; }
+  };
   timer = setInterval(() => {
-    runDueSubscriptionJobs().catch(() => void 0);
+    runSafe().catch(() => void 0);
   }, 30 * 1000);
 }
 

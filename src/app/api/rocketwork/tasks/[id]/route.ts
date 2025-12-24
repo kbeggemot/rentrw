@@ -226,8 +226,10 @@ export async function GET(_: Request) {
           const authToken = (async () => { try { const { findSaleByTaskId } = await import('@/server/taskStore'); const s = await findSaleByTaskId(userId, taskId); if (s && s.orgInn) { try { const { getTokenForOrg } = await import('@/server/orgStore'); const t2 = await getTokenForOrg(String(s.orgInn).replace(/\D/g, ''), userId); if (t2) return t2; } catch {} } } catch {} return token; })();
           const tok = await authToken;
           const resPay = await fetchWithTimeout(payUrl, { method: 'PATCH', headers: { Authorization: `Bearer ${tok}`, Accept: 'application/json' }, cache: 'no-store' }, 15_000);
+          // IMPORTANT: drain body to avoid undici socket leaks even on success
+          const payText = await resPay.text().catch(() => '');
           if (!resPay.ok) {
-            try { const { appendRwError } = await import('@/server/rwAudit'); await appendRwError({ ts: new Date().toISOString(), scope: 'tasks:pay', method: 'PATCH', url: payUrl, status: resPay.status, responseText: await resPay.text(), userId }); } catch {}
+            try { const { appendRwError } = await import('@/server/rwAudit'); await appendRwError({ ts: new Date().toISOString(), scope: 'tasks:pay', method: 'PATCH', url: payUrl, status: resPay.status, responseText: payText, userId }); } catch {}
           }
         } catch (e) {
           try { const { appendRwError } = await import('@/server/rwAudit'); await appendRwError({ ts: new Date().toISOString(), scope: 'tasks:pay', method: 'PATCH', url: payUrl, status: null, error: e instanceof Error ? e.message : String(e), userId }); } catch {}

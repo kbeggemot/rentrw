@@ -7,6 +7,7 @@ import { getDecryptedApiToken } from './secureStore';
 import { resolveRwTokenWithFingerprint } from './rwToken';
 import { listSales } from './taskStore';
 import { listProductsForOrg } from './productsStore';
+import { fetchWithTimeout } from './http';
 
 // Offset jobs are created only when invoiceIdOffset was assigned at creation
 
@@ -51,14 +52,20 @@ export async function enqueueOffsetJob(job: Omit<OffsetJob, 'id'>): Promise<void
 
 let started = false;
 let timer: NodeJS.Timer | null = null;
+let running = false;
 
 export function startOfdScheduleWorker(): void {
   if (started) return;
   started = true;
+  async function runSafe(): Promise<void> {
+    if (running) return;
+    running = true;
+    try { await runDueOffsetJobs(); } catch {} finally { running = false; }
+  }
   // In serverless-like envs, a long interval may be killed. Kick an immediate run once.
-  runDueOffsetJobs().catch(() => void 0);
+  runSafe().catch(() => void 0);
   timer = setInterval(() => {
-    runDueOffsetJobs().catch(() => void 0);
+    runSafe().catch(() => void 0);
   }, 60 * 1000);
 }
 
@@ -106,7 +113,7 @@ export async function runDueOffsetJobs(): Promise<void> {
               if (taskId != null) {
                 const base = process.env.ROCKETWORK_API_BASE_URL || 'https://app.rocketwork.ru/api/';
                 const tUrl = new URL(`tasks/${encodeURIComponent(String(taskId))}`, base.endsWith('/') ? base : base + '/').toString();
-                const r = await fetch(tUrl, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }, cache: 'no-store' });
+                const r = await fetchWithTimeout(tUrl, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }, cache: 'no-store' }, 15_000);
                 const txt = await r.text();
                 let d: any = null; try { d = txt ? JSON.parse(txt) : null; } catch { d = txt; }
                 const task = (d && typeof d === 'object' && 'task' in d) ? (d.task as any) : d;
@@ -179,7 +186,7 @@ export async function runDueOffsetJobs(): Promise<void> {
             if (token) {
               const base = process.env.ROCKETWORK_API_BASE_URL || 'https://app.rocketwork.ru/api/';
               const accUrl = new URL('account', base.endsWith('/') ? base : base + '/').toString();
-              const rAcc = await fetch(accUrl, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }, cache: 'no-store' });
+              const rAcc = await fetchWithTimeout(accUrl, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }, cache: 'no-store' }, 15_000);
               const txt = await rAcc.text();
               let d: any = null; try { d = txt ? JSON.parse(txt) : null; } catch { d = txt; }
               const name = d?.account?.company_name || d?.company_name || null;

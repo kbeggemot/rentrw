@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getDecryptedApiToken } from '@/server/secureStore';
 import { listAllSales, updateSaleFromStatus } from '@/server/taskStore';
 import type { RocketworkTask } from '@/types/rocketwork';
+import { fetchWithTimeout } from '@/server/http';
 
 export const runtime = 'nodejs';
 
@@ -24,7 +25,7 @@ export async function POST(req: Request) {
     for (const s of mine) {
       try {
         const url = new URL(`tasks/${encodeURIComponent(String(s.taskId))}`, base.endsWith('/') ? base : base + '/').toString();
-        const res = await fetch(url, { method: 'GET', headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }, cache: 'no-store' });
+        const res = await fetchWithTimeout(url, { method: 'GET', headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }, cache: 'no-store' }, 15_000);
         const text = await res.text();
         let data: unknown = null; try { data = text ? JSON.parse(text) : null; } catch { data = text; }
         const t: RocketworkTask = (data && typeof data === 'object' && 'task' in (data as Record<string, unknown>)) ? ((data as any).task as RocketworkTask) : (data as RocketworkTask);
@@ -44,7 +45,10 @@ export async function POST(req: Request) {
         const hasCommission = Boolean((saleRec as any)?.additionalCommissionOfdUrl);
         if (hasAgent && aoStatus === 'transfered' && rootStatus === 'completed' && hasFull && hasCommission && !npd) {
           const payUrl = new URL(`tasks/${encodeURIComponent(String(s.taskId))}/pay`, base.endsWith('/') ? base : base + '/').toString();
-          await fetch(payUrl, { method: 'PATCH', headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }, cache: 'no-store' });
+          try {
+            const payRes = await fetchWithTimeout(payUrl, { method: 'PATCH', headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }, cache: 'no-store' }, 15_000);
+            await payRes.text().catch(() => '');
+          } catch {}
         }
       } catch {}
     }

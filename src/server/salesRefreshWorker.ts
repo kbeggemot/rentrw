@@ -1,15 +1,22 @@
 import { listAllSales, updateSaleFromStatus } from './taskStore';
 import { getDecryptedApiToken } from './secureStore';
+import { fetchWithTimeout } from './http';
 
 let started = false;
 let timer: NodeJS.Timer | null = null;
+let running = false;
 
 export function startSalesRefreshWorker(): void {
   if (started) return;
   started = true;
   // Kick immediately once on boot (will noop except at 12:05 MSK)
-  runIf1205().catch(() => void 0);
-  timer = setInterval(() => { runIf1205().catch(() => void 0); }, 60 * 1000);
+  const runSafe = async () => {
+    if (running) return;
+    running = true;
+    try { await runIf1205(); } catch {} finally { running = false; }
+  };
+  runSafe().catch(() => void 0);
+  timer = setInterval(() => { runSafe().catch(() => void 0); }, 60 * 1000);
 }
 
 async function runIf1205(): Promise<void> {
@@ -37,7 +44,7 @@ export async function refreshAllSales(): Promise<void> {
     for (const s of rows) {
       try {
         const url = new URL(`tasks/${encodeURIComponent(String(s.taskId))}`, base.endsWith('/') ? base : base + '/').toString();
-        const res = await fetch(url, { method: 'GET', headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }, cache: 'no-store' });
+        const res = await fetchWithTimeout(url, { method: 'GET', headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }, cache: 'no-store' }, 15_000);
         const text = await res.text();
         let data: any = null; try { data = text ? JSON.parse(text) : null; } catch { data = text; }
         const t = (data && typeof data === 'object' && 'task' in data) ? (data.task as any) : data;
