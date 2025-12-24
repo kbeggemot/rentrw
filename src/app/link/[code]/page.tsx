@@ -275,6 +275,8 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
 
   const pollRef = useRef<number | null>(null);
   const payUrlPollRef = useRef<number | null>(null);
+  const payUrlFailRef = useRef<number>(0);
+  const statusFailRef = useRef<number>(0);
 
   // Animated dots for pending states
   const [dots, setDots] = useState('.');
@@ -608,6 +610,20 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
             return h as any;
           })(),
         });
+        if (!r.ok) {
+          const d = await r.json().catch(() => ({} as any));
+          const msg = String(d?.error || `Ошибка ${r.status}`);
+          statusFailRef.current += 1;
+          if (statusFailRef.current >= 6) {
+            setPayError(true);
+            setMsg(msg);
+            if (pollRef.current) { window.clearTimeout(pollRef.current); pollRef.current = null; }
+            setAwaitingPay(false);
+            return;
+          }
+          throw new Error(msg);
+        }
+        statusFailRef.current = 0;
         const t = await r.json();
         const aoStatus = String((t?.acquiring_order?.status || t?.task?.acquiring_order?.status || '')).toLowerCase();
         if (aoStatus) setIsFinal(['paid', 'transfered', 'transferred'].includes(aoStatus));
@@ -670,6 +686,20 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
             return h as any;
           })(),
         });
+        if (!r.ok) {
+          const d = await r.json().catch(() => ({} as any));
+          const msg = String(d?.error || `Ошибка ${r.status}`);
+          payUrlFailRef.current += 1;
+          if (payUrlFailRef.current >= 6) {
+            setPayError(true);
+            setMsg(msg);
+            if (payUrlPollRef.current) { window.clearTimeout(payUrlPollRef.current); payUrlPollRef.current = null; }
+            setAwaitingPay(false);
+            return;
+          }
+          throw new Error(msg);
+        }
+        payUrlFailRef.current = 0;
         const t = await r.json();
         const ao = (t && (t.acquiring_order || (t.task && t.task.acquiring_order))) || null;
         const url = ao?.url || ao?.payment_url || null;
@@ -695,6 +725,8 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
       setTaskId(null);
       setDetailsOpen(true);
       setPayError(false);
+      payUrlFailRef.current = 0;
+      statusFailRef.current = 0;
       
       // Validate partner in RW for agent sales before creating task
       if (data.isAgent && data.partnerPhone) {
@@ -841,7 +873,9 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
       setAwaitingPay(false);
       startPoll(tId);
     } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Не удалось сформировать платежную ссылку';
       showToast('Не удалось сформировать платежную ссылку');
+      setMsg(msg);
       setPayError(true);
     } finally { setLoading(false); }
   };
