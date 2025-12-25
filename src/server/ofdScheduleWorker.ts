@@ -8,6 +8,7 @@ import { resolveRwTokenWithFingerprint } from './rwToken';
 import { listSales } from './taskStore';
 import { listProductsForOrg } from './productsStore';
 import { fetchWithTimeout } from './http';
+import { ensureLeaderLease } from './leaderLease';
 
 // Offset jobs are created only when invoiceIdOffset was assigned at creation
 
@@ -70,6 +71,11 @@ export function startOfdScheduleWorker(): void {
 }
 
 export async function runDueOffsetJobs(): Promise<void> {
+  // Multi-instance safety: only one replica should run due-job scans to avoid stampeding S3/RW/OFD.
+  try {
+    const ok = await ensureLeaderLease('ofdScheduleWorker', 90_000);
+    if (!ok) return;
+  } catch {}
   const store = await readStore();
   const now = Date.now();
   const remain: OffsetJob[] = [];

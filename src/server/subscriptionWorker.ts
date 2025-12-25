@@ -2,6 +2,7 @@ import { promises as fs } from 'fs';
 import path from 'path';
 import { getDecryptedApiToken } from './secureStore';
 import { discardResponseBody, fetchWithTimeout } from './http';
+import { ensureLeaderLease } from './leaderLease';
 
 const DATA_DIR = path.join(process.cwd(), '.data');
 const JOBS_FILE = path.join(DATA_DIR, 'subscription_jobs.json');
@@ -126,6 +127,11 @@ export function startSubscriptionWorker(): void {
 }
 
 export async function runDueSubscriptionJobs(): Promise<void> {
+  // Multi-instance safety: only one replica should run this background worker.
+  try {
+    const ok = await ensureLeaderLease('subscriptionWorker', 90_000);
+    if (!ok) return;
+  } catch {}
   const store = await readJobs();
   const now = new Date();
   const nextJobs: Job[] = [];

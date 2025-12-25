@@ -8,6 +8,7 @@ import { getDecryptedApiToken } from './secureStore';
 import { getInvoiceIdForOffset } from './orderStore';
 import { listProductsForOrg } from './productsStore';
 import { fetchWithTimeout } from './http';
+import { ensureLeaderLease } from './leaderLease';
 
 let started = false;
 let timer: NodeJS.Timer | null = null;
@@ -34,6 +35,11 @@ export function startOfdRepairWorker(): void {
 }
 
 async function runRepairTick(): Promise<void> {
+  // Multi-instance safety: only one replica should run repair scans to avoid stampeding S3/RW/OFD.
+  try {
+    const ok = await ensureLeaderLease('ofdRepairWorker', 5 * 60_000);
+    if (!ok) return;
+  } catch {}
   try {
     const all = await listAllSales();
     const userIds = Array.from(new Set(all.map((s) => s.userId)));

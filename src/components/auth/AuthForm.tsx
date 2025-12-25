@@ -130,11 +130,16 @@ export function AuthForm() {
     try {
       const emailFlag = (typeof window !== 'undefined' && (window as any).__CFG__?.EMAIL_VER_REQ) ? '1' : (process.env.NEXT_PUBLIC_EMAIL_VERIFICATION_REQUIRED || '0');
       const endpoint = isRegister ? (emailFlag === '1' ? (awaitCode ? '/api/auth/register/confirm' : '/api/auth/register') : '/api/auth/register') : '/api/auth/login';
+      // Client-side timeout to avoid infinite loading when server becomes unresponsive
+      const controller = new AbortController();
+      const t = window.setTimeout(() => controller.abort(), 20_000);
       const res = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(isRegister ? (endpoint.endsWith('/confirm') ? { phone, code: confirm.trim() } : { phone, password, email: email.trim() }) : { phone, password }),
+        signal: controller.signal,
       });
+      try { window.clearTimeout(t); } catch {}
       const text = await res.text();
       let data: { error?: string } | null = null;
       try { data = text ? (JSON.parse(text) as { error?: string }) : null; } catch {}
@@ -161,6 +166,7 @@ export function AuthForm() {
       if (msg === 'EMAIL_TAKEN') setError('Такой email уже используется');
       else if (msg === 'USER_EXISTS') setError('Пользователь с таким телефоном уже существует');
       else if (msg === 'INVALID_CODE') setError('Неверный код подтверждения');
+      else if ((e as any)?.name === 'AbortError') setError('Таймаут запроса. Попробуйте ещё раз.');
       else setError('Ошибка. Попробуйте ещё раз.');
     } finally {
       setLoading(false);

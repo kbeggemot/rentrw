@@ -1,6 +1,7 @@
 import { listAllSales, updateSaleFromStatus } from './taskStore';
 import { getDecryptedApiToken } from './secureStore';
 import { fetchWithTimeout } from './http';
+import { ensureLeaderLease } from './leaderLease';
 
 let started = false;
 let timer: NodeJS.Timer | null = null;
@@ -20,6 +21,11 @@ export function startSalesRefreshWorker(): void {
 }
 
 async function runIf1205(): Promise<void> {
+  // Multi-instance safety: only one replica should run refresh at the scheduled minute.
+  try {
+    const ok = await ensureLeaderLease('salesRefreshWorker', 90_000);
+    if (!ok) return;
+  } catch {}
   const nowMsk = new Date().toLocaleString('ru-RU', { timeZone: 'Europe/Moscow', hour12: false });
   // nowMsk like: DD.MM.YYYY, HH:MM:SS — extract HH:MM
   const m = /\b(\d{2}):(\d{2}):\d{2}\b/.exec(nowMsk);

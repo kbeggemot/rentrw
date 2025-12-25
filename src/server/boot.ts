@@ -6,6 +6,7 @@ import { startOfdScheduleWorker } from './ofdScheduleWorker';
 import { startOfdRepairWorker } from './ofdRepairWorker';
 import { startSalesRefreshWorker } from './salesRefreshWorker';
 import { migrateLegacyTasksToOrgStore } from './taskStore';
+import { ensureLeaderLease } from './leaderLease';
 
 // Some hosting environments have broken IPv6 egress; when DNS rotates and AAAA is preferred,
 // outbound HTTPS to certain domains can start hanging until process restart.
@@ -19,7 +20,17 @@ try {
   startOfdRepairWorker();
   startSalesRefreshWorker();
   // fire-and-forget migration to sharded sales store
-  migrateLegacyTasksToOrgStore();
+  // IMPORTANT: this can be very heavy on large legacy tasks.json and/or multi-instance deployments.
+  // Run it only when explicitly enabled, and only from the elected leader.
+  try {
+    const enabled = (process.env.MIGRATE_LEGACY_SALES_ON_BOOT || '0') === '1';
+    if (enabled) {
+      void (async () => {
+        const ok = await ensureLeaderLease('migrateLegacyTasksToOrgStore', 10 * 60_000).catch(() => false);
+        if (ok) await migrateLegacyTasksToOrgStore();
+      })().catch(() => void 0);
+    }
+  } catch {}
 } catch {
   // ignore — environment may not support intervals, we'll try again on-demand
 }
