@@ -502,7 +502,8 @@ export async function POST(req: Request) {
       ?? (maybeObj?.id as number | string | undefined)
       ?? (maybeObj?.task_id as number | string | undefined);
     if (taskId !== undefined) {
-      await saveTaskId(taskId, orderId);
+      // Skip slow legacy store updates on the critical path (S3/monolith). Best-effort.
+      try { void saveTaskId(taskId, orderId).catch(() => void 0); } catch {}
       // Save sale snapshot for the user
       const commissionValueForRecord = body.agentSale ? (body.commissionValue !== undefined ? Number(body.commissionValue) : undefined) : undefined;
       const resolvedPayerTgId = (() => { const v = (body as any)?.payerTgId; const b = (typeof v === 'string' && v.trim().length > 0) ? String(v).trim() : null; return b || (tgUserFromCookie && tgUserFromCookie.trim().length > 0 ? tgUserFromCookie : null); })();
@@ -517,7 +518,8 @@ export async function POST(req: Request) {
         }
       } catch {}
 
-      await recordSaleOnCreate({
+      // Persist sale snapshot in background (do not block payer UX on storage/S3 latency)
+      void recordSaleOnCreate({
         userId,
         taskId,
         orderId,
@@ -543,10 +545,10 @@ export async function POST(req: Request) {
         partnerFio: null,
         termsDocHash: (typeof (body as any)?.termsDocHash === 'string' && (body as any).termsDocHash.trim().length > 0) ? String((body as any).termsDocHash).trim() : null,
         termsDocName: (typeof (body as any)?.termsDocName === 'string' && (body as any).termsDocName.trim().length > 0) ? String((body as any).termsDocName).trim() : (resolvedDocName ?? null),
-      });
+      }).catch(() => void 0);
 
       // Audit: record how payerTgId/linkCode were resolved
-      try { await appendAdminEntityLog('sale', [String(userId), String(taskId)], { source: 'system', message: 'create/meta', data: { linkCode: (body as any)?.linkCode ?? null, payerTgId_body: (body as any)?.payerTgId ?? null, payerTgId_cookie: tgUserFromCookie ?? null, payerTgId_saved: resolvedPayerTgId ?? null } }); } catch {}
+      try { void appendAdminEntityLog('sale', [String(userId), String(taskId)], { source: 'system', message: 'create/meta', data: { linkCode: (body as any)?.linkCode ?? null, payerTgId_body: (body as any)?.payerTgId ?? null, payerTgId_cookie: tgUserFromCookie ?? null, payerTgId_saved: resolvedPayerTgId ?? null } }).catch(() => void 0); } catch {}
 
       // Removed: prepayment receipt creation and offset scheduling at creation time
       // Ensure subscription in background (do not block payment link creation)
