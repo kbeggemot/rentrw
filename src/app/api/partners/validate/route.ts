@@ -3,9 +3,28 @@ import { promises as fs } from 'fs';
 import path from 'path';
 import { resolveRwTokenWithFingerprint } from '@/server/rwToken';
 import { getSelectedOrgInn } from '@/server/orgContext';
-import { fetchWithTimeout, fireAndForgetFetch } from '@/server/http';
+import { fetchTextWithTimeout, fireAndForgetFetch } from '@/server/http';
 
 export const runtime = 'nodejs';
+
+type ValidateTrace = {
+  id: string;
+  startedAt: string;
+  lastStep: string;
+  msTotal?: number;
+  marks: Array<{ step: string; at: string; ms: number }>;
+  notes?: Record<string, unknown>;
+  error?: string | null;
+  done?: boolean;
+};
+
+function getTraceHub() {
+  const g = globalThis as any as {
+    __partnerValidateTrace?: { active: Record<string, ValidateTrace>; done: ValidateTrace[] };
+  };
+  if (!g.__partnerValidateTrace) g.__partnerValidateTrace = { active: {}, done: [] };
+  return g.__partnerValidateTrace;
+}
 
 function getUserId(req: Request): string | null {
   const cookie = req.headers.get('cookie') || '';
@@ -16,6 +35,23 @@ function getUserId(req: Request): string | null {
 }
 
 export async function POST(req: Request) {
+  const started = Date.now();
+  const traceId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const hub = getTraceHub();
+  const trace: ValidateTrace = {
+    id: traceId,
+    startedAt: new Date().toISOString(),
+    lastStep: 'start',
+    marks: [{ step: 'start', at: new Date().toISOString(), ms: 0 }],
+    notes: {},
+    error: null,
+    done: false,
+  };
+  hub.active[traceId] = trace;
+  const mark = (step: string) => {
+    trace.lastStep = step;
+    trace.marks.push({ step, at: new Date().toISOString(), ms: Date.now() - started });
+  };
   try {
     const userId = getUserId(req);
     if (!userId) return NextResponse.json({ error: 'NO_USER' }, { status: 401 });
@@ -23,11 +59,14 @@ export async function POST(req: Request) {
     const body = await req.json().catch(() => null);
     const phone = String(body?.phone || '').trim();
     if (!phone) return NextResponse.json({ error: 'NO_PHONE' }, { status: 400 });
+    mark('body');
     
     const base = process.env.ROCKETWORK_API_BASE_URL || 'https://app.rocketwork.ru/api/';
     const digits = phone.replace(/\D/g, '');
     const orgInn = getSelectedOrgInn(req);
+    try { trace.notes = { ...(trace.notes || {}), orgInn: orgInn ? String(orgInn).replace(/\D/g, '') : null }; } catch {}
     const { token } = await resolveRwTokenWithFingerprint(req, userId, orgInn, null);
+    mark('token_resolved');
     if (!token) return NextResponse.json({ error: 'NO_TOKEN' }, { status: 400 });
     const commonHeaders: Record<string, string> = {
       Authorization: `Bearer ${token}`,
@@ -43,17 +82,23 @@ export async function POST(req: Request) {
         cache: 'no-store' 
       }, 15_000); 
     } catch {}
+    mark('invite_sent');
     
     const url = new URL(`executors/${encodeURIComponent(digits)}`, base.endsWith('/') ? base : base + '/').toString();
     let res: Response;
+    let txt: string;
     try {
       // Keep server-side timeout below client-side to return a JSON error instead of client abort.
-      res = await fetchWithTimeout(url, { cache: 'no-store', headers: commonHeaders }, 10_000);
+      // IMPORTANT: timeout must include body read, otherwise res.text() can hang indefinitely.
+      const out = await fetchTextWithTimeout(url, { cache: 'no-store', headers: commonHeaders }, 10_000);
+      res = out.res;
+      txt = out.text;
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
+      mark('rw_fetch_error');
       return NextResponse.json({ error: `NETWORK_ERROR: ${msg}` }, { status: 502 });
     }
-    const txt = await res.text();
+    mark('rw_fetched');
     // Persist last executor validate response for debugging
     try {
       const dataDir = path.join(process.cwd(), '.data');
@@ -62,6 +107,7 @@ export async function POST(req: Request) {
     } catch {}
     let executorData: any = null; 
     try { executorData = txt ? JSON.parse(txt) : null; } catch { executorData = txt; }
+    mark('rw_parsed');
     
     // Extract fields defensively from various possible RW shapes
     const raw: any = executorData && typeof executorData === 'object' ? executorData : {};
@@ -128,6 +174,15 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: true, executor: executorData?.executor || executorData, status, inn: partnerInn, employmentKind: employmentKindRaw ?? null, partnerData: { phone: digits, fio, status, inn: partnerInn, updatedAt: new Date().toISOString(), employmentKind: employmentKindRaw ?? null } });
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'Server error';
+    try { trace.error = String(msg || 'Server error'); } catch {}
     return NextResponse.json({ error: msg }, { status: 500 });
+  } finally {
+    try {
+      trace.msTotal = Date.now() - started;
+      trace.done = true;
+      delete hub.active[traceId];
+      hub.done.unshift(trace);
+      if (hub.done.length > 30) hub.done.length = 30;
+    } catch {}
   }
 }
