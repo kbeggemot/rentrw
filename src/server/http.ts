@@ -70,14 +70,21 @@ export async function fetchTextWithTimeout(
   }
 }
 
-export async function discardResponseBody(res: Response): Promise<void> {
+export async function discardResponseBody(res: Response, timeoutMs = 5_000): Promise<void> {
+  const ms = Number.isFinite(timeoutMs) ? Math.max(0, Math.floor(timeoutMs)) : 5_000;
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  const timeout = new Promise<void>((resolve) => {
+    if (ms <= 0) return resolve();
+    timer = setTimeout(() => resolve(), ms);
+  });
   try {
     // Drains body to let undici reuse/close the underlying connection.
-    await res.arrayBuffer();
+    await Promise.race([res.arrayBuffer().then(() => void 0), timeout]);
   } catch {
-    try {
-      res.body?.cancel();
-    } catch {}
+    // ignore
+  } finally {
+    try { if (timer) clearTimeout(timer); } catch {}
+    try { res.body?.cancel(); } catch {}
   }
 }
 

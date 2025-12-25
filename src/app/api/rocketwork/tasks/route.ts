@@ -23,7 +23,7 @@ import { appendRwError, writeRwLastRequest } from '@/server/rwAudit';
 import { appendAdminEntityLog } from '@/server/adminAudit';
 import { getTokenForOrg } from '@/server/orgStore';
 import { findLinkByCode } from '@/server/paymentLinkStore';
-import { discardResponseBody, fetchWithTimeout } from '@/server/http';
+import { discardResponseBody, fetchTextWithTimeout, fetchWithTimeout } from '@/server/http';
 
 export const runtime = 'nodejs';
 
@@ -120,12 +120,13 @@ export async function POST(req: Request) {
         await fs.mkdir(dataDir, { recursive: true });
         await fs.writeFile(path.join(dataDir, 'last_withdrawal_request.json'), JSON.stringify({ ts: new Date().toISOString(), url, payload }, null, 2), 'utf8');
       } catch {}
-      const res = await fetchWithTimeout(
+      const out = await fetchTextWithTimeout(
         url,
         { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify(payload), cache: 'no-store' },
         20_000
       );
-      const text = await res.text();
+      const res = out.res;
+      const text = out.text;
       try {
         const dataDir = path.join(process.cwd(), '.data');
         await fs.mkdir(dataDir, { recursive: true });
@@ -259,12 +260,13 @@ export async function POST(req: Request) {
 
       async function getExecutorById(id: string) {
         const url = new URL(`executors/${encodeURIComponent(id)}`, base.endsWith('/') ? base : base + '/').toString();
-        const res = await fetchWithTimeout(url, {
+        const out = await fetchTextWithTimeout(url, {
           method: 'GET',
           headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
           cache: 'no-store',
         }, 15_000);
-        const text = await res.text();
+        const res = out.res;
+        const text = out.text;
         let data: any = null;
         try { data = text ? JSON.parse(text) : null; } catch { data = text; }
         return { url, res, data };
@@ -464,8 +466,9 @@ export async function POST(req: Request) {
     }
 
     let res: Response;
+    let text = '';
     try {
-      res = await fetchWithTimeout(url, {
+      const out = await fetchTextWithTimeout(url, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${token}`,
@@ -475,13 +478,13 @@ export async function POST(req: Request) {
         body: JSON.stringify(payload),
         cache: 'no-store',
       }, 20_000);
+      res = out.res;
+      text = out.text;
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       try { await appendRwError({ ts: new Date().toISOString(), scope: 'tasks:create', method: 'POST', url, status: null, requestBody: payload, error: msg, userId }); } catch {}
       return NextResponse.json({ error: `NETWORK_ERROR: ${msg}` }, { status: 502 });
     }
-
-    const text = await res.text();
     let data: unknown = null;
     try { data = text ? JSON.parse(text) : null; } catch { data = text; }
 
