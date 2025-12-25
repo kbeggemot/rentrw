@@ -28,7 +28,14 @@ export async function GET() {
       error: t.error || null,
       done: Boolean(t.done),
     }));
-    return NextResponse.json({ active, done, now: new Date().toISOString() }, { status: 200 });
+    const meta = {
+      now: new Date().toISOString(),
+      pid: typeof process !== 'undefined' ? process.pid : null,
+      uptimeSec: typeof process !== 'undefined' ? Math.floor(process.uptime()) : null,
+      hostname: (() => { try { return (process as any)?.env?.HOSTNAME || null; } catch { return null; } })(),
+      node: (() => { try { return (process as any)?.version || null; } catch { return null; } })(),
+    };
+    return NextResponse.json({ ...meta, active, done }, { status: 200 });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     return NextResponse.json({ error: msg }, { status: 500 });

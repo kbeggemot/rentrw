@@ -52,38 +52,54 @@ export async function POST(req: Request) {
     trace.lastStep = step;
     trace.marks.push({ step, at: new Date().toISOString(), ms: Date.now() - started });
   };
-  try {
+  const finish = (() => {
+    let done = false;
+    return (err?: string | null) => {
+      if (done) return;
+      done = true;
+      try { if (err) trace.error = err; } catch {}
+      try {
+        trace.msTotal = Date.now() - started;
+        trace.done = true;
+        delete hub.active[traceId];
+        hub.done.unshift(trace);
+        if (hub.done.length > 30) hub.done.length = 30;
+      } catch {}
+    };
+  })();
+
+  const work = async (): Promise<Response> => {
     const userId = getUserId(req);
-    if (!userId) return NextResponse.json({ error: 'NO_USER' }, { status: 401 });
-    
+    if (!userId) return NextResponse.json({ error: 'NO_USER', traceId }, { status: 401 });
+
     const body = await req.json().catch(() => null);
     const phone = String(body?.phone || '').trim();
-    if (!phone) return NextResponse.json({ error: 'NO_PHONE' }, { status: 400 });
+    if (!phone) return NextResponse.json({ error: 'NO_PHONE', traceId }, { status: 400 });
     mark('body');
-    
+
     const base = process.env.ROCKETWORK_API_BASE_URL || 'https://app.rocketwork.ru/api/';
     const digits = phone.replace(/\D/g, '');
     const orgInn = getSelectedOrgInn(req);
     try { trace.notes = { ...(trace.notes || {}), orgInn: orgInn ? String(orgInn).replace(/\D/g, '') : null }; } catch {}
     const { token } = await resolveRwTokenWithFingerprint(req, userId, orgInn, null);
     mark('token_resolved');
-    if (!token) return NextResponse.json({ error: 'NO_TOKEN' }, { status: 400 });
+    if (!token) return NextResponse.json({ error: 'NO_TOKEN', traceId }, { status: 400 });
     const commonHeaders: Record<string, string> = {
       Authorization: `Bearer ${token}`,
       Accept: 'application/json'
     };
-    
+
     // invite best-effort
-    try { 
-      fireAndForgetFetch(new URL('executors/invite', base.endsWith('/') ? base : base + '/').toString(), { 
-        method: 'POST', 
-        headers: { ...commonHeaders, 'Content-Type': 'application/json' }, 
-        body: JSON.stringify({ phone: digits, with_framework_agreement: false }), 
-        cache: 'no-store' 
-      }, 15_000); 
+    try {
+      fireAndForgetFetch(new URL('executors/invite', base.endsWith('/') ? base : base + '/').toString(), {
+        method: 'POST',
+        headers: { ...commonHeaders, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone: digits, with_framework_agreement: false }),
+        cache: 'no-store'
+      }, 15_000);
     } catch {}
     mark('invite_sent');
-    
+
     const url = new URL(`executors/${encodeURIComponent(digits)}`, base.endsWith('/') ? base : base + '/').toString();
     let res: Response;
     let txt: string;
@@ -96,7 +112,7 @@ export async function POST(req: Request) {
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       mark('rw_fetch_error');
-      return NextResponse.json({ error: `NETWORK_ERROR: ${msg}` }, { status: 502 });
+      return NextResponse.json({ error: `NETWORK_ERROR: ${msg}`, traceId }, { status: 502 });
     }
     mark('rw_fetched');
     // Persist last executor validate response for debugging
@@ -105,10 +121,10 @@ export async function POST(req: Request) {
       await fs.mkdir(dataDir, { recursive: true });
       await fs.writeFile(path.join(dataDir, 'last_executor_validate.json'), JSON.stringify({ ts: new Date().toISOString(), url, status: res.status, text: txt }, null, 2), 'utf8');
     } catch {}
-    let executorData: any = null; 
+    let executorData: any = null;
     try { executorData = txt ? JSON.parse(txt) : null; } catch { executorData = txt; }
     mark('rw_parsed');
-    
+
     // Extract fields defensively from various possible RW shapes
     const raw: any = executorData && typeof executorData === 'object' ? executorData : {};
     const ex = (raw.executor && typeof raw.executor === 'object') ? raw.executor : raw;
@@ -171,18 +187,26 @@ export async function POST(req: Request) {
     }
     // If readiness allows pay, do not require payment_info even for SE
     
-    return NextResponse.json({ ok: true, executor: executorData?.executor || executorData, status, inn: partnerInn, employmentKind: employmentKindRaw ?? null, partnerData: { phone: digits, fio, status, inn: partnerInn, updatedAt: new Date().toISOString(), employmentKind: employmentKindRaw ?? null } });
+    return NextResponse.json({ ok: true, traceId, executor: executorData?.executor || executorData, status, inn: partnerInn, employmentKind: employmentKindRaw ?? null, partnerData: { phone: digits, fio, status, inn: partnerInn, updatedAt: new Date().toISOString(), employmentKind: employmentKindRaw ?? null } });
+  };
+
+  const timeoutMs = Number(process.env.PARTNER_VALIDATE_DEADLINE_MS || 12_000);
+  const deadlineMs = Number.isFinite(timeoutMs) && timeoutMs > 0 ? Math.floor(timeoutMs) : 12_000;
+
+  const timeoutResponse = new Promise<Response>((resolve) => {
+    setTimeout(() => {
+      try { mark('deadline_exceeded'); } catch {}
+      resolve(NextResponse.json({ error: 'DEADLINE_EXCEEDED', traceId }, { status: 504 }));
+    }, deadlineMs);
+  });
+
+  try {
+    const res = await Promise.race([work(), timeoutResponse]);
+    finish(null);
+    return res;
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'Server error';
-    try { trace.error = String(msg || 'Server error'); } catch {}
-    return NextResponse.json({ error: msg }, { status: 500 });
-  } finally {
-    try {
-      trace.msTotal = Date.now() - started;
-      trace.done = true;
-      delete hub.active[traceId];
-      hub.done.unshift(trace);
-      if (hub.done.length > 30) hub.done.length = 30;
-    } catch {}
+    finish(String(msg || 'Server error'));
+    return NextResponse.json({ error: msg, traceId }, { status: 500 });
   }
 }
