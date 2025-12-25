@@ -24,6 +24,7 @@ import { appendAdminEntityLog } from '@/server/adminAudit';
 import { getTokenForOrg } from '@/server/orgStore';
 import { findLinkByCode } from '@/server/paymentLinkStore';
 import { fetchTextWithTimeout, fetchWithTimeout, fireAndForgetFetch } from '@/server/http';
+import { getInstanceId } from '@/server/leaderLease';
 
 export const runtime = 'nodejs';
 
@@ -44,7 +45,56 @@ type BodyIn = {
   agentDescription?: string | null;
 };
 
+type TasksTrace = {
+  id: string;
+  startedAt: string;
+  instanceId: string;
+  lastStep: string;
+  msTotal?: number;
+  marks: Array<{ step: string; at: string; ms: number }>;
+  notes?: Record<string, unknown>;
+  error?: string | null;
+  done?: boolean;
+};
+
+function getTraceHub() {
+  const g = globalThis as any as {
+    __rwTasksTrace?: { active: Record<string, TasksTrace>; done: TasksTrace[] };
+  };
+  if (!g.__rwTasksTrace) g.__rwTasksTrace = { active: {}, done: [] };
+  return g.__rwTasksTrace;
+}
+
 export async function POST(req: Request) {
+  const started = Date.now();
+  const traceId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const hub = getTraceHub();
+  const trace: TasksTrace = {
+    id: traceId,
+    startedAt: new Date().toISOString(),
+    instanceId: getInstanceId(),
+    lastStep: 'start',
+    marks: [{ step: 'start', at: new Date().toISOString(), ms: 0 }],
+    notes: {},
+    error: null,
+    done: false,
+  };
+  hub.active[traceId] = trace;
+  const mark = (step: string) => {
+    trace.lastStep = step;
+    trace.marks.push({ step, at: new Date().toISOString(), ms: Date.now() - started });
+  };
+  const finish = (err?: string | null) => {
+    try { if (err) trace.error = err; } catch {}
+    try {
+      trace.msTotal = Date.now() - started;
+      trace.done = true;
+      delete hub.active[traceId];
+      hub.done.unshift(trace);
+      if (hub.done.length > 30) hub.done.length = 30;
+    } catch {}
+  };
+
   try {
     const cookie = req.headers.get('cookie') || '';
     const tgCookieMatch = /(?:^|;\s*)tg_uid=([^;]+)/.exec(cookie || '');
@@ -52,6 +102,8 @@ export async function POST(req: Request) {
     const mc = /(?:^|;\s*)session_user=([^;]+)/.exec(cookie);
     const userId = (mc ? decodeURIComponent(mc[1]) : undefined) || req.headers.get('x-user-id') || 'default';
     const body = (await req.json()) as BodyIn | any;
+    mark('body');
+    try { trace.notes = { ...(trace.notes || {}), userId, hasCookieUser: Boolean(mc), hasXUser: Boolean(req.headers.get('x-user-id')) }; } catch {}
 
     // Prefer org from header/body/link to support Telegram WebView (no cookies)
     let preferredInn: string | null = null;
@@ -65,6 +117,8 @@ export async function POST(req: Request) {
     if (!preferredInn) {
       try { const code = typeof body?.linkCode === 'string' ? String(body.linkCode) : null; if (code) { const link = await findLinkByCode(code); const li = (link?.orgInn || '').toString().replace(/\D/g, ''); preferredInn = li || null; } } catch {}
     }
+    mark('preferred_inn');
+    try { trace.notes = { ...(trace.notes || {}), preferredInn: preferredInn || null }; } catch {}
 
     let token: string | null = null;
     let orgInn: string | null = null;
@@ -79,7 +133,9 @@ export async function POST(req: Request) {
       const res = await resolveRwToken(req, userId);
       token = res.token; orgInn = res.orgInn; fingerprint = res.fingerprint;
     }
-    if (!token) return NextResponse.json({ error: 'NO_TOKEN' }, { status: 400 });
+    mark('token');
+    try { trace.notes = { ...(trace.notes || {}), orgInn: orgInn || null, hasToken: Boolean(token) }; } catch {}
+    if (!token) { finish('NO_TOKEN'); return NextResponse.json({ error: 'NO_TOKEN', traceId }, { status: 400 }); }
 
     // Withdrawal support
     if (body?.type === 'Withdrawal') {
@@ -236,6 +292,7 @@ export async function POST(req: Request) {
     }
 
     const orderId = await getNextOrderId();
+    mark('order_id');
     const unitPriceCents = Math.round(amountRub * 100);
     const quantity = 1;
     let verifiedPartnerPhone: string | undefined;
@@ -331,6 +388,7 @@ export async function POST(req: Request) {
         }
       }
       verifiedPartnerPhone = partnerPhone;
+      mark('executor_ok');
     }
 
 
@@ -466,6 +524,7 @@ export async function POST(req: Request) {
     let res: Response;
     let text = '';
     try {
+      mark('rw_create_start');
       const out = await fetchTextWithTimeout(url, {
         method: 'POST',
         headers: {
@@ -481,8 +540,10 @@ export async function POST(req: Request) {
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       try { await appendRwError({ ts: new Date().toISOString(), scope: 'tasks:create', method: 'POST', url, status: null, requestBody: payload, error: msg, userId }); } catch {}
-      return NextResponse.json({ error: `NETWORK_ERROR: ${msg}` }, { status: 502 });
+      finish(`NETWORK_ERROR: ${msg}`);
+      return NextResponse.json({ error: `NETWORK_ERROR: ${msg}`, traceId }, { status: 502 });
     }
+    mark('rw_create_done');
     let data: unknown = null;
     try { data = text ? JSON.parse(text) : null; } catch { data = text; }
 
@@ -492,7 +553,8 @@ export async function POST(req: Request) {
       const errorsArr = Array.isArray(mo?.errors) ? (mo?.errors as string[]) : null;
       const message = (maybeObj?.error as string | undefined) || (errorsArr ? errorsArr.join('; ') : undefined) || text || 'External API error';
       try { await appendRwError({ ts: new Date().toISOString(), scope: 'tasks:create', method: 'POST', url, status: res.status, requestBody: payload, responseText: text, error: message, userId }); } catch {}
-      return NextResponse.json({ error: message, details: maybeObj }, { status: res.status });
+      finish(message);
+      return NextResponse.json({ error: message, details: maybeObj, traceId }, { status: res.status });
     }
 
     // Пытаемся извлечь id задачи из ответа и сохраняем (учитываем вариант task.id)
@@ -591,10 +653,12 @@ export async function POST(req: Request) {
       } catch {}
     }
 
-    return NextResponse.json({ ok: true, order_id: orderId, task_id: taskId, data }, { status: 201 });
+    finish(null);
+    return NextResponse.json({ ok: true, order_id: orderId, task_id: taskId, data, traceId }, { status: 201 });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Server error';
-    return NextResponse.json({ error: message }, { status: 500 });
+    finish(message);
+    return NextResponse.json({ error: message, traceId }, { status: 500 });
   }
 }
 
