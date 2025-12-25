@@ -311,6 +311,9 @@ export async function migrateLegacyTasksToOrgStore(): Promise<void> {
 }
 
 export async function saveTaskId(id: number | string, orderId: number): Promise<void> {
+  // In S3 mode the legacy monolithic tasks.json can be huge and slow to read/write.
+  // We rely on sharded sales storage + indexes for lookups; skip legacy writes unless explicitly enabled.
+  if (process.env.S3_ENABLED === '1' && (process.env.LEGACY_TASKS_WRITE || '0') !== '1') return;
   const store = await readTasks();
   store.tasks.push({ id, orderId, createdAt: new Date().toISOString() });
   await writeTasks(store);
@@ -359,8 +362,12 @@ export async function recordSaleOnCreate(params: {
     else retained = commissionValue;
   }
   const now = new Date().toISOString();
-  const store = await readTasks();
-  if (!store.sales) store.sales = [];
+  const legacyEnabled = !(
+    process.env.S3_ENABLED === '1' &&
+    (process.env.LEGACY_TASKS_WRITE || '0') !== '1'
+  );
+  const store = legacyEnabled ? await readTasks() : ({ tasks: [], sales: [] } as TaskStoreData);
+  if (legacyEnabled && !store.sales) store.sales = [];
   // Assign InvoiceIds conditionally by Moscow date rules
   let invoiceIdPrepay: string | null = null;
   let invoiceIdOffset: string | null = null;
@@ -434,11 +441,17 @@ export async function recordSaleOnCreate(params: {
     termsDocName: (termsDocName ?? null) as any,
     termsAcceptedAt: (termsDocHash ? now : null) as any,
   } as SaleRecord;
-  // Legacy list append (backward compatibility for existing readers)
-  store.sales.push(newSale);
-  await writeTasks(store);
-  // New sharded write by org
+  // New sharded write by org (preferred)
   try { await writeSaleAndIndexes(newSale); } catch {}
+
+  // Legacy list append (backward compatibility for existing readers)
+  // In S3 mode this monolithic file can become a hotspot; skip by default.
+  if (!(process.env.S3_ENABLED === '1' && (process.env.LEGACY_TASKS_WRITE || '0') !== '1')) {
+    // Ensure store loaded only when legacy write is enabled
+    if (!store.sales) store.sales = [];
+    store.sales.push(newSale);
+    await writeTasks(store);
+  }
   try { getHub().publish(userId, 'sales:update'); } catch {}
   try {
     await appendAdminEntityLog('sale', [String(userId), String(taskId)], {

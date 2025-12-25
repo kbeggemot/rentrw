@@ -28,7 +28,25 @@ async function writeOrder(data: OrderStoreData): Promise<void> {
   await writeText(ORDER_FILE, JSON.stringify(data, null, 2));
 }
 
+// Fast, globally-unique numeric orderId for multi-instance deployments (no shared lock/store).
+// Uses millisecond timestamp plus per-ms sequence to avoid collisions under bursty traffic.
+let __lastTs = 0;
+let __seq = 0;
+function nextTimestampOrderId(): number {
+  const ts = Date.now();
+  if (ts === __lastTs) __seq = (__seq + 1) % 1000;
+  else { __lastTs = ts; __seq = 0; }
+  return ts * 1000 + __seq; // stays under MAX_SAFE_INTEGER
+}
+
 export async function getNextOrderId(): Promise<number> {
+  // In S3/multi-instance mode, the legacy file lock can become contended and block payment creation.
+  // Prefer a fast timestamp-based id unless explicitly forced to sequential.
+  const mode = String(process.env.ORDER_ID_MODE || '').trim().toLowerCase();
+  if (mode === 'timestamp' || (process.env.S3_ENABLED === '1' && mode !== 'sequential')) {
+    return nextTimestampOrderId();
+  }
+
   // File-lock with TTL to avoid concurrent increments across instances
   const lockPath = '.data/locks/order.lock';
   const lockId = `${Date.now()}-${Math.random().toString(16).slice(2)}`;

@@ -23,7 +23,7 @@ import { appendRwError, writeRwLastRequest } from '@/server/rwAudit';
 import { appendAdminEntityLog } from '@/server/adminAudit';
 import { getTokenForOrg } from '@/server/orgStore';
 import { findLinkByCode } from '@/server/paymentLinkStore';
-import { discardResponseBody, fetchTextWithTimeout, fetchWithTimeout } from '@/server/http';
+import { fetchTextWithTimeout, fetchWithTimeout, fireAndForgetFetch } from '@/server/http';
 
 export const runtime = 'nodejs';
 
@@ -248,14 +248,12 @@ export async function POST(req: Request) {
       // 1) Сначала отправляем инвайт и дожидаемся ответа RW
       try {
         const inviteUrl = new URL('executors/invite', base.endsWith('/') ? base : base + '/').toString();
-        const inviteRes = await fetchWithTimeout(inviteUrl, {
+        fireAndForgetFetch(inviteUrl, {
           method: 'POST',
           headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', Accept: 'application/json' },
           body: JSON.stringify({ phone: partnerPhone, with_framework_agreement: false }),
           cache: 'no-store',
         }, 15_000);
-        // IMPORTANT: drain body to avoid undici socket leaks
-        await discardResponseBody(inviteRes);
       } catch {}
 
       async function getExecutorById(id: string) {
@@ -452,9 +450,9 @@ export async function POST(req: Request) {
     const base = process.env.ROCKETWORK_API_BASE_URL || DEFAULT_BASE_URL;
     const url = new URL('tasks', base.endsWith('/') ? base : base + '/').toString();
 
-    // Persist last outgoing payload for debugging (S3-compatible)
+    // Persist last outgoing payload for debugging (S3-compatible) without blocking the main flow
     try {
-      await writeRwLastRequest({ ts: new Date().toISOString(), scope: 'tasks:create', method: 'POST', url, requestBody: payload, userId });
+      void writeRwLastRequest({ ts: new Date().toISOString(), scope: 'tasks:create', method: 'POST', url, requestBody: payload, userId }).catch(() => void 0);
     } catch {}
 
     // Apply deferred full-settlement logic (serviceEndDate != today in Europe/Moscow)
@@ -551,41 +549,43 @@ export async function POST(req: Request) {
       try { await appendAdminEntityLog('sale', [String(userId), String(taskId)], { source: 'system', message: 'create/meta', data: { linkCode: (body as any)?.linkCode ?? null, payerTgId_body: (body as any)?.payerTgId ?? null, payerTgId_cookie: tgUserFromCookie ?? null, payerTgId_saved: resolvedPayerTgId ?? null } }); } catch {}
 
       // Removed: prepayment receipt creation and offset scheduling at creation time
-      // Ensure subscription only if not found locally (без запроса к RW — только сверяем наш кэш из GET /postbacks)
+      // Ensure subscription in background (do not block payment link creation)
       try {
-        const hdrs = await nextHeaders();
-        const rawProto = hdrs.get('x-forwarded-proto') || 'http';
-        const cbBaseHost = hdrs.get('x-forwarded-host') || hdrs.get('host') || 'localhost:3000';
-        const isPublicHost = !/localhost|127\.0\.0\.1|(^10\.)|(^192\.168\.)/.test(cbBaseHost || '');
-        const cbBaseProto = (rawProto === 'http' && isPublicHost) ? 'https' : rawProto;
-        const callbackBase = `${cbBaseProto}://${cbBaseHost}`;
-        // Читаем наш прошлый кэш ensure напрямую из стора (без админ-эндпоинта)
-        let hasTasks = false, hasExecutors = false;
-        try {
-          const txt = await readText(`.data/postback_cache_${userId}.json`);
-          const d = txt ? JSON.parse(txt) : {};
-          const arr = Array.isArray(d?.subscriptions) ? d.subscriptions : [];
-          const cb = new URL(`/api/rocketwork/postbacks/${encodeURIComponent(userId)}`, callbackBase).toString();
-          for (const s of arr) {
-            const subs = Array.isArray(s?.subscribed_on) ? s.subscribed_on.map((x: any)=>String(x)) : [];
-            const uri = String(s?.callback_url ?? s?.uri ?? '');
-            if (uri === cb) {
-              if (subs.includes('tasks')) hasTasks = true;
-              if (subs.includes('executors')) hasExecutors = true;
+        void (async () => {
+          try {
+            const hdrs = await nextHeaders();
+            const rawProto = hdrs.get('x-forwarded-proto') || 'http';
+            const cbBaseHost = hdrs.get('x-forwarded-host') || hdrs.get('host') || 'localhost:3000';
+            const isPublicHost = !/localhost|127\.0\.0\.1|(^10\.)|(^192\.168\.)/.test(cbBaseHost || '');
+            const cbBaseProto = (rawProto === 'http' && isPublicHost) ? 'https' : rawProto;
+            const callbackBase = `${cbBaseProto}://${cbBaseHost}`;
+            // Read our cached subs to decide whether ensure is needed
+            let hasTasks = false, hasExecutors = false;
+            try {
+              const txt = await readText(`.data/postback_cache_${userId}.json`);
+              const d = txt ? JSON.parse(txt) : {};
+              const arr = Array.isArray(d?.subscriptions) ? d.subscriptions : [];
+              const cb = new URL(`/api/rocketwork/postbacks/${encodeURIComponent(userId)}`, callbackBase).toString();
+              for (const s of arr) {
+                const subs = Array.isArray(s?.subscribed_on) ? s.subscribed_on.map((x: any)=>String(x)) : [];
+                const uri = String(s?.callback_url ?? s?.uri ?? '');
+                if (uri === cb) {
+                  if (subs.includes('tasks')) hasTasks = true;
+                  if (subs.includes('executors')) hasExecutors = true;
+                }
+              }
+            } catch {}
+            if (!hasTasks || !hasExecutors) {
+              const query = !hasTasks && !hasExecutors ? '' : (!hasTasks ? '&stream=tasks' : '&stream=executors');
+              const upsertUrl = new URL(`/api/rocketwork/postbacks?ensure=1${query}`, callbackBase).toString();
+              fireAndForgetFetch(
+                upsertUrl,
+                { method: 'GET', headers: { cookie: `session_user=${encodeURIComponent(userId)}` }, cache: 'no-store' },
+                15_000
+              );
             }
-          }
-        } catch {}
-        if (!hasTasks || !hasExecutors) {
-          const query = !hasTasks && !hasExecutors ? '' : (!hasTasks ? '&stream=tasks' : '&stream=executors');
-          const upsertUrl = new URL(`/api/rocketwork/postbacks?ensure=1${query}`, callbackBase).toString();
-          const upsertRes = await fetchWithTimeout(
-            upsertUrl,
-            { method: 'GET', headers: { cookie: `session_user=${encodeURIComponent(userId)}` }, cache: 'no-store' },
-            15_000
-          );
-          // IMPORTANT: drain body to avoid undici socket leaks
-          await discardResponseBody(upsertRes);
-        }
+          } catch {}
+        })().catch(() => void 0);
       } catch {}
     }
 
