@@ -2,11 +2,26 @@ import { NextResponse } from 'next/server';
 import { findUserByPhoneLoose, verifyPassword } from '@/server/userStore';
 import { listUserOrganizations } from '@/server/orgStore';
 import { fireAndForgetFetch } from '@/server/http';
+import { ensureLeaderLease, getInstanceId } from '@/server/leaderLease';
 
 export const runtime = 'nodejs';
 
 export async function POST(req: Request) {
   try {
+    // Multi-instance mitigation: in S3 mode route auth through the elected API leader to avoid "half-dead" replicas.
+    if (process.env.S3_ENABLED === '1') {
+      try {
+        const ok = await ensureLeaderLease('apiLeader', 30_000);
+        if (!ok) {
+          const instanceId = getInstanceId();
+          const r = NextResponse.json({ error: 'NOT_LEADER', instanceId }, { status: 503 });
+          r.headers.set('Retry-After', '1');
+          r.headers.set('X-Instance-Id', instanceId);
+          return r;
+        }
+      } catch {}
+    }
+
     const body = await req.json().catch(() => null);
     const phoneRaw: string | undefined = body?.phone;
     const passwordRaw: string | undefined = body?.password;

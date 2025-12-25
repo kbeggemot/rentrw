@@ -130,20 +130,40 @@ export function AuthForm() {
     try {
       const emailFlag = (typeof window !== 'undefined' && (window as any).__CFG__?.EMAIL_VER_REQ) ? '1' : (process.env.NEXT_PUBLIC_EMAIL_VERIFICATION_REQUIRED || '0');
       const endpoint = isRegister ? (emailFlag === '1' ? (awaitCode ? '/api/auth/register/confirm' : '/api/auth/register') : '/api/auth/register') : '/api/auth/login';
-      // Client-side timeout to avoid infinite loading when server becomes unresponsive
-      const controller = new AbortController();
-      const t = window.setTimeout(() => controller.abort(), 20_000);
-      const res = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(isRegister ? (endpoint.endsWith('/confirm') ? { phone, code: confirm.trim() } : { phone, password, email: email.trim() }) : { phone, password }),
-        signal: controller.signal,
-      });
-      try { window.clearTimeout(t); } catch {}
-      const text = await res.text();
+      // Client-side timeout + retry on NOT_LEADER (multi-instance) and AbortError
+      let lastErr: unknown = null;
+      let res: Response | null = null;
       let data: { error?: string } | null = null;
-      try { data = text ? (JSON.parse(text) as { error?: string }) : null; } catch {}
-      if (!res.ok) throw new Error(data?.error || 'AUTH_ERROR');
+      for (let attempt = 0; attempt < 4; attempt += 1) {
+        const controller = new AbortController();
+        const t = window.setTimeout(() => controller.abort(), 20_000);
+        try {
+          res = await fetch(endpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(isRegister ? (endpoint.endsWith('/confirm') ? { phone, code: confirm.trim() } : { phone, password, email: email.trim() }) : { phone, password }),
+            signal: controller.signal,
+          });
+          const text = await res.text();
+          try { data = text ? (JSON.parse(text) as { error?: string }) : null; } catch { data = null; }
+          if (res.status === 503 && data?.error === 'NOT_LEADER') {
+            await new Promise((r) => setTimeout(r, 250 + attempt * 350));
+            continue;
+          }
+          if (!res.ok) throw new Error(data?.error || 'AUTH_ERROR');
+          break;
+        } catch (e) {
+          lastErr = e;
+          if ((e as any)?.name === 'AbortError' && attempt < 3) {
+            await new Promise((r) => setTimeout(r, 250 + attempt * 350));
+            continue;
+          }
+          throw e;
+        } finally {
+          try { window.clearTimeout(t); } catch {}
+        }
+      }
+      if (!res) throw (lastErr instanceof Error ? lastErr : new Error('AUTH_ERROR'));
       const requireEmail = emailFlag === '1';
       if (isRegister && requireEmail && !awaitCode) {
         // Перешли на шаг подтверждения

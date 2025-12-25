@@ -25,6 +25,7 @@ import { getTokenForOrg } from '@/server/orgStore';
 import { findLinkByCode } from '@/server/paymentLinkStore';
 import { fetchTextWithTimeout, fetchWithTimeout, fireAndForgetFetch } from '@/server/http';
 import { getInstanceId } from '@/server/leaderLease';
+import { ensureLeaderLease } from '@/server/leaderLease';
 
 export const runtime = 'nodejs';
 
@@ -96,6 +97,21 @@ export async function POST(req: Request) {
   };
 
   try {
+    // Multi-instance mitigation: in S3 mode treat one replica as API leader to avoid split-brain / hot-spotting.
+    // Followers respond fast with 503 so clients can retry and likely hit the leader.
+    if (process.env.S3_ENABLED === '1') {
+      try {
+        const ok = await ensureLeaderLease('apiLeader', 30_000);
+        if (!ok) {
+          finish('NOT_LEADER');
+          const r = NextResponse.json({ error: 'NOT_LEADER', traceId, instanceId: trace.instanceId }, { status: 503 });
+          r.headers.set('Retry-After', '1');
+          r.headers.set('X-Instance-Id', trace.instanceId);
+          return r;
+        }
+      } catch {}
+    }
+
     const cookie = req.headers.get('cookie') || '';
     const tgCookieMatch = /(?:^|;\s*)tg_uid=([^;]+)/.exec(cookie || '');
     const tgUserFromCookie = tgCookieMatch ? decodeURIComponent(tgCookieMatch[1]) : null;
@@ -616,32 +632,32 @@ export async function POST(req: Request) {
       // Ensure subscription in background (do not block payment link creation)
       try {
         void (async () => {
-          try {
-            const hdrs = await nextHeaders();
-            const rawProto = hdrs.get('x-forwarded-proto') || 'http';
-            const cbBaseHost = hdrs.get('x-forwarded-host') || hdrs.get('host') || 'localhost:3000';
-            const isPublicHost = !/localhost|127\.0\.0\.1|(^10\.)|(^192\.168\.)/.test(cbBaseHost || '');
-            const cbBaseProto = (rawProto === 'http' && isPublicHost) ? 'https' : rawProto;
-            const callbackBase = `${cbBaseProto}://${cbBaseHost}`;
+      try {
+        const hdrs = await nextHeaders();
+        const rawProto = hdrs.get('x-forwarded-proto') || 'http';
+        const cbBaseHost = hdrs.get('x-forwarded-host') || hdrs.get('host') || 'localhost:3000';
+        const isPublicHost = !/localhost|127\.0\.0\.1|(^10\.)|(^192\.168\.)/.test(cbBaseHost || '');
+        const cbBaseProto = (rawProto === 'http' && isPublicHost) ? 'https' : rawProto;
+        const callbackBase = `${cbBaseProto}://${cbBaseHost}`;
             // Read our cached subs to decide whether ensure is needed
-            let hasTasks = false, hasExecutors = false;
-            try {
-              const txt = await readText(`.data/postback_cache_${userId}.json`);
-              const d = txt ? JSON.parse(txt) : {};
-              const arr = Array.isArray(d?.subscriptions) ? d.subscriptions : [];
-              const cb = new URL(`/api/rocketwork/postbacks/${encodeURIComponent(userId)}`, callbackBase).toString();
-              for (const s of arr) {
-                const subs = Array.isArray(s?.subscribed_on) ? s.subscribed_on.map((x: any)=>String(x)) : [];
-                const uri = String(s?.callback_url ?? s?.uri ?? '');
-                if (uri === cb) {
-                  if (subs.includes('tasks')) hasTasks = true;
-                  if (subs.includes('executors')) hasExecutors = true;
-                }
-              }
-            } catch {}
-            if (!hasTasks || !hasExecutors) {
-              const query = !hasTasks && !hasExecutors ? '' : (!hasTasks ? '&stream=tasks' : '&stream=executors');
-              const upsertUrl = new URL(`/api/rocketwork/postbacks?ensure=1${query}`, callbackBase).toString();
+        let hasTasks = false, hasExecutors = false;
+        try {
+          const txt = await readText(`.data/postback_cache_${userId}.json`);
+          const d = txt ? JSON.parse(txt) : {};
+          const arr = Array.isArray(d?.subscriptions) ? d.subscriptions : [];
+          const cb = new URL(`/api/rocketwork/postbacks/${encodeURIComponent(userId)}`, callbackBase).toString();
+          for (const s of arr) {
+            const subs = Array.isArray(s?.subscribed_on) ? s.subscribed_on.map((x: any)=>String(x)) : [];
+            const uri = String(s?.callback_url ?? s?.uri ?? '');
+            if (uri === cb) {
+              if (subs.includes('tasks')) hasTasks = true;
+              if (subs.includes('executors')) hasExecutors = true;
+            }
+          }
+        } catch {}
+        if (!hasTasks || !hasExecutors) {
+          const query = !hasTasks && !hasExecutors ? '' : (!hasTasks ? '&stream=tasks' : '&stream=executors');
+          const upsertUrl = new URL(`/api/rocketwork/postbacks?ensure=1${query}`, callbackBase).toString();
               fireAndForgetFetch(
                 upsertUrl,
                 { method: 'GET', headers: { cookie: `session_user=${encodeURIComponent(userId)}` }, cache: 'no-store' },

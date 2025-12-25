@@ -796,18 +796,40 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
         payerTgLastName: (tgMeta.last_name ?? undefined),
         payerTgUsername: (tgMeta.username ?? undefined),
       };
-      const res = await fetchWithTimeout('/api/rocketwork/tasks', {
-        method: 'POST',
-        headers: (() => {
-          const h: Record<string, string> = { 'Content-Type': 'application/json' };
-          if (data?.userId) h['x-user-id'] = String(data.userId);
-          try { const inn = (data as any)?.orgInn ? String((data as any).orgInn).replace(/\D/g,'') : ''; if (inn) h['x-org-inn'] = inn; } catch {}
-          return h as any;
-        })(),
-        body: JSON.stringify(body)
-      }, 30_000);
-      const txt = await res.text();
-      const d = txt ? JSON.parse(txt) : {};
+      // Retry on NOT_LEADER (multi-instance) and on AbortError (connection stall) a few times.
+      let lastErr: unknown = null;
+      let res: Response | null = null;
+      let d: any = null;
+      for (let attempt = 0; attempt < 4; attempt += 1) {
+        try {
+          res = await fetchWithTimeout('/api/rocketwork/tasks', {
+            method: 'POST',
+            headers: (() => {
+              const h: Record<string, string> = { 'Content-Type': 'application/json' };
+              if (data?.userId) h['x-user-id'] = String(data.userId);
+              try { const inn = (data as any)?.orgInn ? String((data as any).orgInn).replace(/\D/g,'') : ''; if (inn) h['x-org-inn'] = inn; } catch {}
+              return h as any;
+            })(),
+            body: JSON.stringify(body)
+          }, 30_000);
+          const txt = await res.text();
+          d = txt ? JSON.parse(txt) : {};
+          if (res.status === 503 && d?.error === 'NOT_LEADER') {
+            await new Promise((r) => setTimeout(r, 250 + attempt * 350));
+            continue;
+          }
+          break;
+        } catch (e) {
+          lastErr = e;
+          const msg = toErrMsg(e, '');
+          if (msg === 'Таймаут запроса. Попробуйте ещё раз.' && attempt < 3) {
+            await new Promise((r) => setTimeout(r, 250 + attempt * 350));
+            continue;
+          }
+          throw e;
+        }
+      }
+      if (!res) throw lastErr || new Error('CREATE_FAILED');
       if (!res.ok) {
         const code = d?.error;
         if (code === 'Сумма должна быть не менее 10 рублей' || code === 'MIN_10') { setMsg('Сумма должна быть ≥ 10 ₽'); setLoading(false); setStarted(false); setDetailsOpen(false); return; }

@@ -49,9 +49,9 @@ export async function ensureLeaderLease(name: string, ttlMs: number): Promise<bo
   const cache = getLeaseCache();
   const cached = cache.get(name);
 
-  // If we believe we're leader and lease is still far from expiry, avoid extra storage reads.
-  if (cached?.isLeader && cached.expiresAt > now + Math.floor(ttl * 0.4) && (now - cached.lastCheckAt) < 5_000) {
-    return true;
+  // If we recently checked and the lease is still valid, reuse cached decision (leader OR follower)
+  if (cached && cached.expiresAt > now + Math.floor(ttl * 0.2) && (now - cached.lastCheckAt) < 5_000) {
+    return Boolean(cached.isLeader);
   }
 
   const path = leasePath(name);
