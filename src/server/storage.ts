@@ -88,12 +88,26 @@ export async function readText(relPath: string): Promise<string | null> {
     try {
       const key = (s3Prefix + relPath).replace(/^\/+/, '');
       const cmd = new (s3Client as any)._Get({ Bucket: s3Bucket, Key: key });
-      const out: any = await withAbortTimeout(msFromEnv('S3_GET_TIMEOUT_MS', 15_000), (abortSignal) => s3Client.send(cmd, { abortSignal }));
-      const chunks: Uint8Array[] = [];
-      for await (const c of out.Body as any) chunks.push(c as Uint8Array);
-      const buf = Buffer.concat(chunks);
-      try { await logS3Io('GET', key, buf.length); } catch {}
-      return buf.toString('utf8');
+      const timeoutMs = msFromEnv('S3_GET_TIMEOUT_MS', 15_000);
+      const text = await withAbortTimeout(timeoutMs, async (abortSignal) => {
+        const out: any = await s3Client.send(cmd, { abortSignal });
+        const body: any = out?.Body;
+        try {
+          abortSignal.addEventListener('abort', () => {
+            try { body?.destroy?.(new Error('S3_GET_ABORTED')); } catch {}
+            try { body?.cancel?.(); } catch {}
+          }, { once: true });
+        } catch {}
+        const chunks: Uint8Array[] = [];
+        for await (const c of body as any) {
+          if (abortSignal.aborted) break;
+          chunks.push(c as Uint8Array);
+        }
+        const buf = Buffer.concat(chunks);
+        try { await logS3Io('GET', key, buf.length); } catch {}
+        return buf.toString('utf8');
+      });
+      return text;
     } catch {
       // If S3 path hangs/breaks, reset client so next request re-inits it
       try { resetS3Client(); } catch {}
@@ -326,10 +340,23 @@ export async function readRangeFile(relPath: string, start: number, endInclusive
       const { GetObjectCommand } = require('@aws-sdk/client-s3');
       const rangeHeader = `bytes=${start}-${endInclusive}`;
       const cmd = new GetObjectCommand({ Bucket: s3Bucket, Key: key, Range: rangeHeader });
-      const out: any = await withAbortTimeout(msFromEnv('S3_GET_TIMEOUT_MS', 15_000), (abortSignal) => s3Client.send(cmd, { abortSignal }));
-      const chunks: Uint8Array[] = [];
-      for await (const c of out.Body as any) chunks.push(c as Uint8Array);
-      return Buffer.concat(chunks).toString('utf8');
+      const timeoutMs = msFromEnv('S3_GET_TIMEOUT_MS', 15_000);
+      return await withAbortTimeout(timeoutMs, async (abortSignal) => {
+        const out: any = await s3Client.send(cmd, { abortSignal });
+        const body: any = out?.Body;
+        try {
+          abortSignal.addEventListener('abort', () => {
+            try { body?.destroy?.(new Error('S3_GET_ABORTED')); } catch {}
+            try { body?.cancel?.(); } catch {}
+          }, { once: true });
+        } catch {}
+        const chunks: Uint8Array[] = [];
+        for await (const c of body as any) {
+          if (abortSignal.aborted) break;
+          chunks.push(c as Uint8Array);
+        }
+        return Buffer.concat(chunks).toString('utf8');
+      });
     } catch {
       try { resetS3Client(); } catch {}
       return null;
@@ -440,11 +467,26 @@ export async function readBinary(relPath: string): Promise<{ data: Buffer; conte
       const { GetObjectCommand } = require('@aws-sdk/client-s3');
       const key = (s3Prefix + relPath).replace(/^\/+/, '');
       const cmd = new GetObjectCommand({ Bucket: s3Bucket, Key: key });
-      const out: any = await withAbortTimeout(msFromEnv('S3_GET_TIMEOUT_MS', 15_000), (abortSignal) => s3Client.send(cmd, { abortSignal }));
-      const chunks: Uint8Array[] = [];
-      for await (const c of out.Body as any) chunks.push(c as Uint8Array);
-      const buf = Buffer.concat(chunks);
-      const ct = (out?.ContentType as string | undefined) || guessContentType(relPath) || 'application/octet-stream';
+      const timeoutMs = msFromEnv('S3_GET_TIMEOUT_MS', 15_000);
+      const wrapped = await withAbortTimeout(timeoutMs, async (abortSignal) => {
+        const out: any = await s3Client.send(cmd, { abortSignal });
+        const body: any = out?.Body;
+        try {
+          abortSignal.addEventListener('abort', () => {
+            try { body?.destroy?.(new Error('S3_GET_ABORTED')); } catch {}
+            try { body?.cancel?.(); } catch {}
+          }, { once: true });
+        } catch {}
+        const chunks: Uint8Array[] = [];
+        for await (const c of body as any) {
+          if (abortSignal.aborted) break;
+          chunks.push(c as Uint8Array);
+        }
+        const buf = Buffer.concat(chunks);
+        return { out, buf };
+      });
+      const buf = (wrapped as any).buf as Buffer;
+      const ct = ((wrapped as any).out?.ContentType as string | undefined) || guessContentType(relPath) || 'application/octet-stream';
       return { data: buf, contentType: ct };
     } catch {
       try { resetS3Client(); } catch {}
