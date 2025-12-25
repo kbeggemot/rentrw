@@ -193,19 +193,26 @@ export async function POST(req: Request) {
   const timeoutMs = Number(process.env.PARTNER_VALIDATE_DEADLINE_MS || 12_000);
   const deadlineMs = Number.isFinite(timeoutMs) && timeoutMs > 0 ? Math.floor(timeoutMs) : 12_000;
 
+  let deadlineTimer: ReturnType<typeof setTimeout> | null = null;
   const timeoutResponse = new Promise<Response>((resolve) => {
-    setTimeout(() => {
-      try { mark('deadline_exceeded'); } catch {}
+    deadlineTimer = setTimeout(() => {
+      try {
+        if (trace.done) return;
+        mark('deadline_exceeded');
+      } catch {}
       resolve(NextResponse.json({ error: 'DEADLINE_EXCEEDED', traceId }, { status: 504 }));
     }, deadlineMs);
   });
 
   try {
     const res = await Promise.race([work(), timeoutResponse]);
-    finish(null);
+    try { if (deadlineTimer) clearTimeout(deadlineTimer); } catch {}
+    if ((res as any)?.status === 504) finish('DEADLINE_EXCEEDED');
+    else finish(null);
     return res;
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'Server error';
+    try { if (deadlineTimer) clearTimeout(deadlineTimer); } catch {}
     finish(String(msg || 'Server error'));
     return NextResponse.json({ error: msg, traceId }, { status: 500 });
   }
