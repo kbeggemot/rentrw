@@ -32,6 +32,24 @@ export const runtime = 'nodejs';
 
 const DEFAULT_BASE_URL = 'https://app.rocketwork.ru/api/';
 
+export async function GET(req: Request) {
+  try { startWatchdog(); } catch {}
+  const url = new URL(req.url);
+  const res = NextResponse.json({
+    ok: true,
+    method: 'GET',
+    now: new Date().toISOString(),
+    instanceId: getInstanceId(),
+    hostname: process.env.HOSTNAME || null,
+    pid: process.pid,
+    uptimeSec: Math.floor(process.uptime()),
+  });
+  try { res.headers.set('Cache-Control', 'no-store'); } catch {}
+  try { res.headers.set('X-Instance-Id', getInstanceId()); } catch {}
+  try { if (url.searchParams.get('close') === '1') res.headers.set('Connection', 'close'); } catch {}
+  return res;
+}
+
 type BodyIn = {
   amountRub: number; // сумма в рублях
   description: string;
@@ -70,6 +88,9 @@ function getTraceHub() {
 export async function POST(req: Request) {
   const started = Date.now();
   try { startWatchdog(); } catch {}
+  const isProbe = (() => {
+    try { return new URL(req.url).searchParams.get('probe') === '1'; } catch { return false; }
+  })();
   const traceId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   const hub = getTraceHub();
   const trace: TasksTrace = {
@@ -97,6 +118,15 @@ export async function POST(req: Request) {
       if (hub.done.length > 30) hub.done.length = 30;
     } catch {}
   };
+
+  if (isProbe) {
+    mark('probe');
+    finish(null);
+    const r = NextResponse.json({ ok: true, probe: true, traceId, instanceId: trace.instanceId }, { status: 200 });
+    r.headers.set('Cache-Control', 'no-store');
+    r.headers.set('X-Instance-Id', trace.instanceId);
+    return r;
+  }
 
   try {
     // Multi-instance mitigation: in S3 mode treat one replica as API leader to avoid split-brain / hot-spotting.
