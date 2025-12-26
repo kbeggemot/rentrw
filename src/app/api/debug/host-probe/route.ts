@@ -8,6 +8,7 @@ export const runtime = 'nodejs';
 type IpProbe = {
   ip: string;
   family: 4 | 6;
+  seq?: number;
   ok: boolean;
   ms: number;
   status?: number | null;
@@ -85,6 +86,8 @@ export async function GET(req: Request) {
     const url = new URL(req.url);
     const timeoutMs = Math.max(300, Math.min(20_000, Math.floor(n(url.searchParams.get('timeoutMs'), 2500))));
     const limit = Math.max(1, Math.min(20, Math.floor(n(url.searchParams.get('limit'), 10))));
+    const nPerIp = Math.max(1, Math.min(40, Math.floor(n(url.searchParams.get('n'), 1))));
+    const concurrency = Math.max(1, Math.min(12, Math.floor(n(url.searchParams.get('concurrency'), 4))));
 
     const hdrs = await nextHeaders();
     const rawHost = (url.searchParams.get('host') || hdrs.get('x-forwarded-host') || hdrs.get('host') || 'ypla.ru').trim();
@@ -98,11 +101,36 @@ export async function GET(req: Request) {
     for (const ip of a4.slice(0, limit)) ips.push({ ip, family: 4 });
     for (const ip of a6.slice(0, limit)) ips.push({ ip, family: 6 });
 
-    const probes: IpProbe[] = [];
+    const tasks: Array<() => Promise<IpProbe>> = [];
+    let seq = 0;
     for (let i = 0; i < ips.length; i += 1) {
       const { ip, family } = ips[i];
-      const p = `${path}${path.includes('?') ? '&' : '?'}ts=${Date.now()}&i=${i}`;
-      probes.push(await httpsGetJsonViaIp({ ip, family, host, path: p, timeoutMs }));
+      for (let j = 0; j < nPerIp; j += 1) {
+        const mySeq = seq++;
+        const p = `${path}${path.includes('?') ? '&' : '?'}ts=${Date.now()}&i=${i}&j=${j}&seq=${mySeq}&close=1`;
+        tasks.push(async () => ({ ...(await httpsGetJsonViaIp({ ip, family, host, path: p, timeoutMs })), seq: mySeq }));
+      }
+    }
+
+    const probes: IpProbe[] = new Array(tasks.length);
+    let cursor = 0;
+    const workerCount = Math.min(concurrency, tasks.length);
+    await Promise.all(
+      new Array(workerCount).fill(0).map(async () => {
+        while (cursor < tasks.length) {
+          const idx = cursor++;
+          probes[idx] = await tasks[idx]();
+        }
+      })
+    );
+
+    const instanceCounts: Record<string, number> = {};
+    const hostnameCounts: Record<string, number> = {};
+    for (const p of probes) {
+      const id = p?.instanceId ? String(p.instanceId) : '(none)';
+      instanceCounts[id] = (instanceCounts[id] || 0) + 1;
+      const hn = p?.hostname ? String(p.hostname) : '(none)';
+      hostnameCounts[hn] = (hostnameCounts[hn] || 0) + 1;
     }
 
     return NextResponse.json({
@@ -110,12 +138,17 @@ export async function GET(req: Request) {
       host,
       path,
       timeoutMs,
+      nPerIp,
+      concurrency,
       resolved: { a4, a6 },
       probes,
       summary: {
         total: probes.length,
         ok: probes.filter((p) => p.ok).length,
         failures: probes.filter((p) => !p.ok).length,
+        uniqueInstanceIds: Object.keys(instanceCounts).filter((k) => k !== '(none)').sort(),
+        instanceCounts,
+        hostnameCounts,
       },
     }, { status: 200 });
   } catch (e) {
