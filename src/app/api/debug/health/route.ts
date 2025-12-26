@@ -20,7 +20,7 @@ async function fdCount(): Promise<number | null> {
   }
 }
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
     const mem = process.memoryUsage();
     const elu = performance.eventLoopUtilization();
@@ -37,7 +37,7 @@ export async function GET() {
       return out;
     })();
 
-    return NextResponse.json({
+    const res = NextResponse.json({
       ok: true,
       now: new Date().toISOString(),
       instanceId: getInstanceId(),
@@ -68,6 +68,19 @@ export async function GET() {
         count: await fdCount(),
       },
     }, { status: 200 });
+
+    // Debug helpers:
+    // - Always disable caching
+    // - Optionally force connection close to encourage new TCP connections (helps diagnose LB/backends)
+    try { res.headers.set('Cache-Control', 'no-store'); } catch {}
+    try { res.headers.set('X-Instance-Id', getInstanceId()); } catch {}
+    try {
+      const url = new URL(req.url);
+      const close = url.searchParams.get('close');
+      if (close === '1') res.headers.set('Connection', 'close');
+    } catch {}
+
+    return res;
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     return NextResponse.json({ ok: false, error: msg }, { status: 500 });

@@ -7,6 +7,7 @@ import { startOfdRepairWorker } from './ofdRepairWorker';
 import { startSalesRefreshWorker } from './salesRefreshWorker';
 import { migrateLegacyTasksToOrgStore } from './taskStore';
 import { ensureLeaderLease } from './leaderLease';
+import { startWatchdog } from './watchdog';
 
 // Some hosting environments have broken IPv6 egress; when DNS rotates and AAAA is preferred,
 // outbound HTTPS to certain domains can start hanging until process restart.
@@ -16,9 +17,18 @@ try {
 } catch {}
 
 try {
-  startOfdScheduleWorker();
-  startOfdRepairWorker();
-  startSalesRefreshWorker();
+  const isProd = process.env.NODE_ENV === 'production';
+  const workersFlag = (process.env.BACKGROUND_WORKERS || '').trim();
+  const backgroundWorkersEnabled = workersFlag
+    ? workersFlag === '1'
+    : (isProd ? false : true);
+
+  if (backgroundWorkersEnabled) {
+    startOfdScheduleWorker();
+    startOfdRepairWorker();
+    startSalesRefreshWorker();
+  }
+  startWatchdog();
   // fire-and-forget migration to sharded sales store
   // IMPORTANT: this can be very heavy on large legacy tasks.json and/or multi-instance deployments.
   // Run it only when explicitly enabled, and only from the elected leader.
