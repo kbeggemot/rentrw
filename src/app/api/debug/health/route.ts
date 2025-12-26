@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getInstanceId } from '@/server/leaderLease';
+import { getWatchdogStatus, startWatchdog } from '@/server/watchdog';
 import { performance } from 'perf_hooks';
 import { promises as fs } from 'fs';
 
@@ -22,6 +23,7 @@ async function fdCount(): Promise<number | null> {
 
 export async function GET(req: Request) {
   try {
+    try { startWatchdog(); } catch {}
     const mem = process.memoryUsage();
     const elu = performance.eventLoopUtilization();
     const handles = (() => {
@@ -46,6 +48,7 @@ export async function GET(req: Request) {
       uptimeSec: Math.floor(process.uptime()),
       node: process.version,
       s3Enabled: (process.env.S3_ENABLED || '0') === '1',
+      watchdog: (() => { try { return getWatchdogStatus(); } catch { return null; } })(),
       mem: {
         rss: mem.rss,
         heapTotal: mem.heapTotal,

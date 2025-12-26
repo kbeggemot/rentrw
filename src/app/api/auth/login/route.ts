@@ -3,11 +3,13 @@ import { findUserByPhoneLoose, verifyPassword } from '@/server/userStore';
 import { listUserOrganizations } from '@/server/orgStore';
 import { fireAndForgetFetch } from '@/server/http';
 import { ensureLeaderLease, getInstanceId } from '@/server/leaderLease';
+import { startWatchdog } from '@/server/watchdog';
 
 export const runtime = 'nodejs';
 
 export async function POST(req: Request) {
   try {
+    try { startWatchdog(); } catch {}
     // Multi-instance mitigation: in S3 mode route auth through the elected API leader to avoid "half-dead" replicas.
     if (process.env.S3_ENABLED === '1') {
       try {

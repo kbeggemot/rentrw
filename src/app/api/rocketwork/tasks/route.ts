@@ -26,6 +26,7 @@ import { findLinkByCode } from '@/server/paymentLinkStore';
 import { fetchTextWithTimeout, fetchWithTimeout, fireAndForgetFetch } from '@/server/http';
 import { getInstanceId } from '@/server/leaderLease';
 import { ensureLeaderLease } from '@/server/leaderLease';
+import { startWatchdog } from '@/server/watchdog';
 
 export const runtime = 'nodejs';
 
@@ -68,6 +69,7 @@ function getTraceHub() {
 
 export async function POST(req: Request) {
   const started = Date.now();
+  try { startWatchdog(); } catch {}
   const traceId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   const hub = getTraceHub();
   const trace: TasksTrace = {
@@ -101,14 +103,17 @@ export async function POST(req: Request) {
     // Followers respond fast with 503 so clients can retry and likely hit the leader.
     if (process.env.S3_ENABLED === '1') {
       try {
+        mark('leader_lease_start');
         const ok = await ensureLeaderLease('apiLeader', 30_000);
         if (!ok) {
+          mark('leader_lease_not_leader');
           finish('NOT_LEADER');
           const r = NextResponse.json({ error: 'NOT_LEADER', traceId, instanceId: trace.instanceId }, { status: 503 });
           r.headers.set('Retry-After', '1');
           r.headers.set('X-Instance-Id', trace.instanceId);
           return r;
         }
+        mark('leader_lease_ok');
       } catch {}
     }
 

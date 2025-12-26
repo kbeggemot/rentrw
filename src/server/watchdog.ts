@@ -9,6 +9,50 @@ let running = false;
 type State = { firstNotLeaderAt?: number | null; consecutiveFailures: number };
 const state: State = { firstNotLeaderAt: null, consecutiveFailures: 0 };
 
+type PublicStatus = {
+  enabled: boolean;
+  started: boolean;
+  instanceId: string;
+  startedAt: string | null;
+  lastTickAt: string | null;
+  lastOkAt: string | null;
+  consecutiveFailures: number;
+  lastError: string | null;
+  lastChecks: { s3Ok: boolean | null; rwOk: boolean | null };
+};
+
+type GlobalBag = typeof globalThis & { __rentrw_watchdog?: PublicStatus };
+const g = globalThis as GlobalBag;
+
+function setStatus(patch: Partial<PublicStatus>) {
+  const base: PublicStatus = g.__rentrw_watchdog || {
+    enabled: isEnabled(),
+    started: false,
+    instanceId: getInstanceId(),
+    startedAt: null,
+    lastTickAt: null,
+    lastOkAt: null,
+    consecutiveFailures: 0,
+    lastError: null,
+    lastChecks: { s3Ok: null, rwOk: null },
+  };
+  g.__rentrw_watchdog = { ...base, ...patch };
+}
+
+export function getWatchdogStatus(): PublicStatus {
+  return g.__rentrw_watchdog || {
+    enabled: isEnabled(),
+    started,
+    instanceId: getInstanceId(),
+    startedAt: null,
+    lastTickAt: null,
+    lastOkAt: null,
+    consecutiveFailures: state.consecutiveFailures,
+    lastError: null,
+    lastChecks: { s3Ok: null, rwOk: null },
+  };
+}
+
 function isEnabled(): boolean {
   return (process.env.WATCHDOG_ENABLED || '0') === '1';
 }
@@ -25,6 +69,7 @@ function ms(name: string, fallback: number): number {
 export function startWatchdog(): void {
   if (started) return;
   started = true;
+  setStatus({ enabled: isEnabled(), started: true, instanceId: getInstanceId(), startedAt: new Date().toISOString() });
   if (!isEnabled()) return;
 
   const intervalMs = ms('WATCHDOG_INTERVAL_MS', 30_000);
@@ -36,6 +81,10 @@ export function startWatchdog(): void {
   const tick = async () => {
     if (running) return;
     running = true;
+    let s3Ok: boolean | null = null;
+    let rwOk: boolean | null = null;
+    let lastErr: string | null = null;
+    setStatus({ lastTickAt: new Date().toISOString(), consecutiveFailures: state.consecutiveFailures });
     // Only meaningful in S3/multi-instance mode
     const s3 = (process.env.S3_ENABLED || '0') === '1';
     // Still useful even without S3: detect dead egress to RocketWork and restart.
@@ -69,9 +118,13 @@ export function startWatchdog(): void {
         await writeText(key, payload);
         // Best-effort read; should be bounded by S3_GET_TIMEOUT_MS
         await readText(key);
+        s3Ok = true;
+      } else {
+        s3Ok = null;
       }
     } catch {
       ok = false;
+      s3Ok = false;
     }
 
     // 3) Egress liveness ping (RocketWork base) — detects half-dead instances where external calls hang
@@ -82,15 +135,24 @@ export function startWatchdog(): void {
       const url = new URL('account', baseNorm).toString();
       const res = await fetchWithTimeout(url, { cache: 'no-store', headers: { Accept: 'application/json' } }, egressTimeoutMs);
       await discardResponseBody(res, egressTimeoutMs);
+      rwOk = true;
     } catch {
       ok = false;
+      rwOk = false;
     }
 
     if (ok) state.consecutiveFailures = 0;
     else state.consecutiveFailures += 1;
+    try { setStatus({ consecutiveFailures: state.consecutiveFailures }); } catch {}
     if (state.consecutiveFailures >= maxFailures) {
       // Something is very wrong (storage and/or egress); restarting is safer than serving half-dead.
       try { process.exit(1); } catch {}
+    }
+    if (ok) {
+      setStatus({ lastOkAt: new Date().toISOString(), lastError: null, lastChecks: { s3Ok, rwOk } });
+    } else {
+      lastErr = `WATCHDOG_FAIL s3Ok=${String(s3Ok)} rwOk=${String(rwOk)}`;
+      setStatus({ lastError: lastErr, lastChecks: { s3Ok, rwOk } });
     }
   };
 
