@@ -2,6 +2,9 @@ FROM node:22-alpine
 
 WORKDIR /app
 
+# Debug marker: if the platform uses THIS Dockerfile from the repo, this line will appear in build logs.
+RUN echo "USING_REPO_DOCKERFILE"
+
 # Install deps first for better caching
 COPY package*.json ./
 COPY .npmrc ./
