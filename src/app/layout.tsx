@@ -4,6 +4,15 @@ import Script from "next/script";
 import "./globals.css";
 // removed unused cookies import
 
+function envBool(name: string, fallback: boolean): boolean {
+  const raw = String(process.env[name] ?? '').trim();
+  if (!raw) return fallback;
+  const v = raw.toLowerCase();
+  if (['1', 'true', 'yes', 'y', 'on'].includes(v)) return true;
+  if (['0', 'false', 'no', 'n', 'off'].includes(v)) return false;
+  return fallback;
+}
+
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
@@ -46,6 +55,20 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // Toggle Webvisor via env:
+  // - NEXT_PUBLIC_METRIKA_WEBVISOR=0/1 (preferred)
+  // - METRIKA_WEBVISOR=0/1 (server-only fallback)
+  // Default is "on" to preserve existing behavior.
+  const metrikaWebvisor = envBool('NEXT_PUBLIC_METRIKA_WEBVISOR', envBool('METRIKA_WEBVISOR', true));
+  const metrikaInitJson = JSON.stringify({
+    ssr: true,
+    webvisor: metrikaWebvisor,
+    clickmap: true,
+    ecommerce: "dataLayer",
+    accurateTrackBounce: true,
+    trackLinks: true,
+  });
+
   return (
     <html lang="en">
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`} suppressHydrationWarning>
@@ -56,7 +79,7 @@ m[i].l=1*new Date();
 for (var j = 0; j < document.scripts.length; j++) {if (document.scripts[j].src === r) { return; }}
 k=e.createElement(t),a=e.getElementsByTagName(t)[0],k.async=1,k.src=r,a.parentNode.insertBefore(k,a)
 })(window, document,'script','https://mc.yandex.ru/metrika/tag.js?id=105421779', 'ym');
-ym(105421779, 'init', {ssr:true, webvisor:true, clickmap:true, ecommerce:"dataLayer", accurateTrackBounce:true, trackLinks:true});`}
+ym(105421779, 'init', ${metrikaInitJson});`}
         </Script>
         <noscript>
           <div>
