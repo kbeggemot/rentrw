@@ -14,7 +14,11 @@ type IpProbe = {
   status?: number | null;
   error?: string | null;
   instanceId?: string | null;
+  buildId?: string | null;
   hostname?: string | null;
+  headerInstanceId?: string | null;
+  headerBuildId?: string | null;
+  bodyHead?: string | null;
 };
 
 function n(v: string | null, fallback: number): number {
@@ -22,21 +26,23 @@ function n(v: string | null, fallback: number): number {
   return Number.isFinite(x) ? x : fallback;
 }
 
-function httpsGetJsonViaIp(opts: {
+function httpsRequestJsonViaIp(opts: {
   ip: string;
   family: 4 | 6;
   host: string;
   path: string;
   timeoutMs: number;
+  method: 'GET' | 'POST';
 }): Promise<IpProbe> {
   const started = Date.now();
   const agent = new https.Agent({ keepAlive: false, maxSockets: 1 });
   return new Promise<IpProbe>((resolve) => {
+    const method = opts.method || 'GET';
     const req = https.request({
       host: opts.ip,
       family: opts.family,
       port: 443,
-      method: 'GET',
+      method,
       path: opts.path,
       servername: opts.host, // SNI
       headers: {
@@ -44,27 +50,38 @@ function httpsGetJsonViaIp(opts: {
         Accept: 'application/json',
         Connection: 'close',
         'Cache-Control': 'no-cache',
+        ...(method === 'POST' ? { 'Content-Length': '0' } : {}),
       },
       agent,
       timeout: opts.timeoutMs,
     }, (res) => {
       const chunks: Buffer[] = [];
+      let total = 0;
       res.on('data', (c) => {
-        if (chunks.reduce((a, b) => a + b.length, 0) < 8192) chunks.push(Buffer.from(c));
+        const buf = Buffer.from(c);
+        total += buf.length;
+        if (total < 8192) chunks.push(buf);
       });
       res.on('end', () => {
         const ms = Date.now() - started;
         const txt = Buffer.concat(chunks).toString('utf8');
         let data: any = null;
         try { data = txt ? JSON.parse(txt) : null; } catch { data = null; }
+        const headerInstanceId = (res.headers['x-instance-id'] ? String(res.headers['x-instance-id']) : null);
+        const headerBuildId = (res.headers['x-build-id'] ? String(res.headers['x-build-id']) : null);
+        const bodyHead = txt ? String(txt).slice(0, 240) : null;
         resolve({
           ip: opts.ip,
           family: opts.family,
           ok: (res.statusCode || 0) >= 200 && (res.statusCode || 0) < 300,
           ms,
           status: res.statusCode || null,
-          instanceId: data?.instanceId ?? null,
+          instanceId: data?.instanceId ?? headerInstanceId ?? null,
+          buildId: data?.buildId ?? headerBuildId ?? null,
           hostname: data?.hostname ?? null,
+          headerInstanceId,
+          headerBuildId,
+          bodyHead,
         });
       });
     });
@@ -88,6 +105,8 @@ export async function GET(req: Request) {
     const limit = Math.max(1, Math.min(20, Math.floor(n(url.searchParams.get('limit'), 10))));
     const nPerIp = Math.max(1, Math.min(40, Math.floor(n(url.searchParams.get('n'), 1))));
     const concurrency = Math.max(1, Math.min(12, Math.floor(n(url.searchParams.get('concurrency'), 4))));
+    const methodRaw = String(url.searchParams.get('method') || 'GET').trim().toUpperCase();
+    const method: 'GET' | 'POST' = methodRaw === 'POST' ? 'POST' : 'GET';
 
     const hdrs = await nextHeaders();
     const rawHost = (url.searchParams.get('host') || hdrs.get('x-forwarded-host') || hdrs.get('host') || 'ypla.ru').trim();
@@ -108,7 +127,7 @@ export async function GET(req: Request) {
       for (let j = 0; j < nPerIp; j += 1) {
         const mySeq = seq++;
         const p = `${path}${path.includes('?') ? '&' : '?'}ts=${Date.now()}&i=${i}&j=${j}&seq=${mySeq}&close=1`;
-        tasks.push(async () => ({ ...(await httpsGetJsonViaIp({ ip, family, host, path: p, timeoutMs })), seq: mySeq }));
+        tasks.push(async () => ({ ...(await httpsRequestJsonViaIp({ ip, family, host, path: p, timeoutMs, method })), seq: mySeq }));
       }
     }
 
@@ -137,6 +156,7 @@ export async function GET(req: Request) {
       now: new Date().toISOString(),
       host,
       path,
+      method,
       timeoutMs,
       nPerIp,
       concurrency,
