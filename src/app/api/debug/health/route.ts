@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getInstanceId } from '@/server/leaderLease';
 import { getWatchdogStatus, startWatchdog } from '@/server/watchdog';
+import { getBuildId } from '@/server/buildInfo';
 import { performance } from 'perf_hooks';
 import { promises as fs } from 'fs';
 
@@ -24,6 +25,7 @@ async function fdCount(): Promise<number | null> {
 export async function GET(req: Request) {
   try {
     try { startWatchdog(); } catch {}
+    const buildId = await getBuildId().catch(() => null);
     const mem = process.memoryUsage();
     const elu = performance.eventLoopUtilization();
     const handles = (() => {
@@ -42,6 +44,7 @@ export async function GET(req: Request) {
     const res = NextResponse.json({
       ok: true,
       now: new Date().toISOString(),
+      buildId,
       instanceId: getInstanceId(),
       hostname: process.env.HOSTNAME || null,
       pid: process.pid,
@@ -77,6 +80,7 @@ export async function GET(req: Request) {
     // - Optionally force connection close to encourage new TCP connections (helps diagnose LB/backends)
     try { res.headers.set('Cache-Control', 'no-store'); } catch {}
     try { res.headers.set('X-Instance-Id', getInstanceId()); } catch {}
+    try { if (buildId) res.headers.set('X-Build-Id', String(buildId)); } catch {}
     try {
       const url = new URL(req.url);
       const close = url.searchParams.get('close');

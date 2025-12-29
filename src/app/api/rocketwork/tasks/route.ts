@@ -27,6 +27,7 @@ import { fetchTextWithTimeout, fetchWithTimeout, fireAndForgetFetch } from '@/se
 import { getInstanceId } from '@/server/leaderLease';
 import { ensureLeaderLease } from '@/server/leaderLease';
 import { startWatchdog } from '@/server/watchdog';
+import { getBuildId } from '@/server/buildInfo';
 
 export const runtime = 'nodejs';
 
@@ -35,10 +36,12 @@ const DEFAULT_BASE_URL = 'https://app.rocketwork.ru/api/';
 export async function GET(req: Request) {
   try { startWatchdog(); } catch {}
   const url = new URL(req.url);
+  const buildId = await getBuildId().catch(() => null);
   const res = NextResponse.json({
     ok: true,
     method: 'GET',
     now: new Date().toISOString(),
+    buildId,
     instanceId: getInstanceId(),
     hostname: process.env.HOSTNAME || null,
     pid: process.pid,
@@ -46,6 +49,7 @@ export async function GET(req: Request) {
   });
   try { res.headers.set('Cache-Control', 'no-store'); } catch {}
   try { res.headers.set('X-Instance-Id', getInstanceId()); } catch {}
+  try { if (buildId) res.headers.set('X-Build-Id', String(buildId)); } catch {}
   try { if (url.searchParams.get('close') === '1') res.headers.set('Connection', 'close'); } catch {}
   return res;
 }
@@ -88,6 +92,7 @@ function getTraceHub() {
 export async function POST(req: Request) {
   const started = Date.now();
   try { startWatchdog(); } catch {}
+  const buildId = await getBuildId().catch(() => null);
   const isProbe = (() => {
     try { return new URL(req.url).searchParams.get('probe') === '1'; } catch { return false; }
   })();
@@ -122,9 +127,10 @@ export async function POST(req: Request) {
   if (isProbe) {
     mark('probe');
     finish(null);
-    const r = NextResponse.json({ ok: true, probe: true, traceId, instanceId: trace.instanceId }, { status: 200 });
+    const r = NextResponse.json({ ok: true, probe: true, traceId, instanceId: trace.instanceId, buildId }, { status: 200 });
     r.headers.set('Cache-Control', 'no-store');
     r.headers.set('X-Instance-Id', trace.instanceId);
+    try { if (buildId) r.headers.set('X-Build-Id', String(buildId)); } catch {}
     return r;
   }
 

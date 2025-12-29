@@ -1,11 +1,13 @@
 import { NextResponse } from 'next/server';
 import { startWatchdog } from '@/server/watchdog';
+import { getBuildId } from '@/server/buildInfo';
 
 export const runtime = 'nodejs';
 
 export async function GET() {
   try {
     try { startWatchdog(); } catch {}
+    const buildId = await getBuildId().catch(() => null);
     const g = globalThis as any as {
       __rwTasksTrace?: { active: Record<string, any>; done: any[] };
     };
@@ -32,8 +34,9 @@ export async function GET() {
       error: t.error || null,
       done: Boolean(t.done),
     }));
-    return NextResponse.json({
+    const res = NextResponse.json({
       now: new Date().toISOString(),
+      buildId,
       pid: typeof process !== 'undefined' ? process.pid : null,
       uptimeSec: typeof process !== 'undefined' ? Math.floor(process.uptime()) : null,
       hostname: (() => { try { return process.env.HOSTNAME || null; } catch { return null; } })(),
@@ -41,6 +44,9 @@ export async function GET() {
       active,
       done,
     }, { status: 200 });
+    try { res.headers.set('Cache-Control', 'no-store'); } catch {}
+    try { if (buildId) res.headers.set('X-Build-Id', String(buildId)); } catch {}
+    return res;
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     return NextResponse.json({ error: msg }, { status: 500 });
