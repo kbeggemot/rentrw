@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { getDecryptedApiToken } from '@/server/secureStore';
 import { getSelectedOrgInn } from '@/server/orgContext';
 import { getTokenForOrg } from '@/server/orgStore';
-import { fetchWithTimeout } from '@/server/http';
+import { fetchTextWithTimeout } from '@/server/http';
 
 export const runtime = 'nodejs';
 
@@ -26,7 +26,7 @@ export async function GET(req: Request) {
     const base = process.env.ROCKETWORK_API_BASE_URL || DEFAULT_BASE_URL;
     const url = new URL('account', base.endsWith('/') ? base : base + '/').toString();
 
-    const res = await fetchWithTimeout(url, {
+    const out = await fetchTextWithTimeout(url, {
       method: 'GET',
       headers: {
         Authorization: `Bearer ${token}`,
@@ -35,8 +35,9 @@ export async function GET(req: Request) {
       // внешний API, данные всегда актуальные
       cache: 'no-store',
     }, 15_000);
+    const res = out.res;
 
-    const text = await res.text();
+    const text = out.text;
     let data: unknown = null;
     try { data = text ? JSON.parse(text) : null; } catch { data = text; }
 

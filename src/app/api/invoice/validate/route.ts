@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { fireAndForgetFetch, fetchWithTimeout } from '@/server/http';
+import { fireAndForgetFetch, fetchTextWithTimeout } from '@/server/http';
 
 export const runtime = 'nodejs';
 
@@ -40,8 +40,9 @@ export async function POST(req: Request) {
 
     // 2) Проверка
     const checkUrl = new URL(`executors/${encodeURIComponent(digits)}`, base.endsWith('/') ? base : base + '/').toString();
-    const res = await fetchWithTimeout(checkUrl, { method: 'GET', headers, cache: 'no-store' }, 15_000);
-    const text = await res.text();
+    const out = await fetchTextWithTimeout(checkUrl, { method: 'GET', headers, cache: 'no-store' }, 15_000);
+    const res = out.res;
+    const text = out.text;
     let data: any = null; try { data = text ? JSON.parse(text) : null; } catch { data = text; }
 
     // Стандартизованная разборка

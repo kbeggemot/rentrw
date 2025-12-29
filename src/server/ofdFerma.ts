@@ -1,5 +1,5 @@
 import { writeText } from './storage';
-import { fetchWithTimeout } from './http';
+import { fetchTextWithTimeout } from './http';
 
 type FermaAuth = {
   baseUrl: string;
@@ -118,8 +118,9 @@ export async function fermaCreateReceipt(payload: unknown, opts?: Partial<FermaA
   }
 
   await rateLimit('create');
-  const res = await fetchWithTimeout(url, { method: 'POST', headers, body, cache: 'no-store' }, fermaTimeoutMs());
-  const text = await res.text();
+  const out = await fetchTextWithTimeout(url, { method: 'POST', headers, body, cache: 'no-store' }, fermaTimeoutMs());
+  const res = out.res;
+  const text = out.text;
   if (shouldLog()) {
     try { await writeText('.data/ofd_last_response.json', JSON.stringify({ ts: new Date().toISOString(), status: res.status, text }, null, 2)); } catch {}
   }
@@ -148,8 +149,9 @@ export async function fermaGetReceiptStatus(id: string, opts?: Partial<FermaAuth
   let text = '';
   if (isGetByPath) {
     await rateLimit('status');
-    const res = await fetchWithTimeout(url, { method: 'GET', headers, cache: 'no-store' }, fermaTimeoutMs());
-    text = await res.text();
+    const out = await fetchTextWithTimeout(url, { method: 'GET', headers, cache: 'no-store' }, fermaTimeoutMs());
+    const res = out.res;
+    text = out.text;
     let data: any = null; try { data = text ? JSON.parse(text) : null; } catch { data = text; }
     return { status: (data && (data.status || data.state)) || undefined, rawStatus: res.status, rawText: text };
   }
@@ -157,8 +159,9 @@ export async function fermaGetReceiptStatus(id: string, opts?: Partial<FermaAuth
   const statusBody = (payload: any) => JSON.stringify({ Request: payload });
   // 1) minimal by ReceiptId
   await rateLimit('status');
-  let res = await fetchWithTimeout(url, { method: 'POST', headers, body: statusBody({ ReceiptId: id }), cache: 'no-store' }, fermaTimeoutMs());
-  text = await res.text();
+  let out = await fetchTextWithTimeout(url, { method: 'POST', headers, body: statusBody({ ReceiptId: id }), cache: 'no-store' }, fermaTimeoutMs());
+  let res = out.res;
+  text = out.text;
   if (res.status === 404 || /not\s*found/i.test(text) || /не\s*найден/i.test(text)) {
     // 2) try extended body with dates derived from current period (±30 days)
     const now = new Date();
@@ -167,14 +170,16 @@ export async function fermaGetReceiptStatus(id: string, opts?: Partial<FermaAuth
     const fmt = (d: Date) => d.toISOString().slice(0, 19);
     const ext = { ReceiptId: id, StartDateUtc: fmt(start), EndDateUtc: fmt(end), StartDateLocal: fmt(start), EndDateLocal: fmt(end) };
     await rateLimit('status');
-    res = await fetchWithTimeout(url, { method: 'POST', headers, body: statusBody(ext), cache: 'no-store' }, fermaTimeoutMs());
-    text = await res.text();
+    out = await fetchTextWithTimeout(url, { method: 'POST', headers, body: statusBody(ext), cache: 'no-store' }, fermaTimeoutMs());
+    res = out.res;
+    text = out.text;
   }
   if (res.status === 404 || /not\s*found/i.test(text) || /не\s*найден/i.test(text)) {
     // 3) fallback by InvoiceId
     await rateLimit('status');
-    res = await fetchWithTimeout(url, { method: 'POST', headers, body: statusBody({ InvoiceId: id }), cache: 'no-store' }, fermaTimeoutMs());
-    text = await res.text();
+    out = await fetchTextWithTimeout(url, { method: 'POST', headers, body: statusBody({ InvoiceId: id }), cache: 'no-store' }, fermaTimeoutMs());
+    res = out.res;
+    text = out.text;
   }
   let data: any = null; try { data = text ? JSON.parse(text) : null; } catch { data = text; }
   return { status: (data && (data.status || data.state)) || (data && data.Status) || undefined, rawStatus: res.status, rawText: text };
@@ -208,8 +213,9 @@ export async function fermaGetReceiptStatusDetailed(
   if (fmt(range.endLocal)) payload.EndDateLocal = fmt(range.endLocal);
   const body = JSON.stringify({ Request: payload });
   await rateLimit('detailed');
-  const res = await fetchWithTimeout(url, { method: 'POST', headers, body, cache: 'no-store' }, fermaTimeoutMs());
-  const text = await res.text();
+  const out = await fetchTextWithTimeout(url, { method: 'POST', headers, body, cache: 'no-store' }, fermaTimeoutMs());
+  const res = out.res;
+  const text = out.text;
   let data: any = null; try { data = text ? JSON.parse(text) : null; } catch { data = text; }
   return { status: (data && (data.status || data.state)) || (data && data.Status) || undefined, rawStatus: res.status, rawText: text };
 }
@@ -233,8 +239,9 @@ export async function fermaGetReceiptExtended(
   if (params.fn) u.searchParams.set('fn', params.fn);
   const headers = authHeaders(auth);
   await rateLimit('extended');
-  const res = await fetchWithTimeout(u.toString(), { method: 'GET', headers, cache: 'no-store' }, fermaTimeoutMs());
-  const text = await res.text();
+  const out = await fetchTextWithTimeout(u.toString(), { method: 'GET', headers, cache: 'no-store' }, fermaTimeoutMs());
+  const res = out.res;
+  const text = out.text;
   return { rawStatus: res.status, rawText: text };
 }
 
@@ -243,8 +250,9 @@ export async function fermaCreateAuthToken(login?: string, password?: string, op
   const baseUrl = opts?.baseUrl || env.baseUrl || 'https://ferma.ofd.ru/';
   const body = JSON.stringify({ Login: login || env.login || '', Password: password || env.password || '' });
   const url = joinUrl(baseUrl, '/api/Authorization/CreateAuthToken');
-  const res = await fetchWithTimeout(url, { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, body, cache: 'no-store' }, fermaTimeoutMs());
-  const text = await res.text();
+  const out = await fetchTextWithTimeout(url, { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, body, cache: 'no-store' }, fermaTimeoutMs());
+  const res = out.res;
+  const text = out.text;
   if (shouldLog()) {
     try { await writeText('.data/ofd_auth_token_last.json', JSON.stringify({ ts: new Date().toISOString(), url, status: res.status, request: { Login: login || env.login, Password: '***' }, text }, null, 2)); } catch {}
   }

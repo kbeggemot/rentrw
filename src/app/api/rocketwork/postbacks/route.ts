@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { writeText } from '@/server/storage';
 import { getDecryptedApiToken } from '@/server/secureStore';
+import { fetchTextWithTimeout } from '@/server/http';
 
 export const runtime = 'nodejs';
 
@@ -49,9 +50,8 @@ export async function GET(req: Request) {
         for (const a of attempts) {
           try {
             const createUrl = new URL(a.path, base.endsWith('/') ? base : base + '/').toString();
-            const res = await fetch(createUrl, { method: 'POST', headers, body: JSON.stringify(a.payload), cache: 'no-store' });
-            const tx = await res.text();
-            ensureLogs.push({ kind: 'create', stream: a.stream, request: { path: a.path, payload: a.payload }, response: { status: res.status, text: tx } });
+            const out = await fetchTextWithTimeout(createUrl, { method: 'POST', headers, body: JSON.stringify(a.payload), cache: 'no-store' }, 15_000);
+            ensureLogs.push({ kind: 'create', stream: a.stream, request: { path: a.path, payload: a.payload }, response: { status: out.res.status, text: out.text } });
           } catch (e) {
             ensureLogs.push({ kind: 'create', stream: a.stream, request: { path: a.path, payload: a.payload }, error: String((e as Error)?.message || e) });
           }
@@ -59,8 +59,8 @@ export async function GET(req: Request) {
         // Additionally, try to update existing subscriptions that have empty or foreign URI
         try {
           const listUrl = new URL('postback_subscriptions', base.endsWith('/') ? base : base + '/').toString();
-          const res = await fetch(listUrl, { method: 'GET', headers, cache: 'no-store' });
-          const txt = await res.text();
+          const out = await fetchTextWithTimeout(listUrl, { method: 'GET', headers, cache: 'no-store' }, 15_000);
+          const txt = out.text;
           let data: any = null; try { data = txt ? JSON.parse(txt) : null; } catch { data = txt; }
           const arr = Array.isArray(data?.subscriptions) ? data.subscriptions : [];
           for (const it of arr) {
@@ -77,9 +77,8 @@ export async function GET(req: Request) {
               ]) {
                 try {
                   const updUrl = new URL(`postback_subscriptions/${encodeURIComponent(String(id))}`, base.endsWith('/') ? base : base + '/').toString();
-                  const r2 = await fetch(updUrl, { method, headers, body: JSON.stringify(f), cache: 'no-store' });
-                  const tx2 = await r2.text();
-                  ensureLogs.push({ kind: 'update', id, request: { method, payload: f }, response: { status: r2.status, text: tx2 } });
+                  const out2 = await fetchTextWithTimeout(updUrl, { method, headers, body: JSON.stringify(f), cache: 'no-store' }, 15_000);
+                  ensureLogs.push({ kind: 'update', id, request: { method, payload: f }, response: { status: out2.res.status, text: out2.text } });
                 } catch {}
               }
             }
@@ -90,8 +89,9 @@ export async function GET(req: Request) {
     }
     async function list(urlPath: string) {
       const url = new URL(urlPath, base.endsWith('/') ? base : base + '/').toString();
-      const res = await fetch(url, { method: 'GET', headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }, cache: 'no-store' });
-      const text = await res.text();
+      const out = await fetchTextWithTimeout(url, { method: 'GET', headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }, cache: 'no-store' }, 15_000);
+      const res = out.res;
+      const text = out.text;
       let data: any = null; try { data = text ? JSON.parse(text) : null; } catch { data = text; }
       return { ok: res.ok, status: res.status, data, text } as const;
     }
@@ -142,8 +142,8 @@ export async function POST(req: Request) {
       let exists = false;
       try {
         const listUrl = new URL('postback_subscriptions', base.endsWith('/') ? base : base + '/').toString();
-        const res = await fetch(listUrl, { method: 'GET', headers, cache: 'no-store' });
-        const txt = await res.text();
+        const out = await fetchTextWithTimeout(listUrl, { method: 'GET', headers, cache: 'no-store' }, 15_000);
+        const txt = out.text;
         const d = txt ? JSON.parse(txt) : {};
         const arr = Array.isArray(d?.subscriptions) ? d.subscriptions : [];
         exists = Array.isArray(arr) && arr.some((p: any) => {
@@ -157,8 +157,8 @@ export async function POST(req: Request) {
       try {
         const createUrl = new URL('postback_subscriptions', base.endsWith('/') ? base : base + '/').toString();
         const payload = { http_method: 'post', uri: callbackUrl, subscribed_on: [stream] } as any;
-        const res = await fetch(createUrl, { method: 'POST', headers, body: JSON.stringify(payload) });
-        if (res.ok) return;
+        const out = await fetchTextWithTimeout(createUrl, { method: 'POST', headers, body: JSON.stringify(payload), cache: 'no-store' }, 15_000);
+        if (out.res.ok) return;
       } catch {}
     }
 

@@ -4,6 +4,7 @@ import { setUserOrgName, setUserOrgInn } from '@/server/userStore';
 import { enqueueSubscriptionJob, ensureSubscriptions, startSubscriptionWorker } from '@/server/subscriptionWorker';
 import { upsertOrganization, addMemberToOrg, setUserOrgToken, deleteUserOrgToken, userHasTokenForOrg } from '@/server/orgStore';
 import { getSelectedOrgInn } from '@/server/orgContext';
+import { fetchTextWithTimeout, fireAndForgetFetch } from '@/server/http';
 
 export const runtime = 'nodejs';
 
@@ -52,12 +53,13 @@ export async function POST(req: Request) {
     //    If 401 → reject. If network/other error → continue to save (degraded mode).
     const base = process.env.ROCKETWORK_API_BASE_URL || 'https://app.rocketwork.ru/api/';
     try {
-      const ping = await fetch(new URL('account', base.endsWith('/') ? base : base + '/').toString(), {
+      const accUrl = new URL('account', base.endsWith('/') ? base : base + '/').toString();
+      const out = await fetchTextWithTimeout(accUrl, {
         method: 'GET',
         headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
         cache: 'no-store',
-      });
-      if (ping.status === 401) {
+      }, 10_000);
+      if (out.res.status === 401) {
         return NextResponse.json({ error: 'INVALID_TOKEN' }, { status: 400 });
       }
       // Non-OK but not 401 → allow save, continue in degraded mode
@@ -70,8 +72,8 @@ export async function POST(req: Request) {
     let orgName: string | null = null;
     try {
       const accUrl = new URL('account', base.endsWith('/') ? base : base + '/').toString();
-      const r = await fetch(accUrl, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }, cache: 'no-store' });
-      const txt = await r.text();
+      const out = await fetchTextWithTimeout(accUrl, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }, cache: 'no-store' }, 15_000);
+      const txt = out.text;
       let d: any = null; try { d = txt ? JSON.parse(txt) : null; } catch { d = txt; }
       orgName = (d?.company_name as string | undefined) ?? null;
       const gotInn: string | undefined = (d?.inn as string | undefined) ?? (d?.company_inn as string | undefined) ?? undefined;
@@ -116,8 +118,8 @@ export async function POST(req: Request) {
         // list existing subscriptions
         try {
           const listUrl = new URL('postback_subscriptions', base.endsWith('/') ? base : base + '/').toString();
-          const res = await fetch(listUrl, { method: 'GET', headers, cache: 'no-store' });
-          const txt = await res.text();
+          const out = await fetchTextWithTimeout(listUrl, { method: 'GET', headers, cache: 'no-store' }, 15_000);
+          const txt = out.text;
           const d = txt ? JSON.parse(txt) : {};
           const arr = Array.isArray(d?.subscriptions) ? d.subscriptions : (Array.isArray(d?.postbacks) ? d.postbacks : []);
           const exists = Array.isArray(arr) && arr.some((p: any) => {
@@ -131,8 +133,8 @@ export async function POST(req: Request) {
         try {
           const createUrl = new URL('postback_subscriptions', base.endsWith('/') ? base : base + '/').toString();
           const payload = { http_method: 'post', uri: callbackUrl, subscribed_on: [stream] } as any;
-          const res = await fetch(createUrl, { method: 'POST', headers, body: JSON.stringify(payload), cache: 'no-store' });
-          if (res.ok) return;
+          const out = await fetchTextWithTimeout(createUrl, { method: 'POST', headers, body: JSON.stringify(payload), cache: 'no-store' }, 15_000);
+          if (out.res.ok) return;
         } catch {}
       }
       await upsert('tasks');
@@ -140,8 +142,8 @@ export async function POST(req: Request) {
       // fetch org name for payout, save to user
       try {
         const accUrl = new URL('account', base.endsWith('/') ? base : base + '/').toString();
-        const r = await fetch(accUrl, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }, cache: 'no-store' });
-        const txt = await r.text();
+        const out = await fetchTextWithTimeout(accUrl, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }, cache: 'no-store' }, 15_000);
+        const txt = out.text;
         let d: any = null; try { d = txt ? JSON.parse(txt) : null; } catch { d = txt; }
         const orgName: string | undefined = (d?.company_name as string | undefined) ?? undefined;
         const orgInn: string | undefined = (d?.inn as string | undefined) ?? (d?.company_inn as string | undefined) ?? undefined;
@@ -154,8 +156,16 @@ export async function POST(req: Request) {
         const ensureHost = req.headers.get('x-forwarded-host') || req.headers.get('host') || 'localhost:3000';
         const ensureBase = `${ensureProto}://${ensureHost}`;
         // дергаем только те стримы, которые реально создавали выше
-        await fetch(new URL('/api/rocketwork/postbacks?ensure=1&stream=tasks', ensureBase).toString(), { method: 'GET', headers: { cookie: `session_user=${encodeURIComponent(userId)}`, 'x-user-id': userId }, cache: 'no-store' });
-        await fetch(new URL('/api/rocketwork/postbacks?ensure=1&stream=executors', ensureBase).toString(), { method: 'GET', headers: { cookie: `session_user=${encodeURIComponent(userId)}`, 'x-user-id': userId }, cache: 'no-store' });
+        fireAndForgetFetch(
+          new URL('/api/rocketwork/postbacks?ensure=1&stream=tasks', ensureBase).toString(),
+          { method: 'GET', headers: { cookie: `session_user=${encodeURIComponent(userId)}`, 'x-user-id': userId }, cache: 'no-store' },
+          15_000
+        );
+        fireAndForgetFetch(
+          new URL('/api/rocketwork/postbacks?ensure=1&stream=executors', ensureBase).toString(),
+          { method: 'GET', headers: { cookie: `session_user=${encodeURIComponent(userId)}`, 'x-user-id': userId }, cache: 'no-store' },
+          15_000
+        );
       } catch {}
     } catch {}
 

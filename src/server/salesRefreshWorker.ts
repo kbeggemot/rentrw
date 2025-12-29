@@ -1,6 +1,6 @@
 import { listAllSales, updateSaleFromStatus } from './taskStore';
 import { getDecryptedApiToken } from './secureStore';
-import { fetchWithTimeout } from './http';
+import { fetchTextWithTimeout } from './http';
 import { ensureLeaderLease } from './leaderLease';
 
 let started = false;
@@ -50,8 +50,9 @@ export async function refreshAllSales(): Promise<void> {
     for (const s of rows) {
       try {
         const url = new URL(`tasks/${encodeURIComponent(String(s.taskId))}`, base.endsWith('/') ? base : base + '/').toString();
-        const res = await fetchWithTimeout(url, { method: 'GET', headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }, cache: 'no-store' }, 15_000);
-        const text = await res.text();
+        const out = await fetchTextWithTimeout(url, { method: 'GET', headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }, cache: 'no-store' }, 15_000);
+        const res = out.res;
+        const text = out.text;
         let data: any = null; try { data = text ? JSON.parse(text) : null; } catch { data = text; }
         const t = (data && typeof data === 'object' && 'task' in data) ? (data.task as any) : data;
         const ofd = t?.ofd_url ?? t?.acquiring_order?.ofd_url ?? null;

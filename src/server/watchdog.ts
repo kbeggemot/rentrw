@@ -1,6 +1,7 @@
 import { ensureLeaderLease, getInstanceId } from './leaderLease';
 import { readText, writeText } from './storage';
 import { discardResponseBody, fetchWithTimeout } from './http';
+import { promises as fs } from 'fs';
 
 let started = false;
 let timer: NodeJS.Timeout | null = null;
@@ -18,7 +19,14 @@ type PublicStatus = {
   lastOkAt: string | null;
   consecutiveFailures: number;
   lastError: string | null;
-  lastChecks: { s3Ok: boolean | null; rwOk: boolean | null };
+  lastChecks: {
+    s3Ok: boolean | null;
+    rwOk: boolean | null;
+    fdOk: boolean | null;
+    handlesOk: boolean | null;
+    fdCount: number | null;
+    handlesCount: number | null;
+  };
 };
 
 type GlobalBag = typeof globalThis & { __rentrw_watchdog?: PublicStatus };
@@ -34,7 +42,7 @@ function setStatus(patch: Partial<PublicStatus>) {
     lastOkAt: null,
     consecutiveFailures: 0,
     lastError: null,
-    lastChecks: { s3Ok: null, rwOk: null },
+    lastChecks: { s3Ok: null, rwOk: null, fdOk: null, handlesOk: null, fdCount: null, handlesCount: null },
   };
   g.__rentrw_watchdog = { ...base, ...patch };
 }
@@ -49,7 +57,7 @@ export function getWatchdogStatus(): PublicStatus {
     lastOkAt: null,
     consecutiveFailures: state.consecutiveFailures,
     lastError: null,
-    lastChecks: { s3Ok: null, rwOk: null },
+    lastChecks: { s3Ok: null, rwOk: null, fdOk: null, handlesOk: null, fdCount: null, handlesCount: null },
   };
 }
 
@@ -77,12 +85,18 @@ export function startWatchdog(): void {
   const notLeaderExitAfterMs = ms('WATCHDOG_NOT_LEADER_EXIT_AFTER_MS', 90_000);
   const maxFailures = ms('WATCHDOG_MAX_FAILURES', 3);
   const egressTimeoutMs = 8_000;
+  const maxFds = ms('WATCHDOG_MAX_FDS', 0);
+  const maxHandles = ms('WATCHDOG_MAX_HANDLES', 0);
 
   const tick = async () => {
     if (running) return;
     running = true;
     let s3Ok: boolean | null = null;
     let rwOk: boolean | null = null;
+    let fdOk: boolean | null = null;
+    let handlesOk: boolean | null = null;
+    let fdCount: number | null = null;
+    let handlesCount: number | null = null;
     let lastErr: string | null = null;
     setStatus({ lastTickAt: new Date().toISOString(), consecutiveFailures: state.consecutiveFailures });
     // Only meaningful in S3/multi-instance mode
@@ -141,6 +155,33 @@ export function startWatchdog(): void {
       rwOk = false;
     }
 
+    // 4) Local resource leak detection (best-effort): file descriptors & active handles
+    try {
+      // Linux-only; returns null on non-Linux/dev
+      const list = await fs.readdir('/proc/self/fd').catch(() => null as any);
+      fdCount = Array.isArray(list) ? list.length : null;
+    } catch {
+      fdCount = null;
+    }
+    try {
+      const handles = (() => { try { return (process as any)._getActiveHandles?.() as any[]; } catch { return null; } })();
+      handlesCount = Array.isArray(handles) ? handles.length : null;
+    } catch {
+      handlesCount = null;
+    }
+    if (maxFds > 0 && fdCount != null) {
+      fdOk = fdCount <= maxFds;
+      if (!fdOk) ok = false;
+    } else {
+      fdOk = null;
+    }
+    if (maxHandles > 0 && handlesCount != null) {
+      handlesOk = handlesCount <= maxHandles;
+      if (!handlesOk) ok = false;
+    } else {
+      handlesOk = null;
+    }
+
     if (ok) state.consecutiveFailures = 0;
     else state.consecutiveFailures += 1;
     try { setStatus({ consecutiveFailures: state.consecutiveFailures }); } catch {}
@@ -149,10 +190,10 @@ export function startWatchdog(): void {
       try { process.exit(1); } catch {}
     }
     if (ok) {
-      setStatus({ lastOkAt: new Date().toISOString(), lastError: null, lastChecks: { s3Ok, rwOk } });
+      setStatus({ lastOkAt: new Date().toISOString(), lastError: null, lastChecks: { s3Ok, rwOk, fdOk, handlesOk, fdCount, handlesCount } });
     } else {
-      lastErr = `WATCHDOG_FAIL s3Ok=${String(s3Ok)} rwOk=${String(rwOk)}`;
-      setStatus({ lastError: lastErr, lastChecks: { s3Ok, rwOk } });
+      lastErr = `WATCHDOG_FAIL s3Ok=${String(s3Ok)} rwOk=${String(rwOk)} fdOk=${String(fdOk)} handlesOk=${String(handlesOk)} fdCount=${String(fdCount)} handlesCount=${String(handlesCount)}`;
+      setStatus({ lastError: lastErr, lastChecks: { s3Ok, rwOk, fdOk, handlesOk, fdCount, handlesCount } });
     }
   };
 

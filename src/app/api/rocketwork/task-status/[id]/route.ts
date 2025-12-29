@@ -4,7 +4,7 @@ import { resolveRwTokenWithFingerprint } from '@/server/rwToken';
 import { listSales, findSaleByTaskId } from '@/server/taskStore';
 import { getSelectedOrgInn } from '@/server/orgContext';
 import { readText, writeText } from '@/server/storage';
-import { fetchWithTimeout } from '@/server/http';
+import { fetchTextWithTimeout } from '@/server/http';
 
 export const runtime = 'nodejs';
 
@@ -37,7 +37,7 @@ export async function GET(_: Request) {
     // поддерживаем специальный id last: берём последний task_id из локального стора
     const url = new URL(`tasks/${encodeURIComponent(taskId)}`, base.endsWith('/') ? base : base + '/').toString();
 
-    const res = await fetchWithTimeout(url, {
+    const out = await fetchTextWithTimeout(url, {
       method: 'GET',
       headers: {
         Authorization: `Bearer ${token}`,
@@ -45,8 +45,9 @@ export async function GET(_: Request) {
       },
       cache: 'no-store',
     }, 15_000);
+    const res = out.res;
 
-    const text = await res.text();
+    const text = out.text;
     let data: unknown = null;
     try { data = text ? JSON.parse(text) : null; } catch { data = text; }
 

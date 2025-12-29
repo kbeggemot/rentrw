@@ -1,4 +1,4 @@
-import { fetchWithTimeout } from '@/server/http';
+import { fetchTextWithTimeout } from '@/server/http';
 import { NextResponse } from 'next/server';
 import dns from 'dns';
 
@@ -9,8 +9,9 @@ type Probe = { url: string; ok: boolean; status: number; ms: number; text?: stri
 async function timedFetch(url: string, timeoutMs: number): Promise<Probe> {
   const started = Date.now();
   try {
-    const res = await fetchWithTimeout(url, { cache: 'no-store', headers: { Accept: 'application/json' } }, timeoutMs);
-    const txt = await res.text().catch(() => '');
+    const out = await fetchTextWithTimeout(url, { cache: 'no-store', headers: { Accept: 'application/json' } }, timeoutMs);
+    const res = out.res;
+    const txt = out.text || '';
     const ms = Date.now() - started;
     return { url, ok: res.ok, status: res.status, ms, text: txt ? txt.slice(0, 300) : '' };
   } catch (e) {

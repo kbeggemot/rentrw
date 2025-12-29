@@ -7,7 +7,7 @@ import { readUserIndex } from '@/server/salesIndex';
 import { readText } from '@/server/storage';
 import { fermaGetAuthTokenCached, fermaGetReceiptStatus, buildReceiptViewUrl } from '@/server/ofdFerma';
 import { startOfdScheduleWorker } from '@/server/ofdScheduleWorker';
-import { fetchWithTimeout } from '@/server/http';
+import { fetchTextWithTimeout } from '@/server/http';
 
 export const runtime = 'nodejs';
 
@@ -65,8 +65,9 @@ export async function GET(req: Request) {
         for (const s of toRefresh) {
           try {
             const taskUrl = new URL(`tasks/${encodeURIComponent(String(s.taskId))}`, base.endsWith('/') ? base : base + '/').toString();
-            let res = await fetchWithTimeout(taskUrl, { method: 'GET', headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }, cache: 'no-store' }, 15_000);
-            let text = await res.text();
+            let out = await fetchTextWithTimeout(taskUrl, { method: 'GET', headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }, cache: 'no-store' }, 15_000);
+            let res = out.res;
+            let text = out.text;
             let data: unknown = null;
             try { data = text ? JSON.parse(text) : null; } catch { data = text; }
             let normalized: RocketworkTask = (data && typeof data === 'object' && 'task' in (data as Record<string, unknown>)) ? ((data as any).task as RocketworkTask) : (data as RocketworkTask);
@@ -77,8 +78,9 @@ export async function GET(req: Request) {
             const status = normalized?.acquiring_order?.status as string | undefined;
             while ((status === 'paid' || status === 'transferred' || status === 'transfered') && tries < 4 && (!normalized?.receipt_uri || (s.isAgent && !normalized?.additional_commission_ofd_url))) {
               await new Promise((r) => setTimeout(r, 1200));
-              res = await fetchWithTimeout(taskUrl, { method: 'GET', headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }, cache: 'no-store' }, 15_000);
-              text = await res.text();
+              out = await fetchTextWithTimeout(taskUrl, { method: 'GET', headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }, cache: 'no-store' }, 15_000);
+              res = out.res;
+              text = out.text;
               try { data = text ? JSON.parse(text) : null; } catch { data = text; }
               normalized = (data && typeof data === 'object' && 'task' in (data as Record<string, unknown>)) ? ((data as any).task as RocketworkTask) : (data as RocketworkTask);
               tries += 1;
@@ -150,15 +152,14 @@ export async function GET(req: Request) {
               if (hasAgent && aoStatus === 'transfered' && rootStatus === 'completed' && saleHasFull && !npdReceipt) {
                 const payUrl = new URL(`tasks/${encodeURIComponent(String(s.taskId))}/pay`, base.endsWith('/') ? base : base + '/').toString();
                 try {
-                  const payRes = await fetchWithTimeout(payUrl, { method: 'PATCH', headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }, cache: 'no-store' }, 15_000);
-                  await payRes.text().catch(() => '');
+                  await fetchTextWithTimeout(payUrl, { method: 'PATCH', headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }, cache: 'no-store' }, 15_000);
                 } catch {}
                 // And poll a few times specifically for NPD receipt
                 let extra = 0;
                 while (extra < 5) {
                   await new Promise((r) => setTimeout(r, 1200));
-                  const r2 = await fetchWithTimeout(taskUrl, { method: 'GET', headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }, cache: 'no-store' }, 15_000);
-                  const t2 = await r2.text();
+                  const out2 = await fetchTextWithTimeout(taskUrl, { method: 'GET', headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }, cache: 'no-store' }, 15_000);
+                  const t2 = out2.text;
                   let d2: any = null; try { d2 = t2 ? JSON.parse(t2) : null; } catch { d2 = t2; }
                   const n2 = d2 && typeof d2 === 'object' && 'task' in d2 ? (d2 as any).task : d2;
                   const npd2 = (n2?.receipt_uri as string | undefined) ?? null;
@@ -233,8 +234,8 @@ export async function GET(req: Request) {
                               if (tok) {
                                 const base = process.env.ROCKETWORK_API_BASE_URL || 'https://app.rocketwork.ru/api/';
                                 const accUrl = new URL('account', base.endsWith('/') ? base : base + '/').toString();
-                                const r = await fetchWithTimeout(accUrl, { headers: { Authorization: `Bearer ${tok}`, Accept: 'application/json' }, cache: 'no-store' }, 15_000);
-                                const txt = await r.text();
+                                const outAcc = await fetchTextWithTimeout(accUrl, { headers: { Authorization: `Bearer ${tok}`, Accept: 'application/json' }, cache: 'no-store' }, 15_000);
+                                const txt = outAcc.text;
                                 let d: any = null; try { d = txt ? JSON.parse(txt) : null; } catch { d = txt; }
                                 const nm = ((d?.company_name as string | undefined) ?? (d?.companyName as string | undefined) ?? '').trim();
                                 if (nm) { supplierNameOrg = nm; try { await updateOrganizationName(orgInn, nm); } catch {} }
@@ -286,8 +287,8 @@ export async function GET(req: Request) {
                               if (tok) {
                                 const base = process.env.ROCKETWORK_API_BASE_URL || 'https://app.rocketwork.ru/api/';
                                 const accUrl = new URL('account', base.endsWith('/') ? base : base + '/').toString();
-                                const r = await fetchWithTimeout(accUrl, { headers: { Authorization: `Bearer ${tok}`, Accept: 'application/json' }, cache: 'no-store' }, 15_000);
-                                const txt = await r.text();
+                                const outAcc = await fetchTextWithTimeout(accUrl, { headers: { Authorization: `Bearer ${tok}`, Accept: 'application/json' }, cache: 'no-store' }, 15_000);
+                                const txt = outAcc.text;
                                 let d: any = null; try { d = txt ? JSON.parse(txt) : null; } catch { d = txt; }
                                 const nm = ((d?.company_name as string | undefined) ?? (d?.companyName as string | undefined) ?? '').trim();
                                 if (nm) { supplierNameOrg2 = nm; try { await updateOrganizationName(orgInn, nm); } catch {} }

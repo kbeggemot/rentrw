@@ -12,6 +12,7 @@ import { enqueueOffsetJob, startOfdScheduleWorker } from '@/server/ofdScheduleWo
 import { appendOfdAudit } from '@/server/audit';
 import { readText, writeText } from '@/server/storage';
 import { listProductsForOrg } from '@/server/productsStore';
+import { fetchTextWithTimeout } from '@/server/http';
 // duplicated import removed
 
 export const runtime = 'nodejs';
@@ -182,12 +183,12 @@ export async function POST(req: Request) {
               }
             } catch {}
             try {
-              const res = await fetch(payUrl, { method: 'PATCH', headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }, cache: 'no-store' });
-              const txt = await res.text().catch(()=> '');
-              if (!res.ok) {
+              const out = await fetchTextWithTimeout(payUrl, { method: 'PATCH', headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }, cache: 'no-store' }, 15_000);
+              const txt = out.text;
+              if (!out.res.ok) {
                 try {
                   const prev = (await readText('.data/rw_errors.log')) || '';
-                  const line = JSON.stringify({ ts: new Date().toISOString(), scope: 'tasks:pay', method: 'PATCH', url: payUrl, status: res.status, responseText: txt, userId, taskId });
+                  const line = JSON.stringify({ ts: new Date().toISOString(), scope: 'tasks:pay', method: 'PATCH', url: payUrl, status: out.res.status, responseText: txt, userId, taskId });
                   await writeText('.data/rw_errors.log', prev + line + '\n');
                 } catch {}
               }
@@ -288,8 +289,8 @@ export async function POST(req: Request) {
                 const token = await getDecryptedApiToken(userId);
                 const base = process.env.ROCKETWORK_API_BASE_URL || 'https://app.rocketwork.ru/api/';
                 const tUrl = new URL(`tasks/${encodeURIComponent(String(taskId))}`, base.endsWith('/') ? base : base + '/').toString();
-                const r = await fetch(tUrl, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }, cache: 'no-store' });
-                const txt = await r.text();
+                const out = await fetchTextWithTimeout(tUrl, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }, cache: 'no-store' }, 15_000);
+                const txt = out.text;
                 let d: any = null; try { d = txt ? JSON.parse(txt) : null; } catch { d = txt; }
                 const taskObj = (d && typeof d === 'object' && 'task' in d) ? (d.task as any) : d;
                 const partnerInn: string | undefined = (taskObj?.executor?.inn as string | undefined);
@@ -572,8 +573,8 @@ export async function POST(req: Request) {
                         if (tok) {
                           const base = process.env.ROCKETWORK_API_BASE_URL || 'https://app.rocketwork.ru/api/';
                           const accUrl = new URL('account', base.endsWith('/') ? base : base + '/').toString();
-                          const r = await fetch(accUrl, { headers: { Authorization: `Bearer ${tok}`, Accept: 'application/json' }, cache: 'no-store' });
-                          const txt = await r.text();
+                          const out = await fetchTextWithTimeout(accUrl, { headers: { Authorization: `Bearer ${tok}`, Accept: 'application/json' }, cache: 'no-store' }, 15_000);
+                          const txt = out.text;
                           let d: any = null; try { d = txt ? JSON.parse(txt) : null; } catch { d = txt; }
                           const nm = ((d?.company_name as string | undefined) ?? (d?.companyName as string | undefined) ?? '').trim();
                           if (nm) { supplierName = nm; try { await updateOrganizationName(orgInn, nm); } catch {} }
@@ -647,8 +648,8 @@ export async function POST(req: Request) {
                         if (tok2) {
                           const base = process.env.ROCKETWORK_API_BASE_URL || 'https://app.rocketwork.ru/api/';
                           const accUrl = new URL('account', base.endsWith('/') ? base : base + '/').toString();
-                          const r = await fetch(accUrl, { headers: { Authorization: `Bearer ${tok2}`, Accept: 'application/json' }, cache: 'no-store' });
-                          const txt = await r.text();
+                          const out = await fetchTextWithTimeout(accUrl, { headers: { Authorization: `Bearer ${tok2}`, Accept: 'application/json' }, cache: 'no-store' }, 15_000);
+                          const txt = out.text;
                           let d: any = null; try { d = txt ? JSON.parse(txt) : null; } catch { d = txt; }
                           const nm = ((d?.company_name as string | undefined) ?? (d?.companyName as string | undefined) ?? '').trim();
                           if (nm) { supplierName2 = nm; try { await updateOrganizationName(orgInn, nm); } catch {} }

@@ -7,7 +7,7 @@ import { getUserOrgInn, getUserPayoutRequisites } from './userStore';
 import { getDecryptedApiToken } from './secureStore';
 import { getInvoiceIdForOffset } from './orderStore';
 import { listProductsForOrg } from './productsStore';
-import { fetchWithTimeout } from './http';
+import { fetchTextWithTimeout } from './http';
 import { ensureLeaderLease } from './leaderLease';
 
 let started = false;
@@ -141,8 +141,8 @@ export async function repairUserSales(userId: string, onlyOrderId?: number): Pro
             if (!token) continue;
             const base = process.env.ROCKETWORK_API_BASE_URL || 'https://app.rocketwork.ru/api/';
             const tUrl = new URL(`tasks/${encodeURIComponent(String(s.taskId))}`, base.endsWith('/') ? base : base + '/').toString();
-            const r = await fetchWithTimeout(tUrl, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }, cache: 'no-store' }, 15_000);
-            const txt = await r.text();
+            const out = await fetchTextWithTimeout(tUrl, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }, cache: 'no-store' }, 15_000);
+            const txt = out.text;
             let d: any = null; try { d = txt ? JSON.parse(txt) : null; } catch { d = txt; }
             const task = (d && typeof d === 'object' && 'task' in d) ? (d.task as any) : d;
             const partnerInn = (task?.executor?.inn as string | undefined) ?? undefined;
@@ -214,8 +214,8 @@ export async function repairUserSales(userId: string, onlyOrderId?: number): Pro
                 if (token) {
                   const base = process.env.ROCKETWORK_API_BASE_URL || 'https://app.rocketwork.ru/api/';
                   const accUrl = new URL('account', base.endsWith('/') ? base : base + '/').toString();
-                  const resAcc = await fetchWithTimeout(accUrl, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }, cache: 'no-store' }, 15_000);
-                  const txtAcc = await resAcc.text();
+                  const outAcc = await fetchTextWithTimeout(accUrl, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }, cache: 'no-store' }, 15_000);
+                  const txtAcc = outAcc.text;
                   let dataAcc: any = null; try { dataAcc = txtAcc ? JSON.parse(txtAcc) : null; } catch { dataAcc = txtAcc; }
                   const name = dataAcc?.account?.company_name || dataAcc?.company_name || null;
                   if (name && typeof name === 'string' && name.trim().length > 0) {
@@ -307,8 +307,8 @@ export async function repairUserSales(userId: string, onlyOrderId?: number): Pro
           if (!token) continue;
           const base = process.env.ROCKETWORK_API_BASE_URL || 'https://app.rocketwork.ru/api/';
           const tUrl = new URL(`tasks/${encodeURIComponent(String(s.taskId))}`, base.endsWith('/') ? base : base + '/').toString();
-          const r = await fetchWithTimeout(tUrl, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }, cache: 'no-store' }, 15_000);
-          const txt = await r.text();
+          const out = await fetchTextWithTimeout(tUrl, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }, cache: 'no-store' }, 15_000);
+          const txt = out.text;
           let d: any = null; try { d = txt ? JSON.parse(txt) : null; } catch { d = txt; }
           const task = (d && typeof d === 'object' && 'task' in d) ? (d.task as any) : d;
           const partnerInn = (task?.executor?.inn as string | undefined) ?? undefined;
@@ -344,8 +344,8 @@ export async function repairUserSales(userId: string, onlyOrderId?: number): Pro
               if (token) {
                 const base = process.env.ROCKETWORK_API_BASE_URL || 'https://app.rocketwork.ru/api/';
                 const accUrl = new URL('account', base.endsWith('/') ? base : base + '/').toString();
-                const resAcc = await fetchWithTimeout(accUrl, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }, cache: 'no-store' }, 15_000);
-                const txtAcc = await resAcc.text();
+                const outAcc = await fetchTextWithTimeout(accUrl, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }, cache: 'no-store' }, 15_000);
+                const txtAcc = outAcc.text;
                 let dataAcc: any = null; try { dataAcc = txtAcc ? JSON.parse(txtAcc) : null; } catch { dataAcc = txtAcc; }
                 const name = dataAcc?.account?.company_name || dataAcc?.company_name || null;
                 if (name && typeof name === 'string' && name.trim().length > 0) {
@@ -407,8 +407,8 @@ export async function repairUserSales(userId: string, onlyOrderId?: number): Pro
           if (token) {
             const base = process.env.ROCKETWORK_API_BASE_URL || 'https://app.rocketwork.ru/api/';
             const tUrl = new URL(`tasks/${encodeURIComponent(String(s.taskId))}`, base.endsWith('/') ? base : base + '/').toString();
-            const r = await fetchWithTimeout(tUrl, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }, cache: 'no-store' }, 15_000);
-            const txt = await r.text();
+            const out = await fetchTextWithTimeout(tUrl, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }, cache: 'no-store' }, 15_000);
+            const txt = out.text;
             let d: any = null; try { d = txt ? JSON.parse(txt) : null; } catch { d = txt; }
             const task = (d && typeof d === 'object' && 'task' in d) ? (d.task as any) : d;
             const partnerInn = (task?.executor?.inn as string | undefined) ?? undefined;
@@ -503,8 +503,8 @@ export async function repairUserSales(userId: string, onlyOrderId?: number): Pro
                 if (token) {
                   const base = process.env.ROCKETWORK_API_BASE_URL || 'https://app.rocketwork.ru/api/';
                   const accUrl = new URL('account', base.endsWith('/') ? base : base + '/').toString();
-                  const rAcc = await fetchWithTimeout(accUrl, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }, cache: 'no-store' }, 15_000);
-                  const txt = await rAcc.text();
+                  const outAcc = await fetchTextWithTimeout(accUrl, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }, cache: 'no-store' }, 15_000);
+                  const txt = outAcc.text;
                   let dAcc: any = null; try { dAcc = txt ? JSON.parse(txt) : null; } catch { dAcc = txt; }
                   const nm = dAcc?.account?.company_name || dAcc?.company_name || null;
                   if (nm && typeof nm === 'string' && nm.trim().length > 0) { supplierName = nm.trim(); try { await updateOrganizationName(orgInn, supplierName); } catch {} }
@@ -600,8 +600,8 @@ export async function repairUserSales(userId: string, onlyOrderId?: number): Pro
         const tUrl = new URL(`tasks/${encodeURIComponent(String(s.taskId))}`, rwBase.endsWith('/') ? rwBase : rwBase + '/').toString();
           let rootStatus = '';
           try {
-            const res = await fetchWithTimeout(tUrl, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }, cache: 'no-store' }, 15_000);
-        const txt = await res.text();
+            const out = await fetchTextWithTimeout(tUrl, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }, cache: 'no-store' }, 15_000);
+        const txt = out.text;
         let d: any = null; try { d = txt ? JSON.parse(txt) : null; } catch { d = txt; }
         const taskObj = (d && typeof d === 'object' && 'task' in d) ? (d.task as any) : d;
             rootStatus = String(taskObj?.status || '').toLowerCase();
@@ -615,10 +615,10 @@ export async function repairUserSales(userId: string, onlyOrderId?: number): Pro
               }
             } catch {}
             try {
-              const resp = await fetchWithTimeout(payUrl, { method: 'PATCH', headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }, cache: 'no-store' }, 15_000);
-              const txt = await resp.text().catch(()=> '');
-              if (!resp.ok) {
-                try { await appendRwError({ ts: new Date().toISOString(), scope: 'tasks:pay', method: 'PATCH', url: payUrl, status: resp.status, responseText: txt, userId }); } catch {}
+              const outPay = await fetchTextWithTimeout(payUrl, { method: 'PATCH', headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }, cache: 'no-store' }, 15_000);
+              const txt = outPay.text;
+              if (!outPay.res.ok) {
+                try { await appendRwError({ ts: new Date().toISOString(), scope: 'tasks:pay', method: 'PATCH', url: payUrl, status: outPay.res.status, responseText: txt, userId }); } catch {}
               }
             } catch (e) {
               try { await appendRwError({ ts: new Date().toISOString(), scope: 'tasks:pay', method: 'PATCH', url: payUrl, status: null, error: e instanceof Error ? e.message : String(e), userId }); } catch {}
@@ -627,8 +627,8 @@ export async function repairUserSales(userId: string, onlyOrderId?: number): Pro
           let triesNpd = 0;
           while (triesNpd < 5) {
             await new Promise((r) => setTimeout(r, 1200));
-              const r2 = await fetchWithTimeout(tUrl, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }, cache: 'no-store' }, 15_000);
-            const t2 = await r2.text();
+              const out2 = await fetchTextWithTimeout(tUrl, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }, cache: 'no-store' }, 15_000);
+            const t2 = out2.text;
             let o2: any = null; try { o2 = t2 ? JSON.parse(t2) : null; } catch { o2 = t2; }
             const norm = (o2 && typeof o2 === 'object' && 'task' in o2) ? (o2.task as any) : o2;
             const npd = (norm?.receipt_uri as string | undefined) ?? undefined;

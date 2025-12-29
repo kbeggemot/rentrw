@@ -3,7 +3,7 @@ import { getDecryptedApiToken } from '@/server/secureStore';
 import { updateWithdrawal, startWithdrawalPoller } from '@/server/withdrawalStore';
 import { promises as fs } from 'fs';
 import path from 'path';
-import { fetchWithTimeout } from '@/server/http';
+import { fetchTextWithTimeout } from '@/server/http';
 
 export const runtime = 'nodejs';
 
@@ -36,8 +36,9 @@ export async function GET(req: Request) {
     if (!token) return NextResponse.json({ error: 'NO_TOKEN' }, { status: 400 });
     const base = process.env.ROCKETWORK_API_BASE_URL || 'https://app.rocketwork.ru/api/';
     const taskUrl = new URL(`tasks/${encodeURIComponent(String(taskId))}`, base.endsWith('/') ? base : base + '/').toString();
-    const res = await fetchWithTimeout(taskUrl, { method: 'GET', headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }, cache: 'no-store' }, 15_000);
-    const text = await res.text();
+    const out = await fetchTextWithTimeout(taskUrl, { method: 'GET', headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }, cache: 'no-store' }, 15_000);
+    const res = out.res;
+    const text = out.text;
     let data: any = null; try { data = text ? JSON.parse(text) : null; } catch { data = text; }
     if (!res.ok) {
       const msg = (data?.error as string | undefined) || text || 'External API error';

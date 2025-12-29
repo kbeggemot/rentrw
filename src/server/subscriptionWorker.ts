@@ -1,7 +1,7 @@
 import { promises as fs } from 'fs';
 import path from 'path';
 import { getDecryptedApiToken } from './secureStore';
-import { discardResponseBody, fetchWithTimeout } from './http';
+import { discardResponseBody, fetchTextWithTimeout, fetchWithTimeout } from './http';
 import { ensureLeaderLease } from './leaderLease';
 
 const DATA_DIR = path.join(process.cwd(), '.data');
@@ -63,8 +63,9 @@ async function upsert(stream: 'tasks' | 'executors', token: string, base: string
   const headers = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', Accept: 'application/json' } as Record<string, string>;
   async function list(pathname: string) {
     const url = new URL(pathname, base.endsWith('/') ? base : base + '/').toString();
-    const res = await fetchWithTimeout(url, { method: 'GET', headers, cache: 'no-store' }, 15_000);
-    const txt = await res.text();
+    const out = await fetchTextWithTimeout(url, { method: 'GET', headers, cache: 'no-store' }, 15_000);
+    const res = out.res;
+    const txt = out.text;
     let data: any = null; try { data = txt ? JSON.parse(txt) : null; } catch { data = txt; }
     return { ok: res.ok, data } as const;
   }
