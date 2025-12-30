@@ -10,6 +10,7 @@ const TASKS_FILE = path.join(DATA_DIR, 'tasks.json');
 // New sharded sales storage (by organization INN)
 const SALES_DIR = path.join(DATA_DIR, 'sales'); // .data/sales/{inn}/sales/{taskId}.json
 const SALES_INDEX_DIR = path.join(DATA_DIR, 'sales_index'); // .data/sales_index/by_task/{taskId}.json
+const SALES_ORDER_INDEX_DIR = path.join(SALES_INDEX_DIR, 'by_order'); // .data/sales_index/by_order/{orderId}.json
 
 export type StoredTask = {
   id: number | string;
@@ -117,7 +118,19 @@ function byTaskIndexPath(taskId: number | string): string {
   return path.join(SALES_INDEX_DIR, 'by_task', `${String(taskId)}.json`).replace(/\\/g, '/');
 }
 
+function byOrderIndexPath(orderId: number | string): string {
+  return path.join(SALES_ORDER_INDEX_DIR, `${String(normalizeOrderId(orderId))}.json`).replace(/\\/g, '/');
+}
+
 type OrgIndexRow = { taskId: number | string; orderId: number | string; userId: string; createdAt: string; updatedAt: string; status?: string | null; orgInn: string; hasPrepay?: boolean; hasFull?: boolean; hasCommission?: boolean; hasNpd?: boolean; pageCode?: string | null };
+
+function stripUndefined<T extends Record<string, any>>(obj: T): Partial<T> {
+  const out: any = {};
+  for (const [k, v] of Object.entries(obj || {})) {
+    if (v !== undefined) out[k] = v;
+  }
+  return out;
+}
 
 async function readOrgIndex(inn: string): Promise<OrgIndexRow[]> {
   const raw = await readText(orgIndexPath(inn));
@@ -136,33 +149,95 @@ async function readSaleByInnTask(inn: string, taskId: number | string): Promise<
 }
 
 async function writeSaleAndIndexes(sale: SaleRecord): Promise<void> {
-  const inn = sanitizeInn(sale.orgInn || null);
-  // 1) write sale file
-  await writeText(saleFilePath(inn, sale.taskId), JSON.stringify(sale, null, 2));
-  // 2) update org index (upsert)
-  const idx = await readOrgIndex(inn);
-  const existingPos = idx.findIndex((r) => String(r.taskId) === String(sale.taskId));
-  const existing = existingPos !== -1 ? (idx[existingPos] as any) : null;
-  const meta: OrgIndexRow = {
-    taskId: sale.taskId,
-    orderId: sale.orderId,
-    userId: sale.userId,
-    createdAt: sale.createdAt,
-    updatedAt: sale.updatedAt,
-    status: sale.status ?? null,
-    orgInn: inn,
-    hasPrepay: Boolean(sale.ofdUrl),
-    hasFull: Boolean(sale.ofdFullUrl),
-    hasCommission: Boolean(sale.additionalCommissionOfdUrl),
-    hasNpd: Boolean(sale.npdReceiptUri),
-    pageCode: (sale as any)?.pageCode ?? (existing ? existing.pageCode ?? null : null),
-  };
-  if (existingPos === -1) idx.push(meta); else idx[existingPos] = meta;
-  // keep newest first (optional)
-  idx.sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
-  await writeOrgIndex(inn, idx);
-  // 3) upsert by-task index
-  await writeText(byTaskIndexPath(sale.taskId), JSON.stringify({ inn, userId: sale.userId }, null, 2));
+  // In S3 mode we may receive partial objects (e.g. from legacy store). Avoid wiping existing fields by merging.
+  let innGuess = sanitizeInn((sale as any)?.orgInn || null);
+  // Try to resolve the canonical inn for this taskId if orgInn is missing/unknown
+  try {
+    if (innGuess === 'unknown') {
+      const mapped = await readByTask(sale.taskId).catch(() => null);
+      if (mapped?.inn) innGuess = sanitizeInn(mapped.inn);
+    }
+  } catch {}
+
+  let prev: SaleRecord | null = null;
+  try {
+    // Read existing sale file if possible (to preserve invoice ids, serviceEndDate, itemsSnapshot, etc.)
+    if (innGuess && innGuess !== 'unknown') {
+      prev = await readSaleByInnTask(innGuess, sale.taskId);
+    }
+  } catch {}
+
+  const merged = { ...(prev as any), ...(stripUndefined(sale as any) as any) } as SaleRecord;
+  // Sticky fields: do not allow partial/legacy updates to erase important data once it's set.
+  // (This matters in S3 mode where some code paths may have incomplete legacy snapshots.)
+  try {
+    if (prev) {
+      const stickyKeys: string[] = [
+        'orgInn',
+        'serviceEndDate',
+        'vatRate',
+        'invoiceIdPrepay',
+        'invoiceIdOffset',
+        'invoiceIdFull',
+        'itemsSnapshot',
+        'linkCode',
+        'rwTokenFp',
+        'termsDocHash',
+        'termsDocName',
+        'termsAcceptedAt',
+      ];
+      for (const k of stickyKeys) {
+        const nv = (merged as any)[k];
+        const pv = (prev as any)[k];
+        if ((nv === null || typeof nv === 'undefined') && pv !== null && typeof pv !== 'undefined') {
+          (merged as any)[k] = pv;
+        }
+      }
+    }
+  } catch {}
+  const inn = sanitizeInn((merged as any)?.orgInn || innGuess || null);
+
+  // 1) write sale file (best-effort)
+  try {
+    await writeText(saleFilePath(inn, merged.taskId), JSON.stringify(merged, null, 2));
+  } catch {}
+
+  // 2) update org index (best-effort)
+  try {
+    const idx = await readOrgIndex(inn);
+    const existingPos = idx.findIndex((r) => String((r as any).taskId) === String(merged.taskId));
+    const existing = existingPos !== -1 ? (idx[existingPos] as any) : null;
+    const meta: OrgIndexRow = {
+      taskId: merged.taskId,
+      orderId: merged.orderId,
+      userId: merged.userId,
+      createdAt: merged.createdAt,
+      updatedAt: merged.updatedAt,
+      status: merged.status ?? null,
+      orgInn: inn,
+      hasPrepay: Boolean((merged as any).ofdUrl),
+      hasFull: Boolean((merged as any).ofdFullUrl),
+      hasCommission: Boolean((merged as any).additionalCommissionOfdUrl),
+      hasNpd: Boolean((merged as any).npdReceiptUri),
+      pageCode: (merged as any)?.pageCode ?? (existing ? existing.pageCode ?? null : null),
+    };
+    if (existingPos === -1) idx.push(meta); else idx[existingPos] = meta;
+    idx.sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
+    await writeOrgIndex(inn, idx);
+  } catch {}
+
+  // 3) upsert by-task index (best-effort) — do this even if org index update failed
+  try {
+    await writeText(byTaskIndexPath(merged.taskId), JSON.stringify({ inn, userId: merged.userId }, null, 2));
+  } catch {}
+
+  // 4) upsert by-order index (best-effort) — used for OFD callbacks when legacy store is disabled
+  try {
+    const numOrder = normalizeOrderId((merged as any).orderId);
+    if (Number.isFinite(numOrder)) {
+      await writeText(byOrderIndexPath(numOrder), JSON.stringify({ inn, userId: merged.userId, taskId: merged.taskId }, null, 2));
+    }
+  } catch {}
 }
 
 export async function deleteSale(userId: string, taskId: number | string): Promise<boolean> {
@@ -473,6 +548,63 @@ export async function updateSaleFromStatus(userId: string, taskId: number | stri
   const store = await readTasks();
   if (!store.sales) store.sales = [];
   const idx = store.sales.findIndex((s) => s.taskId == taskId && s.userId === userId);
+  // Fallback for S3/sharded mode: legacy tasks.json may be disabled or incomplete.
+  if (idx === -1) {
+    try {
+      const mapped = await readByTask(taskId).catch(() => null);
+      if (!mapped?.inn) return;
+      const current = await readSaleByInnTask(mapped.inn, taskId);
+      if (!current || current.userId !== userId) return;
+      const next = { ...current } as SaleRecord;
+      // --- Apply the same update semantics as legacy path ---
+      try {
+        // If orgInn is unknown and we have rwTokenFp, try to resolve it in background
+        const curInn = (next.orgInn && String(next.orgInn).trim().length > 0) ? String(next.orgInn) : null;
+        if ((!curInn || curInn === 'неизвестно') && next.rwTokenFp) {
+          const { findOrgByFingerprint } = await import('./orgStore');
+          const org = await findOrgByFingerprint(next.rwTokenFp);
+          if (org?.inn) next.orgInn = org.inn;
+        }
+      } catch {}
+      if (typeof update.status !== 'undefined' && update.status !== null) {
+        const prevStatus = String(next.status || '').toLowerCase();
+        const newStatus = String(update.status || '').toLowerCase();
+        const acquiringStatuses = new Set(['pending', 'paying', 'paid', 'transfered', 'transferred', 'expired', 'refunded', 'failed']);
+        const rootOnlyStatuses = new Set(['completed', 'draft', 'canceled', 'cancelled', 'error']);
+        if (!acquiringStatuses.has(newStatus) && rootOnlyStatuses.has(newStatus)) {
+          (next as any).rootStatus = update.status as any;
+        } else {
+          next.status = update.status;
+          const wasPaid = prevStatus === 'paid' || prevStatus === 'transfered' || prevStatus === 'transferred';
+          const nowPaid = newStatus === 'paid' || newStatus === 'transfered' || newStatus === 'transferred';
+          if (!wasPaid && nowPaid && !next.paidAt) {
+            next.paidAt = new Date().toISOString();
+          }
+        }
+      }
+      try {
+        const anyUpd = update as any;
+        const root = typeof anyUpd.rootStatus === 'string' ? anyUpd.rootStatus : (typeof anyUpd.taskStatus === 'string' ? anyUpd.taskStatus : undefined);
+        if (typeof root !== 'undefined' && root !== null) (next as any).rootStatus = root;
+      } catch {}
+      if (next.status && String(next.status).toLowerCase() === 'expired') {
+        next.hidden = process.env.NODE_ENV === 'production';
+      }
+      if (typeof update.ofdUrl !== 'undefined' && update.ofdUrl) next.ofdUrl = update.ofdUrl;
+      if (typeof update.ofdFullUrl !== 'undefined' && update.ofdFullUrl) next.ofdFullUrl = update.ofdFullUrl;
+      if (typeof update.additionalCommissionOfdUrl !== 'undefined' && update.additionalCommissionOfdUrl) next.additionalCommissionOfdUrl = update.additionalCommissionOfdUrl;
+      if (typeof update.npdReceiptUri !== 'undefined' && update.npdReceiptUri) next.npdReceiptUri = update.npdReceiptUri;
+      const beforeVals = { status: current.status, rootStatus: (current as any).rootStatus ?? null, ofdUrl: current.ofdUrl, ofdFullUrl: current.ofdFullUrl, additionalCommissionOfdUrl: current.additionalCommissionOfdUrl, npdReceiptUri: current.npdReceiptUri } as const;
+      const afterVals = { status: next.status, rootStatus: (next as any).rootStatus ?? null, ofdUrl: next.ofdUrl, ofdFullUrl: next.ofdFullUrl, additionalCommissionOfdUrl: next.additionalCommissionOfdUrl, npdReceiptUri: next.npdReceiptUri } as const;
+      if (JSON.stringify(beforeVals) === JSON.stringify(afterVals)) return;
+      next.updatedAt = new Date().toISOString();
+      try { await writeSaleAndIndexes(next); } catch {}
+      try { getHub().publish(userId, 'sales:update'); } catch {}
+      try { await appendAdminEntityLog('sale', [String(userId), String(taskId)], { source: 'system', message: 'status/update(sharded)', data: update }); } catch {}
+      try { sendInstantDeliveryIfReady(userId, next).catch(() => {}); } catch {}
+    } catch {}
+    return;
+  }
   if (idx !== -1) {
     const current = store.sales[idx];
     const next = { ...current } as SaleRecord;
@@ -562,7 +694,53 @@ export async function updateSaleOfdUrlsByOrderId(userId: string, orderId: number
     .map((s, i) => ({ s, i }))
     .filter(({ s }) => normalizeOrderId(s.orderId) === orderId && s.userId === userId)
     .map(({ i }) => i);
-  if (idxs.length === 0) return;
+  if (idxs.length === 0) {
+    // Fast path: try resolve the sharded sale by orderId using by-order index.
+    try {
+      const raw = await readText(byOrderIndexPath(orderId));
+      const d = raw ? JSON.parse(raw) : null;
+      const inn = typeof d?.inn === 'string' ? d.inn : null;
+      const uid = typeof d?.userId === 'string' ? d.userId : null;
+      const taskId = (typeof d?.taskId === 'string' || typeof d?.taskId === 'number') ? d.taskId : null;
+      if (inn && uid === userId && taskId != null) {
+        const current = await readSaleByInnTask(inn, taskId);
+        if (current && current.userId === userId && normalizeOrderId((current as any).orderId) === orderId) {
+          const next = { ...current } as SaleRecord;
+          let changed = false;
+          if (typeof patch.ofdUrl !== 'undefined' && (next.ofdUrl ?? null) !== (patch.ofdUrl ?? null)) { next.ofdUrl = patch.ofdUrl ?? null; changed = true; }
+          if (typeof patch.ofdFullUrl !== 'undefined' && (next.ofdFullUrl ?? null) !== (patch.ofdFullUrl ?? null)) { next.ofdFullUrl = patch.ofdFullUrl ?? null; changed = true; }
+          if (typeof patch.ofdPrepayId !== 'undefined' && ((next as any).ofdPrepayId ?? null) !== (patch.ofdPrepayId ?? null)) { (next as any).ofdPrepayId = patch.ofdPrepayId ?? null; changed = true; }
+          if (typeof patch.ofdFullId !== 'undefined' && ((next as any).ofdFullId ?? null) !== (patch.ofdFullId ?? null)) { (next as any).ofdFullId = patch.ofdFullId ?? null; changed = true; }
+          if (changed) {
+            next.updatedAt = new Date().toISOString();
+            try { await writeSaleAndIndexes(next); } catch {}
+            try { getHub().publish(userId, 'sales:update'); } catch {}
+          }
+          return;
+        }
+      }
+    } catch {}
+
+    // Sharded fallback (S3 mode / legacy store disabled): find matching sales via sharded indexes.
+    try {
+      const sales = await listSales(userId).catch(() => []);
+      const targets = sales.filter((s) => normalizeOrderId((s as any).orderId) === orderId);
+      if (targets.length === 0) return;
+      for (const current of targets) {
+        const next = { ...current } as SaleRecord;
+        let changed = false;
+        if (typeof patch.ofdUrl !== 'undefined' && (next.ofdUrl ?? null) !== (patch.ofdUrl ?? null)) { next.ofdUrl = patch.ofdUrl ?? null; changed = true; }
+        if (typeof patch.ofdFullUrl !== 'undefined' && (next.ofdFullUrl ?? null) !== (patch.ofdFullUrl ?? null)) { next.ofdFullUrl = patch.ofdFullUrl ?? null; changed = true; }
+        if (typeof patch.ofdPrepayId !== 'undefined' && ((next as any).ofdPrepayId ?? null) !== (patch.ofdPrepayId ?? null)) { (next as any).ofdPrepayId = patch.ofdPrepayId ?? null; changed = true; }
+        if (typeof patch.ofdFullId !== 'undefined' && ((next as any).ofdFullId ?? null) !== (patch.ofdFullId ?? null)) { (next as any).ofdFullId = patch.ofdFullId ?? null; changed = true; }
+        if (!changed) continue;
+        next.updatedAt = new Date().toISOString();
+        try { await writeSaleAndIndexes(next); } catch {}
+      }
+      try { getHub().publish(userId, 'sales:update'); } catch {}
+    } catch {}
+    return;
+  }
   let anyChanged = false;
   for (const idx of idxs) {
     const current = store.sales[idx];
