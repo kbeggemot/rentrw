@@ -3,8 +3,28 @@ import { resolveResumeToken } from '@/server/payResumeStore';
 import { listSales } from '@/server/taskStore';
 import { getUserPayoutRequisites } from '@/server/userStore';
 import { getDecryptedApiToken } from '@/server/secureStore';
+import { readText } from '@/server/storage';
+import path from 'path';
 
 export const runtime = 'nodejs';
+
+type ByOrderMapping = { inn: string; userId: string; taskId: string | number };
+
+async function readByOrderIndex(orderId: number): Promise<ByOrderMapping | null> {
+  try {
+    const p = path.join('.data', 'sales_index', 'by_order', `${String(orderId)}.json`).replace(/\\/g, '/');
+    const raw = await readText(p);
+    if (!raw) return null;
+    const d = JSON.parse(raw) as any;
+    const inn = typeof d?.inn === 'string' ? d.inn : null;
+    const userId = typeof d?.userId === 'string' ? d.userId : null;
+    const taskId = (typeof d?.taskId === 'string' || typeof d?.taskId === 'number') ? d.taskId : null;
+    if (!inn || !userId || taskId == null) return null;
+    return { inn, userId, taskId };
+  } catch {
+    return null;
+  }
+}
 
 export async function GET(req: Request) {
   try {
@@ -14,6 +34,7 @@ export async function GET(req: Request) {
     let userId: string | null = null;
     let orderId: number | null = null;
     if (sid) {
+      // Stateless sid token should be resolvable without cookies
       const entry = await resolveResumeToken(sid);
       if (!entry) return NextResponse.json({ error: 'NOT_FOUND' }, { status: 404 });
       userId = entry.userId;
@@ -30,11 +51,36 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: 'NO_QUERY' }, { status: 400 });
     }
     if (!userId || orderId == null) return NextResponse.json({ error: 'NO_DATA' }, { status: 400 });
-    const sales = await listSales(userId);
-    const sale = sales.find((s) => s.orderId === orderId) || null;
+
+    // Hint: read by-order index first (fast) — also provides taskId even if sale isn't available yet.
+    let mapping: ByOrderMapping | null = null;
+    let taskIdHint: string | number | null = null;
+    try {
+      mapping = await readByOrderIndex(orderId);
+      if (mapping && String(mapping.userId) === String(userId)) taskIdHint = mapping.taskId;
+    } catch {}
+
+    let sale: any = null;
+
+    if (!sale && mapping && String(mapping.userId) === String(userId)) {
+      try {
+        const inn = String(mapping.inn || '').replace(/\D/g, '') || 'unknown';
+        const taskId = mapping.taskId;
+        const raw = await readText(`.data/sales/${inn}/sales/${encodeURIComponent(String(taskId))}.json`);
+        sale = raw ? JSON.parse(raw) : null;
+      } catch {}
+    }
+
+    // Fallback: scan all sales for the user and match by normalized numeric orderId
+    if (!sale) {
+      try {
+        const sales = await listSales(userId);
+        sale = sales.find((s) => Number(String(s.orderId).match(/(\d+)/g)?.slice(-1)[0] || NaN) === orderId) || null;
+      } catch {}
+    }
     let orgName: string | null = null;
     try { const reqs = await getUserPayoutRequisites(userId); orgName = reqs?.orgName || null; } catch {}
-    const payload: Record<string, unknown> = { userId, orderId, taskId: sale?.taskId ?? null, orgName };
+    const payload: Record<string, unknown> = { userId, orderId, taskId: sale?.taskId ?? taskIdHint ?? null, orgName };
     if (sale) {
       payload.sale = {
         description: sale.description ?? null,

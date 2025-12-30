@@ -21,6 +21,47 @@ export default function PublicSuccessUnifiedPage() {
   const [dots, setDots] = useState(".");
   const metaSentRef = useRef(false);
 
+  function parseSidHint(sid: string | null): { userId: string | null; orderId: number | null } {
+    const t = String(sid || '').trim();
+    if (!t) return { userId: null, orderId: null };
+    // Format: v1.<base64url(json)>.sig
+    if (!t.startsWith('v1.')) return { userId: null, orderId: null };
+    const parts = t.split('.');
+    if (parts.length !== 3) return { userId: null, orderId: null };
+    const body = parts[1] || '';
+    if (!body) return { userId: null, orderId: null };
+    try {
+      // base64url -> base64
+      const b64 = body.replace(/-/g, '+').replace(/_/g, '/');
+      const pad = b64.length % 4 === 0 ? '' : '='.repeat(4 - (b64.length % 4));
+      const json = decodeURIComponent(
+        Array.prototype.map
+          .call(atob(b64 + pad), (c: string) => `%${(`00${c.charCodeAt(0).toString(16)}`).slice(-2)}`)
+          .join('')
+      );
+      const obj = JSON.parse(json);
+      const uid = obj?.uid ? String(obj.uid) : null;
+      const oid = Number(obj?.oid);
+      return { userId: uid && uid.trim() ? uid.trim() : null, orderId: Number.isFinite(oid) ? oid : null };
+    } catch {
+      return { userId: null, orderId: null };
+    }
+  }
+
+  async function fetchSaleByOrder(userId: string, oid: number): Promise<any | null> {
+    try {
+      const res = await fetch(`/api/sales/by-order/${encodeURIComponent(String(oid))}`, {
+        cache: 'no-store',
+        headers: { 'x-user-id': userId } as any,
+      });
+      if (!res.ok) return null;
+      const data = await res.json().catch(() => null);
+      return data?.sale || null;
+    } catch {
+      return null;
+    }
+  }
+
   useEffect(() => {
     let t: number | null = null;
     t = window.setInterval(() => setDots((p) => (p.length >= 3 ? "." : p + ".")), 400) as unknown as number;
@@ -33,6 +74,18 @@ export default function PublicSuccessUnifiedPage() {
       const params = new URLSearchParams(window.location.search);
       const sid = params.get("sid");
       const orderParam = params.get("order");
+      // If localStorage is unavailable (Safari/Telegram) still try to derive hints from sid
+      const sidHint = parseSidHint(sid);
+      if (sidHint.userId && !info?.userId) {
+        setInfo((prev) => ({ code: prev?.code || '', userId: sidHint.userId!, title: prev?.title, orgName: prev?.orgName || null }));
+      }
+      if (sidHint.orderId != null && orderId == null) {
+        setOrderId(sidHint.orderId);
+      } else if (orderParam && orderId == null) {
+        const n = Number(orderParam);
+        if (Number.isFinite(n)) setOrderId(n);
+      }
+
       const now = Date.now();
       const keys = Object.keys(localStorage).filter((k) => k.startsWith("lastPay:"));
       const candidates: Array<{ key: string; code: string; taskId: any; ts: number; sid?: string }> = [];
@@ -60,22 +113,45 @@ export default function PublicSuccessUnifiedPage() {
               const url = sid ? `/api/pay-resume?sid=${encodeURIComponent(sid)}` : `/api/pay-resume?order=${encodeURIComponent(String(orderParam))}`;
               const r = await fetch(url, { cache: 'no-store' });
               const d = await r.json();
-              if (r.ok && d?.taskId) {
-                setTaskId(d.taskId);
-                setInfo({ code: '', userId: String(d.userId || ''), title: undefined, orgName: d?.orgName || null });
-                setOrderId(Number(d.orderId || 0) || null);
+              if (r.ok && (d?.userId || d?.orderId || d?.taskId)) {
+                const uid = String(d.userId || sidHint.userId || '').trim();
+                const oid = Number(d.orderId || sidHint.orderId || 0) || null;
+                if (uid) setInfo({ code: '', userId: uid, title: undefined, orgName: d?.orgName || null });
+                if (oid != null) setOrderId(oid);
+                if (d?.taskId) setTaskId(d.taskId);
                 if (d?.sale) {
-                  const items = Array.isArray(d.sale.itemsSnapshot) ? (d.sale.itemsSnapshot as any[]).map((i)=> ({ title: String(i?.title||''), qty: Number(i?.qty||1) })) : null;
+                  const items = Array.isArray(d.sale.itemsSnapshot) ? (d.sale.itemsSnapshot as any[]).map((i) => ({ title: String(i?.title || ''), qty: Number(i?.qty || 1) })) : null;
                   setSummary({ amountRub: d.sale.amountRub, description: d.sale.description, createdAt: d.sale.createdAt ?? null, items });
                   if (typeof d.sale.isAgent === 'boolean') setIsAgent(Boolean(d.sale.isAgent));
-                }
-                if (d?.sale) {
                   setReceipts({
                     prepay: d.sale.ofdUrl || null,
                     full: d.sale.ofdFullUrl || null,
                     commission: d.sale.commissionUrl || null,
                     npd: d.sale.npdReceiptUri || null,
                   });
+                }
+
+                // Even if taskId is missing, we can still poll by orderId using uid (sid contains uid+oid).
+                if (!d?.taskId && uid && oid != null) {
+                  setMsg('Оплата найдена. Подтягиваем детали и чек…');
+                  const sl = await fetchSaleByOrder(uid, oid);
+                  if (sl) {
+                    if (sl.taskId != null) setTaskId(sl.taskId);
+                    if (typeof sl?.isAgent === 'boolean') setIsAgent(Boolean(sl.isAgent));
+                    try {
+                      const items = Array.isArray(sl?.itemsSnapshot) ? (sl.itemsSnapshot as any[]).map((i: any) => ({ title: String(i?.title || ''), qty: Number(i?.qty || 1) })) : null;
+                      if (items && items.length > 0) setSummary((prev) => ({ ...(prev || {}), items, description: (prev?.description ?? sl?.description) || null, amountRub: (prev?.amountRub ?? sl?.amountGrossRub) as any, createdAt: (prev?.createdAt ?? sl?.createdAtRw ?? sl?.createdAt) || null }));
+                    } catch {}
+                    setReceipts((prev) => ({
+                      prepay: (sl?.ofdUrl ?? prev.prepay) || null,
+                      full: (sl?.ofdFullUrl ?? prev.full) || null,
+                      commission: (sl?.additionalCommissionOfdUrl ?? prev.commission) || null,
+                      npd: (sl?.npdReceiptUri ?? prev.npd) || null,
+                    }));
+                    setMsg(null);
+                  }
+                } else {
+                  setMsg(null);
                 }
                 setWaiting(false);
               } else {
@@ -118,6 +194,8 @@ export default function PublicSuccessUnifiedPage() {
               if (sres.ok) {
                 const sj = await sres.json();
                 const sl = sj?.sale;
+                // Learn taskId from sale record if we didn't have it yet
+                try { if (!taskId && sl?.taskId != null) setTaskId(sl.taskId); } catch {}
                 if (typeof sl?.isAgent === 'boolean') setIsAgent(Boolean(sl.isAgent));
                 try {
                   const items = Array.isArray(sl?.itemsSnapshot) ? (sl.itemsSnapshot as any[]).map((i:any)=> ({ title: String(i?.title||''), qty: Number(i?.qty||1) })) : null;
@@ -152,20 +230,23 @@ export default function PublicSuccessUnifiedPage() {
         } catch {}
 
         // 2) RW — как резервный источник статусов
-        const r = await fetch(`/api/rocketwork/tasks/${encodeURIComponent(String(uid))}?t=${Date.now()}`, { cache: 'no-store', headers: userId ? { 'x-user-id': userId } as any : undefined });
-        const t = await r.json();
-        const typ = (t?.acquiring_order?.type || t?.task?.acquiring_order?.type || '').toString().toUpperCase();
-        if (typ) setPayMethod(typ === 'QR' ? 'СБП' : typ === 'CARD' ? 'Карта' : typ);
-        const rwPre = t?.ofd_url || t?.acquiring_order?.ofd_url || null;
-        const rwFull = t?.ofd_full_url || t?.acquiring_order?.ofd_full_url || null;
-        const rwCom = t?.additional_commission_ofd_url || t?.task?.additional_commission_ofd_url || t?.additional_commission_url || t?.task?.additional_commission_url || null;
-        const rwNpd = t?.receipt_uri || t?.task?.receipt_uri || null;
-        setReceipts((prev) => ({
-          prepay: prev.prepay ?? (rwPre ?? null),
-          full: prev.full ?? (rwFull ?? null),
-          commission: prev.commission ?? (rwCom ?? null),
-          npd: prev.npd ?? (rwNpd ?? null),
-        }));
+        // Only if taskId is known (orderId-only mode can still show receipts from local store)
+        if (uid != null && String(uid).trim().length > 0) {
+          const r = await fetch(`/api/rocketwork/tasks/${encodeURIComponent(String(uid))}?t=${Date.now()}`, { cache: 'no-store', headers: userId ? { 'x-user-id': userId } as any : undefined });
+          const t = await r.json();
+          const typ = (t?.acquiring_order?.type || t?.task?.acquiring_order?.type || '').toString().toUpperCase();
+          if (typ) setPayMethod(typ === 'QR' ? 'СБП' : typ === 'CARD' ? 'Карта' : typ);
+          const rwPre = t?.ofd_url || t?.acquiring_order?.ofd_url || null;
+          const rwFull = t?.ofd_full_url || t?.acquiring_order?.ofd_full_url || null;
+          const rwCom = t?.additional_commission_ofd_url || t?.task?.additional_commission_ofd_url || t?.additional_commission_url || t?.task?.additional_commission_url || null;
+          const rwNpd = t?.receipt_uri || t?.task?.receipt_uri || null;
+          setReceipts((prev) => ({
+            prepay: prev.prepay ?? (rwPre ?? null),
+            full: prev.full ?? (rwFull ?? null),
+            commission: prev.commission ?? (rwCom ?? null),
+            npd: prev.npd ?? (rwNpd ?? null),
+          }));
+        }
       } catch {}
       pollRef.current = window.setTimeout(tick, 1200) as unknown as number;
     };
@@ -173,13 +254,19 @@ export default function PublicSuccessUnifiedPage() {
     void tick();
   };
 
-  const canShowDetails = useMemo(() => Boolean(taskId && info?.userId), [taskId, info?.userId]);
+  const canShowDetails = useMemo(() => Boolean(info?.userId && (taskId || orderId != null)), [taskId, orderId, info?.userId]);
 
   useEffect(() => {
-    if (detailsOpen && taskId && info?.userId) {
+    if (detailsOpen && info?.userId && (taskId || orderId != null)) {
       // Дополнительно триггерим серверный sync по orderId, чтобы ускорить появление ссылки
-      (async () => { try { if (orderId != null) await fetch(`/api/ofd/sync?order=${orderId}`, { cache: 'no-store' }); } catch {} })();
-      startPoll(taskId, info.userId);
+      (async () => {
+        try {
+          if (orderId != null) {
+            await fetch(`/api/ofd/sync?order=${orderId}`, { cache: 'no-store', headers: { 'x-user-id': info.userId } as any });
+          }
+        } catch {}
+      })();
+      startPoll((taskId ?? '') as any, info.userId);
     }
     return () => { if (pollRef.current) { window.clearTimeout(pollRef.current); pollRef.current = null; } };
   }, [detailsOpen, taskId, info?.userId]);

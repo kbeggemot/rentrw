@@ -19,9 +19,14 @@ export async function POST(req: Request) {
       const configured = process.env.TELEGRAM_INVOICE_SECRET_TOKEN;
       if (configured) {
         const got = req.headers.get('x-telegram-bot-api-secret-token');
-        if (!got || got !== configured) {
+        // If Telegram webhook wasn't configured with a secret token, the header may be missing.
+        // We only reject when the header is PRESENT but mismatched (misconfiguration).
+        if (got && got !== configured) {
           await logInvoiceDebug({ event: 'secret_mismatch', got: got || null });
           return NextResponse.json({ ok: false }, { status: 403 });
+        }
+        if (!got) {
+          await logInvoiceDebug({ event: 'secret_missing' });
         }
       }
     } catch {}

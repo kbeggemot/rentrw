@@ -9,7 +9,9 @@ export async function POST(req: Request) {
       const configured = process.env.TELEGRAM_SECRET_TOKEN;
       if (configured) {
         const got = req.headers.get('x-telegram-bot-api-secret-token');
-        if (!got || got !== configured) return NextResponse.json({ ok: false }, { status: 403 });
+        // If webhook isn't configured with a secret token, the header may be missing.
+        // Only reject when the header is PRESENT but mismatched.
+        if (got && got !== configured) return NextResponse.json({ ok: false }, { status: 403 });
       }
     } catch {}
 

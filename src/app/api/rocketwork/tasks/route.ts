@@ -546,7 +546,7 @@ export async function POST(req: Request) {
       const host = hdrs.get('x-forwarded-host') || hdrs.get('host') || 'localhost:3000';
       // Create one-time resume token bound to userId+orderId to help payer browser resume polling
       const tokenForResume = await createResumeToken(userId, orderId);
-      const successUrl = `${proto}://${host}/link/success?sid=${encodeURIComponent(tokenForResume)}`;
+      const successUrl = `${proto}://${host}/link/success?sid=${encodeURIComponent(tokenForResume)}&order=${encodeURIComponent(String(orderId))}`;
       (payload.acquiring_order as any).redirect_url = successUrl;
     } catch {}
 
