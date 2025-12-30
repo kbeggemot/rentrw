@@ -4,6 +4,12 @@ export type PostJsonWithGetFallbackOptions = {
   /** ms */
   timeoutGetMs?: number;
   /**
+   * Force using GET fallback immediately (skip POST attempt).
+   * If omitted, can be enabled globally via env:
+   *   NEXT_PUBLIC_FORCE_GET_FALLBACK=1
+   */
+  forceGet?: boolean;
+  /**
    * Override GET URL used for fallback.
    * If omitted, uses `url + (?|&)via=get`.
    */
@@ -29,6 +35,20 @@ export type PostJsonWithGetFallbackOptions = {
    */
   fallbackStatuses?: number[];
 };
+
+function envFlagEnabled(v: unknown): boolean {
+  const s = String(v ?? '').trim().toLowerCase();
+  return s === '1' || s === 'true' || s === 'yes' || s === 'on';
+}
+
+export function isGetFallbackForced(): boolean {
+  try {
+    // NEXT_PUBLIC_* is inlined into client bundles by Next.js
+    return envFlagEnabled((process as any)?.env?.NEXT_PUBLIC_FORCE_GET_FALLBACK);
+  } catch {
+    return false;
+  }
+}
 
 function withTimeout(input: RequestInfo | URL, init: RequestInit, timeoutMs: number): Promise<Response> {
   const ms = Number.isFinite(Number(timeoutMs)) ? Math.max(1, Math.floor(Number(timeoutMs))) : 15_000;
@@ -79,6 +99,7 @@ export async function postJsonWithGetFallback(
   const timeoutGetMs = opts.timeoutGetMs ?? 15_000;
   const payloadHeader = (opts.payloadHeader || 'x-fallback-payload').toLowerCase();
   const fallbackStatuses = Array.isArray(opts.fallbackStatuses) && opts.fallbackStatuses.length > 0 ? opts.fallbackStatuses : [502, 504];
+  const forceGet = typeof opts.forceGet === 'boolean' ? opts.forceGet : isGetFallbackForced();
 
   const postInit: RequestInit = { ...(opts.postInit || {}) };
   const postHeaders = new Headers(postInit.headers || undefined);
@@ -87,18 +108,7 @@ export async function postJsonWithGetFallback(
   postInit.method = 'POST';
   postInit.body = JSON.stringify(payload ?? {});
 
-  // 1) Try POST (fast)
-  try {
-    const r = await withTimeout(url, postInit, timeoutPostMs);
-    if (fallbackStatuses.includes(r.status)) throw new Error('FALLBACK_GET');
-    return r;
-  } catch (e: any) {
-    const isAbort = e?.name === 'AbortError';
-    const isForced = String(e?.message || '') === 'FALLBACK_GET';
-    if (!isAbort && !isForced) throw e;
-  }
-
-  // 2) GET fallback with payload in header
+  // 1) GET fallback with payload in header (used either after POST failure or when forced)
   const getUrl = opts.getUrl || fallbackUrl(url);
   const getInit: RequestInit = { ...(opts.getInit || {}) };
   if (!opts.getInit) {
@@ -115,6 +125,22 @@ export async function postJsonWithGetFallback(
   getInit.headers = getHeaders;
   try { delete (getInit as any).body; } catch {}
 
+  if (forceGet) {
+    return await withTimeout(getUrl, getInit, timeoutGetMs);
+  }
+
+  // 2) Try POST (fast)
+  try {
+    const r = await withTimeout(url, postInit, timeoutPostMs);
+    if (fallbackStatuses.includes(r.status)) throw new Error('FALLBACK_GET');
+    return r;
+  } catch (e: any) {
+    const isAbort = e?.name === 'AbortError';
+    const isForced = String(e?.message || '') === 'FALLBACK_GET';
+    if (!isAbort && !isForced) throw e;
+  }
+
+  // 3) POST failed -> fallback to GET
   return await withTimeout(getUrl, getInit, timeoutGetMs);
 }
 

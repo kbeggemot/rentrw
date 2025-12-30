@@ -3,6 +3,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Input } from '@/components/ui/Input';
 import { Textarea } from '@/components/ui/Textarea';
+import { isGetFallbackForced } from '@/lib/postFallback';
 
 declare global {
   interface Window { Telegram?: any }
@@ -64,24 +65,28 @@ export default function InvoiceNewPage() {
     const timeoutGetMs = opts?.timeoutGetMs ?? 15_000;
     const extraHeaders = opts?.extraHeaders ?? {};
 
-    // 1) Try POST first (fast)
-    try {
-      const r = await fetchWithTimeout(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...extraHeaders },
-        body: JSON.stringify(payload),
-        cache: 'no-store'
-      }, timeoutPostMs);
-      // If ingress returns 502/504 on POST, use GET fallback.
-      if (r.status === 502 || r.status === 504) throw new Error('FALLBACK_GET');
-      return r;
-    } catch (e: any) {
-      // Timeout / AbortError → fallback to GET
-      const isAbort = e?.name === 'AbortError';
-      if (!isAbort && String(e?.message || '') !== 'FALLBACK_GET') throw e;
+    const forceGet = isGetFallbackForced();
+
+    // 1) Try POST first (fast) unless forced to GET
+    if (!forceGet) {
+      try {
+        const r = await fetchWithTimeout(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...extraHeaders },
+          body: JSON.stringify(payload),
+          cache: 'no-store'
+        }, timeoutPostMs);
+        // If ingress returns 502/504 on POST, use GET fallback.
+        if (r.status === 502 || r.status === 504) throw new Error('FALLBACK_GET');
+        return r;
+      } catch (e: any) {
+        // Timeout / AbortError → fallback to GET
+        const isAbort = e?.name === 'AbortError';
+        if (!isAbort && String(e?.message || '') !== 'FALLBACK_GET') throw e;
+      }
     }
 
-    // 2) GET fallback with payload in header
+    // 2) GET fallback with payload in header (or forced)
     const b64 = jsonToB64(payload);
     const getUrl = opts?.getUrl || (url + (url.includes('?') ? '&' : '?') + 'via=get');
     return await fetchWithTimeout(getUrl, {
@@ -267,22 +272,27 @@ export default function InvoiceNewPage() {
     try {
       const initData: string | undefined = (window as any)?.Telegram?.WebApp?.initData;
       const url = `/api/phone/await-contact-invoice?wait=${encodeURIComponent(waitId)}`;
-      try {
-        await fetchWithTimeout(url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ initData: initData || '' }),
-          cache: 'no-store'
-        }, 8_000);
-      } catch (e: any) {
-        // GET fallback (server accepts initData via header; empty is OK when waitId is present)
-        const b64 = initData ? ((): string => { try { return window.btoa(unescape(encodeURIComponent(String(initData)))); } catch { return ''; } })() : '';
-        await fetchWithTimeout(url + (url.includes('?') ? '&' : '?') + 'via=get', {
-          method: 'GET',
-          headers: { ...(b64 ? { 'x-tg-initdata': b64 } : {}) },
-          cache: 'no-store'
-        }, 8_000).catch(() => void 0);
+      const forceGet = isGetFallbackForced();
+      if (!forceGet) {
+        try {
+          await fetchWithTimeout(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ initData: initData || '' }),
+            cache: 'no-store'
+          }, 8_000);
+          return;
+        } catch (e: any) {
+          // fall through to GET fallback below
+        }
       }
+      // GET fallback (server accepts initData via header; empty is OK when waitId is present)
+      const b64 = initData ? ((): string => { try { return window.btoa(unescape(encodeURIComponent(String(initData)))); } catch { return ''; } })() : '';
+      await fetchWithTimeout(url + (url.includes('?') ? '&' : '?') + 'via=get', {
+        method: 'GET',
+        headers: { ...(b64 ? { 'x-tg-initdata': b64 } : {}) },
+        cache: 'no-store'
+      }, 8_000).catch(() => void 0);
     } catch {}
   }, [waitId, fetchWithTimeout]);
 

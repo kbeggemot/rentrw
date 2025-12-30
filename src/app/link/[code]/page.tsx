@@ -2,7 +2,7 @@
 
 import { use, useEffect, useMemo, useRef, useState } from 'react';
 import { applyAgentCommissionToCart } from '@/lib/pricing';
-import { postJsonWithGetFallback } from '@/lib/postFallback';
+import { isGetFallbackForced, postJsonWithGetFallback } from '@/lib/postFallback';
 
 // Very lightweight RU genitive case inflector for full name like "Фамилия Имя Отчество"
 // Covers common male patterns; indeclinable and rare patterns are returned unchanged
@@ -814,32 +814,34 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
       let d: any = null;
 
       // 1) Try POST fast (a couple of attempts)
-      for (let attempt = 0; attempt < 2; attempt += 1) {
-        try {
-          res = await fetchWithTimeout('/api/rocketwork/tasks', {
-            method: 'POST',
-            headers: { ...baseHeaders, 'Content-Type': 'application/json' } as any,
-            body: JSON.stringify(body),
-          }, 12_000);
-          const txt = await res.text().catch(() => '');
-          d = parseJsonBestEffort(txt);
-          if (res.status === 503 && d?.error === 'NOT_LEADER') {
-            await new Promise((r) => setTimeout(r, 250 + attempt * 350));
-            res = null;
-            d = null;
-            continue;
+      if (!isGetFallbackForced()) {
+        for (let attempt = 0; attempt < 2; attempt += 1) {
+          try {
+            res = await fetchWithTimeout('/api/rocketwork/tasks', {
+              method: 'POST',
+              headers: { ...baseHeaders, 'Content-Type': 'application/json' } as any,
+              body: JSON.stringify(body),
+            }, 12_000);
+            const txt = await res.text().catch(() => '');
+            d = parseJsonBestEffort(txt);
+            if (res.status === 503 && d?.error === 'NOT_LEADER') {
+              await new Promise((r) => setTimeout(r, 250 + attempt * 350));
+              res = null;
+              d = null;
+              continue;
+            }
+            // If ingress gives 50x/html on POST, switch to GET fallback below.
+            if (!res.ok && (res.status === 502 || res.status === 504)) { res = null; d = null; break; }
+            break;
+          } catch (e) {
+            lastErr = e;
+            if ((e as any)?.name === 'AbortError') { res = null; d = null; break; }
+            if (attempt < 1) {
+              await new Promise((r) => setTimeout(r, 250 + attempt * 350));
+              continue;
+            }
+            throw e;
           }
-          // If ingress gives 50x/html on POST, switch to GET fallback below.
-          if (!res.ok && (res.status === 502 || res.status === 504)) { res = null; d = null; break; }
-          break;
-        } catch (e) {
-          lastErr = e;
-          if ((e as any)?.name === 'AbortError') { res = null; d = null; break; }
-          if (attempt < 1) {
-            await new Promise((r) => setTimeout(r, 250 + attempt * 350));
-            continue;
-          }
-          throw e;
         }
       }
 
