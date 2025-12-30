@@ -39,6 +39,57 @@ export default function InvoiceNewPage() {
   const [listCursor, setListCursor] = useState<number | null>(0);
   const [listLoading, setListLoading] = useState(false);
   const isValidEmail = (s: string) => /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/.test(s.trim());
+
+  const fetchWithTimeout = useCallback(async (input: RequestInfo | URL, init: RequestInit = {}, timeoutMs = 15_000) => {
+    const ms = Number.isFinite(Number(timeoutMs)) ? Math.max(1, Math.floor(Number(timeoutMs))) : 15_000;
+    const controller = new AbortController();
+    const t = window.setTimeout(() => controller.abort(), ms) as unknown as number;
+    try {
+      return await fetch(input, { ...init, signal: controller.signal });
+    } finally {
+      try { window.clearTimeout(t); } catch {}
+    }
+  }, []);
+
+  const jsonToB64 = useCallback((obj: any): string => {
+    try { return window.btoa(unescape(encodeURIComponent(JSON.stringify(obj)))); } catch { return ''; }
+  }, []);
+
+  const postJsonWithGetFallback = useCallback(async (
+    url: string,
+    payload: any,
+    opts?: { timeoutPostMs?: number; timeoutGetMs?: number; getUrl?: string; extraHeaders?: Record<string, string> }
+  ) => {
+    const timeoutPostMs = opts?.timeoutPostMs ?? 12_000;
+    const timeoutGetMs = opts?.timeoutGetMs ?? 15_000;
+    const extraHeaders = opts?.extraHeaders ?? {};
+
+    // 1) Try POST first (fast)
+    try {
+      const r = await fetchWithTimeout(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...extraHeaders },
+        body: JSON.stringify(payload),
+        cache: 'no-store'
+      }, timeoutPostMs);
+      // If ingress returns 502/504 on POST, use GET fallback.
+      if (r.status === 502 || r.status === 504) throw new Error('FALLBACK_GET');
+      return r;
+    } catch (e: any) {
+      // Timeout / AbortError → fallback to GET
+      const isAbort = e?.name === 'AbortError';
+      if (!isAbort && String(e?.message || '') !== 'FALLBACK_GET') throw e;
+    }
+
+    // 2) GET fallback with payload in header
+    const b64 = jsonToB64(payload);
+    const getUrl = opts?.getUrl || (url + (url.includes('?') ? '&' : '?') + 'via=get');
+    return await fetchWithTimeout(getUrl, {
+      method: 'GET',
+      headers: { Accept: 'application/json', 'x-invoice-payload': b64, ...extraHeaders },
+      cache: 'no-store'
+    }, timeoutGetMs);
+  }, [fetchWithTimeout, jsonToB64]);
   const canCreate = useMemo(() => {
     if (!phone || !payerName || serviceDescription.trim().length === 0 || serviceAmount.trim().length === 0 || customerEmail.trim().length === 0) return false;
     if (companyType === 'ru') return payerInnValid();
@@ -62,7 +113,7 @@ export default function InvoiceNewPage() {
     setChecking(true); setCheckMsg(null); setCheckOk(null); setFio(null);
     const key = (() => { try { return `inv_check_${String(phone).replace(/\D/g, '')}`; } catch { return 'inv_check'; } })();
     try {
-      const r = await fetch('/api/invoice/validate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ phone }) });
+      const r = await postJsonWithGetFallback('/api/invoice/validate', { phone });
       const d = await r.json().catch(() => ({}));
       if (r.ok && d?.ok) {
         setCheckOk(true);
@@ -94,7 +145,7 @@ export default function InvoiceNewPage() {
     } finally {
       setChecking(false);
     }
-  }, [phone, checking]);
+  }, [phone, checking, postJsonWithGetFallback]);
 
   useEffect(() => {
     try {
@@ -216,13 +267,24 @@ export default function InvoiceNewPage() {
     try {
       const initData: string | undefined = (window as any)?.Telegram?.WebApp?.initData;
       const url = `/api/phone/await-contact-invoice?wait=${encodeURIComponent(waitId)}`;
-      await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ initData: initData || '' })
-      });
+      try {
+        await fetchWithTimeout(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ initData: initData || '' }),
+          cache: 'no-store'
+        }, 8_000);
+      } catch (e: any) {
+        // GET fallback (server accepts initData via header; empty is OK when waitId is present)
+        const b64 = initData ? ((): string => { try { return window.btoa(unescape(encodeURIComponent(String(initData)))); } catch { return ''; } })() : '';
+        await fetchWithTimeout(url + (url.includes('?') ? '&' : '?') + 'via=get', {
+          method: 'GET',
+          headers: { ...(b64 ? { 'x-tg-initdata': b64 } : {}) },
+          cache: 'no-store'
+        }, 8_000).catch(() => void 0);
+      }
     } catch {}
-  }, [waitId]);
+  }, [waitId, fetchWithTimeout]);
 
   const showLogin = useMemo(() => !phone, [phone]);
 
@@ -388,7 +450,7 @@ export default function InvoiceNewPage() {
                     if (inn.length < 10) return;
                     try {
                       setConfirming(true);
-                      const r = await fetch('/api/invoice/dadata', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ inn }) });
+                      const r = await postJsonWithGetFallback('/api/invoice/dadata', { inn });
                       const d = await r.json().catch(() => ({}));
                       if (r.ok && d?.ok && d?.name) {
                         setPayerName(String(d.name));
@@ -610,7 +672,7 @@ export default function InvoiceNewPage() {
                       executorFio: fio || (sessionStorage.getItem('inv_executor_fio') || null),
                       executorInn: (sessionStorage.getItem('inv_executor_inn') || null)
                     };
-                    const r = await fetch('/api/invoice', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+                    const r = await postJsonWithGetFallback('/api/invoice', payload, { getUrl: '/api/invoice?create=1' });
                     const d = await r.json().catch(()=>({}));
                     if (r.ok && d?.ok && d?.invoice?.id) {
                       const url = `/invoice/${d?.invoice?.code || d.invoice.id}`;

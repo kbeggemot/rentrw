@@ -39,6 +39,33 @@ function validateTelegramInitData(initData: string): { ok: boolean; userId?: str
   }
 }
 
+function b64ToUtf8(raw: string): string {
+  const s = String(raw || '').trim();
+  if (!s) return '';
+  const norm = s.replace(/-/g, '+').replace(/_/g, '/');
+  const pad = norm.length % 4 ? norm + '='.repeat(4 - (norm.length % 4)) : norm;
+  return Buffer.from(pad, 'base64').toString('utf8');
+}
+
+export async function GET(req: Request) {
+  // Fallback for environments where POST is unstable at ingress.
+  // Prefer no body; optional initData can be passed via header `x-tg-initdata` as base64.
+  try {
+    const initHdr = req.headers.get('x-tg-initdata') || '';
+    let initData = '';
+    try { initData = initHdr ? b64ToUtf8(initHdr) : ''; } catch { initData = ''; }
+    const headers = new Headers(req.headers);
+    headers.set('content-type', 'application/json');
+    try { headers.delete('content-length'); } catch {}
+    const url = new URL(req.url);
+    url.searchParams.set('via', 'get');
+    const req2 = new Request(url.toString(), { method: 'POST', headers, body: JSON.stringify({ initData }) });
+    return await POST(req2);
+  } catch {
+    return NextResponse.json({ ok: false, error: 'SERVER_ERROR' }, { status: 500 });
+  }
+}
+
 export async function POST(req: Request) {
   try {
     const body = await req.json().catch(() => null);
