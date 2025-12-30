@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
+import { postJsonWithGetFallback } from '@/lib/postFallback';
 
 type Partner = { phone: string; fio: string | null; status: string | null; updatedAt: string; employmentKind?: 'selfemployed'|'entrepreneur'|null };
 
@@ -161,7 +162,7 @@ export default function PartnersClient({ initial, hasTokenInitial }: { initial: 
     if (ph.length === 0) return;
     setLoading(true);
     try {
-      const res = await fetch('/api/partners', { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ phone: ph }) });
+      const res = await postJsonWithGetFallback('/api/partners', { phone: ph }, { timeoutPostMs: 20_000, timeoutGetMs: 20_000, postInit: { credentials: 'include', cache: 'no-store' }, fallbackStatuses: [500, 502, 504] });
       const text = await res.text();
       let data: any = null; try { data = text ? JSON.parse(text) : null; } catch { data = text; }
       if (!res.ok) throw new Error((data && data.error) || text || 'Ошибка');
@@ -214,7 +215,7 @@ export default function PartnersClient({ initial, hasTokenInitial }: { initial: 
           onClick={async () => {
             setLoading(true);
             try {
-              await fetch('/api/partners/refresh', { method: 'POST' });
+              await postJsonWithGetFallback('/api/partners/refresh', {}, { timeoutPostMs: 20_000, timeoutGetMs: 20_000, postInit: { cache: 'no-store' }, fallbackStatuses: [500, 502, 504] });
               await reload();
             } catch {}
             setLoading(false);

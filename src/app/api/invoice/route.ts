@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { fetchTextWithTimeout } from '@/server/http';
+import { readFallbackJsonBody } from '@/server/getFallback';
 
 export const runtime = 'nodejs';
 
@@ -29,14 +30,6 @@ type Invoice = {
   total_amount_rub?: number | null; // итоговая сумма к выплате в рублях
 };
 
-function b64ToUtf8(raw: string): string {
-  const s = String(raw || '').trim();
-  if (!s) return '';
-  const norm = s.replace(/-/g, '+').replace(/_/g, '/');
-  const pad = norm.length % 4 ? norm + '='.repeat(4 - (norm.length % 4)) : norm;
-  return Buffer.from(pad, 'base64').toString('utf8');
-}
-
 async function readStore(): Promise<Invoice[]> {
   try { const { readText } = await import('@/server/storage'); const t = await readText('.data/invoices.json'); return t ? JSON.parse(t) : []; } catch { return []; }
 }
@@ -48,12 +41,10 @@ async function writeStore(list: Invoice[]): Promise<void> {
 export async function GET(req: Request) {
   try {
     const url = new URL(req.url);
-    // Fallback create flow: GET /api/invoice?create=1 with header x-invoice-payload=base64(JSON)
+    // Fallback create flow: GET /api/invoice?create=1 with header x-invoice-payload OR x-fallback-payload (base64 JSON)
     if (url.searchParams.get('create') === '1') {
-      const hdr = req.headers.get('x-invoice-payload') || '';
-      if (!hdr) return NextResponse.json({ ok: false, error: 'NO_PAYLOAD' }, { status: 400 });
-      let jsonStr = '';
-      try { jsonStr = b64ToUtf8(hdr); } catch { jsonStr = ''; }
+      const jsonStr = readFallbackJsonBody(req, ['x-invoice-payload', 'x-fallback-payload']) || '';
+      if (!jsonStr) return NextResponse.json({ ok: false, error: 'NO_PAYLOAD' }, { status: 400 });
       if (!jsonStr) return NextResponse.json({ ok: false, error: 'BAD_PAYLOAD' }, { status: 400 });
       const headers = new Headers(req.headers);
       headers.set('content-type', 'application/json');

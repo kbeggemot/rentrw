@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { addAdmin, deleteAdmin, listAdmins, setAdminPassword, ensureRootAdmin, getAdminByUsername } from '@/server/adminStore';
+import { readFallbackJsonBody } from '@/server/getFallback';
 
 export const runtime = 'nodejs';
 
@@ -20,6 +21,21 @@ export async function GET(req: Request) {
   try {
     if (!isAuthed(req)) return NextResponse.json({ error: 'UNAUTHORIZED' }, { status: 401 });
     await ensureRootAdmin();
+    // Fallback: allow POST via GET (when ?via=get and x-fallback-payload provided)
+    try {
+      const url = new URL(req.url);
+      if (url.searchParams.get('via') === 'get') {
+        const body = readFallbackJsonBody(req, ['x-fallback-payload']) || '';
+        if (!body) return NextResponse.json({ error: 'METHOD_NOT_ALLOWED' }, { status: 405 });
+        const headers = new Headers(req.headers);
+        headers.set('content-type', 'application/json');
+        try { headers.delete('content-length'); } catch {}
+        const req2 = new Request(url.toString(), { method: 'POST', headers, body });
+        const res = await POST(req2);
+        try { res.headers.set('Cache-Control', 'no-store'); } catch {}
+        return res;
+      }
+    } catch {}
     const users = await listAdmins();
     const role = await currentRole(req);
     return NextResponse.json({ users, role });

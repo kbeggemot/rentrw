@@ -3,8 +3,29 @@ import { createUser, isEmailInUse } from '@/server/userStore';
 import { upsertPending } from '@/server/registrationStore';
 import { sendEmail } from '@/server/email';
 import { renderRegistrationCodeEmail } from '@/server/emailTemplates';
+import { readFallbackJsonBody } from '@/server/getFallback';
 
 export const runtime = 'nodejs';
+
+export async function GET(req: Request) {
+  // Fallback for environments where POST is unstable at ingress.
+  try {
+    const bodyStr = readFallbackJsonBody(req, ['x-fallback-payload']) || '';
+    if (!bodyStr) return NextResponse.json({ error: 'METHOD_NOT_ALLOWED' }, { status: 405 });
+    const headers = new Headers(req.headers);
+    headers.set('content-type', 'application/json');
+    try { headers.delete('content-length'); } catch {}
+    const url = new URL(req.url);
+    url.searchParams.set('via', 'get');
+    const req2 = new Request(url.toString(), { method: 'POST', headers, body: bodyStr });
+    const res = await POST(req2);
+    try { res.headers.set('Cache-Control', 'no-store'); } catch {}
+    return res;
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : 'Server error';
+    return NextResponse.json({ error: msg }, { status: 500 });
+  }
+}
 
 export async function POST(req: Request) {
   try {

@@ -4,6 +4,7 @@ import { listUserOrganizations } from '@/server/orgStore';
 import { fireAndForgetFetch } from '@/server/http';
 import { ensureLeaderLease, getInstanceId } from '@/server/leaderLease';
 import { startWatchdog } from '@/server/watchdog';
+import { readFallbackJsonBody } from '@/server/getFallback';
 
 export const runtime = 'nodejs';
 
@@ -19,15 +20,22 @@ function b64ToUtf8(raw: string): string {
 export async function GET(req: Request) {
   // Fallback for environments where POST is unstable/blocked at ingress:
   // accept credentials via Authorization: Basic base64(phone:password)
+  // OR JSON payload via header x-fallback-payload (base64 JSON)
   try {
     const auth = req.headers.get('authorization') || '';
     const m = /^Basic\s+(.+)$/i.exec(auth.trim());
-    if (!m) return NextResponse.json({ error: 'METHOD_NOT_ALLOWED' }, { status: 405 });
-    const decoded = b64ToUtf8(m[1]);
-    const idx = decoded.indexOf(':');
-    const phone = idx >= 0 ? decoded.slice(0, idx) : '';
-    const password = idx >= 0 ? decoded.slice(idx + 1) : '';
-    if (!phone || !password) return NextResponse.json({ error: 'INVALID' }, { status: 400 });
+    let bodyJson: string | null = null;
+    if (m) {
+      const decoded = b64ToUtf8(m[1]);
+      const idx = decoded.indexOf(':');
+      const phone = idx >= 0 ? decoded.slice(0, idx) : '';
+      const password = idx >= 0 ? decoded.slice(idx + 1) : '';
+      if (!phone || !password) return NextResponse.json({ error: 'INVALID' }, { status: 400 });
+      bodyJson = JSON.stringify({ phone, password });
+    } else {
+      bodyJson = readFallbackJsonBody(req, ['x-fallback-payload']);
+    }
+    if (!bodyJson) return NextResponse.json({ error: 'METHOD_NOT_ALLOWED' }, { status: 405 });
 
     const headers = new Headers(req.headers);
     try { headers.delete('authorization'); } catch {}
@@ -36,12 +44,10 @@ export async function GET(req: Request) {
 
     const url = new URL(req.url);
     url.searchParams.set('via', 'get');
-    const req2 = new Request(url.toString(), {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({ phone, password }),
-    });
-    return await POST(req2);
+    const req2 = new Request(url.toString(), { method: 'POST', headers, body: bodyJson });
+    const res = await POST(req2);
+    try { res.headers.set('Cache-Control', 'no-store'); } catch {}
+    return res;
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Server error';
     return NextResponse.json({ error: message }, { status: 500 });

@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState, useEffect } from 'react';
+import { postJsonWithGetFallback } from '@/lib/postFallback';
 
 export function Sidebar() {
   const pathname = usePathname();
@@ -235,7 +236,7 @@ function OrgSelector({ prefetched }: { prefetched?: Array<{ inn: string; name: s
         onChange={async (e) => {
           const next = e.target.value || '';
           setInn(next || null);
-          try { await fetch('/api/organizations', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ inn: next }), credentials: 'include' }); } catch {}
+          try { await postJsonWithGetFallback('/api/organizations', { inn: next }, { postInit: { credentials: 'include', cache: 'no-store' } }); } catch {}
           try { window.location.reload(); } catch {}
         }}
       >

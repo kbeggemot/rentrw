@@ -48,8 +48,9 @@ export async function GET(req: Request) {
 
   // Hotfix fallback: allow creating tasks via GET when POST is unstable at ingress.
   // The payload is passed via header (to avoid URLs with PII) and we internally route it through POST logic.
-  if (url.searchParams.get('create') === '1') {
-    const payloadB64 = req.headers.get('x-rw-payload') || '';
+  // Supports both legacy `?create=1` and generic `?via=get` used by the shared client helper.
+  if (url.searchParams.get('create') === '1' || url.searchParams.get('via') === 'get') {
+    const payloadB64 = req.headers.get('x-rw-payload') || req.headers.get('x-fallback-payload') || '';
     if (!payloadB64) {
       const r = NextResponse.json({ error: 'NO_PAYLOAD', hint: 'Set header x-rw-payload=base64(JSON)' }, { status: 400 });
       try { r.headers.set('Cache-Control', 'no-store'); } catch {}

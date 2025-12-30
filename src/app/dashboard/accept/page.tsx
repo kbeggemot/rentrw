@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/Input';
 import { applyAgentCommissionToCart } from '@/lib/pricing';
 import { Textarea } from '@/components/ui/Textarea';
 import { Button } from '@/components/ui/Button';
+import { postJsonWithGetFallback } from '@/lib/postFallback';
 
 type PaymentMethod = 'qr' | 'card';
 
@@ -945,7 +946,7 @@ function AcceptPaymentContent() {
                               if (!phoneDigits) return;
                               setPartnerLoading(true);
                               try {
-                                const res = await fetch('/api/partners', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ phone: phoneDigits }) });
+                                const res = await postJsonWithGetFallback('/api/partners', { phone: phoneDigits }, { timeoutPostMs: 20_000, timeoutGetMs: 20_000, postInit: { cache: 'no-store' }, fallbackStatuses: [500, 502, 504] });
                                 const d = await res.json();
                                 if (res.ok) {
                                   const p = d?.partner || {};

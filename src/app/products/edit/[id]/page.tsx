@@ -2,6 +2,7 @@
 
 import { use, useEffect, useState } from 'react';
 import { Button } from '@/components/ui/Button';
+import { uploadImageWithGetFallback } from '@/lib/chunkedUpload';
 
 export default function EditProductPage(props: { params: Promise<{ id?: string }> }) {
   // In Next 15, route params in Client Components are a Promise. Unwrap with React.use().
@@ -228,9 +229,7 @@ export default function EditProductPage(props: { params: Promise<{ id?: string }
                       try {
                         objUrl = URL.createObjectURL(file);
                         setPreviews((p) => [...p, objUrl as string]);
-                        const fd = new FormData();
-                        fd.append('file', file);
-                        const r = await fetch('/api/products/upload', { method: 'POST', body: fd });
+                        const r = await uploadImageWithGetFallback('/api/products/upload', file);
                         const j = await r.json();
                         if (!r.ok) { setError('Не удалось загрузить фото'); return; }
                         setPhotos((p) => [...p, j.path]);

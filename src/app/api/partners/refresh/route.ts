@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { resolveRwTokenWithFingerprint } from '@/server/rwToken';
 import { getSelectedOrgInn } from '@/server/orgContext';
 import { listPartners, upsertPartner } from '@/server/partnerStore';
+import { readFallbackJsonBody } from '@/server/getFallback';
 
 export const runtime = 'nodejs';
 
@@ -69,6 +70,26 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: true, updated }, { status: 200 });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Server error';
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
+}
+
+export async function GET(req: Request) {
+  // Fallback for environments where POST is unstable at ingress.
+  try {
+    const body = readFallbackJsonBody(req, ['x-fallback-payload']) || '';
+    if (!body) return NextResponse.json({ error: 'METHOD_NOT_ALLOWED' }, { status: 405 });
+    const headers = new Headers(req.headers);
+    headers.set('content-type', 'application/json');
+    try { headers.delete('content-length'); } catch {}
+    const url = new URL(req.url);
+    url.searchParams.set('via', 'get');
+    const req2 = new Request(url.toString(), { method: 'POST', headers, body });
+    const res = await POST(req2);
+    try { res.headers.set('Cache-Control', 'no-store'); } catch {}
+    return res;
+  } catch (e) {
+    const message = e instanceof Error ? e.message : 'Server error';
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

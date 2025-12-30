@@ -1,24 +1,15 @@
 import { NextResponse } from 'next/server';
 import { fetchTextWithTimeout } from '@/server/http';
+import { readFallbackJsonBody } from '@/server/getFallback';
 
 export const runtime = 'nodejs';
 
-function b64ToUtf8(raw: string): string {
-  const s = String(raw || '').trim();
-  if (!s) return '';
-  const norm = s.replace(/-/g, '+').replace(/_/g, '/');
-  const pad = norm.length % 4 ? norm + '='.repeat(4 - (norm.length % 4)) : norm;
-  return Buffer.from(pad, 'base64').toString('utf8');
-}
-
 export async function GET(req: Request) {
   // Fallback for environments where POST is unstable at ingress.
-  // Accept JSON payload via header `x-invoice-payload` (base64 of UTF-8 JSON).
+  // Accept JSON payload via header `x-invoice-payload` or `x-fallback-payload` (base64 of UTF-8 JSON).
   try {
-    const hdr = req.headers.get('x-invoice-payload') || '';
-    if (!hdr) return NextResponse.json({ ok: false, error: 'METHOD_NOT_ALLOWED' }, { status: 405 });
-    let jsonStr = '';
-    try { jsonStr = b64ToUtf8(hdr); } catch { jsonStr = ''; }
+    const jsonStr = readFallbackJsonBody(req, ['x-invoice-payload', 'x-fallback-payload']) || '';
+    if (!jsonStr) return NextResponse.json({ ok: false, error: 'METHOD_NOT_ALLOWED' }, { status: 405 });
     if (!jsonStr) return NextResponse.json({ ok: false, error: 'BAD_PAYLOAD' }, { status: 400 });
     const headers = new Headers(req.headers);
     headers.set('content-type', 'application/json');

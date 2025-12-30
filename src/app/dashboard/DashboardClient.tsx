@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@/components/ui/Button';
 import { startRegistration as startWebAuthnReg, browserSupportsWebAuthn, platformAuthenticatorIsAvailable } from '@simplewebauthn/browser';
+import { postJsonWithGetFallback } from '@/lib/postFallback';
 
 export default function DashboardClient({ hasTokenInitial }: { hasTokenInitial: boolean }) {
   const [balance, setBalance] = useState<string | null>(null);
@@ -304,7 +305,7 @@ export default function DashboardClient({ hasTokenInitial }: { hasTokenInitial: 
           return;
         }
         if (s?.optOut) return;
-        const init = await fetch('/api/auth/webauthn/register', { method: 'POST' });
+        const init = await postJsonWithGetFallback('/api/auth/webauthn/register', {}, { timeoutPostMs: 20_000, timeoutGetMs: 20_000, postInit: { cache: 'no-store' }, fallbackStatuses: [500, 502, 504] });
         const { options, rpID, origin } = await init.json();
         if (cancelled) return;
         try {
@@ -455,7 +456,7 @@ export default function DashboardClient({ hasTokenInitial }: { hasTokenInitial: 
                           // Проверка партнёра через RW
                           try {
                             const phoneDigits = linkPartner.replace(/\D/g, '');
-                            const r1 = await fetch('/api/rocketwork/tasks', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'InviteExecutor', phone: phoneDigits }) });
+                            const r1 = await postJsonWithGetFallback('/api/rocketwork/tasks', { type: 'InviteExecutor', phone: phoneDigits }, { timeoutPostMs: 12_000, timeoutGetMs: 15_000, postInit: { cache: 'no-store' }, fallbackStatuses: [500, 502, 504] });
                             await r1.text();
                           } catch {}
                           try {
@@ -465,8 +466,8 @@ export default function DashboardClient({ hasTokenInitial }: { hasTokenInitial: 
                           } catch {}
                         }
                         const payload: any = { title: linkTitle.trim(), description: linkDesc.trim(), sumMode: linkSumMode, amountRub: amountNum, vatRate: linkVat, isAgent: linkAgent, commissionType: linkAgent ? linkCommType : undefined, commissionValue: linkAgent ? Number(linkCommVal.replace(',', '.')) : undefined, partnerPhone: linkAgent ? linkPartner.trim() : undefined, method: linkMethod };
-                        const r = await fetch('/api/links', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-                        const d = await r.json();
+                        const r = await postJsonWithGetFallback('/api/links', payload, { timeoutPostMs: 20_000, timeoutGetMs: 20_000, postInit: { cache: 'no-store' }, fallbackStatuses: [500, 502, 504] });
+                        const d = await r.json().catch(() => ({} as any));
                         if (!r.ok) {
                           const code = d?.error;
                           if (code === 'TITLE_REQUIRED') showToast('Укажите название ссылки', 'error');
@@ -577,8 +578,8 @@ export default function DashboardClient({ hasTokenInitial }: { hasTokenInitial: 
                   if (amountNum > bal) { showToast('Сумма вывода больше доступного баланса', 'error'); return; }
                   setWithdrawing(true);
                   try {
-                    const res = await fetch('/api/rocketwork/tasks', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'Withdrawal', amountRub: amountNum }) });
-                    const d = await res.json();
+                    const res = await postJsonWithGetFallback('/api/rocketwork/tasks', { type: 'Withdrawal', amountRub: amountNum }, { timeoutPostMs: 20_000, timeoutGetMs: 20_000, postInit: { cache: 'no-store' }, fallbackStatuses: [500, 502, 504] });
+                    const d = await res.json().catch(() => ({} as any));
                     if (!res.ok) throw new Error(d?.error || 'Ошибка вывода');
                     if (d?.error === 'WITHDRAWAL_IN_PROGRESS') { showToast('Уже есть незавершённый вывод. Дождитесь завершения.', 'error'); return; }
                     const taskId = d?.task_id;
@@ -689,7 +690,7 @@ export default function DashboardClient({ hasTokenInitial }: { hasTokenInitial: 
             </label>
             <div className="flex justify-end gap-2">
               <Button type="button" onClick={async () => {
-                try { if (optOutChecked) await fetch('/api/auth/webauthn/optout', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ optOut: true }) }); } catch {}
+                try { if (optOutChecked) await postJsonWithGetFallback('/api/auth/webauthn/optout', { optOut: true }, { timeoutPostMs: 20_000, timeoutGetMs: 20_000, postInit: { cache: 'no-store' }, fallbackStatuses: [500, 502, 504] }); } catch {}
                 setShowOptOutModal(false);
               }}>Понятно</Button>
             </div>

@@ -3,6 +3,7 @@ import { getDecryptedApiToken } from '@/server/secureStore';
 import { listPartners, listPartnersForOrg, upsertPartner, softDeletePartner, upsertPartnerFromValidation, listAllPartnersForOrg } from '@/server/partnerStore';
 import { getSelectedOrgInn } from '@/server/orgContext';
 import { fireAndForgetFetch } from '@/server/http';
+import { readFallbackJsonBody } from '@/server/getFallback';
 
 export const runtime = 'nodejs';
 
@@ -10,13 +11,25 @@ const DEFAULT_BASE_URL = 'https://app.rocketwork.ru/api/';
 
 export async function GET(req: Request) {
   try {
+    const url = new URL(req.url);
+    // Fallback: allow POST via GET (when ?via=get and x-fallback-payload provided)
+    if (url.searchParams.get('via') === 'get') {
+      const bodyStr = readFallbackJsonBody(req, ['x-fallback-payload']) || '';
+      if (!bodyStr) return NextResponse.json({ error: 'METHOD_NOT_ALLOWED' }, { status: 405 });
+      const headers = new Headers(req.headers);
+      headers.set('content-type', 'application/json');
+      try { headers.delete('content-length'); } catch {}
+      const req2 = new Request(url.toString(), { method: 'POST', headers, body: bodyStr });
+      const res = await POST(req2);
+      try { res.headers.set('Cache-Control', 'no-store'); } catch {}
+      return res;
+    }
     const cookie = req.headers.get('cookie') || '';
     const mc = /(?:^|;\s*)session_user=([^;]+)/.exec(cookie);
     const userId = (mc ? decodeURIComponent(mc[1]) : undefined) || req.headers.get('x-user-id') || 'default';
     const inn = getSelectedOrgInn(req);
     const { getShowAllDataFlag } = await import('@/server/userStore');
     const showAll = await getShowAllDataFlag(userId);
-    const url = new URL(req.url);
     const limitParam = url.searchParams.get('limit');
     let limit = Number(limitParam);
     if (!Number.isFinite(limit) || limit <= 0) limit = 15;

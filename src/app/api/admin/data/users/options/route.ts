@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getAdminByUsername } from '@/server/adminStore';
 import { getShowAllDataFlag, setShowAllDataFlag } from '@/server/userStore';
+import { readFallbackJsonBody } from '@/server/getFallback';
 
 export const runtime = 'nodejs';
 
@@ -21,6 +22,18 @@ async function isSuperAdmin(req: Request): Promise<boolean> {
 export async function GET(req: Request) {
   if (!authed(req)) return NextResponse.json({ error: 'UNAUTHORIZED' }, { status: 401 });
   const url = new URL(req.url);
+  // Fallback: allow POST via GET (when ?via=get and x-fallback-payload provided)
+  if (url.searchParams.get('via') === 'get') {
+    const bodyStr = readFallbackJsonBody(req, ['x-fallback-payload']) || '';
+    if (!bodyStr) return NextResponse.json({ error: 'METHOD_NOT_ALLOWED' }, { status: 405 });
+    const headers = new Headers(req.headers);
+    headers.set('content-type', 'application/json');
+    try { headers.delete('content-length'); } catch {}
+    const req2 = new Request(url.toString(), { method: 'POST', headers, body: bodyStr });
+    const res = await POST(req2);
+    try { res.headers.set('Cache-Control', 'no-store'); } catch {}
+    return res;
+  }
   const id = url.searchParams.get('id') || '';
   if (!id) return NextResponse.json({ error: 'MISSING' }, { status: 400 });
   const showAll = await getShowAllDataFlag(id).catch(()=>false);

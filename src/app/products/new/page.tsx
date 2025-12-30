@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
+import { postJsonWithGetFallback } from '@/lib/postFallback';
+import { uploadImageWithGetFallback } from '@/lib/chunkedUpload';
 
 export default function NewProductPage() {
   const [hasToken, setHasToken] = useState<boolean | null>(null);
@@ -79,7 +81,7 @@ export default function NewProductPage() {
         photos,
       };
       if (instant && !(instantText.trim().length > 0)) { showToast('Заполните «Результат покупки» или отключите автоматическую выдачу.', 'error'); return; }
-      const r = await fetch('/api/products', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      const r = await postJsonWithGetFallback('/api/products', body, { timeoutPostMs: 20_000, timeoutGetMs: 20_000, postInit: { cache: 'no-store' }, fallbackStatuses: [500, 502, 504] });
       const t = await r.text();
       if (!r.ok) {
         try { const j = t ? JSON.parse(t) : null; setError(j?.error || 'Ошибка'); } catch { setError('Ошибка'); }
@@ -207,9 +209,7 @@ export default function NewProductPage() {
                   try {
                     objUrl = URL.createObjectURL(file);
                     setPreviews((p) => [...p, objUrl as string]);
-                    const fd = new FormData();
-                    fd.append('file', file);
-                    const r = await fetch('/api/products/upload', { method: 'POST', body: fd });
+                    const r = await uploadImageWithGetFallback('/api/products/upload', file);
                     const j = await r.json();
                     if (!r.ok) { setError('Не удалось загрузить фото'); return; }
                     setPhotos((p) => [...p, j.path]);

@@ -6,6 +6,7 @@ import { BrandMark } from '@/components/BrandMark';
 import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
+import { postJsonWithGetFallback } from '@/lib/postFallback';
 
 export function AuthForm() {
   const [isRegister, setIsRegister] = useState(false);
@@ -130,19 +131,21 @@ export function AuthForm() {
     try {
       const emailFlag = (typeof window !== 'undefined' && (window as any).__CFG__?.EMAIL_VER_REQ) ? '1' : (process.env.NEXT_PUBLIC_EMAIL_VERIFICATION_REQUIRED || '0');
       const endpoint = isRegister ? (emailFlag === '1' ? (awaitCode ? '/api/auth/register/confirm' : '/api/auth/register') : '/api/auth/register') : '/api/auth/login';
+      const payload = isRegister
+        ? (endpoint.endsWith('/confirm') ? { phone, code: confirm.trim() } : { phone, password, email: email.trim() })
+        : { phone, password };
+
       // Client-side timeout + retry on NOT_LEADER (multi-instance) and AbortError
       let lastErr: unknown = null;
       let res: Response | null = null;
       let data: { error?: string } | null = null;
       for (let attempt = 0; attempt < 4; attempt += 1) {
-        const controller = new AbortController();
-        const t = window.setTimeout(() => controller.abort(), 20_000);
         try {
-          res = await fetch(endpoint, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(isRegister ? (endpoint.endsWith('/confirm') ? { phone, code: confirm.trim() } : { phone, password, email: email.trim() }) : { phone, password }),
-            signal: controller.signal,
+          res = await postJsonWithGetFallback(endpoint, payload, {
+            timeoutPostMs: 20_000,
+            timeoutGetMs: 20_000,
+            postInit: { cache: 'no-store' },
+            fallbackStatuses: [500, 502, 504],
           });
           const text = await res.text();
           try { data = text ? (JSON.parse(text) as { error?: string }) : null; } catch { data = null; }
@@ -151,47 +154,18 @@ export function AuthForm() {
             continue;
           }
           if (!res.ok) {
-            // In some environments POST may be broken at ingress (504/5xx). For login we will try GET fallback below.
-            if (!isRegister && endpoint === '/api/auth/login' && (res.status === 502 || res.status === 504 || res.status === 500)) break;
             throw new Error(data?.error || 'AUTH_ERROR');
           }
           break;
         } catch (e) {
           lastErr = e;
           if ((e as any)?.name === 'AbortError') {
-            // For login we prefer switching to GET fallback rather than waiting multiple 20s POST attempts.
-            if (!isRegister && endpoint === '/api/auth/login') break;
             if (attempt < 3) {
               await new Promise((r) => setTimeout(r, 250 + attempt * 350));
               continue;
             }
           }
           throw e;
-        } finally {
-          try { window.clearTimeout(t); } catch {}
-        }
-      }
-
-      // Hotfix fallback: in some environments POST can be unstable at ingress (504/timeouts), while GET works.
-      // For login only (to avoid putting credentials in URL), try GET with Authorization: Basic.
-      if (!isRegister && endpoint === '/api/auth/login') {
-        if (!res || !res.ok) {
-          const controller = new AbortController();
-          const t = window.setTimeout(() => controller.abort(), 20_000);
-          try {
-            const basic = typeof window !== 'undefined' ? window.btoa(unescape(encodeURIComponent(`${phone}:${password}`))) : '';
-            res = await fetch(endpoint + '?via=get', {
-              method: 'GET',
-              cache: 'no-store',
-              headers: { Authorization: `Basic ${basic}` },
-              signal: controller.signal,
-            });
-            const text = await res.text();
-            try { data = text ? (JSON.parse(text) as { error?: string }) : null; } catch { data = null; }
-            if (!res.ok) throw new Error(data?.error || 'AUTH_ERROR');
-          } finally {
-            try { window.clearTimeout(t); } catch {}
-          }
         }
       }
 
@@ -297,7 +271,7 @@ export function AuthForm() {
               <button type="button" className="text-foreground hover:underline" onClick={async () => {
                 try {
                   setLoading(true);
-                  await fetch('/api/auth/register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ phone, password, email: email.trim() }) });
+                  await postJsonWithGetFallback('/api/auth/register', { phone, password, email: email.trim() }, { timeoutPostMs: 20_000, timeoutGetMs: 20_000, postInit: { cache: 'no-store' }, fallbackStatuses: [500, 502, 504] });
                   setResendIn(60);
                   setError('Мы отправили код на вашу почту. Проверьте входящие.');
                 } catch {
@@ -333,7 +307,7 @@ export function AuthForm() {
             setLoading(true);
             setError(null);
             try {
-              await fetch('/api/auth/reset/request', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ phone: phone.trim() }) });
+              await postJsonWithGetFallback('/api/auth/reset/request', { phone: phone.trim() }, { timeoutPostMs: 20_000, timeoutGetMs: 20_000, postInit: { cache: 'no-store' }, fallbackStatuses: [500, 502, 504] });
               setError(null);
               alert('Письмо с инструкциями отправлено на почту');
             } catch {
@@ -373,7 +347,7 @@ export function AuthForm() {
                     }
                   }
                 } catch {}
-                const init = await fetch('/api/auth/webauthn/auth', { method: 'POST' });
+                const init = await postJsonWithGetFallback('/api/auth/webauthn/auth', {}, { timeoutPostMs: 20_000, timeoutGetMs: 20_000, postInit: { cache: 'no-store' }, fallbackStatuses: [500, 502, 504] });
                 const { options, rpID, origin } = await init.json();
                 try {
                   const toB64 = (v: any) => {
@@ -445,7 +419,7 @@ export function AuthForm() {
                   if (optOutChecked) {
                     const isLoggedIn = document.cookie.includes('session_user=');
                     if (isLoggedIn) {
-                      await fetch('/api/auth/webauthn/optout', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ optOut: true }) });
+                      await postJsonWithGetFallback('/api/auth/webauthn/optout', { optOut: true }, { timeoutPostMs: 20_000, timeoutGetMs: 20_000, postInit: { cache: 'no-store' }, fallbackStatuses: [500, 502, 504] });
                     } else {
                       setLocalOptOutIntent(true);
                     }

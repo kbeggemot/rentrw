@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
+import { uploadPdfWithGetFallback } from '@/lib/chunkedUpload';
 
 type Props = {
   code: string;
@@ -62,8 +63,7 @@ export default function ManageLinkClient(props: Props) {
                 if (f.size > 5*1024*1024) { showToast('Файл слишком большой. Загрузите файл размером до 5 МБ', 'error'); return; }
                 try {
                   setUploading(true);
-                  const buf = await f.arrayBuffer();
-                  const res = await fetch('/api/docs', { method: 'POST', headers: { 'Content-Type': 'application/pdf' }, body: buf });
+                  const res = await uploadPdfWithGetFallback('/api/docs', f);
                   const d = await res.json();
                   if (!res.ok) {
                     const code = d?.error; if (code === 'INVALID_FORMAT') showToast('Загрузите файл в формате PDF', 'error'); else if (code === 'TOO_LARGE') showToast('Файл слишком большой. Загрузите файл размером до 5 МБ', 'error'); else showToast('Не удалось открыть файл. Попробуйте другой PDF', 'error');

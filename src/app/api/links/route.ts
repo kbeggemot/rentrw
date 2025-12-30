@@ -6,6 +6,7 @@ import { getSelectedOrgInn } from '@/server/orgContext';
 import { partnerExists, upsertPartnerFromValidation } from '@/server/partnerStore';
 import { applyAgentCommissionToCart } from '@/lib/pricing';
 import { fireAndForgetFetch } from '@/server/http';
+import { readFallbackJsonBody } from '@/server/getFallback';
 
 export const runtime = 'nodejs';
 
@@ -23,6 +24,20 @@ export async function GET(req: Request) {
     if (!userId) return NextResponse.json({ error: 'NO_USER' }, { status: 401 });
     // optional: live uniqueness check for vanity code
     const url = new URL(req.url);
+
+    // Fallback: allow POST via GET (when ?via=get and x-fallback-payload provided)
+    if (url.searchParams.get('via') === 'get') {
+      const bodyStr = readFallbackJsonBody(req, ['x-fallback-payload']) || '';
+      if (!bodyStr) return NextResponse.json({ error: 'METHOD_NOT_ALLOWED' }, { status: 405 });
+      const headers = new Headers(req.headers);
+      headers.set('content-type', 'application/json');
+      try { headers.delete('content-length'); } catch {}
+      const req2 = new Request(url.toString(), { method: 'POST', headers, body: bodyStr });
+      const res = await POST(req2);
+      try { res.headers.set('Cache-Control', 'no-store'); } catch {}
+      return res;
+    }
+
     const check = url.searchParams.get('check');
     if (check) {
       const candidate = String(check).trim().toLowerCase();

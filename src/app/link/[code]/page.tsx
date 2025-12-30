@@ -2,6 +2,7 @@
 
 import { use, useEffect, useMemo, useRef, useState } from 'react';
 import { applyAgentCommissionToCart } from '@/lib/pricing';
+import { postJsonWithGetFallback } from '@/lib/postFallback';
 
 // Very lightweight RU genitive case inflector for full name like "Фамилия Имя Отчество"
 // Covers common male patterns; indeclinable and rare patterns are returned unchanged
@@ -901,14 +902,16 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
           const tgId = getTelegramUserIdStrong();
           const meta = getTelegramUserMeta();
           // Do not block payment flow: POST may hang on some ingresses.
-          const controller = new AbortController();
-          const t = window.setTimeout(() => controller.abort(), 3_000);
-          fetch('/api/sales/meta', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'x-user-id': data.userId } as any,
-            body: JSON.stringify({ taskId: tId, payerTgId: tgId, linkCode: code, payerTgFirstName: meta.first_name ?? null, payerTgLastName: meta.last_name ?? null, payerTgUsername: meta.username ?? null }),
-            signal: controller.signal,
-          }).catch(() => {}).finally(() => { try { window.clearTimeout(t); } catch {} });
+          void postJsonWithGetFallback(
+            '/api/sales/meta',
+            { taskId: tId, payerTgId: tgId, linkCode: code, payerTgFirstName: meta.first_name ?? null, payerTgLastName: meta.last_name ?? null, payerTgUsername: meta.username ?? null },
+            {
+              timeoutPostMs: 600,
+              timeoutGetMs: 3_000,
+              postInit: { cache: 'no-store', headers: { 'x-user-id': data.userId } as any },
+              fallbackStatuses: [500, 502, 504],
+            }
+          ).then((r) => r.text().catch(() => void 0)).catch(() => void 0);
           metaSentRef.current = true;
         }
       } catch {}
@@ -932,11 +935,16 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
       const id = getTelegramUserIdStrong();
       if (id) {
         metaSentRef.current = true;
-        fetch('/api/sales/meta', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'x-user-id': data.userId as any },
-          body: JSON.stringify({ taskId, payerTgId: id, linkCode: code }),
-        }).catch(() => {});
+        void postJsonWithGetFallback(
+          '/api/sales/meta',
+          { taskId, payerTgId: id, linkCode: code },
+          {
+            timeoutPostMs: 600,
+            timeoutGetMs: 3_000,
+            postInit: { cache: 'no-store', headers: { 'x-user-id': data.userId as any } as any },
+            fallbackStatuses: [500, 502, 504],
+          }
+        ).then((r) => r.text().catch(() => void 0)).catch(() => void 0);
       }
     }
   }, [taskId, data?.userId, code]);

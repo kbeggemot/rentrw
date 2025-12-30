@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { readText, writeText } from '@/server/storage';
 import { listAllSales } from '@/server/taskStore';
 import { getDecryptedApiToken } from '@/server/secureStore';
+import { readFallbackJsonBody } from '@/server/getFallback';
 
 export const runtime = 'nodejs';
 
@@ -95,6 +96,26 @@ export async function POST(req: Request) {
     await writeText('.data/ofd_jobs.json', JSON.stringify({ jobs }, null, 2));
 
     return NextResponse.json({ ok: true, jobs: jobs.length, today: onlyToday });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : 'Server error';
+    return NextResponse.json({ error: msg }, { status: 500 });
+  }
+}
+
+export async function GET(req: Request) {
+  // Fallback for environments where POST is unstable at ingress.
+  try {
+    const body = readFallbackJsonBody(req, ['x-fallback-payload']) || '';
+    if (!body) return NextResponse.json({ error: 'METHOD_NOT_ALLOWED' }, { status: 405 });
+    const headers = new Headers(req.headers);
+    headers.set('content-type', 'application/json');
+    try { headers.delete('content-length'); } catch {}
+    const url = new URL(req.url);
+    url.searchParams.set('via', 'get');
+    const req2 = new Request(url.toString(), { method: 'POST', headers, body });
+    const res = await POST(req2);
+    try { res.headers.set('Cache-Control', 'no-store'); } catch {}
+    return res;
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'Server error';
     return NextResponse.json({ error: msg }, { status: 500 });

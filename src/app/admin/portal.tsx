@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
+import { postJsonWithGetFallback } from '@/lib/postFallback';
 
 type AdminUser = { username: string; role: 'superadmin' | 'admin'; createdAt: string; updatedAt: string };
 
@@ -46,7 +47,7 @@ function AdminLogin({ onLogged }: { onLogged: () => void }) {
         <Button loading={loading} onClick={async () => {
           setLoading(true); setMsg(null);
           try {
-            const r = await fetch('/api/admin/session', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username, password }) });
+            const r = await postJsonWithGetFallback('/api/admin/session', { username, password }, { timeoutPostMs: 20_000, timeoutGetMs: 20_000, postInit: { cache: 'no-store' }, fallbackStatuses: [500, 502, 504] });
             if (!r.ok) throw new Error('INVALID');
             onLogged();
           } catch { setMsg('Неверный логин или пароль'); }
@@ -119,7 +120,7 @@ function UsersPanel({ showToast }: { showToast: (m: string, k?: any) => void }) 
           <option value="admin">admin</option>
           <option value="superadmin">superadmin</option>
         </select>
-        <Button onClick={async()=>{ const r=await fetch('/api/admin/users',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:u,password:p,role})}); if(r.ok){showToast('Добавлено','success'); setU(''); setP(''); load();} else showToast('Ошибка','error'); }}>Добавить</Button>
+        <Button onClick={async()=>{ const r=await postJsonWithGetFallback('/api/admin/users',{username:u,password:p,role},{ timeoutPostMs: 20_000, timeoutGetMs: 20_000, postInit: { cache: 'no-store' }, fallbackStatuses: [500, 502, 504] }); if(r.ok){showToast('Добавлено','success'); setU(''); setP(''); load();} else showToast('Ошибка','error'); }}>Добавить</Button>
       </div>
       <div className="border rounded">
         <table className="min-w-full text-sm">
@@ -156,7 +157,7 @@ function LkUserOptions({ userId }: { userId: string }) {
   }, [userId]);
   return (
     <label className="inline-flex items-center gap-2 text-sm">
-      <input type="checkbox" checked={!!value} onChange={async (e) => { setValue(e.target.checked); try { await fetch('/api/admin/data/users/options', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: userId, showAll: e.target.checked }) }); } catch {} }} />
+      <input type="checkbox" checked={!!value} onChange={async (e) => { setValue(e.target.checked); try { await postJsonWithGetFallback('/api/admin/data/users/options', { id: userId, showAll: e.target.checked }, { timeoutPostMs: 20_000, timeoutGetMs: 20_000, postInit: { cache: 'no-store' }, fallbackStatuses: [500, 502, 504] }); } catch {} }} />
       <span>Показывать все данные (по орг.)</span>
     </label>
   );
@@ -351,7 +352,7 @@ function SalesPanel({ showToast, role }: { showToast: (m: string, k?: any) => vo
               <>
                 <button className="w-full text-left px-3 py-2 hover:bg-gray-50 dark:hover:bg-gray-900" onClick={async(e)=>{ e.preventDefault(); e.stopPropagation();
                   try {
-                    const r = await fetch('/api/admin/actions/repair?rebuild=1',{method:'POST', credentials:'include', cache:'no-store'});
+                    const r = await postJsonWithGetFallback('/api/admin/actions/repair?rebuild=1', {}, { timeoutPostMs: 20_000, timeoutGetMs: 20_000, postInit: { credentials:'include', cache:'no-store' }, fallbackStatuses: [500, 502, 504] });
                     const d = await r.json().catch(()=>null);
                     if (!r.ok) { showToast(String(d?.error||`Ошибка ${r.status}`),'error'); return; }
                     await load();
@@ -361,15 +362,15 @@ function SalesPanel({ showToast, role }: { showToast: (m: string, k?: any) => vo
                 }}>Восстановить продажи (из кэша постбеков)</button>
                 <button className="w-full text-left px-3 py-2 hover:bg-gray-50 dark:hover:bg-gray-900" onClick={async(e)=>{ e.preventDefault(); e.stopPropagation();
                   try {
-                    const r = await fetch('/api/admin/actions/repair',{method:'POST', credentials:'include', cache:'no-store'});
+                    const r = await postJsonWithGetFallback('/api/admin/actions/repair', {}, { timeoutPostMs: 20_000, timeoutGetMs: 20_000, postInit: { credentials:'include', cache:'no-store' }, fallbackStatuses: [500, 502, 504] });
                     const d = await r.json().catch(()=>null);
                     if (!r.ok) { showToast(String(d?.error||`Ошибка ${r.status}`),'error'); return; }
                     showToast('OFD Repair запущен','success');
                   } catch { showToast('Сеть/сервер недоступен','error'); } finally { try { const d=e.currentTarget.closest('details') as HTMLDetailsElement|null; if(d) d.open=false; } catch {} }
                 }}>Запустить OFD Repair</button>
-                <button className="w-full text-left px-3 py-2 hover:bg-gray-50 dark:hover:bg-gray-900" onClick={async(e)=>{ e.preventDefault(); e.stopPropagation(); try{ await fetch('/api/admin/actions/schedule',{method:'POST',credentials:'include',cache:'no-store'}); showToast('Schedule запущен','info'); } catch { showToast('Сеть/сервер недоступен','error'); } finally { try { const d=e.currentTarget.closest('details') as HTMLDetailsElement|null; if(d) d.open=false; } catch {} } }}>Schedule</button>
+                <button className="w-full text-left px-3 py-2 hover:bg-gray-50 dark:hover:bg-gray-900" onClick={async(e)=>{ e.preventDefault(); e.stopPropagation(); try{ await postJsonWithGetFallback('/api/admin/actions/schedule', {}, { timeoutPostMs: 20_000, timeoutGetMs: 20_000, postInit: { credentials:'include', cache:'no-store' }, fallbackStatuses: [500, 502, 504] }); showToast('Schedule запущен','info'); } catch { showToast('Сеть/сервер недоступен','error'); } finally { try { const d=e.currentTarget.closest('details') as HTMLDetailsElement|null; if(d) d.open=false; } catch {} } }}>Schedule</button>
                 <div className="border-t my-1" />
-                <button className="w-full text-left px-3 py-2 hover:bg-gray-50 dark:hover:bg-gray-900" onClick={async(e)=>{ e.preventDefault(); e.stopPropagation(); try{ const r=await fetch('/api/admin/actions/ofd/rebuild-queue',{method:'POST',credentials:'include',cache:'no-store'}); const d=await r.json().catch(()=>null); if(!r.ok){ showToast(String(d?.error||`Ошибка ${r.status}`),'error'); return;} showToast(`Пересобрано: ${d?.jobs||0}`,'success'); } catch { showToast('Сеть/сервер недоступен','error'); } finally { try { const d=e.currentTarget.closest('details') as HTMLDetailsElement|null; if(d) d.open=false; } catch {} } }}>Пересобрать очередь OFD</button>
+                <button className="w-full text-left px-3 py-2 hover:bg-gray-50 dark:hover:bg-gray-900" onClick={async(e)=>{ e.preventDefault(); e.stopPropagation(); try{ const r=await postJsonWithGetFallback('/api/admin/actions/ofd/rebuild-queue', {}, { timeoutPostMs: 20_000, timeoutGetMs: 20_000, postInit: { credentials:'include', cache:'no-store' }, fallbackStatuses: [500, 502, 504] }); const d=await r.json().catch(()=>null); if(!r.ok){ showToast(String(d?.error||`Ошибка ${r.status}`),'error'); return;} showToast(`Пересобрано: ${d?.jobs||0}`,'success'); } catch { showToast('Сеть/сервер недоступен','error'); } finally { try { const d=e.currentTarget.closest('details') as HTMLDetailsElement|null; if(d) d.open=false; } catch {} } }}>Пересобрать очередь OFD</button>
               </>
             ) : null}
           </div>

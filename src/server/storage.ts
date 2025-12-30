@@ -504,3 +504,26 @@ export async function readBinary(relPath: string): Promise<{ data: Buffer; conte
 }
 
 
+export async function deleteFile(relPath: string): Promise<void> {
+  if (process.env.S3_ENABLED === '1') {
+    ensureS3();
+    if (!s3Client || !s3Bucket) return;
+    try {
+      const { DeleteObjectCommand } = require('@aws-sdk/client-s3');
+      const key = (s3Prefix + relPath).replace(/^\/+/, '');
+      const cmd = new DeleteObjectCommand({ Bucket: s3Bucket, Key: key });
+      await withAbortTimeout(msFromEnv('S3_DEL_TIMEOUT_MS', 10_000), (abortSignal) => s3Client.send(cmd, { abortSignal }));
+    } catch {
+      try { resetS3Client(); } catch {}
+      // best-effort delete; do not throw hard
+    }
+    return;
+  }
+  try {
+    await fs.unlink(path.join(process.cwd(), relPath));
+  } catch {
+    // ignore
+  }
+}
+
+

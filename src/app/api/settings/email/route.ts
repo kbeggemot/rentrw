@@ -3,6 +3,7 @@ import { getUserById, updateUserEmail } from '@/server/userStore';
 import { sendEmail } from '@/server/email';
 import { renderSettingsEmailVerification } from '@/server/emailTemplates';
 import { writeText } from '@/server/storage';
+import { readFallbackJsonBody } from '@/server/getFallback';
 
 export const runtime = 'nodejs';
 
@@ -18,6 +19,21 @@ function maskEmail(email: string): string {
 
 export async function GET(req: Request) {
   try {
+    // Fallback: allow POST via GET (when ?via=get and x-fallback-payload provided)
+    try {
+      const url = new URL(req.url);
+      if (url.searchParams.get('via') === 'get') {
+        const bodyStr = readFallbackJsonBody(req, ['x-fallback-payload']) || '';
+        if (!bodyStr) return NextResponse.json({ error: 'METHOD_NOT_ALLOWED' }, { status: 405 });
+        const headers = new Headers(req.headers);
+        headers.set('content-type', 'application/json');
+        try { headers.delete('content-length'); } catch {}
+        const req2 = new Request(url.toString(), { method: 'POST', headers, body: bodyStr });
+        const res = await POST(req2);
+        try { res.headers.set('Cache-Control', 'no-store'); } catch {}
+        return res;
+      }
+    } catch {}
     const cookie = req.headers.get('cookie') || '';
     const mc = /(?:^|;\s*)session_user=([^;]+)/.exec(cookie);
     const userId = (mc ? decodeURIComponent(mc[1]) : undefined) || req.headers.get('x-user-id') || 'default';

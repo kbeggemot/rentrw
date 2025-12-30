@@ -4,6 +4,7 @@ import { writeText } from '@/server/storage';
 import { findOrgByInn, getOrgPayoutRequisites, updateOrgPayoutRequisites } from '@/server/orgStore';
 import { getSelectedOrgInn } from '@/server/orgContext';
 import { resolveRwToken } from '@/server/rwToken';
+import { readFallbackJsonBody } from '@/server/getFallback';
 
 export const runtime = 'nodejs';
 
@@ -17,6 +18,19 @@ function getUserId(req: Request): string | null {
 
 export async function GET(req: Request) {
   try {
+    // Fallback: allow POST via GET (when ?via=get and x-fallback-payload provided)
+    const url = new URL(req.url);
+    if (url.searchParams.get('via') === 'get') {
+      const bodyStr = readFallbackJsonBody(req, ['x-fallback-payload']) || '';
+      if (!bodyStr) return NextResponse.json({ error: 'METHOD_NOT_ALLOWED' }, { status: 405 });
+      const headers = new Headers(req.headers);
+      headers.set('content-type', 'application/json');
+      try { headers.delete('content-length'); } catch {}
+      const req2 = new Request(url.toString(), { method: 'POST', headers, body: bodyStr });
+      const res = await POST(req2);
+      try { res.headers.set('Cache-Control', 'no-store'); } catch {}
+      return res;
+    }
     const userId = getUserId(req);
     if (!userId) return NextResponse.json({ error: 'NO_USER' }, { status: 401 });
     // Read requisites from currently selected organization

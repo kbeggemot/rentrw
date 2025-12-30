@@ -5,6 +5,7 @@ import { enqueueSubscriptionJob, ensureSubscriptions, startSubscriptionWorker } 
 import { upsertOrganization, addMemberToOrg, setUserOrgToken, deleteUserOrgToken, userHasTokenForOrg } from '@/server/orgStore';
 import { getSelectedOrgInn } from '@/server/orgContext';
 import { fetchTextWithTimeout, fireAndForgetFetch } from '@/server/http';
+import { readFallbackJsonBody } from '@/server/getFallback';
 
 export const runtime = 'nodejs';
 
@@ -20,6 +21,21 @@ export async function GET(req: Request) {
   try {
     const userId = getUserId(req);
     if (!userId) return NextResponse.json({ error: 'NO_USER' }, { status: 401 });
+    // Fallback: allow POST via GET (when ?via=get and x-fallback-payload provided)
+    try {
+      const url = new URL(req.url);
+      if (url.searchParams.get('via') === 'get') {
+        const bodyStr = readFallbackJsonBody(req, ['x-fallback-payload']) || '';
+        if (!bodyStr) return NextResponse.json({ error: 'METHOD_NOT_ALLOWED' }, { status: 405 });
+        const headers = new Headers(req.headers);
+        headers.set('content-type', 'application/json');
+        try { headers.delete('content-length'); } catch {}
+        const req2 = new Request(url.toString(), { method: 'POST', headers, body: bodyStr });
+        const res = await POST(req2);
+        try { res.headers.set('Cache-Control', 'no-store'); } catch {}
+        return res;
+      }
+    } catch {}
     // If org is selected, prefer token masked for that org; otherwise fallback to per-user store
     const innCookie = getSelectedOrgInn(req);
     if (innCookie) {

@@ -3,6 +3,8 @@
 import { use, useEffect, useMemo, useState } from 'react';
 import { applyAgentCommissionToCart } from '@/lib/pricing';
 import { Button } from '@/components/ui/Button';
+import { postJsonWithGetFallback } from '@/lib/postFallback';
+import { uploadPdfWithGetFallback } from '@/lib/chunkedUpload';
 
 export default function EditLinkPage(props: { params: Promise<{ code: string }> }) {
   const [hasToken, setHasToken] = useState<boolean | null>(null);
@@ -592,8 +594,7 @@ export default function EditLinkPage(props: { params: Promise<{ code: string }> 
                     if (f.size > 5*1024*1024) { showToast('Файл слишком большой. Загрузите файл размером до 5 МБ', 'error'); return; }
                     try {
                       setTermsUploading(true);
-                      const body = await f.arrayBuffer();
-                      const res = await fetch('/api/docs', { method:'POST', headers: { 'Content-Type': 'application/pdf', 'x-file-name': encodeURIComponent(f.name) }, body });
+                      const res = await uploadPdfWithGetFallback('/api/docs', f);
                       const d = await res.json();
                       if (!res.ok) {
                         const code = d?.error; if (code==='INVALID_FORMAT') showToast('Загрузите файл в формате PDF','error'); else if (code==='TOO_LARGE') showToast('Файл слишком большой. Загрузите файл размером до 5 МБ','error'); else showToast('Не удалось открыть файл. Попробуйте другой PDF','error');
@@ -671,7 +672,7 @@ export default function EditLinkPage(props: { params: Promise<{ code: string }> 
                                 if (!phoneDigits) return;
                                 setPartnerLoading(true);
                                 try {
-                                  const res = await fetch('/api/partners', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ phone: phoneDigits }) });
+                                  const res = await postJsonWithGetFallback('/api/partners', { phone: phoneDigits }, { timeoutPostMs: 20_000, timeoutGetMs: 20_000, postInit: { cache: 'no-store' }, fallbackStatuses: [500, 502, 504] });
                                   const d = await res.json();
                                   if (!res.ok) {
                                     const msg = d?.error || 'Не удалось добавить партнёра';

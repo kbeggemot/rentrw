@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { startRegistration as startWebAuthnReg, browserSupportsWebAuthn, platformAuthenticatorIsAvailable } from '@simplewebauthn/browser';
+import { postJsonWithGetFallback } from '@/lib/postFallback';
 
 type DefaultCommission = { type: 'percent' | 'fixed'; value: number } | null;
 type Passkey = { id: string; counter: number };
@@ -169,11 +170,7 @@ export default function SettingsClient({ initial, userId }: { initial: SettingsP
     setSaving(true);
     setMessage(null);
     try {
-      const res = await fetch('/api/settings/token', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token }),
-      });
+      const res = await postJsonWithGetFallback('/api/settings/token', { token }, { timeoutPostMs: 20_000, timeoutGetMs: 20_000, postInit: { cache: 'no-store' }, fallbackStatuses: [500, 502, 504] });
       const text = await res.text();
       let data: { token?: string; error?: string; inn?: string } | null = null;
       try { data = text ? (JSON.parse(text) as { token?: string; error?: string; inn?: string }) : null; } catch {}
@@ -242,7 +239,7 @@ export default function SettingsClient({ initial, userId }: { initial: SettingsP
       const supported = await browserSupportsWebAuthn();
       const platform = await platformAuthenticatorIsAvailable();
       if (!supported || !platform) throw new Error('Биометрия недоступна на этом устройстве');
-      const init = await fetch('/api/auth/webauthn/register', { method: 'POST' });
+      const init = await postJsonWithGetFallback('/api/auth/webauthn/register', {}, { timeoutPostMs: 20_000, timeoutGetMs: 20_000, postInit: { cache: 'no-store' }, fallbackStatuses: [500, 502, 504] });
       const { options, rpID, origin } = await init.json();
       const attResp = await startWebAuthnReg(options);
       const put = await fetch('/api/auth/webauthn/register', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ response: attResp, rpID, origin }) });
@@ -327,7 +324,7 @@ export default function SettingsClient({ initial, userId }: { initial: SettingsP
                     setEmailMsg(null);
                     try {
                       // Re-send verification to saved full email on server (no masked email in payload)
-                      const r = await fetch('/api/settings/email', { method: 'POST' });
+                      const r = await postJsonWithGetFallback('/api/settings/email', {}, { timeoutPostMs: 20_000, timeoutGetMs: 20_000, postInit: { cache: 'no-store', credentials: 'include' }, fallbackStatuses: [500, 502, 504] });
                       if (!r.ok) throw new Error('SEND_FAILED');
                       setEmailVerified(false);
                       setEmailPending(true);
@@ -363,11 +360,7 @@ export default function SettingsClient({ initial, userId }: { initial: SettingsP
                   setSavingEmail(true);
                   setMessage(null);
                   try {
-                    const r = await fetch('/api/settings/email', {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ email: emailValue.trim() }),
-                    });
+                    const r = await postJsonWithGetFallback('/api/settings/email', { email: emailValue.trim() }, { timeoutPostMs: 20_000, timeoutGetMs: 20_000, postInit: { cache: 'no-store', credentials: 'include' }, fallbackStatuses: [500, 502, 504] });
                     const t = await r.text();
                     const d = t ? JSON.parse(t) : {};
                     if (!r.ok) throw new Error(d?.error || t || 'Ошибка сохранения email');
@@ -422,7 +415,7 @@ export default function SettingsClient({ initial, userId }: { initial: SettingsP
                   setMessage(null);
                   setEmailMsg(null);
                   try {
-                    const r = await fetch('/api/settings/email/verify', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code: emailCode.trim() }) });
+                    const r = await postJsonWithGetFallback('/api/settings/email/verify', { code: emailCode.trim() }, { timeoutPostMs: 20_000, timeoutGetMs: 20_000, postInit: { cache: 'no-store', credentials: 'include' }, fallbackStatuses: [500, 502, 504] });
                     const t = await r.text();
                     const d = t ? JSON.parse(t) : {};
                     if (!r.ok) throw new Error(d?.error || t || 'Ошибка подтверждения');
@@ -451,7 +444,7 @@ export default function SettingsClient({ initial, userId }: { initial: SettingsP
                 disabled={resendIn > 0}
                 onClick={async () => {
                   try {
-                    const r = await fetch('/api/settings/email', { method: 'POST' });
+                    const r = await postJsonWithGetFallback('/api/settings/email', {}, { timeoutPostMs: 20_000, timeoutGetMs: 20_000, postInit: { cache: 'no-store', credentials: 'include' }, fallbackStatuses: [500, 502, 504] });
                     if (!r.ok) throw new Error('SEND_FAILED');
                     setEmailVerified(false);
                     setEmailPending(true);
@@ -504,7 +497,7 @@ export default function SettingsClient({ initial, userId }: { initial: SettingsP
                   if (b.length !== 9) throw new Error('INVALID_BIK');
                   if (a.length !== 20) throw new Error('INVALID_ACC');
                   if (!isValidAccount(b, a)) throw new Error('INVALID_ACC_KEY');
-                  const r = await fetch('/api/settings/payout', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ bik, account }) });
+                  const r = await postJsonWithGetFallback('/api/settings/payout', { bik, account }, { timeoutPostMs: 20_000, timeoutGetMs: 20_000, postInit: { cache: 'no-store', credentials: 'include' }, fallbackStatuses: [500, 502, 504] });
                   const t = await r.text();
                   let d: any = null; try { d = t ? JSON.parse(t) : null; } catch {}
                   if (!r.ok) throw new Error(d?.error || t || 'SAVE_FAILED');
@@ -544,11 +537,7 @@ export default function SettingsClient({ initial, userId }: { initial: SettingsP
                 onClick={async () => {
                   setSavingAgentDesc(true);
                   try {
-                    const r = await fetch('/api/settings/agent', {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ agentDescription: agentDesc }),
-                    });
+                    const r = await postJsonWithGetFallback('/api/settings/agent', { agentDescription: agentDesc }, { timeoutPostMs: 20_000, timeoutGetMs: 20_000, postInit: { cache: 'no-store', credentials: 'include' }, fallbackStatuses: [500, 502, 504] });
                     const t = await r.text();
                     let d: any = null; try { d = t ? JSON.parse(t) : null; } catch {}
                     if (!r.ok) throw new Error('SAVE_FAILED');
@@ -590,7 +579,7 @@ export default function SettingsClient({ initial, userId }: { initial: SettingsP
                       agentDescription: agentDesc,
                       defaultCommission: agentValue.trim().length > 0 ? { type: agentType, value: Number(agentValue) } : undefined,
                     };
-                    const r = await fetch('/api/settings/agent', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+                    const r = await postJsonWithGetFallback('/api/settings/agent', payload, { timeoutPostMs: 20_000, timeoutGetMs: 20_000, postInit: { cache: 'no-store', credentials: 'include' }, fallbackStatuses: [500, 502, 504] });
                     if (!r.ok) throw new Error('SAVE_FAILED');
                     setMessage('Сохранено');
                     try { showToast('Настройки сохранены', 'success'); } catch {}

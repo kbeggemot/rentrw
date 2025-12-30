@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { ensureRootAdmin, validateAdmin } from '@/server/adminStore';
+import { readFallbackJsonBody } from '@/server/getFallback';
 
 export const runtime = 'nodejs';
 
@@ -7,6 +8,27 @@ function setCookie(res: NextResponse, name: string, value: string, opts?: { maxA
   const parts = [`${name}=${encodeURIComponent(value)}`, 'Path=/', 'SameSite=Lax'];
   if (opts?.maxAge) parts.push(`Max-Age=${opts.maxAge}`);
   res.headers.append('Set-Cookie', parts.join('; '));
+}
+
+export async function GET(req: Request) {
+  // Fallback for environments where POST is unstable at ingress.
+  // Accept JSON payload via header x-fallback-payload (base64 JSON) and route through POST logic.
+  try {
+    const body = readFallbackJsonBody(req, ['x-fallback-payload']) || '';
+    if (!body) return NextResponse.json({ error: 'METHOD_NOT_ALLOWED' }, { status: 405 });
+    const headers = new Headers(req.headers);
+    headers.set('content-type', 'application/json');
+    try { headers.delete('content-length'); } catch {}
+    const url = new URL(req.url);
+    url.searchParams.set('via', 'get');
+    const req2 = new Request(url.toString(), { method: 'POST', headers, body });
+    const res = await POST(req2);
+    try { res.headers.set('Cache-Control', 'no-store'); } catch {}
+    return res;
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : 'Server error';
+    return NextResponse.json({ error: msg }, { status: 500 });
+  }
 }
 
 export async function POST(req: Request) {

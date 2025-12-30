@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { BrandMark } from '@/components/BrandMark';
+import { postJsonWithGetFallback } from '@/lib/postFallback';
 
 export default function ResetPasswordPage() {
   const params = useParams<{ token: string }>();
@@ -29,7 +30,7 @@ export default function ResetPasswordPage() {
     }
     setLoading(true);
     try {
-      const res = await fetch('/api/auth/reset/confirm', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token, password }) });
+      const res = await postJsonWithGetFallback('/api/auth/reset/confirm', { token, password });
       const t = await res.text();
       const d = t ? JSON.parse(t) : {};
       if (!res.ok) throw new Error(d?.error || t || 'ERROR');
