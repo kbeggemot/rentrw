@@ -1,11 +1,11 @@
-FROM node:20-alpine
+FROM node:24-alpine
 
 WORKDIR /app
 
 # Install deps first for better caching
 COPY package*.json ./
 COPY .npmrc ./
-RUN npm ci
+RUN npm ci --include=dev
 
 # Copy sources and build
 COPY . .
