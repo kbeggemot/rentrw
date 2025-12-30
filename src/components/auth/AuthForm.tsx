@@ -150,19 +150,51 @@ export function AuthForm() {
             await new Promise((r) => setTimeout(r, 250 + attempt * 350));
             continue;
           }
-          if (!res.ok) throw new Error(data?.error || 'AUTH_ERROR');
+          if (!res.ok) {
+            // In some environments POST may be broken at ingress (504/5xx). For login we will try GET fallback below.
+            if (!isRegister && endpoint === '/api/auth/login' && (res.status === 502 || res.status === 504 || res.status === 500)) break;
+            throw new Error(data?.error || 'AUTH_ERROR');
+          }
           break;
         } catch (e) {
           lastErr = e;
-          if ((e as any)?.name === 'AbortError' && attempt < 3) {
-            await new Promise((r) => setTimeout(r, 250 + attempt * 350));
-            continue;
+          if ((e as any)?.name === 'AbortError') {
+            // For login we prefer switching to GET fallback rather than waiting multiple 20s POST attempts.
+            if (!isRegister && endpoint === '/api/auth/login') break;
+            if (attempt < 3) {
+              await new Promise((r) => setTimeout(r, 250 + attempt * 350));
+              continue;
+            }
           }
           throw e;
         } finally {
           try { window.clearTimeout(t); } catch {}
         }
       }
+
+      // Hotfix fallback: in some environments POST can be unstable at ingress (504/timeouts), while GET works.
+      // For login only (to avoid putting credentials in URL), try GET with Authorization: Basic.
+      if (!isRegister && endpoint === '/api/auth/login') {
+        if (!res || !res.ok) {
+          const controller = new AbortController();
+          const t = window.setTimeout(() => controller.abort(), 20_000);
+          try {
+            const basic = typeof window !== 'undefined' ? window.btoa(unescape(encodeURIComponent(`${phone}:${password}`))) : '';
+            res = await fetch(endpoint + '?via=get', {
+              method: 'GET',
+              cache: 'no-store',
+              headers: { Authorization: `Basic ${basic}` },
+              signal: controller.signal,
+            });
+            const text = await res.text();
+            try { data = text ? (JSON.parse(text) as { error?: string }) : null; } catch { data = null; }
+            if (!res.ok) throw new Error(data?.error || 'AUTH_ERROR');
+          } finally {
+            try { window.clearTimeout(t); } catch {}
+          }
+        }
+      }
+
       if (!res) throw (lastErr instanceof Error ? lastErr : new Error('AUTH_ERROR'));
       const requireEmail = emailFlag === '1';
       if (isRegister && requireEmail && !awaitCode) {
