@@ -166,7 +166,7 @@ export default async function AdminSaleEditor(props: { params: Promise<{ uid: st
             </div>
           </div>
 
-          <form action={`/admin/sales/${encodeURIComponent(p.uid)}/${encodeURIComponent(p.task)}/save`} method="post" className="space-y-3">
+          <form action={`/admin/sales/${encodeURIComponent(p.uid)}/${encodeURIComponent(p.task)}/save`} method="get" className="space-y-3">
             <input type="hidden" name="uid" defaultValue={p.uid} />
             <input type="hidden" name="taskId" defaultValue={p.task} />
             <div className="grid grid-cols-2 gap-3">
@@ -239,7 +239,7 @@ export default async function AdminSaleEditor(props: { params: Promise<{ uid: st
             <h2 className="text-lg font-semibold mb-2">Действия</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               <div>
-                <form action="/api/admin/actions/instant-resend" method="post">
+                <form action="/api/admin/actions/instant-resend" method="get">
                   <input type="hidden" name="userId" defaultValue={p.uid} />
                   <input type="hidden" name="taskId" defaultValue={p.task} />
                   <button className="px-3 py-2 border rounded inline-block" type="submit">Переотправить письмо выдачи</button>
@@ -255,9 +255,7 @@ export default async function AdminSaleEditor(props: { params: Promise<{ uid: st
                 <div className="text-xs text-gray-600 mt-1">Опрос OFD по orderId: пытается найти чеки по присвоенным InvoiceId, подтягивает ReceiptId/URL (предоплата и полный), обновляет запись.</div>
               </div>
               <div>
-                <form action={`/api/admin/actions/ofd/repair-one?user=${encodeURIComponent(p.uid)}&order=${encodeURIComponent(String(item.orderId).match(/(\d+)/g)?.slice(-1)[0] || String(item.orderId))}`} method="post">
-                  <button className="px-3 py-2 border rounded inline-block" type="submit">Repair OFD (этот заказ)</button>
-                </form>
+                <a className="px-3 py-2 border rounded inline-block" href={`/api/admin/actions/ofd/repair-one?user=${encodeURIComponent(p.uid)}&order=${encodeURIComponent(String(item.orderId).match(/(\d+)/g)?.slice(-1)[0] || String(item.orderId))}`} target="_blank" rel="noreferrer">Repair OFD (этот заказ)</a>
                 <div className="text-xs text-gray-600 mt-1">Принудительный repair только для этой продажи: достроит ссылки по имеющимся ReceiptId и создаст чек при необходимости.</div>
               </div>
               <div>
@@ -269,27 +267,27 @@ export default async function AdminSaleEditor(props: { params: Promise<{ uid: st
                 <div className="text-xs text-gray-600 mt-1">Принудительно создаёт чек полного расчёта. Используется назначенный InvoiceId C (invoiceIdFull) или логика полного расчёта; результат сохраняется в ofdFullId/ofdFullUrl.</div>
               </div>
               <div>
-                <form action="/api/admin/actions/pay" method="post"><input type="hidden" name="userId" defaultValue={p.uid} /><input type="hidden" name="taskId" defaultValue={p.task} /><button className="px-3 py-2 border rounded" type="submit">Pay RW</button></form>
+                <a className="px-3 py-2 border rounded inline-block" href={`/api/admin/actions/pay?userId=${encodeURIComponent(p.uid)}&taskId=${encodeURIComponent(String(p.task))}`} target="_blank" rel="noreferrer">Pay RW</a>
                 <div className="text-xs text-gray-600 mt-1">Фоново отправляет PATCH /tasks/{`{id}`}/pay в Rocketwork для данной продажи (userId/taskId).</div>
               </div>
               <div>
-                <form action="/api/admin/actions/ofd/sync-by-id" method="post"><input type="hidden" name="userId" defaultValue={p.uid} /><input type="hidden" name="invoiceId" defaultValue={item.invoiceIdPrepay||''} /><button className="px-3 py-2 border rounded" type="submit">Sync Inv A</button></form>
+                <a className="px-3 py-2 border rounded inline-block" href={`/api/admin/actions/ofd/sync-by-id?userId=${encodeURIComponent(p.uid)}&invoiceId=${encodeURIComponent(String(item.invoiceIdPrepay||''))}`} target="_blank" rel="noreferrer">Sync Inv A</a>
                 <div className="text-xs text-gray-600 mt-1">Синхронизация по InvoiceId A (предоплата): запрашивает статус в OFD и, если найден чек, сохраняет ofdPrepayId/ofdUrl.</div>
               </div>
               <div>
-                <form action="/api/admin/actions/ofd/sync-by-id" method="post"><input type="hidden" name="userId" defaultValue={p.uid} /><input type="hidden" name="invoiceId" defaultValue={item.invoiceIdOffset||''} /><button className="px-3 py-2 border rounded" type="submit">Sync Inv B</button></form>
+                <a className="px-3 py-2 border rounded inline-block" href={`/api/admin/actions/ofd/sync-by-id?userId=${encodeURIComponent(p.uid)}&invoiceId=${encodeURIComponent(String(item.invoiceIdOffset||''))}`} target="_blank" rel="noreferrer">Sync Inv B</a>
                 <div className="text-xs text-gray-600 mt-1">Синхронизация по InvoiceId B (зачёт предоплаты): ищет чек полного расчёта по зачёту и сохраняет ofdFullId/ofdFullUrl.</div>
               </div>
               <div>
-                <form action="/api/admin/actions/ofd/sync-by-id" method="post"><input type="hidden" name="userId" defaultValue={p.uid} /><input type="hidden" name="invoiceId" defaultValue={item.invoiceIdFull||''} /><button className="px-3 py-2 border rounded" type="submit">Sync Inv C</button></form>
+                <a className="px-3 py-2 border rounded inline-block" href={`/api/admin/actions/ofd/sync-by-id?userId=${encodeURIComponent(p.uid)}&invoiceId=${encodeURIComponent(String(item.invoiceIdFull||''))}`} target="_blank" rel="noreferrer">Sync Inv C</a>
                 <div className="text-xs text-gray-600 mt-1">Синхронизация по InvoiceId C (полный расчёт «день‑в‑день»): сохраняет ofdFullId/ofdFullUrl, если чек найден.</div>
               </div>
               <div>
-                <form action="/api/admin/actions/ofd/sync-by-receipt" method="post"><input type="hidden" name="userId" defaultValue={p.uid} /><input type="hidden" name="orderId" defaultValue={String(item.orderId)} /><input type="hidden" name="target" defaultValue="prepay" /><input type="hidden" name="receiptId" defaultValue={item.ofdPrepayId||''} /><button className="px-3 py-2 border rounded" type="submit">Sync RID A</button></form>
+                <a className="px-3 py-2 border rounded inline-block" href={`/api/admin/actions/ofd/sync-by-receipt?userId=${encodeURIComponent(p.uid)}&orderId=${encodeURIComponent(String(item.orderId))}&target=prepay&receiptId=${encodeURIComponent(String(item.ofdPrepayId||''))}`} target="_blank" rel="noreferrer">Sync RID A</a>
                 <div className="text-xs text-gray-600 mt-1">Синхронизация по ReceiptId предоплаты: обновляет URL и фиксирует состояние чека предоплаты.</div>
               </div>
               <div>
-                <form action="/api/admin/actions/ofd/sync-by-receipt" method="post"><input type="hidden" name="userId" defaultValue={p.uid} /><input type="hidden" name="orderId" defaultValue={String(item.orderId)} /><input type="hidden" name="target" defaultValue="full" /><input type="hidden" name="receiptId" defaultValue={item.ofdFullId||''} /><button className="px-3 py-2 border rounded" type="submit">Sync RID F</button></form>
+                <a className="px-3 py-2 border rounded inline-block" href={`/api/admin/actions/ofd/sync-by-receipt?userId=${encodeURIComponent(p.uid)}&orderId=${encodeURIComponent(String(item.orderId))}&target=full&receiptId=${encodeURIComponent(String(item.ofdFullId||''))}`} target="_blank" rel="noreferrer">Sync RID F</a>
                 <div className="text-xs text-gray-600 mt-1">Синхронизация по ReceiptId полного расчёта: обновляет URL и статус полного чека.</div>
               </div>
             </div>

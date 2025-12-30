@@ -43,7 +43,7 @@ export default async function AdminOrgEditor(props: { params: Promise<{ inn: str
         <div className="text-sm text-gray-600">Запись не найдена</div>
       ) : (
         <>
-          <form action={`/admin/orgs/${encodeURIComponent(p.inn)}/save`} method="post" className="space-y-3">
+          <form action={`/admin/orgs/${encodeURIComponent(p.inn)}/save`} method="get" className="space-y-3">
             <input type="hidden" name="inn" defaultValue={p.inn} />
             <div className="grid grid-cols-2 gap-3">
               <label className="block text-sm col-span-2">Название<input name="name" defaultValue={item.name||''} className="w-full border rounded px-2 py-1" /></label>
@@ -60,7 +60,7 @@ export default async function AdminOrgEditor(props: { params: Promise<{ inn: str
               <div className="text-sm border rounded p-3 inline-block">
                 <div className="mb-1">БИК: <b>{(item as any)?.payoutBik || '—'}</b></div>
                 <div className="mb-2">Счёт: <b>{(item as any)?.payoutAccount || '—'}</b></div>
-                <form action="/api/admin/data/orgs/payout/delete" method="post">
+                <form action="/api/admin/data/orgs/payout/delete" method="get">
                   <input type="hidden" name="inn" defaultValue={p.inn} />
                   <label className="flex items-center gap-2 text-xs mb-2"><input type="checkbox" name="confirm" value="yes" required /> Подтверждаю удаление реквизитов</label>
                   <button type="submit" className="px-3 py-2 border rounded text-red-600">Удалить реквизиты</button>

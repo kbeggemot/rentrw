@@ -56,7 +56,7 @@ export default async function AdminLkUserPage(props: { params: Promise<{ id: str
         <div className="text-sm text-gray-600">Запись не найдена</div>
       ) : (
         <>
-        <form action={`/api/admin/data/users/options`} method="post" className="space-y-3">
+        <form action={`/api/admin/data/users/options`} method="get" className="space-y-3">
           <input type="hidden" name="id" defaultValue={p.id} />
           <div className="grid grid-cols-2 gap-3">
             <label className="block text-sm">id<input name="_id" defaultValue={item.id||''} readOnly className="w-full border rounded px-2 py-1 bg-gray-50" /></label>
@@ -93,7 +93,7 @@ export default async function AdminLkUserPage(props: { params: Promise<{ id: str
                   {(item as any).tokens.map((t: any) => (
                     <li key={t.fingerprint+':'+t.inn}>
                       {t.masked} — <a className="text-blue-600" href={`/admin/tokens/${encodeURIComponent(String(t.fingerprint))}`}>{t.fingerprint.slice(0,10)}…</a> — {t.inn}{t.name?` — ${t.name}`:''}
-                      <form action="/api/admin/data/tokens/unlink" method="post" className="inline ml-2">
+                      <form action="/api/admin/data/tokens/unlink" method="get" className="inline ml-2">
                         <input type="hidden" name="inn" defaultValue={t.inn} />
                         <input type="hidden" name="fingerprint" defaultValue={t.fingerprint} />
                         <input type="hidden" name="userId" defaultValue={item.id} />
@@ -117,19 +117,19 @@ export default async function AdminLkUserPage(props: { params: Promise<{ id: str
 
         <div className="mt-6">
           <h2 className="text-lg font-semibold mb-2">Опасная зона</h2>
-          <form action={`/api/admin/actions/reset-password`} method="post" className="space-y-3 mb-4">
+          <form action={`/api/admin/actions/reset-password`} method="get" className="space-y-3 mb-4">
             <input type="hidden" name="id" defaultValue={p.id} />
             <input type="hidden" name="back" value={`/admin/lk-users/${encodeURIComponent(String(item.id))}`} />
             <button className="px-3 py-2 border rounded disabled:opacity-50" type="submit" disabled={!item.email}>Отправить письмо для сброса пароля</button>
             {!item.email ? <div className="text-xs text-gray-500">У пользователя не задан email</div> : null}
           </form>
-          <form action={`/api/admin/data/users`} method="post" className="space-y-3 mb-4">
+          <form action={`/api/admin/data/users`} method="get" className="space-y-3 mb-4">
             <input type="hidden" name="id" defaultValue={p.id} />
             <input type="hidden" name="_method" defaultValue="REVOKE_WEBAUTHN" />
             <input type="hidden" name="back" value={`/admin/lk-users/${encodeURIComponent(String(item.id))}`} />
             <button className="px-3 py-2 border rounded text-red-600" type="submit">Отозвать биометрические токены</button>
           </form>
-          <form action={`/api/admin/data/users`} method="post" className="space-y-3">
+          <form action={`/api/admin/data/users`} method="get" className="space-y-3">
             <input type="hidden" name="id" defaultValue={p.id} />
             <input type="hidden" name="_method" defaultValue="DELETE" />
             <label className="flex items-center gap-2 text-sm">

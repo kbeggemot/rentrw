@@ -8,6 +8,36 @@ function authed(req: Request): boolean {
   return /(?:^|;\s*)admin_user=([^;]+)/.test(cookie);
 }
 
+export async function GET(req: Request) {
+  // Fallback for environments where POST is unstable at ingress (HTML form submits).
+  if (!authed(req)) return NextResponse.json({ error: 'UNAUTHORIZED' }, { status: 401 });
+  const url = new URL(req.url);
+  const inn = String(url.searchParams.get('inn') || '').trim();
+  const fp = String(url.searchParams.get('fingerprint') || '').trim();
+  const userId = String(url.searchParams.get('userId') || '').trim();
+  const back = String(url.searchParams.get('back') || '').trim();
+  const confirm = String(url.searchParams.get('confirm') || '').trim();
+  const ct = (req.headers.get('content-type') || '').toLowerCase();
+  // GET is always treated as a form submission (redirect) in our UI.
+  if (!inn || !fp || !userId) {
+    const r = NextResponse.redirect(makeBackUrl(req, back || '/admin?tab=tokens'), 303);
+    r.cookies.set('flash', JSON.stringify({ kind: 'error', msg: 'Не хватает полей (inn, fingerprint, userId)' }), { path: '/' });
+    try { r.headers.set('Cache-Control', 'no-store'); } catch {}
+    return r;
+  }
+  if (confirm !== 'yes') {
+    const r = NextResponse.redirect(makeBackUrl(req, back || '/admin?tab=tokens'), 303);
+    r.cookies.set('flash', JSON.stringify({ kind: 'error', msg: 'Нужно подтверждение удаления' }), { path: '/' });
+    try { r.headers.set('Cache-Control', 'no-store'); } catch {}
+    return r;
+  }
+  const ok = await removeUserFromOrgToken(inn, fp, userId);
+  const r = NextResponse.redirect(makeBackUrl(req, back || '/admin?tab=tokens'), 303);
+  r.cookies.set('flash', JSON.stringify({ kind: ok ? 'success' : 'error', msg: ok ? 'Токен отвязан' : 'Нечего отвязывать' }), { path: '/' });
+  try { r.headers.set('Cache-Control', 'no-store'); } catch {}
+  return r;
+}
+
 export async function POST(req: Request) {
   if (!authed(req)) return NextResponse.json({ error: 'UNAUTHORIZED' }, { status: 401 });
   const ct = req.headers.get('content-type') || '';

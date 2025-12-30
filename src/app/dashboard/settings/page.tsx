@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
+import { postJsonWithGetFallback } from '@/lib/postFallback';
 
 type Passkey = { id: string; counter: number };
 
@@ -33,10 +34,11 @@ export default function SettingsPage() {
 		setSaving(true);
 		setMessage(null);
 		try {
-			const res = await fetch('/api/settings/token', {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ token }),
+			const res = await postJsonWithGetFallback('/api/settings/token', { token }, {
+				timeoutPostMs: 12_000,
+				timeoutGetMs: 15_000,
+				postInit: { cache: 'no-store' },
+				fallbackStatuses: [500, 502, 504],
 			});
 			const text = await res.text();
 			let data: { token?: string; error?: string } | null = null;

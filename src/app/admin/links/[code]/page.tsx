@@ -28,7 +28,7 @@ export default async function AdminLinkEditor(props: { params: Promise<{ code: s
       {!item ? (
         <div className="text-sm text-gray-600">Запись не найдена</div>
       ) : (
-        <form action={`/admin/links/${encodeURIComponent(p.code)}/save`} method="post" className="space-y-3">
+        <form action={`/admin/links/${encodeURIComponent(p.code)}/save`} method="get" className="space-y-3">
           <input type="hidden" name="code" defaultValue={p.code} />
           <div className="grid grid-cols-2 gap-3">
             <label className="block text-sm">orgInn<input name="orgInn" defaultValue={item.orgInn||''} className="w-full border rounded px-2 py-1" /></label>

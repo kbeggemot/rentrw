@@ -13,14 +13,8 @@ export default function InstantResendLink(props: { userId: string | null | undef
     if (!confirm('Переотправить письмо выдачи?')) return;
     setLoading(true);
     try {
-      const body = new URLSearchParams();
-      body.set('userId', userId);
-      body.set('taskId', taskId);
-      const res = await fetch('/api/admin/actions/instant-resend', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body,
-      });
+      const url = `/api/admin/actions/instant-resend?userId=${encodeURIComponent(userId)}&taskId=${encodeURIComponent(taskId)}`;
+      const res = await fetch(url, { method: 'GET', cache: 'no-store' });
       showToast(res.ok ? 'Письмо переотправлено' : 'Не удалось переотправить', res.ok);
     } catch {
       showToast('Не удалось переотправить', false);

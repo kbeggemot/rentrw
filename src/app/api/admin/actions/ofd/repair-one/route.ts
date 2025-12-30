@@ -9,6 +9,11 @@ function isAuthed(req: Request): boolean {
   return /(?:^|;\s*)admin_user=([^;]+)/.test(cookie);
 }
 
+export async function GET(req: Request) {
+  // Fallback for environments where POST is unstable at ingress.
+  return await POST(req);
+}
+
 export async function POST(req: Request) {
   try {
     if (!isAuthed(req)) return NextResponse.json({ error: 'UNAUTHORIZED' }, { status: 401 });

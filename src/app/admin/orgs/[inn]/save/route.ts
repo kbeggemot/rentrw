@@ -20,6 +20,33 @@ async function writeStore(s: OrgStore): Promise<void> {
   await writeText('.data/orgs.json', JSON.stringify(s, null, 2));
 }
 
+export async function GET(req: Request) {
+  if (!authed(req)) return NextResponse.redirect(new URL('/admin', req.url));
+  const url = new URL(req.url);
+  const sp = url.searchParams;
+  const inn = String(sp.get('inn') || '').replace(/\D/g,'');
+  const name = String(sp.get('name') || '').trim() || null;
+  const s = await readStore();
+  if (!s.orgs) s.orgs = {} as any;
+  const cur = (s.orgs as any)[inn];
+  if (!cur) return NextResponse.redirect(new URL('/admin', req.url));
+  const next: any = { ...cur, name, updatedAt: new Date().toISOString() };
+  (s.orgs as any)[inn] = next;
+  await writeStore(s);
+  const path = `/admin/orgs/${encodeURIComponent(inn)}`;
+  const setFlash = (res: Response) => { try { (res as any).headers?.set('Set-Cookie', `flash=ORG_SAVED; Path=/; Max-Age=5; SameSite=Lax`); } catch {} return res; };
+  const xfProto = req.headers.get('x-forwarded-proto');
+  const xfHost = req.headers.get('x-forwarded-host');
+  const host = req.headers.get('host');
+  if (xfProto && (xfHost || host)) {
+    const proto = xfProto.split(',')[0].trim();
+    const h = (xfHost || host)!.split(',')[0].trim();
+    const abs = new URL(path, `${proto}://${h}`);
+    return setFlash(NextResponse.redirect(abs, 303));
+  }
+  return setFlash(NextResponse.redirect(path, 303));
+}
+
 export async function POST(req: Request) {
   if (!authed(req)) return NextResponse.redirect(new URL('/admin', req.url));
   const body = await req.formData();

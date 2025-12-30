@@ -38,7 +38,7 @@ export default async function AdminWithdrawalPage(props: { params: Promise<{ id:
             <div>paidAt: <b>{data.rec.paidAt?new Date(data.rec.paidAt).toLocaleString('ru-RU',{timeZone:'Europe/Moscow'}):'—'}</b></div>
           </div>
           <div className="mt-3">
-            <form action="/api/admin/actions/withdrawal/refresh" method="post" className="inline-flex items-center gap-2">
+            <form action="/api/admin/actions/withdrawal/refresh" method="get" className="inline-flex items-center gap-2">
               <input type="hidden" name="taskId" defaultValue={String(data.rec.taskId)} />
               <input type="hidden" name="userId" defaultValue={String(data.rec.userId)} />
               <input type="hidden" name="back" defaultValue={`/admin/withdrawals/${encodeURIComponent(String(data.rec.taskId))}?user=${encodeURIComponent(String(data.rec.userId))}`} />

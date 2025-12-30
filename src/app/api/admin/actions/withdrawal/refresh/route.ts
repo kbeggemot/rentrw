@@ -18,6 +18,28 @@ function makeBackUrl(req: Request, path: string): string {
   } catch { return path; }
 }
 
+export async function GET(req: Request) {
+  if (!authed(req)) return NextResponse.json({ error: 'UNAUTHORIZED' }, { status: 401 });
+  const url = new URL(req.url);
+  const userId = String(url.searchParams.get('userId') || '').trim();
+  const taskId = String(url.searchParams.get('taskId') || '').trim();
+  const back = String(url.searchParams.get('back') || `/admin/withdrawals/${encodeURIComponent(taskId)}`);
+  if (!userId || !taskId) return NextResponse.json({ error: 'MISSING' }, { status: 400 });
+  const proto = req.headers.get('x-forwarded-proto') || 'https';
+  const host = req.headers.get('x-forwarded-host') || req.headers.get('host') || '';
+  const base = `${proto}://${host}`;
+  const u = `${base}/api/rocketwork/withdrawal-status/${encodeURIComponent(taskId)}`;
+  try {
+    const r = await fetch(u, { cache: 'no-store', headers: { cookie: req.headers.get('cookie') || '', 'x-user-id': userId } });
+    const d = await r.json().catch(()=>({}));
+    await appendWithdrawalLog(userId, taskId, `manual refresh -> ${JSON.stringify(d)}`, 'manual');
+  } catch {}
+  const res = NextResponse.redirect(makeBackUrl(req, back), 303);
+  res.cookies.set('flash', JSON.stringify({ kind: 'success', msg: 'Статус обновлён' }), { path: '/' });
+  try { res.headers.set('Cache-Control', 'no-store'); } catch {}
+  return res;
+}
+
 export async function POST(req: Request) {
   if (!authed(req)) return NextResponse.json({ error: 'UNAUTHORIZED' }, { status: 401 });
   const fd = await req.formData();

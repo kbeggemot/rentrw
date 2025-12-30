@@ -10,15 +10,35 @@ function isAuthed(req: Request): boolean {
   return /(?:^|;\s*)admin_user=([^;]+)/.test(cookie);
 }
 
+async function parsePayload(req: Request): Promise<{ userId: string; invoiceId: string }> {
+  const url = new URL(req.url);
+  if (req.method === 'GET') {
+    return { userId: String(url.searchParams.get('userId') || '').trim(), invoiceId: String(url.searchParams.get('invoiceId') || '').trim() };
+  }
+  const ct = (req.headers.get('content-type') || '').toLowerCase();
+  if (ct.includes('application/json')) {
+    const body = await req.json().catch(() => ({} as any));
+    return { userId: String(body?.userId || '').trim(), invoiceId: String(body?.invoiceId || '').trim() };
+  }
+  const fd = await req.formData().catch(() => null);
+  return {
+    userId: String(fd?.get('userId') || url.searchParams.get('userId') || '').trim(),
+    invoiceId: String(fd?.get('invoiceId') || url.searchParams.get('invoiceId') || '').trim(),
+  };
+}
+
+export async function GET(req: Request) {
+  // Fallback for environments where POST is unstable at ingress.
+  return await POST(req);
+}
+
 export async function POST(req: Request) {
   try {
     if (!isAuthed(req)) return NextResponse.json({ error: 'UNAUTHORIZED' }, { status: 401 });
     const m = /(?:^|;\s*)admin_user=([^;]+)/.exec(req.headers.get('cookie') || '');
     const admin = m ? await getAdminByUsername(decodeURIComponent(m[1])) : null;
     if (!admin || admin.role !== 'superadmin') return NextResponse.json({ error: 'FORBIDDEN' }, { status: 403 });
-    const body = await req.json().catch(()=>({} as any));
-    const userId = String(body?.userId || '').trim();
-    const invoiceId = String(body?.invoiceId || '').trim();
+    const { userId, invoiceId } = await parsePayload(req);
     if (!userId || !invoiceId) return NextResponse.json({ error: 'MISSING' }, { status: 400 });
     const sales = await listSales(userId);
     const sale = sales.find((s) => s.invoiceIdPrepay === invoiceId || s.invoiceIdOffset === invoiceId || s.invoiceIdFull === invoiceId);

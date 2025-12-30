@@ -50,17 +50,41 @@ function b64ToUtf8(raw: string): string {
 export async function GET(req: Request) {
   // Fallback for environments where POST is unstable at ingress.
   // Prefer no body; optional initData can be passed via header `x-tg-initdata` as base64.
+  // Also supports generic `x-fallback-payload` (base64(JSON)) used by the shared client helper.
   try {
+    const url = new URL(req.url);
+    if (url.searchParams.get('via') !== 'get') {
+      // Avoid accidental side effects (e.g. prefetch) — this GET is only for fallback.
+      return NextResponse.json({ ok: false, error: 'METHOD_NOT_ALLOWED' }, { status: 405 });
+    }
+
     const initHdr = req.headers.get('x-tg-initdata') || '';
     let initData = '';
     try { initData = initHdr ? b64ToUtf8(initHdr) : ''; } catch { initData = ''; }
+    if (!initData) {
+      // Try generic payload header: base64(JSON.stringify({ initData }))
+      const fb = req.headers.get('x-fallback-payload') || '';
+      if (fb) {
+        try {
+          const txt = b64ToUtf8(fb);
+          try {
+            const obj = txt ? JSON.parse(txt) : null;
+            if (obj && typeof obj === 'object' && typeof (obj as any).initData === 'string') initData = String((obj as any).initData || '');
+          } catch {
+            // If payload is not JSON, treat decoded string as initData
+            initData = String(txt || '');
+          }
+        } catch {}
+      }
+    }
     const headers = new Headers(req.headers);
     headers.set('content-type', 'application/json');
     try { headers.delete('content-length'); } catch {}
-    const url = new URL(req.url);
-    url.searchParams.set('via', 'get');
+    headers.set('x-fallback-method', 'GET');
     const req2 = new Request(url.toString(), { method: 'POST', headers, body: JSON.stringify({ initData }) });
-    return await POST(req2);
+    const res = await POST(req2);
+    try { res.headers.set('Cache-Control', 'no-store'); } catch {}
+    return res;
   } catch {
     return NextResponse.json({ ok: false, error: 'SERVER_ERROR' }, { status: 500 });
   }

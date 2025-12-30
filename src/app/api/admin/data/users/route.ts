@@ -37,6 +37,61 @@ function makeBackUrl(req: Request, path: string): string {
 
 export async function GET(req: Request) {
   if (!authed(req)) return NextResponse.json({ error: 'UNAUTHORIZED' }, { status: 401 });
+  const url = new URL(req.url);
+  const method = String(url.searchParams.get('_method') || '').toUpperCase();
+  if (method) {
+    // Allow admin actions via GET as a mitigation when POST is unstable at ingress.
+    if (method === 'PATCH') {
+      const id = String(url.searchParams.get('id') || '').trim();
+      if (!id) return NextResponse.json({ error: 'MISSING' }, { status: 400 });
+      const emailVerified = url.searchParams.get('emailVerified');
+      const email = url.searchParams.get('email');
+      const phone = url.searchParams.get('phone');
+      const showAll = url.searchParams.get('showAll');
+      const back = String(url.searchParams.get('back') || `/admin/lk-users/${encodeURIComponent(id)}`);
+      if (emailVerified !== null) await setUserEmailVerified(id, String(emailVerified) === 'true');
+      if (typeof email === 'string' && email) await updateUserEmail(id, String(email));
+      if (typeof phone === 'string' && phone) await updateUserPhone(id, String(phone));
+      if (showAll !== null) {
+        const v = String(showAll);
+        await setShowAllDataFlag(id, v === 'true' || v === '1' || v === 'on');
+      }
+      const r = NextResponse.redirect(makeBackUrl(req, back), 303);
+      r.cookies.set('flash', JSON.stringify({ kind: 'success', msg: 'Изменения сохранены' }), { path: '/' });
+      try { r.headers.set('Cache-Control', 'no-store'); } catch {}
+      return r;
+    }
+    if (method === 'REVOKE_WEBAUTHN') {
+      const id = String(url.searchParams.get('id') || '').trim();
+      if (!id) return NextResponse.json({ error: 'MISSING' }, { status: 400 });
+      const count = await revokeAllCredentialsForUser(id);
+      const back = String(url.searchParams.get('back') || `/admin/lk-users/${encodeURIComponent(id)}`);
+      const r = NextResponse.redirect(makeBackUrl(req, back), 303);
+      r.cookies.set('flash', JSON.stringify({ kind: 'success', msg: `Отозваны биометрические токены: ${count}` }), { path: '/' });
+      try { r.headers.set('Cache-Control', 'no-store'); } catch {}
+      return r;
+    }
+    if (method === 'DELETE') {
+      const id = String(url.searchParams.get('id') || '').trim();
+      const confirm = String(url.searchParams.get('confirm') || '').trim().toLowerCase();
+      if (!id) return NextResponse.json({ error: 'MISSING' }, { status: 400 });
+      const back = String(url.searchParams.get('back') || `/admin/lk-users/${encodeURIComponent(id)}`);
+      if (confirm !== 'yes') {
+        const r = NextResponse.redirect(makeBackUrl(req, back), 303);
+        r.cookies.set('flash', JSON.stringify({ kind: 'error', msg: 'Нужно подтверждение удаления' }), { path: '/' });
+        try { r.headers.set('Cache-Control', 'no-store'); } catch {}
+        return r;
+      }
+      const u = await readUsers();
+      const list = Array.isArray(u.users) ? u.users : [];
+      const next = list.filter((x) => x.id !== id);
+      await writeText('.data/users.json', JSON.stringify({ users: next }, null, 2));
+      const r = NextResponse.redirect(makeBackUrl(req, '/admin?tab=lk_users'), 303);
+      r.cookies.set('flash', JSON.stringify({ kind: 'success', msg: 'Пользователь удалён' }), { path: '/' });
+      try { r.headers.set('Cache-Control', 'no-store'); } catch {}
+      return r;
+    }
+  }
   const [usersFile, orgsFile] = await Promise.all([readUsers(), readOrgs()]);
   const users = Array.isArray(usersFile.users) ? usersFile.users : [];
   const orgs = (orgsFile.orgs && typeof orgsFile.orgs === 'object') ? orgsFile.orgs : {} as any;

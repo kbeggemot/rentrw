@@ -4,6 +4,7 @@ import path from 'path';
 import { resolveRwTokenWithFingerprint } from '@/server/rwToken';
 import { getSelectedOrgInn } from '@/server/orgContext';
 import { fetchTextWithTimeout, fireAndForgetFetch } from '@/server/http';
+import { readFallbackJsonBody } from '@/server/getFallback';
 
 export const runtime = 'nodejs';
 
@@ -215,5 +216,34 @@ export async function POST(req: Request) {
     try { if (deadlineTimer) clearTimeout(deadlineTimer); } catch {}
     finish(String(msg || 'Server error'));
     return NextResponse.json({ error: msg, traceId }, { status: 500 });
+  }
+}
+
+export async function GET(req: Request) {
+  // Fallback for environments where POST is unstable at ingress.
+  try {
+    const url = new URL(req.url);
+    if (url.searchParams.get('via') !== 'get') {
+      const r = NextResponse.json({ error: 'METHOD_NOT_ALLOWED' }, { status: 405 });
+      try { r.headers.set('Cache-Control', 'no-store'); } catch {}
+      return r;
+    }
+    const bodyStr = readFallbackJsonBody(req, ['x-fallback-payload']) || '';
+    if (!bodyStr) {
+      const r = NextResponse.json({ error: 'MISSING_PAYLOAD' }, { status: 400 });
+      try { r.headers.set('Cache-Control', 'no-store'); } catch {}
+      return r;
+    }
+    const headers = new Headers(req.headers);
+    headers.set('content-type', 'application/json');
+    try { headers.delete('content-length'); } catch {}
+    headers.set('x-fallback-method', 'GET');
+    const req2 = new Request(url.toString(), { method: 'POST', headers, body: bodyStr });
+    const res = await POST(req2);
+    try { res.headers.set('Cache-Control', 'no-store'); } catch {}
+    return res;
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : 'Server error';
+    return NextResponse.json({ error: 'SERVER_ERROR', message: msg }, { status: 500 });
   }
 }

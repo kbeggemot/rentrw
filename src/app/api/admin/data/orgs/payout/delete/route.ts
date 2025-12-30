@@ -18,6 +18,25 @@ function makeBackUrl(req: Request, path: string): string {
   } catch { return path; }
 }
 
+export async function GET(req: Request) {
+  if (!authed(req)) return NextResponse.json({ error: 'UNAUTHORIZED' }, { status: 401 });
+  const url = new URL(req.url);
+  const inn = String(url.searchParams.get('inn') || '').replace(/\D/g, '');
+  const confirm = String(url.searchParams.get('confirm') || '').trim().toLowerCase();
+  if (!inn) return NextResponse.json({ error: 'NO_INN' }, { status: 400 });
+  if (confirm !== 'yes') {
+    const r = NextResponse.redirect(makeBackUrl(req, `/admin/orgs/${encodeURIComponent(inn)}`), 303);
+    r.cookies.set('flash', JSON.stringify({ kind: 'error', msg: 'Нужно подтверждение удаления реквизитов' }), { path: '/' });
+    try { r.headers.set('Cache-Control', 'no-store'); } catch {}
+    return r;
+  }
+  await updateOrgPayoutRequisites(inn, { bik: null, account: null });
+  const r = NextResponse.redirect(makeBackUrl(req, `/admin/orgs/${encodeURIComponent(inn)}`), 303);
+  r.cookies.set('flash', JSON.stringify({ kind: 'success', msg: 'Реквизиты удалены' }), { path: '/' });
+  try { r.headers.set('Cache-Control', 'no-store'); } catch {}
+  return r;
+}
+
 export async function POST(req: Request) {
   if (!authed(req)) return NextResponse.json({ error: 'UNAUTHORIZED' }, { status: 401 });
   const fd = await req.formData();

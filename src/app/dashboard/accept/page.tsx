@@ -478,11 +478,11 @@ function AcceptPaymentContent() {
         const digits = agentPhone.replace(/\D/g, '');
         
         // Validate partner via our API endpoint
-        const res = await fetch('/api/partners/validate', {
-          method: 'POST',
-          credentials: 'include',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ phone: digits })
+        const res = await postJsonWithGetFallback('/api/partners/validate', { phone: digits }, {
+          timeoutPostMs: 12_000,
+          timeoutGetMs: 15_000,
+          postInit: { credentials: 'include', cache: 'no-store' },
+          fallbackStatuses: [500, 502, 504],
         });
         
         if (!res.ok) {
@@ -492,10 +492,11 @@ function AcceptPaymentContent() {
           // Always update partner with current data from RW, even on error
           if (errorData?.partnerData) {
             try {
-              await fetch('/api/partners', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(errorData.partnerData)
+              await postJsonWithGetFallback('/api/partners', errorData.partnerData, {
+                timeoutPostMs: 8_000,
+                timeoutGetMs: 10_000,
+                postInit: { cache: 'no-store' },
+                fallbackStatuses: [500, 502, 504],
               });
             } catch (e) {
               // Silent fail - partner update is not critical for payment flow
@@ -529,10 +530,11 @@ function AcceptPaymentContent() {
             hidden: false
           };
           
-          await fetch('/api/partners', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(partner)
+          await postJsonWithGetFallback('/api/partners', partner, {
+            timeoutPostMs: 8_000,
+            timeoutGetMs: 10_000,
+            postInit: { cache: 'no-store' },
+            fallbackStatuses: [500, 502, 504],
           });
         } catch (e) {
           // Silent fail - partner update is not critical for payment flow
@@ -568,23 +570,24 @@ function AcceptPaymentContent() {
       setAttempt(0);
       // зафиксируем тип текущей сделки — используем для отображения чеков после успеха
       setTaskIsAgent(isAgentSale);
-      const res = await fetch('/api/rocketwork/tasks', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          amountRub: numAmount,
-          description,
-          commissionPercent: undefined,
-          method,
-          clientEmail: buyerEmail || null,
-          agentSale: isAgentSale || undefined,
-          agentPhone: isAgentSale && agentPhone.replace(/\D/g, '').length > 0 ? agentPhone.replace(/\D/g, '') : undefined,
-          commissionType: isAgentSale ? commissionType : undefined,
-          commissionValue: isAgentSale ? numComm : undefined,
-          serviceEndDate,
-          vatRate,
-          cartItems: mode === 'cart' ? cartNumeric : undefined,
-        }),
+      const res = await postJsonWithGetFallback('/api/rocketwork/tasks', {
+        amountRub: numAmount,
+        description,
+        commissionPercent: undefined,
+        method,
+        clientEmail: buyerEmail || null,
+        agentSale: isAgentSale || undefined,
+        agentPhone: isAgentSale && agentPhone.replace(/\D/g, '').length > 0 ? agentPhone.replace(/\D/g, '') : undefined,
+        commissionType: isAgentSale ? commissionType : undefined,
+        commissionValue: isAgentSale ? numComm : undefined,
+        serviceEndDate,
+        vatRate,
+        cartItems: mode === 'cart' ? cartNumeric : undefined,
+      }, {
+        timeoutPostMs: 12_000,
+        timeoutGetMs: 15_000,
+        postInit: { cache: 'no-store' },
+        fallbackStatuses: [500, 502, 504],
       });
       const text = await res.text();
       const data = text ? JSON.parse(text) : {};

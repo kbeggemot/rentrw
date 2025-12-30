@@ -105,7 +105,7 @@ export function Sidebar() {
       <div className="block md:hidden p-2 pt-0 mt-auto">
         {/* Организация: перенесена вниз, над кнопкой выхода */}
         <OrgSelectorWrapper />
-        <form action="/api/auth/logout" method="post" className="w-full">
+        <form action="/api/auth/logout" method="get" className="w-full">
           <button
             type="submit"
             className="px-3 py-2 rounded-md text-sm w-full text-left hover:bg-gray-50 dark:hover:bg-gray-900 active:bg-gray-100 active:dark:bg-gray-900 transition-colors"
@@ -117,7 +117,7 @@ export function Sidebar() {
       <div className="hidden md:block mt-auto p-2">
         {/* Организация: перенесена вниз, над кнопкой выхода */}
         <OrgSelectorWrapper />
-        <form action="/api/auth/logout" method="post" className="w-full">
+        <form action="/api/auth/logout" method="get" className="w-full">
           <button
             type="submit"
             className="px-3 py-2 rounded-md text-sm w-full text-left hover:bg-gray-50 dark:hover:bg-gray-900 active:bg-gray-100 active:dark:bg-gray-900 transition-colors"

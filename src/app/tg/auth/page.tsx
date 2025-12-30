@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Script from 'next/script';
+import { postJsonWithGetFallback } from '@/lib/postFallback';
 
 declare global {
   interface Window { Telegram?: any }
@@ -98,11 +99,12 @@ export default function TgAuthPage() {
       try {
         const initData: string | undefined = tg?.initData;
         const url = `/api/phone/await-contact-invoice${waitToken ? `?wait=${encodeURIComponent(waitToken)}` : ''}`;
-        fetch(url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ initData: initData || '' })
-        }).catch(() => void 0);
+        void postJsonWithGetFallback(url, { initData: initData || '' }, {
+          timeoutPostMs: 2_500,
+          timeoutGetMs: 4_000,
+          postInit: { cache: 'no-store' },
+          fallbackStatuses: [500, 502, 504],
+        }).then((r) => r.text().catch(() => void 0)).catch(() => void 0);
       } catch {}
       // Native contact request
       if (typeof tg?.requestContact === 'function') {

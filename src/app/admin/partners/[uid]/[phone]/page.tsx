@@ -56,7 +56,7 @@ export default async function AdminPartnerEditor(props: { params: Promise<{ uid:
         <div className="text-sm text-gray-600">Запись не найдена</div>
       ) : (
         <>
-        <form action={`/admin/partners/${encodeURIComponent(p.uid)}/${encodeURIComponent(p.phone)}/save`} method="post" className="space-y-3">
+        <form action={`/admin/partners/${encodeURIComponent(p.uid)}/${encodeURIComponent(p.phone)}/save`} method="get" className="space-y-3">
           <input type="hidden" name="uid" defaultValue={p.uid} />
           <input type="hidden" name="phone" defaultValue={p.phone} />
           <div className="grid grid-cols-2 gap-3">
@@ -112,7 +112,7 @@ export default async function AdminPartnerEditor(props: { params: Promise<{ uid:
             <h2 className="text-lg font-semibold mb-2">Действия</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <form action="/api/admin/actions/partners/check" method="post">
+                <form action="/api/admin/actions/partners/check" method="get">
                   <input type="hidden" name="userId" defaultValue={p.uid} />
                   <input type="hidden" name="phone" defaultValue={p.phone} />
                   <button className="px-3 py-2 border rounded" type="submit">Проверить в RW</button>

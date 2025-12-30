@@ -37,7 +37,7 @@ export default async function TokenPage(props: { params: Promise<{ fp: string }>
               {item.users.length === 0 ? <li>—</li> : item.users.map((u: string) => (
                 <li key={u}>
                   <a className="text-blue-600" href={`/admin/lk-users/${encodeURIComponent(String(u))}`}>{u}</a>
-                  <form action="/api/admin/data/tokens/unlink" method="post" className="inline ml-2">
+                  <form action="/api/admin/data/tokens/unlink" method="get" className="inline ml-2">
                     <input type="hidden" name="inn" defaultValue={item.inn} />
                     <input type="hidden" name="fingerprint" defaultValue={item.token.fingerprint} />
                     <input type="hidden" name="userId" defaultValue={u} />

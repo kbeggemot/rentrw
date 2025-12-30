@@ -26,6 +26,48 @@ function makeBackUrl(req: Request, back?: string | null): string {
   } catch { return '/admin?tab=lk_users'; }
 }
 
+export async function GET(req: Request) {
+  // Fallback for environments where POST is unstable at ingress (HTML form submits).
+  if (!authed(req)) return NextResponse.json({ error: 'UNAUTHORIZED' }, { status: 401 });
+  const url = new URL(req.url);
+  const id = String(url.searchParams.get('id') || '').trim();
+  const back = String(url.searchParams.get('back') || '').trim();
+  if (!id) {
+    const r = NextResponse.redirect(makeBackUrl(req, back), 303);
+    r.cookies.set('flash', JSON.stringify({ kind: 'error', msg: 'Не указан пользователь' }), { path: '/' });
+    try { r.headers.set('Cache-Control', 'no-store'); } catch {}
+    return r;
+  }
+  try {
+    const user = await getUserById(id);
+    if (!user || !user.email) {
+      const r = NextResponse.redirect(makeBackUrl(req, back), 303);
+      r.cookies.set('flash', JSON.stringify({ kind: 'error', msg: 'У пользователя не задан email' }), { path: '/' });
+      try { r.headers.set('Cache-Control', 'no-store'); } catch {}
+      return r;
+    }
+    const token = (await import('crypto')).randomBytes(24).toString('hex');
+    const ttl = 1000 * 60 * 60 * 24;
+    const hdrProto = req.headers.get('x-forwarded-proto') || req.headers.get('x-forwarded-protocol') || 'https';
+    const hdrHost = req.headers.get('x-forwarded-host') || req.headers.get('host') || '';
+    const origin = process.env.NEXT_PUBLIC_BASE_URL || (hdrHost ? `${hdrProto}://${hdrHost}` : new URL(req.url).origin);
+    const fullLink = `${origin}/auth/reset/${token}`;
+    await createResetToken({ userId: user.id, email: user.email, token, expiresAt: Date.now() + ttl });
+    const html = renderPasswordResetEmail({ resetUrl: fullLink, expiresHours: 24 });
+    await sendEmail({ to: user.email, subject: 'Сброс пароля в YPLA', html });
+    try { await writeText('.data/last_reset_email_admin.json', JSON.stringify({ userId: user.id, to: user.email, link: fullLink, ts: new Date().toISOString() }, null, 2)); } catch {}
+    const r = NextResponse.redirect(makeBackUrl(req, back), 303);
+    r.cookies.set('flash', JSON.stringify({ kind: 'success', msg: 'Письмо для сброса отправлено' }), { path: '/' });
+    try { r.headers.set('Cache-Control', 'no-store'); } catch {}
+    return r;
+  } catch {
+    const r = NextResponse.redirect(makeBackUrl(req, back), 303);
+    r.cookies.set('flash', JSON.stringify({ kind: 'error', msg: 'Ошибка отправки письма' }), { path: '/' });
+    try { r.headers.set('Cache-Control', 'no-store'); } catch {}
+    return r;
+  }
+}
+
 export async function POST(req: Request) {
   if (!authed(req)) return NextResponse.json({ error: 'UNAUTHORIZED' }, { status: 401 });
   const ct = req.headers.get('content-type') || '';

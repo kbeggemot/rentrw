@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { postJsonWithGetFallback } from "@/lib/postFallback";
 
 type LinkInfo = { code: string; userId: string; title?: string; orgName?: string | null };
 
@@ -204,11 +205,12 @@ export default function PublicSuccessUnifiedPage() {
       const uid = ck ? decodeURIComponent(ck.split('=')[1]) : '';
       if (uid) {
         metaSentRef.current = true;
-        fetch('/api/sales/meta', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'x-user-id': info.userId as any },
-          body: JSON.stringify({ taskId, payerTgId: uid })
-        }).catch(()=>{});
+        void postJsonWithGetFallback('/api/sales/meta', { taskId, payerTgId: uid }, {
+          timeoutPostMs: 800,
+          timeoutGetMs: 3_000,
+          postInit: { cache: 'no-store', headers: { 'x-user-id': info.userId as any } as any },
+          fallbackStatuses: [500, 502, 504],
+        }).then((r) => r.text().catch(() => void 0)).catch(() => void 0);
       }
     } catch {}
   }, [taskId, info?.userId]);
