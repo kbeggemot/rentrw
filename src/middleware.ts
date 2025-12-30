@@ -5,6 +5,18 @@ import { NextResponse } from 'next/server';
 // Protect app routes: require session_user cookie for dashboard and settings
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
+
+  // Hotfix: force close connections for API routes.
+  // Rationale: mitigates proxy/LB issues where POST requests may hang on stale upstream keep-alive sockets
+  // (GET can be retried by proxy, POST often isn't).
+  // Closing upstream connections makes each request use a fresh connection.
+  if (pathname === '/api' || pathname.startsWith('/api/')) {
+    const res = NextResponse.next();
+    try { res.headers.set('Connection', 'close'); } catch {}
+    try { res.headers.set('X-Api-Connection', 'close'); } catch {}
+    try { res.headers.set('Cache-Control', 'no-store'); } catch {}
+    return res;
+  }
   const user = req.cookies.get('session_user')?.value;
   const admin = req.cookies.get('admin_user')?.value;
 
@@ -57,7 +69,7 @@ export function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/', '/auth', '/dashboard/:path*', '/settings/:path*', '/sales/:path*', '/partners/:path*', '/link/:path*', '/products/:path*', '/admin/:path*', '/inbox/:path*'],
+  matcher: ['/', '/auth', '/api/:path*', '/dashboard/:path*', '/settings/:path*', '/sales/:path*', '/partners/:path*', '/link/:path*', '/products/:path*', '/admin/:path*', '/inbox/:path*'],
 };
 
 
