@@ -55,6 +55,12 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // Toggle Metrika injection entirely via env:
+  // - NEXT_PUBLIC_METRIKA_ENABLED=0/1 (preferred)
+  // - METRIKA_ENABLED=0/1 (server-only fallback)
+  // Default is "on" to preserve existing behavior.
+  const metrikaEnabled = envBool('NEXT_PUBLIC_METRIKA_ENABLED', envBool('METRIKA_ENABLED', true));
+
   // Toggle Webvisor via env:
   // - NEXT_PUBLIC_METRIKA_WEBVISOR=0/1 (preferred)
   // - METRIKA_WEBVISOR=0/1 (server-only fallback)
@@ -72,24 +78,28 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`} suppressHydrationWarning>
-        <Script id="yandex-metrika" strategy="afterInteractive">
-          {`(function(m,e,t,r,i,k,a){
+        {metrikaEnabled ? (
+          <>
+            <Script id="yandex-metrika" strategy="afterInteractive">
+              {`(function(m,e,t,r,i,k,a){
 m[i]=m[i]||function(){(m[i].a=m[i].a||[]).push(arguments)};
 m[i].l=1*new Date();
 for (var j = 0; j < document.scripts.length; j++) {if (document.scripts[j].src === r) { return; }}
 k=e.createElement(t),a=e.getElementsByTagName(t)[0],k.async=1,k.src=r,a.parentNode.insertBefore(k,a)
 })(window, document,'script','https://mc.yandex.ru/metrika/tag.js?id=105421779', 'ym');
 ym(105421779, 'init', ${metrikaInitJson});`}
-        </Script>
-        <noscript>
-          <div>
-            <img
-              src="https://mc.yandex.ru/watch/105421779"
-              style={{ position: "absolute", left: "-9999px" }}
-              alt=""
-            />
-          </div>
-        </noscript>
+            </Script>
+            <noscript>
+              <div>
+                <img
+                  src="https://mc.yandex.ru/watch/105421779"
+                  style={{ position: "absolute", left: "-9999px" }}
+                  alt=""
+                />
+              </div>
+            </noscript>
+          </>
+        ) : null}
         <script
           dangerouslySetInnerHTML={{
             __html: `window.__CFG__=${JSON.stringify({ EMAIL_VER_REQ: process.env.EMAIL_VERIFICATION_REQUIRED === '1' })}`,
