@@ -33,43 +33,9 @@ export const runtime = 'nodejs';
 
 const DEFAULT_BASE_URL = 'https://app.rocketwork.ru/api/';
 
-function b64ToUtf8(raw: string): string {
-  const s = String(raw || '').trim();
-  if (!s) return '';
-  // tolerate base64url
-  const norm = s.replace(/-/g, '+').replace(/_/g, '/');
-  const pad = norm.length % 4 ? norm + '='.repeat(4 - (norm.length % 4)) : norm;
-  return Buffer.from(pad, 'base64').toString('utf8');
-}
-
 export async function GET(req: Request) {
   try { startWatchdog(); } catch {}
   const url = new URL(req.url);
-
-  // Hotfix fallback: allow creating tasks via GET when POST is unstable at ingress.
-  // The payload is passed via header (to avoid URLs with PII) and we internally route it through POST logic.
-  if (url.searchParams.get('create') === '1') {
-    const payloadB64 = req.headers.get('x-rw-payload') || '';
-    if (!payloadB64) {
-      const r = NextResponse.json({ error: 'NO_PAYLOAD', hint: 'Set header x-rw-payload=base64(JSON)' }, { status: 400 });
-      try { r.headers.set('Cache-Control', 'no-store'); } catch {}
-      return r;
-    }
-    let jsonStr = '';
-    try { jsonStr = b64ToUtf8(payloadB64); } catch { jsonStr = ''; }
-    if (!jsonStr) {
-      const r = NextResponse.json({ error: 'BAD_PAYLOAD' }, { status: 400 });
-      try { r.headers.set('Cache-Control', 'no-store'); } catch {}
-      return r;
-    }
-    const headers = new Headers(req.headers);
-    headers.set('content-type', 'application/json');
-    try { headers.delete('content-length'); } catch {}
-    headers.set('x-fallback-method', 'GET');
-    const req2 = new Request(url.toString(), { method: 'POST', headers, body: jsonStr });
-    return await POST(req2);
-  }
-
   const buildId = await getBuildId().catch(() => null);
   const res = NextResponse.json({
     ok: true,

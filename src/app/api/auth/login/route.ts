@@ -7,47 +7,6 @@ import { startWatchdog } from '@/server/watchdog';
 
 export const runtime = 'nodejs';
 
-function b64ToUtf8(raw: string): string {
-  const s = String(raw || '').trim();
-  if (!s) return '';
-  // tolerate base64url
-  const norm = s.replace(/-/g, '+').replace(/_/g, '/');
-  const pad = norm.length % 4 ? norm + '='.repeat(4 - (norm.length % 4)) : norm;
-  return Buffer.from(pad, 'base64').toString('utf8');
-}
-
-export async function GET(req: Request) {
-  // Fallback for environments where POST is unstable/blocked at ingress:
-  // accept credentials via Authorization: Basic base64(phone:password)
-  try {
-    const auth = req.headers.get('authorization') || '';
-    const m = /^Basic\s+(.+)$/i.exec(auth.trim());
-    if (!m) return NextResponse.json({ error: 'METHOD_NOT_ALLOWED' }, { status: 405 });
-    const decoded = b64ToUtf8(m[1]);
-    const idx = decoded.indexOf(':');
-    const phone = idx >= 0 ? decoded.slice(0, idx) : '';
-    const password = idx >= 0 ? decoded.slice(idx + 1) : '';
-    if (!phone || !password) return NextResponse.json({ error: 'INVALID' }, { status: 400 });
-
-    const headers = new Headers(req.headers);
-    try { headers.delete('authorization'); } catch {}
-    headers.set('content-type', 'application/json');
-    try { headers.delete('content-length'); } catch {}
-
-    const url = new URL(req.url);
-    url.searchParams.set('via', 'get');
-    const req2 = new Request(url.toString(), {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({ phone, password }),
-    });
-    return await POST(req2);
-  } catch (error) {
-    const message = error instanceof Error ? error.message : 'Server error';
-    return NextResponse.json({ error: message }, { status: 500 });
-  }
-}
-
 export async function POST(req: Request) {
   try {
     try { startWatchdog(); } catch {}

@@ -796,84 +796,39 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
         payerTgLastName: (tgMeta.last_name ?? undefined),
         payerTgUsername: (tgMeta.username ?? undefined),
       };
-      const baseHeaders = (() => {
-        const h: Record<string, string> = {};
-        if (data?.userId) h['x-user-id'] = String(data.userId);
-        try { const inn = (data as any)?.orgInn ? String((data as any).orgInn).replace(/\D/g,'') : ''; if (inn) h['x-org-inn'] = inn; } catch {}
-        return h as any;
-      })();
-      const parseJsonBestEffort = (txt: string) => {
-        try { return txt ? JSON.parse(txt) : {}; } catch { return { _raw: txt }; }
-      };
-
-      // Retry on NOT_LEADER (multi-instance). If POST is broken at ingress (504/timeouts),
-      // fallback to GET /api/rocketwork/tasks?create=1 with payload in header.
+      // Retry on NOT_LEADER (multi-instance) and on AbortError (connection stall) a few times.
       let lastErr: unknown = null;
       let res: Response | null = null;
       let d: any = null;
-
-      // 1) Try POST fast (a couple of attempts)
-      for (let attempt = 0; attempt < 2; attempt += 1) {
+      for (let attempt = 0; attempt < 4; attempt += 1) {
         try {
           res = await fetchWithTimeout('/api/rocketwork/tasks', {
             method: 'POST',
-            headers: { ...baseHeaders, 'Content-Type': 'application/json' } as any,
-            body: JSON.stringify(body),
-          }, 12_000);
-          const txt = await res.text().catch(() => '');
-          d = parseJsonBestEffort(txt);
+            headers: (() => {
+              const h: Record<string, string> = { 'Content-Type': 'application/json' };
+              if (data?.userId) h['x-user-id'] = String(data.userId);
+              try { const inn = (data as any)?.orgInn ? String((data as any).orgInn).replace(/\D/g,'') : ''; if (inn) h['x-org-inn'] = inn; } catch {}
+              return h as any;
+            })(),
+            body: JSON.stringify(body)
+          }, 30_000);
+          const txt = await res.text();
+          d = txt ? JSON.parse(txt) : {};
           if (res.status === 503 && d?.error === 'NOT_LEADER') {
             await new Promise((r) => setTimeout(r, 250 + attempt * 350));
-            res = null;
-            d = null;
             continue;
           }
-          // If ingress gives 50x/html on POST, switch to GET fallback below.
-          if (!res.ok && (res.status === 502 || res.status === 504)) { res = null; d = null; break; }
           break;
         } catch (e) {
           lastErr = e;
-          if ((e as any)?.name === 'AbortError') { res = null; d = null; break; }
-          if (attempt < 1) {
+          const msg = toErrMsg(e, '');
+          if (msg === 'Таймаут запроса. Попробуйте ещё раз.' && attempt < 3) {
             await new Promise((r) => setTimeout(r, 250 + attempt * 350));
             continue;
           }
           throw e;
         }
       }
-
-      // 2) GET fallback (payload via header; avoids PII in URL)
-      if (!res) {
-        for (let attempt = 0; attempt < 2; attempt += 1) {
-          try {
-            const payload = typeof window !== 'undefined'
-              ? window.btoa(unescape(encodeURIComponent(JSON.stringify(body))))
-              : '';
-            res = await fetchWithTimeout('/api/rocketwork/tasks?create=1', {
-              method: 'GET',
-              cache: 'no-store',
-              headers: { ...baseHeaders, 'x-rw-payload': payload, Accept: 'application/json' } as any,
-            }, 15_000);
-            const txt = await res.text().catch(() => '');
-            d = parseJsonBestEffort(txt);
-            if (res.status === 503 && d?.error === 'NOT_LEADER') {
-              await new Promise((r) => setTimeout(r, 250 + attempt * 350));
-              res = null;
-              d = null;
-              continue;
-            }
-            break;
-          } catch (e) {
-            lastErr = e;
-            if ((e as any)?.name === 'AbortError' && attempt < 1) {
-              await new Promise((r) => setTimeout(r, 250 + attempt * 350));
-              continue;
-            }
-            throw e;
-          }
-        }
-      }
-
       if (!res) throw lastErr || new Error('CREATE_FAILED');
       if (!res.ok) {
         const code = d?.error;
@@ -900,15 +855,7 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
         if (tId && data?.userId) {
           const tgId = getTelegramUserIdStrong();
           const meta = getTelegramUserMeta();
-          // Do not block payment flow: POST may hang on some ingresses.
-          const controller = new AbortController();
-          const t = window.setTimeout(() => controller.abort(), 3_000);
-          fetch('/api/sales/meta', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'x-user-id': data.userId } as any,
-            body: JSON.stringify({ taskId: tId, payerTgId: tgId, linkCode: code, payerTgFirstName: meta.first_name ?? null, payerTgLastName: meta.last_name ?? null, payerTgUsername: meta.username ?? null }),
-            signal: controller.signal,
-          }).catch(() => {}).finally(() => { try { window.clearTimeout(t); } catch {} });
+          await fetch('/api/sales/meta', { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-user-id': data.userId }, body: JSON.stringify({ taskId: tId, payerTgId: tgId, linkCode: code, payerTgFirstName: meta.first_name ?? null, payerTgLastName: meta.last_name ?? null, payerTgUsername: meta.username ?? null }) });
           metaSentRef.current = true;
         }
       } catch {}
