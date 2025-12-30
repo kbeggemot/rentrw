@@ -42,12 +42,8 @@ function envFlagEnabled(v: unknown): boolean {
 }
 
 export function isGetFallbackForced(): boolean {
-  try {
-    // NEXT_PUBLIC_* is inlined into client bundles by Next.js
-    return envFlagEnabled((process as any)?.env?.NEXT_PUBLIC_FORCE_GET_FALLBACK);
-  } catch {
-    return false;
-  }
+  // IMPORTANT: keep a direct `process.env.NEXT_PUBLIC_*` access so Next.js can inline it into client bundles.
+  return envFlagEnabled(process.env.NEXT_PUBLIC_FORCE_GET_FALLBACK);
 }
 
 function withTimeout(input: RequestInfo | URL, init: RequestInit, timeoutMs: number): Promise<Response> {

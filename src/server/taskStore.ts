@@ -88,11 +88,56 @@ type TaskStoreData = {
   sales?: SaleRecord[];
 };
 
+function extractFirstJson(raw: string): string | null {
+  // Attempts to extract the first complete top-level JSON value from a string.
+  // Useful when a file accidentally contains multiple concatenated JSON payloads.
+  try {
+    const s = String(raw || '').trimStart();
+    if (!s) return null;
+    const first = s[0];
+    if (first !== '{' && first !== '[') return null;
+    let depth = 0;
+    let inString = false;
+    let esc = false;
+    for (let i = 0; i < s.length; i += 1) {
+      const ch = s[i];
+      if (inString) {
+        if (esc) { esc = false; continue; }
+        if (ch === '\\') { esc = true; continue; }
+        if (ch === '"') { inString = false; continue; }
+        continue;
+      }
+      if (ch === '"') { inString = true; continue; }
+      if (ch === '{' || ch === '[') depth += 1;
+      else if (ch === '}' || ch === ']') depth -= 1;
+      if (depth === 0) return s.slice(0, i + 1);
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 async function readTasks(): Promise<TaskStoreData> {
   const raw = await readText(TASKS_FILE);
   if (!raw) return { tasks: [], sales: [] };
-  const parsed = JSON.parse(raw) as Partial<TaskStoreData>;
-  return { tasks: Array.isArray(parsed.tasks) ? parsed.tasks : [], sales: Array.isArray((parsed as any).sales) ? (parsed as any).sales : [] };
+  let parsed: any = null;
+  try {
+    parsed = JSON.parse(raw) as Partial<TaskStoreData>;
+  } catch {
+    // Try salvage: parse only the first JSON object if file contains extra garbage/concatenated JSON.
+    try {
+      const first = extractFirstJson(raw);
+      if (first) parsed = JSON.parse(first);
+    } catch {
+      parsed = null;
+    }
+  }
+  if (!parsed || typeof parsed !== 'object') return { tasks: [], sales: [] };
+  return {
+    tasks: Array.isArray(parsed.tasks) ? parsed.tasks : [],
+    sales: Array.isArray(parsed.sales) ? parsed.sales : [],
+  };
 }
 
 async function writeTasks(data: TaskStoreData): Promise<void> {
