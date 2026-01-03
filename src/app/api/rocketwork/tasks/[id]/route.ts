@@ -22,25 +22,44 @@ export async function GET(_: Request) {
   try {
     const cookie = _.headers.get('cookie') || '';
     const mc = /(?:^|;\s*)session_user=([^;]+)/.exec(cookie);
-    let userId = (mc ? decodeURIComponent(mc[1]) : undefined) || _.headers.get('x-user-id') || 'default';
+    const cookieUserId = (mc ? decodeURIComponent(mc[1]) : undefined) || null;
+    const headerUserId = (() => { const v = _.headers.get('x-user-id'); return v && v.trim().length > 0 ? v.trim() : null; })();
+    let userId = cookieUserId || headerUserId || 'default';
     const urlObj = new URL(_.url);
     const segs = urlObj.pathname.split('/');
     let taskId = decodeURIComponent(segs[segs.length - 1] || '');
-    let rwTokenFp: string | null = null;
-    try { const s0 = await findSaleByTaskId(userId, taskId); rwTokenFp = (s0 as any)?.rwTokenFp ?? null; } catch {}
     let inn = getSelectedOrgInn(_);
-    // Auto-resolve owner and inn by taskId if headers are missing and current user has no access
-    if (!inn || String(inn).trim().length === 0 || inn === 'неизвестно') {
-      try {
-        const mapped = await resolveOwnerAndInnByTask(taskId);
-        if (mapped.userId) userId = mapped.userId;
-        if (mapped.orgInn) inn = mapped.orgInn;
-        // Re-read fingerprint for mapped owner if we didn't have it
-        if (!rwTokenFp && mapped.userId) {
-          try { const s = await findSaleByTaskId(mapped.userId, taskId); rwTokenFp = (s as any)?.rwTokenFp ?? null; } catch {}
+    // Resolve canonical owner by taskId (important for admin/public requests without session_user).
+    // Previously we only did this when org_inn cookie was missing, which caused updates to be skipped.
+    let rwTokenFp: string | null = null;
+    try {
+      const mapped = await resolveOwnerAndInnByTask(taskId).catch(() => ({ userId: null, orgInn: null } as any));
+      const mappedUserId = mapped?.userId ? String(mapped.userId) : null;
+      const mappedInn = mapped?.orgInn ? String(mapped.orgInn) : null;
+      // If current user context is absent/placeholder OR sale not found under that user — switch to mapped owner.
+      const needOwner = (!cookieUserId && !headerUserId) || userId === 'default';
+      if (mappedUserId) {
+        if (needOwner) {
+          userId = mappedUserId;
+        } else {
+          // If not the owner, try to detect by absence of sale record
+          try {
+            const s0 = await findSaleByTaskId(userId, taskId);
+            if (!s0 && mappedUserId !== userId) userId = mappedUserId;
+          } catch {}
         }
-      } catch {}
-    }
+      }
+      // If org is not selected or unknown — prefer mapped org
+      if ((!inn || String(inn).trim().length === 0 || inn === 'неизвестно') && mappedInn) {
+        inn = mappedInn;
+      }
+    } catch {}
+
+    // Resolve token fingerprint from sale (after owner resolution)
+    try {
+      const s0 = await findSaleByTaskId(userId, taskId);
+      rwTokenFp = (s0 as any)?.rwTokenFp ?? null;
+    } catch {}
     const resolved = await resolveRwTokenWithFingerprint(_, userId, inn, rwTokenFp);
     let token = resolved.token;
     if (!token && inn) {

@@ -347,7 +347,15 @@ function SalesPanel({ showToast, role }: { showToast: (m: string, k?: any) => vo
         <details className="relative" onToggle={(e)=>{ /* no-op for now */ }}>
           <summary className="list-none cursor-pointer inline-flex items-center h-9 px-3 rounded border bg-white dark:bg-gray-900 hover:bg-gray-50 dark:hover:bg-gray-800 select-none" onClick={(e)=>{ /* prevent immediate close on button click */ e.stopPropagation(); }}>{'Массовые действия'}</summary>
           <div className="absolute z-50 mt-1 w-64 border rounded bg-white dark:bg-gray-950 shadow" onClick={(e)=>e.stopPropagation()}>
-            <button className="w-full text-left px-3 py-2 hover:bg-gray-50 dark:hover:bg-gray-900" onClick={async(e)=>{ e.preventDefault(); e.stopPropagation(); try{ await fetch('/api/sales?refresh=1',{cache:'no-store',credentials:'include'}); await load(); showToast('Опрос RW запущен','info'); }catch{ showToast('Сеть/сервер недоступен','error'); } finally { try { const d=e.currentTarget.closest('details') as HTMLDetailsElement|null; if(d) d.open=false; } catch {} } }}>Опросить RW</button>
+            <button className="w-full text-left px-3 py-2 hover:bg-gray-50 dark:hover:bg-gray-900" onClick={async(e)=>{ e.preventDefault(); e.stopPropagation(); try{
+              const r = await fetch('/api/admin/actions/rw-refresh?run=1&limit=60&days=14', { cache:'no-store', credentials:'include' });
+              const d = await r.json().catch(()=>null);
+              if (!r.ok) { showToast(String(d?.error||`Ошибка ${r.status}`),'error'); return; }
+              await load();
+              const attempted = typeof d?.attempted==='number' ? d.attempted : 0;
+              const updated = typeof d?.updated==='number' ? d.updated : 0;
+              showToast(`RW синхронизирован: ${updated}/${attempted}`,'success');
+            }catch{ showToast('Сеть/сервер недоступен','error'); } finally { try { const d=e.currentTarget.closest('details') as HTMLDetailsElement|null; if(d) d.open=false; } catch {} } }}>Опросить RW</button>
             {role==='superadmin' ? (
               <>
                 <button className="w-full text-left px-3 py-2 hover:bg-gray-50 dark:hover:bg-gray-900" onClick={async(e)=>{ e.preventDefault(); e.stopPropagation();
