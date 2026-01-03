@@ -78,11 +78,11 @@ export async function POST(req: Request) {
       // Prefer mapping by stored InvoiceId variants
       let mappedByInvoice = false;
       let targetForUrl: 'prepay' | 'full' | null = null;
+      const invStr = (typeof invoiceIdRaw !== 'undefined' && invoiceIdRaw !== null) ? String(invoiceIdRaw).trim() : '';
       try {
         const sales = await listSales(userId);
-        const sale = sales.find((s) => s.orderId === orderNum);
+        const sale = sales.find((s) => Number(String((s as any).orderId).match(/(\d+)/g)?.slice(-1)[0] || NaN) === orderNum);
         if (sale && typeof invoiceIdRaw !== 'undefined' && invoiceIdRaw !== null) {
-          const invStr = String(invoiceIdRaw);
           if (sale.invoiceIdPrepay && invStr === String(sale.invoiceIdPrepay)) {
             if (receiptUrl) patch.ofdUrl = receiptUrl;
             if (receiptId) patch.ofdPrepayId = receiptId;
@@ -112,6 +112,22 @@ export async function POST(req: Request) {
         }
         targetForUrl = classify;
       }
+
+      // Backfill invoiceId* fields from Ferma callback (InvoiceId is authoritative).
+      // This is needed because older records and some repair paths might have receipts saved,
+      // but invoiceId fields were never persisted into our sale record.
+      try {
+        if (invStr) {
+          const mKind = /-(A|B|C)-/i.exec(invStr);
+          const kind = mKind ? String(mKind[1] || '').toUpperCase() : '';
+          if (kind === 'A') patch.invoiceIdPrepay = invStr;
+          else if (kind === 'B') patch.invoiceIdOffset = invStr;
+          else if (kind === 'C') patch.invoiceIdFull = invStr;
+          else if (pt === 2) patch.invoiceIdOffset = invStr;
+          else if (targetForUrl === 'prepay') patch.invoiceIdPrepay = invStr;
+          else patch.invoiceIdFull = invStr;
+        }
+      } catch {}
       // Запишем лог самого обращения к OFD (даже если данных не изменили)
       try {
         const msg = { reason: 'ofd_callback', patchKeys: Object.keys(patch) } as any;

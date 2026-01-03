@@ -732,7 +732,11 @@ export async function updateSaleOfdUrls(userId: string, taskId: number | string,
   }
 }
 
-export async function updateSaleOfdUrlsByOrderId(userId: string, orderId: number, patch: Partial<Pick<SaleRecord, 'ofdUrl' | 'ofdFullUrl' | 'ofdPrepayId' | 'ofdFullId'>>): Promise<void> {
+export async function updateSaleOfdUrlsByOrderId(
+  userId: string,
+  orderId: number,
+  patch: Partial<Pick<SaleRecord, 'ofdUrl' | 'ofdFullUrl' | 'ofdPrepayId' | 'ofdFullId' | 'invoiceIdPrepay' | 'invoiceIdOffset' | 'invoiceIdFull'>>
+): Promise<void> {
   const store = await readTasks();
   if (!store.sales) store.sales = [];
   const idxs = store.sales
@@ -756,6 +760,9 @@ export async function updateSaleOfdUrlsByOrderId(userId: string, orderId: number
           if (typeof patch.ofdFullUrl !== 'undefined' && (next.ofdFullUrl ?? null) !== (patch.ofdFullUrl ?? null)) { next.ofdFullUrl = patch.ofdFullUrl ?? null; changed = true; }
           if (typeof patch.ofdPrepayId !== 'undefined' && ((next as any).ofdPrepayId ?? null) !== (patch.ofdPrepayId ?? null)) { (next as any).ofdPrepayId = patch.ofdPrepayId ?? null; changed = true; }
           if (typeof patch.ofdFullId !== 'undefined' && ((next as any).ofdFullId ?? null) !== (patch.ofdFullId ?? null)) { (next as any).ofdFullId = patch.ofdFullId ?? null; changed = true; }
+          if (typeof patch.invoiceIdPrepay !== 'undefined' && (next.invoiceIdPrepay ?? null) !== (patch.invoiceIdPrepay ?? null)) { next.invoiceIdPrepay = patch.invoiceIdPrepay ?? null; changed = true; }
+          if (typeof patch.invoiceIdOffset !== 'undefined' && (next.invoiceIdOffset ?? null) !== (patch.invoiceIdOffset ?? null)) { next.invoiceIdOffset = patch.invoiceIdOffset ?? null; changed = true; }
+          if (typeof patch.invoiceIdFull !== 'undefined' && (next.invoiceIdFull ?? null) !== (patch.invoiceIdFull ?? null)) { next.invoiceIdFull = patch.invoiceIdFull ?? null; changed = true; }
           if (changed) {
             next.updatedAt = new Date().toISOString();
             try { await writeSaleAndIndexes(next); } catch {}
@@ -778,6 +785,9 @@ export async function updateSaleOfdUrlsByOrderId(userId: string, orderId: number
         if (typeof patch.ofdFullUrl !== 'undefined' && (next.ofdFullUrl ?? null) !== (patch.ofdFullUrl ?? null)) { next.ofdFullUrl = patch.ofdFullUrl ?? null; changed = true; }
         if (typeof patch.ofdPrepayId !== 'undefined' && ((next as any).ofdPrepayId ?? null) !== (patch.ofdPrepayId ?? null)) { (next as any).ofdPrepayId = patch.ofdPrepayId ?? null; changed = true; }
         if (typeof patch.ofdFullId !== 'undefined' && ((next as any).ofdFullId ?? null) !== (patch.ofdFullId ?? null)) { (next as any).ofdFullId = patch.ofdFullId ?? null; changed = true; }
+        if (typeof patch.invoiceIdPrepay !== 'undefined' && (next.invoiceIdPrepay ?? null) !== (patch.invoiceIdPrepay ?? null)) { next.invoiceIdPrepay = patch.invoiceIdPrepay ?? null; changed = true; }
+        if (typeof patch.invoiceIdOffset !== 'undefined' && (next.invoiceIdOffset ?? null) !== (patch.invoiceIdOffset ?? null)) { next.invoiceIdOffset = patch.invoiceIdOffset ?? null; changed = true; }
+        if (typeof patch.invoiceIdFull !== 'undefined' && (next.invoiceIdFull ?? null) !== (patch.invoiceIdFull ?? null)) { next.invoiceIdFull = patch.invoiceIdFull ?? null; changed = true; }
         if (!changed) continue;
         next.updatedAt = new Date().toISOString();
         try { await writeSaleAndIndexes(next); } catch {}
@@ -790,12 +800,25 @@ export async function updateSaleOfdUrlsByOrderId(userId: string, orderId: number
   for (const idx of idxs) {
     const current = store.sales[idx];
     const next = { ...current } as SaleRecord;
-    const before: any = process.env.OFD_AUDIT === '1' ? { ofdUrl: next.ofdUrl ?? null, ofdFullUrl: next.ofdFullUrl ?? null, ofdPrepayId: (next as any).ofdPrepayId ?? null, ofdFullId: (next as any).ofdFullId ?? null } : null;
+    const before: any = process.env.OFD_AUDIT === '1'
+      ? {
+          ofdUrl: next.ofdUrl ?? null,
+          ofdFullUrl: next.ofdFullUrl ?? null,
+          ofdPrepayId: (next as any).ofdPrepayId ?? null,
+          ofdFullId: (next as any).ofdFullId ?? null,
+          invoiceIdPrepay: next.invoiceIdPrepay ?? null,
+          invoiceIdOffset: next.invoiceIdOffset ?? null,
+          invoiceIdFull: next.invoiceIdFull ?? null,
+        }
+      : null;
     let changed = false;
     if (typeof patch.ofdUrl !== 'undefined' && (next.ofdUrl ?? null) !== (patch.ofdUrl ?? null)) { next.ofdUrl = patch.ofdUrl ?? null; changed = true; }
     if (typeof patch.ofdFullUrl !== 'undefined' && (next.ofdFullUrl ?? null) !== (patch.ofdFullUrl ?? null)) { next.ofdFullUrl = patch.ofdFullUrl ?? null; changed = true; }
     if (typeof patch.ofdPrepayId !== 'undefined' && ((next as any).ofdPrepayId ?? null) !== (patch.ofdPrepayId ?? null)) { (next as any).ofdPrepayId = patch.ofdPrepayId ?? null; changed = true; }
     if (typeof patch.ofdFullId !== 'undefined' && ((next as any).ofdFullId ?? null) !== (patch.ofdFullId ?? null)) { (next as any).ofdFullId = patch.ofdFullId ?? null; changed = true; }
+    if (typeof patch.invoiceIdPrepay !== 'undefined' && (next.invoiceIdPrepay ?? null) !== (patch.invoiceIdPrepay ?? null)) { next.invoiceIdPrepay = patch.invoiceIdPrepay ?? null; changed = true; }
+    if (typeof patch.invoiceIdOffset !== 'undefined' && (next.invoiceIdOffset ?? null) !== (patch.invoiceIdOffset ?? null)) { next.invoiceIdOffset = patch.invoiceIdOffset ?? null; changed = true; }
+    if (typeof patch.invoiceIdFull !== 'undefined' && (next.invoiceIdFull ?? null) !== (patch.invoiceIdFull ?? null)) { next.invoiceIdFull = patch.invoiceIdFull ?? null; changed = true; }
     if (!changed) {
       try {
         if ((global as any).__OFD_SOURCE__) {
@@ -814,7 +837,25 @@ export async function updateSaleOfdUrlsByOrderId(userId: string, orderId: number
     try {
       if (process.env.OFD_AUDIT === '1') {
         const { appendOfdAudit } = await import('./audit');
-        await appendOfdAudit({ ts: new Date().toISOString(), source: (global as any).__OFD_SOURCE__ || 'unknown', userId, orderId, taskId: current.taskId, action: 'update_ofd_urls', patch, before, after: { ofdUrl: next.ofdUrl ?? null, ofdFullUrl: next.ofdFullUrl ?? null, ofdPrepayId: (next as any).ofdPrepayId ?? null, ofdFullId: (next as any).ofdFullId ?? null } });
+        await appendOfdAudit({
+          ts: new Date().toISOString(),
+          source: (global as any).__OFD_SOURCE__ || 'unknown',
+          userId,
+          orderId,
+          taskId: current.taskId,
+          action: 'update_ofd_urls',
+          patch,
+          before,
+          after: {
+            ofdUrl: next.ofdUrl ?? null,
+            ofdFullUrl: next.ofdFullUrl ?? null,
+            ofdPrepayId: (next as any).ofdPrepayId ?? null,
+            ofdFullId: (next as any).ofdFullId ?? null,
+            invoiceIdPrepay: next.invoiceIdPrepay ?? null,
+            invoiceIdOffset: next.invoiceIdOffset ?? null,
+            invoiceIdFull: next.invoiceIdFull ?? null,
+          },
+        });
       }
     } catch {}
     try { await appendAdminEntityLog('sale', [String(userId), String(current.taskId)], { source: 'system', message: 'ofd/updateByOrder', data: { patch } }); } catch {}
