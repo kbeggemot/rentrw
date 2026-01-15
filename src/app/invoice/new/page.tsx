@@ -9,13 +9,40 @@ declare global {
   interface Window { Telegram?: any }
 }
 
+function normalizeWaitId(value: string | null): string | null {
+  const v = (value || '').trim();
+  if (v.length === 0) return null;
+  if (!/^[A-Za-z0-9_-]{3,64}$/.test(v)) return null;
+  return v;
+}
+
+function generateWaitId(): string {
+  return 'w' + Math.random().toString(36).slice(2, 10);
+}
+
+function resolveInitialWaitId(): string {
+  if (typeof window === 'undefined') return generateWaitId();
+  let wid: string | null = null;
+  try {
+    const current = new URL(window.location.href);
+    wid = normalizeWaitId(current.searchParams.get('wait'));
+  } catch {}
+  if (!wid) {
+    try { wid = normalizeWaitId(sessionStorage.getItem('tg_wait_id')); } catch {}
+  }
+  if (!wid) {
+    try { wid = normalizeWaitId(localStorage.getItem('tg_invoice_last_wait')); } catch {}
+  }
+  return wid || generateWaitId();
+}
+
 export default function InvoiceNewPage() {
   const [tgReady, setTgReady] = useState(false);
   const [tgUserId, setTgUserId] = useState<string | null>(null);
   const [phone, setPhone] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
   const [opening, setOpening] = useState(false);
-  const [waitId, setWaitId] = useState<string | null>(null);
+  const [waitId, setWaitId] = useState<string>(() => resolveInitialWaitId());
   const [checking, setChecking] = useState(false);
   const [checkMsg, setCheckMsg] = useState<string | null>(null);
   const [checkOk, setCheckOk] = useState<boolean | null>(null);
@@ -186,29 +213,9 @@ export default function InvoiceNewPage() {
         return m ? decodeURIComponent(m[1]) : null;
       } catch { return null; }
     }
-    // Initialize or reuse wait id
-    try {
-      let wid: string | null = null;
-      try {
-        const current = new URL(window.location.href);
-        const param = current.searchParams.get('wait');
-        if (param && /^[A-Za-z0-9_-]{3,64}$/.test(param)) {
-          wid = param;
-        }
-      } catch {}
-      if (!wid) {
-        wid = sessionStorage.getItem('tg_wait_id');
-      }
-      if (!wid) {
-        try { wid = localStorage.getItem('tg_invoice_last_wait'); } catch { wid = null; }
-      }
-      if (!wid) {
-        wid = 'w' + Math.random().toString(36).slice(2, 10);
-      }
-      setWaitId(wid);
-      try { sessionStorage.setItem('tg_wait_id', wid); } catch {}
-      try { localStorage.setItem('tg_invoice_last_wait', wid); } catch {}
-    } catch {}
+    // Persist wait id for cross-page correlation
+    try { sessionStorage.setItem('tg_wait_id', waitId); } catch {}
+    try { localStorage.setItem('tg_invoice_last_wait', waitId); } catch {}
     if (!tgUserId) {
       const uidFromCookie = readCookie('tg_uid');
       if (uidFromCookie) setTgUserId(uidFromCookie);

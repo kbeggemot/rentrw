@@ -41,6 +41,18 @@ export default function TgAuthPage() {
       // ignore
     }
   }, []);
+  const openInvoice = useCallback((token?: string | null) => {
+    const url = buildInvoiceUrl(token);
+    try {
+      const tg = (window as any)?.Telegram?.WebApp;
+      tg?.openLink?.(url, { try_instant_view: false });
+    } catch {}
+    try {
+      window.location.replace(url);
+    } catch {
+      try { window.location.href = url; } catch {}
+    }
+  }, []);
   useEffect(() => {
     try {
       const tg = (window as any)?.Telegram?.WebApp;
@@ -112,12 +124,13 @@ export default function TgAuthPage() {
           if (shared) {
             try { localStorage.setItem('tg_invoice_last_wait', waitToken || ''); } catch {}
             const message = 'Спасибо! Чтобы продолжить, вернитесь на экран «Создание счёта» в браузере, либо продолжите в Telegram';
-            const target = buildInvoiceUrl(waitToken);
             try {
-              tg?.showAlert?.(message, () => redirectToInvoice(waitToken));
+              tg?.showAlert?.(message, () => openInvoice(waitToken));
             } catch {
-              redirectToInvoice(waitToken);
+              openInvoice(waitToken);
             }
+            // Extra nudge in case alert callback is not fired
+            try { window.setTimeout(() => openInvoice(waitToken), 1200); } catch {}
           } else {
             try { tg?.showAlert?.('Вы отменили доступ к номеру'); } catch {}
           }
