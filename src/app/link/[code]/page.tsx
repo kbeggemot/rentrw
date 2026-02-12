@@ -1241,7 +1241,7 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
                     </div>
                   ) : null
                 )}
-                {awaitingPay && !isFinal ? (
+                {awaitingPay && !isFinal && Boolean(qrDataUrl) ? (
                   <div className="text-gray-600">{`Ждём подтверждения оплаты${dots}`}</div>
                 ) : null}
                 {isFinal ? (
