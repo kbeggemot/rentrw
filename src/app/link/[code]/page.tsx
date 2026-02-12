@@ -3,6 +3,7 @@
 import { use, useEffect, useMemo, useRef, useState } from 'react';
 import { applyAgentCommissionToCart } from '@/lib/pricing';
 import { isGetFallbackForced, postJsonWithGetFallback } from '@/lib/postFallback';
+import QRCode from 'qrcode';
 
 // Very lightweight RU genitive case inflector for full name like "Фамилия Имя Отчество"
 // Covers common male patterns; indeclinable and rare patterns are returned unchanged
@@ -266,6 +267,7 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
   // Flow state
   const [taskId, setTaskId] = useState<string | number | null>(null);
   const [payUrl, setPayUrl] = useState<string | null>(null);
+  const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
   const [awaitingPay, setAwaitingPay] = useState(false);
   const [payError, setPayError] = useState(false);
   const [receipts, setReceipts] = useState<{ prepay?: string | null; full?: string | null; commission?: string | null; npd?: string | null }>({});
@@ -278,6 +280,7 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
   const payUrlPollRef = useRef<number | null>(null);
   const payUrlFailRef = useRef<number>(0);
   const statusFailRef = useRef<number>(0);
+  const lastQrUrlRef = useRef<string | null>(null);
 
   // Animated dots for pending states
   const [dots, setDots] = useState('.');
@@ -318,6 +321,27 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
     }
     return fallback;
   };
+
+  // Render QR inline immediately when payment URL appears.
+  useEffect(() => {
+    let aborted = false;
+    if (!payUrl) {
+      setQrDataUrl(null);
+      lastQrUrlRef.current = null;
+      return () => { aborted = true; };
+    }
+    if (lastQrUrlRef.current === payUrl) return () => { aborted = true; };
+    (async () => {
+      try {
+        const dataUrl = await QRCode.toDataURL(payUrl, { margin: 1, scale: 6 });
+        if (!aborted) {
+          setQrDataUrl(dataUrl);
+          lastQrUrlRef.current = payUrl;
+        }
+      } catch {}
+    })();
+    return () => { aborted = true; };
+  }, [payUrl]);
 
   useEffect(() => {
     let cancelled = false;
@@ -919,7 +943,7 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
       } catch {}
       const url = d?.data?.acquiring_order?.url || d?.data?.acquiring_order?.payment_url || null;
       if (url) setPayUrl(url); else startPayUrlPoll(tId);
-      setAwaitingPay(false);
+      setAwaitingPay(true);
       startPoll(tId);
     } catch (e) {
       const msg = toErrMsg(e, 'Не удалось сформировать платежную ссылку');
@@ -1203,9 +1227,17 @@ export default function PublicPayPage(props: { params: Promise<{ code?: string }
                   <div className="text-gray-600">{`Формируем платежную ссылку${dots}`}</div>
                 ) : (
                   !isFinal ? (
-                    <div className="grid grid-cols-[9rem_1fr] gap-y-2">
-                      <div className="text-gray-500">Платежная ссылка</div>
-                      <a className={`${awaitingPay ? 'text-gray-500' : 'text-black font-semibold'} hover:underline`} href={payUrl} target="_blank" rel="noreferrer" onClick={() => setAwaitingPay(true)}>Оплатить</a>
+                    <div className="space-y-2">
+                      <div className="grid grid-cols-[9rem_1fr] gap-y-2">
+                        <div className="text-gray-500">Платежная ссылка</div>
+                        <a className={`${awaitingPay ? 'text-gray-500' : 'text-black font-semibold'} hover:underline`} href={payUrl} target="_blank" rel="noreferrer" onClick={() => setAwaitingPay(true)}>Оплатить</a>
+                      </div>
+                      {qrDataUrl ? (
+                        <div className="mt-1">
+                          <div className="text-sm text-gray-600 mb-1">QR для оплаты</div>
+                          <img src={qrDataUrl} alt="QR code" className="w-48 h-48 border rounded bg-white" />
+                        </div>
+                      ) : null}
                     </div>
                   ) : null
                 )}
