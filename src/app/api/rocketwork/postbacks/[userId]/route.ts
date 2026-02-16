@@ -237,6 +237,13 @@ export async function POST(req: Request) {
             const endDate = sale.serviceEndDate || null;
             const endDateMsk = ymdMoscow(endDate ? `${endDate}T00:00:00Z` : null);
             const isToday = Boolean(paidDateMsk && endDateMsk && paidDateMsk === endDateMsk);
+            const isAfterServiceDate = Boolean(paidDateMsk && endDateMsk && paidDateMsk > endDateMsk);
+            const hasInvoiceC = Boolean((sale as any).invoiceIdFull);
+            const hasInvoiceAorB = Boolean((sale as any).invoiceIdPrepay || (sale as any).invoiceIdOffset);
+            // If payment happened on/after service date, create full-settlement receipt (C).
+            // Also fallback to C when A/B are missing, even if dates do not match exactly.
+            const useFullSettlement = Boolean(hasInvoiceC && (isToday || isAfterServiceDate || !hasInvoiceAorB));
+            const useFullReason = isToday ? 'is_today' : (isAfterServiceDate ? 'paid_after_service' : (!hasInvoiceAorB ? 'fallback_invoice_c_no_ab' : 'not_today'));
             const amountRub = Number(sale.amountGrossRub || 0);
             const usedVat = (sale.vatRate || 'none') as any;
             const baseUrl = process.env.FERMA_BASE_URL || 'https://ferma.ofd.ru/';
@@ -309,10 +316,10 @@ export async function POST(req: Request) {
                     } catch {}
                     return 'Оплата услуг';
                   })();
-                  const useFull = isToday;
+                  const useFull = useFullSettlement;
                   try {
                     const prev = (await readText('.data/ofd_create_attempts.log')) || '';
-                    const line = JSON.stringify({ ts: new Date().toISOString(), src: 'postback', stage: 'ofd_branch_choice', party: 'partner', userId, taskId, orderId: sale.orderId, reason: useFull ? 'is_today' : 'not_today', fin, paidDateMsk, endDateMsk });
+                    const line = JSON.stringify({ ts: new Date().toISOString(), src: 'postback', stage: 'ofd_branch_choice', party: 'partner', userId, taskId, orderId: sale.orderId, reason: useFull ? useFullReason : 'not_today', fin, paidDateMsk, endDateMsk });
                     await writeText('.data/ofd_create_attempts.log', prev + line + '\n');
                   } catch {}
                   if (useFull) {
@@ -528,10 +535,10 @@ export async function POST(req: Request) {
                   } catch {}
                   return 'Оплата услуг';
                 })();
-                const useFull = isToday;
+                const useFull = useFullSettlement;
                 try {
                   const prev = (await readText('.data/ofd_create_attempts.log')) || '';
-                  const line = JSON.stringify({ ts: new Date().toISOString(), src: 'postback', stage: 'ofd_branch_choice', party: 'org', userId, taskId, orderId: sale.orderId, reason: useFull ? 'is_today' : 'not_today', fin, paidDateMsk, endDateMsk });
+                  const line = JSON.stringify({ ts: new Date().toISOString(), src: 'postback', stage: 'ofd_branch_choice', party: 'org', userId, taskId, orderId: sale.orderId, reason: useFull ? useFullReason : 'not_today', fin, paidDateMsk, endDateMsk });
                   await writeText('.data/ofd_create_attempts.log', prev + line + '\n');
                 } catch {}
                 if (useFull) {

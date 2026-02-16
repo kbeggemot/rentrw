@@ -105,8 +105,13 @@ export async function repairUserSales(userId: string, onlyOrderId?: number): Pro
       .reverse()
       .join('-');
     const isToday = Boolean(endDate && endDate === mskToday);
+    const paidDateMsk = ymdMoscow((s as any)?.paidAt || null);
+    const isPaidOnOrAfterService = Boolean(endDate && paidDateMsk && paidDateMsk >= endDate);
+    const hasInvoiceC = Boolean(s.invoiceIdFull);
+    const hasInvoiceAorB = Boolean((s as any).invoiceIdPrepay || (s as any).invoiceIdOffset);
+    const useFullSettlement = Boolean(hasInvoiceC && (isToday || isPaidOnOrAfterService || !hasInvoiceAorB));
     // Full settlement «день-в-день» по InvoiceId C — только если C присвоен
-    if (isToday && s.invoiceIdFull) {
+    if (useFullSettlement && s.invoiceIdFull) {
       if (!s.ofdFullId && !s.ofdFullUrl) {
         try {
           // Idempotency pre-check: see if OFD already has receipt by stored InvoiceId (C)

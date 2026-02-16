@@ -137,6 +137,9 @@ export async function GET(req: Request) {
       } catch { return 0; }
     })();
     const dueOffset = Boolean(endDate && nowMsk && (endDate < nowMsk || (endDate === nowMsk && mskHour >= 12)));
+    const isAfterServiceDay = Boolean(endDate && paidMsk && paidMsk > endDate);
+    const hasInvoiceAorB = Boolean(invoiceIdPrepay || invoiceIdOffset);
+    const useFullFallback = Boolean(invoiceIdFull && (isSameDay || isAfterServiceDay || !hasInvoiceAorB));
 
     const expectation = (() => {
       // The system has two paths:
@@ -145,8 +148,8 @@ export async function GET(req: Request) {
       if (!endDate) {
         return { path: 'full_same_day', needs: { invoiceIdFull: true }, note: 'serviceEndDate не задан — трактуем как расчёт день-в-день (InvoiceId C)' } as const;
       }
-      if (isSameDay) {
-        return { path: 'full_same_day', needs: { invoiceIdFull: true }, note: 'оплата и дата оказания совпали по МСК — должен быть чек C (Income)' } as const;
+      if (useFullFallback) {
+        return { path: 'full_settlement', needs: { invoiceIdFull: true }, note: 'используется чек C (Income): день-в-день, оплата позже даты услуги, либо fallback при отсутствии A/B' } as const;
       }
       return { path: 'prepay_then_offset', needs: { invoiceIdPrepay: true, invoiceIdOffset: true }, note: 'дата оказания НЕ совпала с оплатой по МСК — A сейчас, B (offset) после 12:00 МСК в дату оказания' } as const;
     })();

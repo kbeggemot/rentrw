@@ -131,10 +131,13 @@ export async function GET(req: Request) {
       } catch { return 0; }
     })();
     const dueOffset = Boolean(endDate && nowMsk && (endDate < nowMsk || (endDate === nowMsk && mskHour >= 12)));
+    const isAfterServiceDay = Boolean(endDate && paidMsk && paidMsk > endDate);
+    const hasInvoiceAorB = Boolean(invoiceIdPrepay || invoiceIdOffset);
+    const useFullFallback = Boolean(invoiceIdFull && (isSameDay || isAfterServiceDay || !hasInvoiceAorB));
 
     const expectation = (() => {
       if (!endDate) return { path: 'full_same_day', note: 'serviceEndDate не задан — трактуем как расчёт день-в-день (InvoiceId C)' } as const;
-      if (isSameDay) return { path: 'full_same_day', note: 'оплата и дата оказания совпали по МСК — должен быть чек C (Income)' } as const;
+      if (useFullFallback) return { path: 'full_settlement', note: 'используется чек C (Income): день-в-день, оплата позже даты услуги, либо fallback при отсутствии A/B' } as const;
       return { path: 'prepay_then_offset', note: 'дата оказания НЕ совпала с оплатой по МСК — A сейчас, B (offset) после 12:00 МСК в дату оказания' } as const;
     })();
 
