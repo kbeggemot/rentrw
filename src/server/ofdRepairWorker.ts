@@ -14,6 +14,16 @@ let started = false;
 let timer: NodeJS.Timer | null = null;
 let running = false;
 
+function ymdMoscow(ts: string | Date | null | undefined): string | null {
+  try {
+    if (!ts) return null;
+    const d = new Date(ts);
+    return d.toLocaleDateString('en-CA', { timeZone: 'Europe/Moscow' });
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Periodically scans sales for missing OFD receipts and repairs them.
  * Cases:
