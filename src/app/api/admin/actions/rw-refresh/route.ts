@@ -19,7 +19,7 @@ function digitsOnly(v: unknown): string {
 
 function isFinalAcquiringStatus(st: string): boolean {
   const s = String(st || '').toLowerCase();
-  return s === 'transfered' || s === 'transferred' || s === 'expired' || s === 'refunded' || s === 'failed';
+  return s === 'paid' || s === 'transfered' || s === 'transferred' || s === 'expired' || s === 'refunded' || s === 'failed';
 }
 
 async function refreshSales(params: { taskId?: string | null; limit: number; days: number; force: boolean }) {

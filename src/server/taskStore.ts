@@ -83,6 +83,25 @@ function withLocalOrderPrefix(orderId: number): string | number {
   return process.env.NODE_ENV !== 'production' ? `0000${orderId}` : orderId;
 }
 
+function normalizeAcquiringStatus(st: string | null | undefined): string {
+  const s = String(st || '').toLowerCase();
+  return s === 'transferred' ? 'transfered' : s;
+}
+
+function isFinalAcquiringStatus(st: string | null | undefined): boolean {
+  const s = normalizeAcquiringStatus(st);
+  return s === 'paid' || s === 'transfered' || s === 'expired' || s === 'refunded' || s === 'failed';
+}
+
+function shouldApplyAcquiringStatus(prev: string | null | undefined, next: string | null | undefined): boolean {
+  const p = normalizeAcquiringStatus(prev);
+  const n = normalizeAcquiringStatus(next);
+  if (!n) return false;
+  // Prevent status regressions like paid/transfered -> paying/pending from stale RW reads.
+  if (isFinalAcquiringStatus(p) && !isFinalAcquiringStatus(n)) return false;
+  return true;
+}
+
 type TaskStoreData = {
   tasks: StoredTask[];
   sales?: SaleRecord[];
@@ -619,11 +638,13 @@ export async function updateSaleFromStatus(userId: string, taskId: number | stri
         if (!acquiringStatuses.has(newStatus) && rootOnlyStatuses.has(newStatus)) {
           (next as any).rootStatus = update.status as any;
         } else {
-          next.status = update.status;
-          const wasPaid = prevStatus === 'paid' || prevStatus === 'transfered' || prevStatus === 'transferred';
-          const nowPaid = newStatus === 'paid' || newStatus === 'transfered' || newStatus === 'transferred';
-          if (!wasPaid && nowPaid && !next.paidAt) {
-            next.paidAt = new Date().toISOString();
+          if (shouldApplyAcquiringStatus(prevStatus, newStatus)) {
+            next.status = update.status;
+            const wasPaid = prevStatus === 'paid' || prevStatus === 'transfered' || prevStatus === 'transferred';
+            const nowPaid = newStatus === 'paid' || newStatus === 'transfered' || newStatus === 'transferred';
+            if (!wasPaid && nowPaid && !next.paidAt) {
+              next.paidAt = new Date().toISOString();
+            }
           }
         }
       }
@@ -673,11 +694,13 @@ export async function updateSaleFromStatus(userId: string, taskId: number | stri
         // treat as root status update only
         (next as any).rootStatus = update.status as any;
       } else {
-        next.status = update.status;
-        const wasPaid = prevStatus === 'paid' || prevStatus === 'transfered' || prevStatus === 'transferred';
-        const nowPaid = newStatus === 'paid' || newStatus === 'transfered' || newStatus === 'transferred';
-        if (!wasPaid && nowPaid && !next.paidAt) {
-          next.paidAt = new Date().toISOString();
+        if (shouldApplyAcquiringStatus(prevStatus, newStatus)) {
+          next.status = update.status;
+          const wasPaid = prevStatus === 'paid' || prevStatus === 'transfered' || prevStatus === 'transferred';
+          const nowPaid = newStatus === 'paid' || newStatus === 'transfered' || newStatus === 'transferred';
+          if (!wasPaid && nowPaid && !next.paidAt) {
+            next.paidAt = new Date().toISOString();
+          }
         }
       }
     }

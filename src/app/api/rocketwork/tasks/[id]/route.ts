@@ -230,7 +230,7 @@ export async function GET(_: Request) {
       let saleHasFull = false;
       let saleHasCommission = false;
       try { const s = await findSaleByTaskId(userId, taskId); saleHasFull = Boolean(s?.ofdFullUrl); saleHasCommission = Boolean((s as any)?.additionalCommissionOfdUrl); } catch {}
-      if (hasAgent && aoStatus === 'transfered' && rootStatus === 'completed' && saleHasFull && saleHasCommission) {
+      if (hasAgent && (aoStatus === 'transfered' || aoStatus === 'transferred') && rootStatus === 'completed' && saleHasFull && saleHasCommission) {
         // Prefer org-scoped token for the sale if available
         try {
           const { findSaleByTaskId } = await import('@/server/taskStore');
