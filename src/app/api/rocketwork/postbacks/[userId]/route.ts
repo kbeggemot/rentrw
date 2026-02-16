@@ -162,7 +162,8 @@ export async function POST(req: Request) {
         const aoStatus = String(aoStatusRaw || status || '').toLowerCase();
         const rootStatus = String(rootStatusRaw || '').toLowerCase();
         const hasCommission = Boolean(sale?.additionalCommissionOfdUrl);
-        if (sale && sale.isAgent && sale.ofdFullUrl && hasCommission && aoStatus === 'transfered' && rootStatus === 'completed') {
+        const isTransfered = aoStatus === 'transfered' || aoStatus === 'transferred';
+        if (sale && sale.isAgent && sale.ofdFullUrl && hasCommission && isTransfered && rootStatus === 'completed') {
           // Resolve token preferring org-scoped token for the sale's inn
           let token: string | null = null;
           try {

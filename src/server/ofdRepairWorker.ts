@@ -1,4 +1,4 @@
-import { listSales, updateSaleOfdUrlsByOrderId, listAllSales, updateSaleFromStatus } from './taskStore';
+import { listSales, updateSaleOfdUrlsByOrderId, listAllSales, updateSaleFromStatus, findSaleByTaskId } from './taskStore';
 import { appendOfdAudit } from './audit';
 import { appendRwError } from './rwAudit';
 import { fermaGetAuthTokenCached, fermaCreateReceipt, fermaGetReceiptStatus, buildReceiptViewUrl } from './ofdFerma';
@@ -595,14 +595,17 @@ export async function repairUserSales(userId: string, onlyOrderId?: number): Pro
     } catch {}
     // Background pay trigger (same conditions as в API и postback): агент, transfered, completed, есть полный чек и чек комиссии
     try {
-      const aoStatus = String(s.status || '').toLowerCase();
-      const hasFull = Boolean(s.ofdFullUrl);
-      const hasCommission = Boolean((s as any)?.additionalCommissionOfdUrl);
-      if (s.isAgent && hasFull && hasCommission && aoStatus === 'transfered') {
+      // Re-read sale because this tick may have just updated ofdFullUrl/ofd ids.
+      const latestSale = (await findSaleByTaskId(userId, s.taskId)) || s;
+      const aoStatus = String((latestSale as any)?.status || '').toLowerCase();
+      const isTransfered = aoStatus === 'transfered' || aoStatus === 'transferred';
+      const hasFull = Boolean((latestSale as any)?.ofdFullUrl);
+      const hasCommission = Boolean((latestSale as any)?.additionalCommissionOfdUrl);
+      if ((latestSale as any)?.isAgent && hasFull && hasCommission && isTransfered) {
         // Резолвим токен: сначала по организации, затем общий
         let token: string | null = null;
         try {
-          const innDigits = (s as any)?.orgInn ? String((s as any).orgInn).replace(/\D/g, '') : '';
+          const innDigits = (latestSale as any)?.orgInn ? String((latestSale as any).orgInn).replace(/\D/g, '') : '';
           if (innDigits) {
             const { getTokenForOrg } = await import('./orgStore');
             token = await getTokenForOrg(innDigits, userId);
@@ -612,7 +615,7 @@ export async function repairUserSales(userId: string, onlyOrderId?: number): Pro
           try { token = await getDecryptedApiToken(userId); } catch { token = null; }
         }
         if (token) {
-        const tUrl = new URL(`tasks/${encodeURIComponent(String(s.taskId))}`, rwBase.endsWith('/') ? rwBase : rwBase + '/').toString();
+        const tUrl = new URL(`tasks/${encodeURIComponent(String(latestSale.taskId))}`, rwBase.endsWith('/') ? rwBase : rwBase + '/').toString();
           let rootStatus = '';
           try {
             const out = await fetchTextWithTimeout(tUrl, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }, cache: 'no-store' }, 15_000);
@@ -622,11 +625,11 @@ export async function repairUserSales(userId: string, onlyOrderId?: number): Pro
             rootStatus = String(taskObj?.status || '').toLowerCase();
           } catch {}
         if (rootStatus === 'completed') {
-          const payUrl = new URL(`tasks/${encodeURIComponent(String(s.taskId))}/pay`, rwBase.endsWith('/') ? rwBase : rwBase + '/').toString();
+          const payUrl = new URL(`tasks/${encodeURIComponent(String(latestSale.taskId))}/pay`, rwBase.endsWith('/') ? rwBase : rwBase + '/').toString();
           try {
             if (process.env.OFD_AUDIT === '1') {
-                const numOrder = Number(String(s.orderId).match(/(\d+)/g)?.slice(-1)[0] || NaN);
-                await appendOfdAudit({ ts: new Date().toISOString(), source: 'repair_worker', userId, orderId: numOrder, taskId: s.taskId, action: 'background_pay', patch: { reason: 'agent_transfered_completed_has_full_and_commission', payUrl } });
+                const numOrder = Number(String((latestSale as any).orderId).match(/(\d+)/g)?.slice(-1)[0] || NaN);
+                await appendOfdAudit({ ts: new Date().toISOString(), source: 'repair_worker', userId, orderId: numOrder, taskId: latestSale.taskId, action: 'background_pay', patch: { reason: 'agent_transfered_completed_has_full_and_commission', payUrl } });
               }
             } catch {}
             try {
@@ -654,7 +657,7 @@ export async function repairUserSales(userId: string, onlyOrderId?: number): Pro
               ?? undefined;
             const add = (norm?.additional_commission_ofd_url as string | undefined) ?? undefined;
             const aoSt = (norm?.acquiring_order?.status as string | undefined) ?? undefined;
-              try { await updateSaleFromStatus(userId, s.taskId, { status: aoSt, ofdUrl: ofd, additionalCommissionOfdUrl: add, npdReceiptUri: npd, rootStatus: String(norm?.status || '').toLowerCase() } as any); } catch {}
+              try { await updateSaleFromStatus(userId, latestSale.taskId, { status: aoSt, ofdUrl: ofd, additionalCommissionOfdUrl: add, npdReceiptUri: npd, rootStatus: String(norm?.status || '').toLowerCase() } as any); } catch {}
               // НПД для ИП не ждём
               break;
             }
