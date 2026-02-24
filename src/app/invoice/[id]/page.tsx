@@ -1,5 +1,6 @@
 export const runtime = 'nodejs';
 import type { Metadata } from 'next';
+import { getForeignInvoicePaymentDetails } from '@/lib/foreignInvoiceRequisites';
 
 export const metadata: Metadata = { robots: { index: false, follow: false } };
 
@@ -38,6 +39,7 @@ export default async function InvoicePublicPage(props: { params: Promise<{ id?: 
       }
     } catch {}
   }
+  const foreignPayment = invoice?.payerType === 'foreign' ? getForeignInvoicePaymentDetails(invoice?.currency) : null;
   return (
     <div className="max-w-xl mx-auto mt-6 md:mt-8 px-4 md:px-0 pb-10 md:pb-12">
       <h1 className="text-2xl font-bold mb-3">{invoice ? (invoice.payerType === 'foreign' ? `Invoice № ${invoice.id}` : `Счёт № ${invoice.id}`) : 'Счёт'}</h1>
@@ -63,17 +65,18 @@ export default async function InvoicePublicPage(props: { params: Promise<{ id?: 
             <div className="pt-2 rounded border border-gray-200 dark:border-gray-800 p-4">
               <div className="font-semibold mb-2">Payment Details</div>
               <div className="space-y-1 text-sm">
-                <div><span className="font-semibold">Sky Rock LLP</span></div>
-                <div>CITY OF ALMATY, ALMALI DISTRICT, ST. NURMAKOVA, 65, Apt. 10, 050026, Republic of Kazakhstan, BIN 240940015346</div>
-                <div><span className="font-semibold">Bank Name:</span> PKO Bank Polski S.A.</div>
-                <div><span className="font-semibold">Beneficiary name:</span> Payholding International sp. z o.o. sp. K.</div>
-                <div><span className="font-semibold">Beneficiary address:</span> ul. Laciarska 4B, 50-104 Wroclaw Poland</div>
-                <div><span className="font-semibold">Bank SWIFT:</span> BPKOPLPW</div>
-                <div><span className="font-semibold">Account or IBAN:</span> PL34 1020 1068 0000 1102 0354 4665</div>
+                <div><span className="font-semibold">{foreignPayment?.companyName}</span></div>
+                {foreignPayment?.companyAddressLines.map((line) => (<div key={line}>{line}</div>))}
+                <div><span className="font-semibold">BIN:</span> {foreignPayment?.bin}</div>
+                <div><span className="font-semibold">Bank Name:</span> {foreignPayment?.bankName}</div>
+                <div><span className="font-semibold">Recipient name:</span> {foreignPayment?.recipientName}</div>
+                <div><span className="font-semibold">Beneficiary address:</span> {foreignPayment?.beneficiaryAddress}</div>
+                <div><span className="font-semibold">Bank SWIFT:</span> {foreignPayment?.bankSwift}</div>
+                <div><span className="font-semibold">Account or IBAN:</span> {foreignPayment?.accountOrIban}</div>
               </div>
               <div className="mt-3">
                 <div className="font-semibold mb-1">Payment Reference</div>
-                <div>NODABANK Sky Rock LLP Payment under Agreement No. {invoice.id} for {invoice.description}. VAT not applicable.</div>
+                <div>{foreignPayment?.reference}</div>
               </div>
               <div className="mt-3">
                 <a className="text-blue-600 hover:underline" href={`/api/invoice/${encodeURIComponent(String(code))}/pdf`} target="_blank" rel="noreferrer">{invoice.payerType === 'foreign' ? 'Download in PDF' : 'Скачать в PDF'}</a>

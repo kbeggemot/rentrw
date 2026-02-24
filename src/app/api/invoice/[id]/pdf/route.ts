@@ -3,6 +3,7 @@ import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
 import fontkit from '@pdf-lib/fontkit';
 import { readBinary, writeBinary, statFile } from '@/server/storage';
 import { getEmbeddedRegularFont, getEmbeddedBoldFont } from '@/server/embeddedFonts';
+import { getForeignInvoicePaymentDetails } from '@/lib/foreignInvoiceRequisites';
 
 export const runtime = 'nodejs';
 
@@ -322,18 +323,20 @@ export async function GET(req: Request, ctx: { params: Promise<{ id?: string }> 
     // Bank details (разные для RU/Foreign)
     const bankHeaderY = y;
     if (isForeign) {
+      const fx = getForeignInvoicePaymentDetails((invoice as any)?.currency);
       drawText('Payment Details', { y, bold: true }); y -= 14;
       const bankTopY = bankHeaderY + 12;
       y -= 2;
-      drawText('Sky Rock LLP', { y, bold: true }); y -= 12;
-      y = drawParagraph('CITY OF ALMATY, ALMALI DISTRICT, ST. NURMAKOVA, 65, Apt. 10, 050026, Republic of Kazakhstan, BIN 240940015346', margin, y, width - margin*2, 10, false, 2);
-      drawText('Bank Name: PKO Bank Polski S.A.', { y }); y -= 12;
-      y = drawParagraph('Beneficiary name: Payholding International sp. z o.o. sp. K.', margin, y, width - margin*2, 10, false, 2);
-      drawText('Beneficiary address: ul. Laciarska 4B, 50-104 Wroclaw Poland', { y }); y -= 12;
-      drawText('Bank SWIFT: BPKOPLPW', { y }); y -= 12;
-      drawText('Account or IBAN: PL34 1020 1068 0000 1102 0354 4665', { y }); y -= 16;
+      drawText(fx.companyName, { y, bold: true }); y -= 12;
+      for (const line of fx.companyAddressLines) { drawText(line, { y }); y -= 12; }
+      drawText(`BIN: ${fx.bin}`, { y }); y -= 12;
+      drawText(`Bank Name: ${fx.bankName}`, { y }); y -= 12;
+      drawText(`Recipient name: ${fx.recipientName}`, { y }); y -= 12;
+      y = drawParagraph(`Beneficiary address: ${fx.beneficiaryAddress}`, margin, y, width - margin*2, 10, false, 2);
+      drawText(`Bank SWIFT: ${fx.bankSwift}`, { y }); y -= 12;
+      drawText(`Account or IBAN: ${fx.accountOrIban}`, { y }); y -= 16;
       drawText('Payment Reference', { y, bold: true }); y -= 12;
-      const payRef = `NODABANK Sky Rock LLP Payment under Agreement No. ${invoice.id} for ${invoice.description}. VAT not applicable.`;
+      const payRef = fx.reference;
       y = drawParagraph(payRef, margin, y, width - margin*2, 10, false, 2);
       const bankBottomY = y - 6;
       page.drawRectangle({ x: margin - 6, y: bankBottomY, width: (width - margin*2) + 12, height: bankTopY - bankBottomY + 6, borderWidth: 1, color: undefined, borderColor: rgb(0.8,0.8,0.8) });
