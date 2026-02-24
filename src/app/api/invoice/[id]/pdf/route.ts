@@ -335,8 +335,11 @@ export async function GET(req: Request, ctx: { params: Promise<{ id?: string }> 
       y = drawParagraph(`Beneficiary address: ${fx.beneficiaryAddress}`, margin, y, width - margin*2, 10, false, 2);
       drawText(`Bank SWIFT: ${fx.bankSwift}`, { y }); y -= 12;
       drawText(`Account or IBAN: ${fx.accountOrIban}`, { y }); y -= 16;
+      drawText('Reference', { y, bold: true }); y -= 12;
+      y = drawParagraph(fx.reference, margin, y, width - margin*2, 10, false, 2);
+      y -= 6;
       drawText('Payment Reference', { y, bold: true }); y -= 12;
-      const payRef = fx.reference;
+      const payRef = `Payment under Agreement No. ${invoice.id} for ${invoice.orgName || 'legal entity'}. VAT not applicable.`;
       y = drawParagraph(payRef, margin, y, width - margin*2, 10, false, 2);
       const bankBottomY = y - 6;
       page.drawRectangle({ x: margin - 6, y: bankBottomY, width: (width - margin*2) + 12, height: bankTopY - bankBottomY + 6, borderWidth: 1, color: undefined, borderColor: rgb(0.8,0.8,0.8) });

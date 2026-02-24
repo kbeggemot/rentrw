@@ -75,8 +75,14 @@ export default async function InvoicePublicPage(props: { params: Promise<{ id?: 
                 <div><span className="font-semibold">Account or IBAN:</span> {foreignPayment?.accountOrIban}</div>
               </div>
               <div className="mt-3">
-                <div className="font-semibold mb-1">Payment Reference</div>
+                <div className="font-semibold mb-1">Reference</div>
                 <div>{foreignPayment?.reference}</div>
+              </div>
+              <div className="mt-2">
+                <div className="font-semibold mb-1">Payment Reference</div>
+                <div>
+                  Payment under Agreement No. {invoice.id} for {invoice.orgName || 'legal entity'}. VAT not applicable.
+                </div>
               </div>
               <div className="mt-3">
                 <a className="text-blue-600 hover:underline" href={`/api/invoice/${encodeURIComponent(String(code))}/pdf`} target="_blank" rel="noreferrer">{invoice.payerType === 'foreign' ? 'Download in PDF' : 'Скачать в PDF'}</a>
