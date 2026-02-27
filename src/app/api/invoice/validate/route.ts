@@ -87,13 +87,18 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false, error: 'RW_ERROR', message: msg }, { status: 400 });
     }
 
-    // В счетах пропускаем только самозанятых (selfemployed) с валидированным статусом
+    // В счетах:
+    // - selfemployed: требуется validated
+    // - entrepreneur/civil_contract: пропускаем без проверки selfemployed_status
     const kind = (employmentKindRaw ?? 'selfemployed').toLowerCase();
-    if (kind !== 'selfemployed') {
+    const isSelfEmployed = kind === 'selfemployed';
+    const isEntrepreneur = kind === 'entrepreneur';
+    const isCivilContract = kind === 'civil_contract';
+    if (!isSelfEmployed && !isEntrepreneur && !isCivilContract) {
       return NextResponse.json({ ok: false, error: 'PARTNER_NOT_VALIDATED_OR_NOT_SE_IP', message: 'Вы не можете принять оплату: вы не самозанятый (НПД)' }, { status: 400 });
     }
-    // readiness может дать общий «готов к оплатам», но нам всё равно нужна валидация НПД
-    if (!(status && status.toLowerCase() === 'validated')) {
+    // readiness может дать общий «готов к оплатам», но для самозанятых всё равно нужна валидация НПД
+    if (isSelfEmployed && !(status && status.toLowerCase() === 'validated')) {
       return NextResponse.json({ ok: false, error: 'PARTNER_NOT_VALIDATED', message: 'Вы не можете принять оплату: нет статуса самозанятого' }, { status: 400 });
     }
 
@@ -108,7 +113,7 @@ export async function POST(req: Request) {
       }
     }
 
-    return NextResponse.json({ ok: true, message: 'Все в порядке', fio, inn });
+    return NextResponse.json({ ok: true, message: 'Все в порядке', fio, inn, employmentKind: kind });
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'Server error';
     return NextResponse.json({ ok: false, error: 'SERVER_ERROR', message: msg }, { status: 500 });

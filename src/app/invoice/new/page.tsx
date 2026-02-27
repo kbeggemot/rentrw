@@ -47,6 +47,7 @@ export default function InvoiceNewPage() {
   const [checkMsg, setCheckMsg] = useState<string | null>(null);
   const [checkOk, setCheckOk] = useState<boolean | null>(null);
   const [fio, setFio] = useState<string | null>(null);
+  const [employmentKind, setEmploymentKind] = useState<string | null>(null);
   const logoutVersionRef = useRef(0);
   const [companyType, setCompanyType] = useState<'ru' | 'foreign' | null>(null);
   const [payerInn, setPayerInn] = useState<string>('');
@@ -150,14 +151,16 @@ export default function InvoiceNewPage() {
       if (r.ok && d?.ok) {
         setCheckOk(true);
         setCheckMsg('Все в порядке');
+        setEmploymentKind(typeof d?.employmentKind === 'string' ? d.employmentKind : null);
         if (d?.fio) {
           setFio(String(d.fio));
           try { sessionStorage.setItem('inv_executor_fio', String(d.fio)); } catch {}
         }
         try { if (d?.inn) sessionStorage.setItem('inv_executor_inn', String(d.inn)); } catch {}
-        try { sessionStorage.setItem(key, JSON.stringify({ ok: true, msg: 'Все в порядке', fio: d?.fio || null, ts: Date.now() })); } catch {}
+        try { sessionStorage.setItem(key, JSON.stringify({ ok: true, msg: 'Все в порядке', fio: d?.fio || null, employmentKind: d?.employmentKind || null, ts: Date.now() })); } catch {}
       } else {
         setCheckOk(false);
+        setEmploymentKind(typeof d?.employmentKind === 'string' ? d.employmentKind : null);
         // Маппинг ошибок под стиль партнёров
         let msg = '';
         const code = String(d?.error || '').toUpperCase();
@@ -167,13 +170,14 @@ export default function InvoiceNewPage() {
         else if (code === 'PARTNER_NO_PAYMENT_INFO') msg = 'У вас нет платёжных реквизитов';
         else msg = `${d?.message || d?.error || 'Ошибка'}`;
         setCheckMsg(msg);
-        try { sessionStorage.setItem(key, JSON.stringify({ ok: false, msg, fio: null, ts: Date.now() })); } catch {}
+        try { sessionStorage.setItem(key, JSON.stringify({ ok: false, msg, fio: null, employmentKind: d?.employmentKind || null, ts: Date.now() })); } catch {}
       }
     } catch {
       setCheckOk(false);
+      setEmploymentKind(null);
       const msg = 'Ошибка запроса';
       setCheckMsg(msg);
-      try { const key = `inv_check_${String(phone || '').replace(/\D/g, '')}`; sessionStorage.setItem(key, JSON.stringify({ ok: false, msg, fio: null, ts: Date.now() })); } catch {}
+      try { const key = `inv_check_${String(phone || '').replace(/\D/g, '')}`; sessionStorage.setItem(key, JSON.stringify({ ok: false, msg, fio: null, employmentKind: null, ts: Date.now() })); } catch {}
     } finally {
       setChecking(false);
     }
@@ -265,6 +269,7 @@ export default function InvoiceNewPage() {
             setCheckOk(Boolean(obj.ok));
             setCheckMsg(typeof obj.msg === 'string' ? obj.msg : null);
             setFio(obj.fio ? String(obj.fio) : null);
+            setEmploymentKind(obj.employmentKind ? String(obj.employmentKind) : null);
             return; // show cached status; кнопку спрячем если ok
           }
         } catch {}
@@ -326,6 +331,7 @@ export default function InvoiceNewPage() {
     setCheckOk(null);
     setCheckMsg(null);
     setFio(null);
+    setEmploymentKind(null);
     setOpening(false);
     setStatus(null);
     try {
@@ -413,6 +419,15 @@ export default function InvoiceNewPage() {
                   ) : 'Проверить еще раз'}
                 </button>
               ) : null}
+            </div>
+            <div className="mt-2 text-sm text-gray-700 dark:text-gray-200">
+              Тип занятости: <strong>{(() => {
+                const k = String(employmentKind || '').toLowerCase();
+                if (k === 'selfemployed') return 'Самозанятый';
+                if (k === 'entrepreneur') return 'Индивидуальный предприниматель';
+                if (k === 'civil_contract') return 'Физическое лицо без специального налогового статуса';
+                return '—';
+              })()}</strong>
             </div>
             {fio ? (
               <div className="mt-2 text-sm text-gray-700 dark:text-gray-200">ФИО: <strong>{fio}</strong></div>
